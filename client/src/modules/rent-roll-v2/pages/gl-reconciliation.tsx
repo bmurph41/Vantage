@@ -114,6 +114,82 @@ const mappingFormSchema = z.object({
 type AccountFormValues = z.infer<typeof accountFormSchema>;
 type MappingFormValues = z.infer<typeof mappingFormSchema>;
 
+interface UnmatchedCashFlow {
+  id: string;
+  cashflow_type: string;
+  amount: string;
+  year: number;
+  month: number;
+  notes: string | null;
+}
+
+function ManualLinkRow({ entry, accounts, onLink, isPending }: {
+  entry: UnmatchedCashFlow;
+  accounts: GLAccount[];
+  onLink: (glAccountId: string) => void;
+  isPending: boolean;
+}) {
+  const [selectedAccount, setSelectedAccount] = useState("");
+  return (
+    <div className="flex items-center gap-2 rounded-md border p-2 bg-yellow-50 dark:bg-yellow-900/10">
+      <div className="flex-1 text-xs text-foreground">
+        <span className="font-medium">{entry.notes || entry.cashflow_type || "Unknown"}</span>
+        {entry.cashflow_type && <span className="ml-2 text-muted-foreground">({entry.cashflow_type})</span>}
+      </div>
+      <Select value={selectedAccount} onValueChange={setSelectedAccount}>
+        <SelectTrigger className="w-48 h-8 text-xs">
+          <SelectValue placeholder="Link to GL account..." />
+        </SelectTrigger>
+        <SelectContent>
+          {accounts.map(a => (
+            <SelectItem key={a.id} value={a.id} className="text-xs">
+              {a.accountCode} — {a.accountName}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <Button
+        size="sm"
+        variant="outline"
+        className="h-8 text-xs"
+        disabled={!selectedAccount || isPending}
+        onClick={() => { if (selectedAccount) onLink(selectedAccount); }}
+      >
+        <LinkIcon className="mr-1 h-3 w-3" />
+        Save Link
+      </Button>
+    </div>
+  );
+}
+
+interface GlAccountEntry {
+  id: string;
+  account_code: string;
+  account_name: string;
+  charge_type: string | null;
+}
+
+interface MatchedPair {
+  rentRoll: UnmatchedCashFlow;
+  glEntry: GlAccountEntry;
+  confidence: number;
+  matchType: "cashflow_type" | "account_name_contains" | "account_code_prefix";
+}
+
+interface AutoMatchResult {
+  matched: MatchedPair[];
+  unmatchedRentRoll: UnmatchedCashFlow[];
+  unmatchedGL: GlAccountEntry[];
+  summary: {
+    totalRentRoll: number;
+    totalGL: number;
+    matchedCount: number;
+    matchPct: number;
+    unmatchedRRCount: number;
+    unmatchedGLCount: number;
+  };
+}
+
 export default function GLReconciliationPage() {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("accounts");
@@ -121,6 +197,8 @@ export default function GLReconciliationPage() {
   const [mappingDialogOpen, setMappingDialogOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<GLAccount | null>(null);
   const [editingMapping, setEditingMapping] = useState<GLMapping | null>(null);
+  const [autoMatchDialogOpen, setAutoMatchDialogOpen] = useState(false);
+  const [autoMatchResult, setAutoMatchResult] = useState<AutoMatchResult | null>(null);
 
   const getDefaultAccountValues = useCallback((): AccountFormValues => ({
     accountCode: "",
@@ -277,6 +355,47 @@ export default function GLReconciliationPage() {
     },
     onError: () => {
       toast({ title: "Failed to delete GL mapping", variant: "destructive" });
+    },
+  });
+
+  const autoMatchMutation = useMutation({
+    mutationFn: async (params: { projectId?: string; periodMonth?: number; periodYear?: number }): Promise<AutoMatchResult> => {
+      const res = await apiRequest('POST', '/api/rent-roll/reconciliation/auto-match', params);
+      return res.json() as Promise<AutoMatchResult>;
+    },
+    onSuccess: (data) => {
+      setAutoMatchResult(data);
+      setAutoMatchDialogOpen(true);
+      toast({ title: `Auto-match complete: ${data.summary.matchedCount} of ${data.summary.totalRentRoll} matched (${data.summary.matchPct}%)` });
+    },
+    onError: () => {
+      toast({ title: "Auto-match failed", variant: "destructive" });
+    },
+  });
+
+  const lockPeriodMutation = useMutation({
+    mutationFn: async ({ periodId, action }: { periodId: string; action: "lock" | "unlock" }) => {
+      return apiRequest('POST', `/api/rent-roll/periods/${periodId}/${action}`, {});
+    },
+    onSuccess: (_data, vars) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/reconciliation-records'] });
+      toast({ title: vars.action === "lock" ? "Period locked successfully" : "Period unlocked successfully" });
+    },
+    onError: (_err, vars) => {
+      toast({ title: `Failed to ${vars.action} period`, variant: "destructive" });
+    },
+  });
+
+  const manualLinkMutation = useMutation({
+    mutationFn: async ({ chargeType, glAccountId }: { chargeType: string; glAccountId: string }) => {
+      return apiRequest('POST', '/api/gl-mappings', { chargeType, glAccountId, isActive: true });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/gl-mappings'] });
+      toast({ title: "Manual link saved — re-run Auto Match to pick it up" });
+    },
+    onError: () => {
+      toast({ title: "Failed to save manual link", variant: "destructive" });
     },
   });
 
@@ -703,12 +822,102 @@ export default function GLReconciliationPage() {
           </TabsContent>
 
           <TabsContent value="records">
+            {/* Auto-Match Results Dialog */}
+            <Dialog open={autoMatchDialogOpen} onOpenChange={setAutoMatchDialogOpen}>
+              <DialogContent className="max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle>GL Auto-Match Results</DialogTitle>
+                  <DialogDescription>
+                    {autoMatchResult && `${autoMatchResult.summary.matchedCount} of ${autoMatchResult.summary.totalRentRoll} rent roll entries matched (${autoMatchResult.summary.matchPct}%)`}
+                  </DialogDescription>
+                </DialogHeader>
+                {autoMatchResult && (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-3 gap-3 text-sm">
+                      <div className="rounded-md border p-3 text-center">
+                        <div className="text-2xl font-bold text-green-600">{autoMatchResult.summary.matchedCount}</div>
+                        <div className="text-muted-foreground">Matched</div>
+                      </div>
+                      <div className="rounded-md border p-3 text-center">
+                        <div className="text-2xl font-bold text-yellow-600">{autoMatchResult.summary.unmatchedRRCount}</div>
+                        <div className="text-muted-foreground">Unmatched RR</div>
+                      </div>
+                      <div className="rounded-md border p-3 text-center">
+                        <div className="text-2xl font-bold text-red-600">{autoMatchResult.summary.unmatchedGLCount}</div>
+                        <div className="text-muted-foreground">Unmatched GL</div>
+                      </div>
+                    </div>
+                    {autoMatchResult.matched.length > 0 && (
+                      <div>
+                        <h4 className="text-sm font-medium mb-2">Matched Entries</h4>
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Rent Roll</TableHead>
+                              <TableHead>GL Account</TableHead>
+                              <TableHead>Confidence</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {autoMatchResult.matched.slice(0, 10).map((m, i) => (
+                              <TableRow key={i}>
+                                <TableCell className="text-xs">{m.rentRoll.notes || m.rentRoll.cashflow_type}</TableCell>
+                                <TableCell className="text-xs">{m.glEntry.account_code} {m.glEntry.account_name}</TableCell>
+                                <TableCell>
+                                  <Badge variant="outline" className={m.confidence >= 0.9 ? "text-green-600" : "text-yellow-600"}>
+                                    {Math.round(m.confidence * 100)}%
+                                  </Badge>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    )}
+                    {autoMatchResult.unmatchedRentRoll.length > 0 && (
+                      <div>
+                        <h4 className="text-sm font-medium mb-2 text-yellow-700">
+                          Unmatched Rent Roll Entries — Link to GL Account
+                        </h4>
+                        <div className="space-y-2">
+                          {autoMatchResult.unmatchedRentRoll.map((rrEntry, i) => (
+                            <ManualLinkRow
+                              key={i}
+                              entry={rrEntry}
+                              accounts={accounts || []}
+                              onLink={(glAccountId) =>
+                                manualLinkMutation.mutate({ chargeType: rrEntry.cashflow_type || "other", glAccountId })
+                              }
+                              isPending={manualLinkMutation.isPending}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setAutoMatchDialogOpen(false)}>Close</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+
             <Card>
               <CardHeader className="flex flex-row items-center justify-between gap-2">
                 <div>
                   <CardTitle>Reconciliation Records</CardTitle>
                   <CardDescription>Monthly reconciliation between rent roll and GL</CardDescription>
                 </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => autoMatchMutation.mutate({})}
+                  disabled={autoMatchMutation.isPending}
+                  data-testid="button-auto-match"
+                >
+                  <RefreshCw className={`mr-2 h-4 w-4 ${autoMatchMutation.isPending ? "animate-spin" : ""}`} />
+                  Auto Match GL Entries
+                </Button>
               </CardHeader>
               <CardContent>
                 {recordsLoading ? (
@@ -731,6 +940,7 @@ export default function GLReconciliationPage() {
                         <TableHead className="text-right">Rent Roll Total</TableHead>
                         <TableHead className="text-right">GL Total</TableHead>
                         <TableHead className="text-right">Variance</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -738,6 +948,8 @@ export default function GLReconciliationPage() {
                         const statusConfig = STATUS_CONFIG[record.status] || STATUS_CONFIG.pending;
                         const StatusIcon = statusConfig.icon;
                         const hasVariance = record.varianceAmount && parseFloat(record.varianceAmount) !== 0;
+                        const isClosed = record.status === "closed" || record.status === "reconciled";
+                        const isPending = lockPeriodMutation.isPending;
 
                         return (
                           <TableRow key={record.id} data-testid={`row-record-${record.id}`}>
@@ -771,6 +983,31 @@ export default function GLReconciliationPage() {
                                 </span>
                               ) : (
                                 <span className="text-green-600">-</span>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {isClosed ? (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  disabled={isPending}
+                                  onClick={() => lockPeriodMutation.mutate({ periodId: record.id, action: "unlock" })}
+                                  data-testid={`button-unlock-${record.id}`}
+                                >
+                                  <CheckCircle2 className="mr-1 h-3 w-3 text-green-600" />
+                                  Unlock
+                                </Button>
+                              ) : (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  disabled={isPending}
+                                  onClick={() => lockPeriodMutation.mutate({ periodId: record.id, action: "lock" })}
+                                  data-testid={`button-lock-${record.id}`}
+                                >
+                                  <XCircle className="mr-1 h-3 w-3 text-muted-foreground" />
+                                  Lock Period
+                                </Button>
                               )}
                             </TableCell>
                           </TableRow>

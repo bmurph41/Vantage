@@ -220,6 +220,7 @@ export async function getPercentageRentAnalysis(options: {
 export async function getCAMReconciliation(options: {
   orgId: string;
   modelingProjectId?: string;
+  marinaId?: string;
 }): Promise<CAMReconciliation[]> {
   const conditions = [
     eq(commercialTenants.orgId, options.orgId),
@@ -227,6 +228,9 @@ export async function getCAMReconciliation(options: {
   ];
   if (options.modelingProjectId) {
     conditions.push(eq(commercialTenants.modelingProjectId, options.modelingProjectId));
+  }
+  if (options.marinaId) {
+    conditions.push(eq(commercialTenants.marinaId, options.marinaId));
   }
 
   const tenants = await db
@@ -250,4 +254,112 @@ export async function getCAMReconciliation(options: {
     adminFeePercent: parseFloat(t.adminFeePercent?.toString() || '0') * 100,
     excludedItems: t.excludedCamItems || [],
   }));
+}
+
+// ============================================================================
+// New Analytics: WALT and Rollover Schedule (Phase 9D)
+// ============================================================================
+
+export interface RetailWALT {
+  walt: number;
+  totalActiveTenants: number;
+  weightedByRent: number;
+  avgRemainingTerm: number;
+}
+
+export interface RetailRolloverYear {
+  year: number;
+  leasesExpiring: number;
+  sfAtRisk: number;
+  annualBaseRentAtRisk: number;
+  pctOfOccupiedGLA: number;
+  pctOfTotalBaseRent: number;
+}
+
+/**
+ * Compute Weighted Average Lease Term (WALT) in years, weighted by in-place rent.
+ */
+export async function getWALT(options: { orgId: string; modelingProjectId?: string; marinaId?: string }): Promise<RetailWALT> {
+  const conditions = [
+    eq(commercialTenants.orgId, options.orgId),
+    eq(commercialTenants.tenantStatus, 'active'),
+  ];
+  if (options.modelingProjectId) conditions.push(eq(commercialTenants.modelingProjectId, options.modelingProjectId));
+  if (options.marinaId) conditions.push(eq(commercialTenants.marinaId, options.marinaId));
+
+  const tenantList = await db.select().from(commercialTenants).where(and(...conditions));
+
+  const now = new Date();
+  let weightedTermSum = 0;
+  let weightedTermDenom = 0;
+  let termSum = 0;
+  let count = 0;
+
+  for (const t of tenantList) {
+    const rent = parseFloat(t.currentBaseRent?.toString() || '0');
+    if (t.leaseExpirationDate && rent > 0) {
+      const remaining = Math.max(0, (new Date(t.leaseExpirationDate).getTime() - now.getTime()) / (365.25 * 24 * 60 * 60 * 1000));
+      weightedTermSum += remaining * rent;
+      weightedTermDenom += rent;
+      termSum += remaining;
+      count++;
+    }
+  }
+
+  const walt = weightedTermDenom > 0 ? Math.round((weightedTermSum / weightedTermDenom) * 100) / 100 : 0;
+  const avgRemaining = count > 0 ? Math.round((termSum / count) * 100) / 100 : 0;
+
+  return {
+    walt,
+    totalActiveTenants: tenantList.length,
+    weightedByRent: weightedTermDenom,
+    avgRemainingTerm: avgRemaining,
+  };
+}
+
+/**
+ * Get lease rollover schedule for next 5 years.
+ */
+export async function getRolloverSchedule(options: { orgId: string; modelingProjectId?: string; marinaId?: string }): Promise<RetailRolloverYear[]> {
+  const conditions = [
+    eq(commercialTenants.orgId, options.orgId),
+    eq(commercialTenants.tenantStatus, 'active'),
+  ];
+  if (options.modelingProjectId) conditions.push(eq(commercialTenants.modelingProjectId, options.modelingProjectId));
+  if (options.marinaId) conditions.push(eq(commercialTenants.marinaId, options.marinaId));
+
+  const tenantList = await db.select().from(commercialTenants).where(and(...conditions));
+
+  const totalSF = tenantList.reduce((s, t) => s + parseFloat(t.squareFootage?.toString() || '0'), 0) || 1;
+  const totalRent = tenantList.reduce((s, t) => s + parseFloat(t.currentBaseRent?.toString() || '0'), 0) || 1;
+
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const result: RetailRolloverYear[] = [];
+
+  for (let i = 0; i < 5; i++) {
+    const year = currentYear + i;
+    const yearStart = new Date(year, 0, 1);
+    const yearEnd = new Date(year, 11, 31);
+
+    const expiringThisYear = tenantList.filter(t => {
+      if (!t.leaseExpirationDate) return false;
+      const exp = new Date(t.leaseExpirationDate);
+      return exp >= yearStart && exp <= yearEnd;
+    });
+
+    const sfAtRisk = expiringThisYear.reduce((s, t) => s + parseFloat(t.squareFootage?.toString() || '0'), 0);
+    const rentAtRisk = expiringThisYear.reduce((s, t) => s + parseFloat(t.currentBaseRent?.toString() || '0'), 0);
+
+    result.push({
+      year,
+      leasesExpiring: expiringThisYear.length,
+      sfAtRisk: Math.round(sfAtRisk),
+      annualBaseRentAtRisk: Math.round(rentAtRisk * 100) / 100,
+      pctOfOccupiedGLA: Math.round((sfAtRisk / totalSF) * 1000) / 10,
+      pctOfTotalBaseRent: Math.round((rentAtRisk / totalRent) * 1000) / 10,
+    });
+  }
+
+  return result;
 }

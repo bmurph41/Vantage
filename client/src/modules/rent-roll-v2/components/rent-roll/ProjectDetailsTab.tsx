@@ -7,7 +7,9 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Loader2, Plus, Trash2, RefreshCw } from "lucide-react";
+import { Loader2, Plus, Trash2, RefreshCw, ArrowRightLeft } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
 import LocationsTable from "../locations/LocationsTable";
 import LocationFormDrawer from "../locations/LocationFormDrawer";
 import CustomTypesManagement from "./CustomTypesManagement";
@@ -41,6 +43,7 @@ interface MarinaLocation {
   id: string;
   name: string;
   projectType: 'OWNED' | 'DEAL';
+  seasonType: 'ANNUAL' | 'SEASONAL' | null;
   seasonStartDate: string | null;
   seasonEndDate: string | null;
   winterStartDate: string | null;
@@ -237,6 +240,65 @@ export function ProjectDetailsTab({ locationId }: ProjectDetailsTabProps) {
   const [isLocationDrawerOpen, setIsLocationDrawerOpen] = useState(false);
   const [selectedLocationId, setSelectedLocationId] = useState<string | null>(null);
 
+  // Auto-sync state
+  const [autoSyncEnabled, setAutoSyncEnabled] = useState(false);
+
+  const { data: syncStatus } = useQuery<{ autoSyncEnabled: boolean; lastSyncAt: string | null }>({
+    queryKey: ['/api/rent-roll/locations', locationId, 'sync-status'],
+    queryFn: async () => {
+      // Use canonical locations-based sync-status endpoint (keyed on rra_marina_locations.id)
+      const res = await fetch(`/api/rent-roll/locations/${locationId}/sync-status`, { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to load sync status');
+      return res.json();
+    },
+    enabled: !!locationId,
+  });
+
+  useEffect(() => {
+    if (syncStatus) setAutoSyncEnabled(!!syncStatus.autoSyncEnabled);
+  }, [syncStatus]);
+
+  // Fetch sync conflicts for conflict-resolution dialog
+  const { data: syncConflictsData, refetch: refetchConflicts } = useQuery<{
+    conflicts: Array<{ leaseId: string; tenantName: string; unitNumber: string; field: string; currentValue: number; snapshotValue: number; description: string }>;
+    totalLeases: number;
+    snapshotsAvailable: number;
+  }>({
+    queryKey: ['/api/rent-roll/locations', locationId, 'sync-conflicts'],
+    queryFn: async () => {
+      const res = await fetch(`/api/rent-roll/locations/${locationId}/sync-conflicts`, { credentials: 'include' });
+      if (!res.ok) return { conflicts: [], totalLeases: 0, snapshotsAvailable: 0 };
+      return res.json();
+    },
+    enabled: !!locationId,
+  });
+
+  const toggleAutoSyncMutation = useMutation({
+    mutationFn: (enabled: boolean) =>
+      // Use canonical locations-based auto-sync endpoint (updates both primary and fallback stores)
+      apiRequest('PATCH', `/api/rent-roll/locations/${locationId}/auto-sync`, { autoSyncEnabled: enabled }),
+    onSuccess: (_, enabled) => {
+      setAutoSyncEnabled(enabled);
+      toast({ title: enabled ? "Auto-sync enabled" : "Auto-sync disabled" });
+      queryClient.invalidateQueries({ queryKey: ['/api/rent-roll/locations', locationId, 'sync-status'] });
+      // Also invalidate dashboard header badge
+      queryClient.invalidateQueries({ queryKey: ['/api/rent-roll/locations', locationId, 'sync-status'] });
+    },
+    onError: () => toast({ title: "Failed to update auto-sync", variant: "destructive" }),
+  });
+
+  const syncNowMutation = useMutation({
+    mutationFn: () =>
+      // Use canonical location-based sync-to-proforma (correctly resolves linked modeling project)
+      apiRequest('POST', `/api/rent-roll/locations/${locationId}/sync-to-proforma`, {}),
+    onSuccess: () => {
+      toast({ title: "Sync complete", description: "Rent roll data has been pushed to Pro Forma." });
+      queryClient.invalidateQueries({ queryKey: ['/api/rent-roll/locations', locationId, 'sync-status'] });
+      refetchConflicts();
+    },
+    onError: () => toast({ title: "Sync failed", variant: "destructive" }),
+  });
+
   // Local state for reset dialog
   const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
   const [confirmationInput, setConfirmationInput] = useState('');
@@ -256,7 +318,7 @@ export function ProjectDetailsTab({ locationId }: ProjectDetailsTabProps) {
   useEffect(() => {
     if (location) {
       // Use database field for seasonType, defaulting to 'annual'
-      setSeasonType((location as any).seasonType === 'SEASONAL' ? 'seasonal' : 'annual');
+      setSeasonType(location.seasonType === 'SEASONAL' ? 'seasonal' : 'annual');
       setSummerStartDate(normalizeDate(location.seasonStartDate));
       setSummerEndDate(normalizeDate(location.seasonEndDate));
       setWinterStartDate(normalizeDate(location.winterStartDate));
@@ -506,7 +568,7 @@ export function ProjectDetailsTab({ locationId }: ProjectDetailsTabProps) {
       
       // Send seasonType and clear season date fields
       updateLocationMutation.mutate({
-        seasonType: 'ANNUAL' as any,
+        seasonType: 'ANNUAL',
         seasonStartDate: null,
         seasonEndDate: null,
         winterStartDate: null,
@@ -519,7 +581,7 @@ export function ProjectDetailsTab({ locationId }: ProjectDetailsTabProps) {
     } else {
       // Save seasonType as SEASONAL
       updateLocationMutation.mutate({
-        seasonType: 'SEASONAL' as any,
+        seasonType: 'SEASONAL',
       });
       toast({
         title: "Boating season updated",
@@ -552,7 +614,7 @@ export function ProjectDetailsTab({ locationId }: ProjectDetailsTabProps) {
       budgetedOccupancy: budgetedOccupancy ? parseFloat(budgetedOccupancy).toString() : null,
       budgetedExpenses: budgetedExpenses ? parseFloat(budgetedExpenses.replace(/,/g, '')).toString() : null,
       budgetYear: budgetYear ? parseInt(budgetYear) : null,
-    } as any);
+    });
     toast({
       title: "Budget updated",
       description: `Budget targets for ${budgetYear || 'current year'} have been saved.`,
@@ -1259,6 +1321,124 @@ export function ProjectDetailsTab({ locationId }: ProjectDetailsTabProps) {
 
       {/* Custom Types Management */}
       <CustomTypesManagement />
+
+      {/* Auto-Sync to Pro Forma */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <ArrowRightLeft className="w-5 h-5 text-primary" />
+            <CardTitle>Pro Forma Auto-Sync</CardTitle>
+          </div>
+          <CardDescription>
+            Automatically push rent roll data into your Pro Forma model when leases change.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="space-y-1">
+              <p className="text-sm font-medium">Enable Auto-Sync</p>
+              <p className="text-xs text-muted-foreground">
+                When enabled, rent roll changes are automatically reflected in the linked Pro Forma.
+              </p>
+              {syncStatus?.lastSyncAt && (
+                <p className="text-xs text-muted-foreground">
+                  Last synced: {new Date(syncStatus.lastSyncAt).toLocaleString()}
+                </p>
+              )}
+            </div>
+            <Switch
+              checked={autoSyncEnabled}
+              onCheckedChange={(checked) => toggleAutoSyncMutation.mutate(checked)}
+              disabled={toggleAutoSyncMutation.isPending}
+              data-testid="switch-auto-sync"
+            />
+          </div>
+          <div className="flex items-center gap-3 pt-2 border-t">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => syncNowMutation.mutate()}
+              disabled={syncNowMutation.isPending}
+              data-testid="button-sync-now"
+            >
+              <RefreshCw className={`w-4 h-4 mr-1 ${syncNowMutation.isPending ? "animate-spin" : ""}`} />
+              {syncNowMutation.isPending ? "Syncing..." : "Sync Now"}
+            </Button>
+            {autoSyncEnabled && (
+              <Badge variant="secondary" className="text-xs">
+                Auto-sync active
+              </Badge>
+            )}
+            {syncConflictsData && syncConflictsData.conflicts.length > 0 && (
+              <Badge variant="destructive" className="text-xs" data-testid="badge-sync-conflicts">
+                {syncConflictsData.conflicts.length} conflict{syncConflictsData.conflicts.length !== 1 ? "s" : ""}
+              </Badge>
+            )}
+          </div>
+
+          {/* Conflict Resolution Panel */}
+          {syncConflictsData && syncConflictsData.conflicts.length > 0 && (
+            <div className="mt-4 border rounded-md p-3 bg-amber-50 dark:bg-amber-950/20 space-y-2" data-testid="panel-sync-conflicts">
+              <p className="text-sm font-medium text-amber-800 dark:text-amber-400">
+                Sync Conflicts Detected
+              </p>
+              <p className="text-xs text-muted-foreground">
+                The following lease values have changed since the last snapshot. Review and resolve each conflict.
+              </p>
+              <div className="space-y-2 max-h-48 overflow-y-auto">
+                {syncConflictsData.conflicts.map((conflict) => (
+                  <div
+                    key={`${conflict.leaseId}-${conflict.field}`}
+                    className="flex items-start justify-between gap-2 rounded bg-white dark:bg-background border p-2 text-xs"
+                    data-testid={`conflict-row-${conflict.leaseId}`}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium truncate">{conflict.tenantName || conflict.unitNumber || conflict.leaseId}</p>
+                      <p className="text-muted-foreground mt-0.5">{conflict.description}</p>
+                    </div>
+                    <div className="flex gap-1 shrink-0">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-xs px-2"
+                        data-testid={`button-accept-${conflict.leaseId}`}
+                        onClick={async () => {
+                          await fetch(`/api/rent-roll/locations/${locationId}/sync-conflicts/${conflict.leaseId}/resolve`, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            credentials: "include",
+                            body: JSON.stringify({ resolution: "accept_current", field: conflict.field }),
+                          });
+                          refetchConflicts();
+                        }}
+                      >
+                        Accept
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 text-xs px-2 text-muted-foreground"
+                        data-testid={`button-revert-${conflict.leaseId}`}
+                        onClick={async () => {
+                          await fetch(`/api/rent-roll/locations/${locationId}/sync-conflicts/${conflict.leaseId}/resolve`, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            credentials: "include",
+                            body: JSON.stringify({ resolution: "revert_to_snapshot", field: conflict.field, value: conflict.snapshotValue }),
+                          });
+                          refetchConflicts();
+                        }}
+                      >
+                        Revert
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Danger Zone - Reset Project */}
       <Card className="border-destructive">

@@ -10,9 +10,10 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { format } from "date-fns";
@@ -24,7 +25,12 @@ import {
   GitCompare,
   CheckCircle2,
   Clock,
-  Building2
+  Building2,
+  TrendingUp,
+  TrendingDown,
+  Minus,
+  Plus,
+  ArrowRight,
 } from "lucide-react";
 import DashboardNav from "../components/navigation/DashboardNav";
 
@@ -55,10 +61,46 @@ const snapshotFormSchema = z.object({
 
 type SnapshotFormValues = z.infer<typeof snapshotFormSchema>;
 
+interface CompareResult {
+  summary: {
+    occupancyA: number;
+    occupancyB: number;
+    occupancyDelta: number;
+    revenueA: number;
+    revenueB: number;
+    revenueDelta: number;
+    revenueDeltaPct: number;
+    leaseCountA: number;
+    leaseCountB: number;
+    leaseCountDelta: number;
+    addedCount: number;
+    removedCount: number;
+    changedCount: number;
+  };
+  snapshotA: { id: string; name: string; snapshotDate: string };
+  snapshotB: { id: string; name: string; snapshotDate: string };
+  leaseChanges: {
+    type: "added" | "removed" | "changed";
+    leaseId: string;
+    tenantName: string;
+    rentA: number;
+    rentB: number;
+    rentDelta?: number;
+    rentDeltaPct?: number;
+    statusA?: string;
+    statusB?: string;
+  }[];
+}
+
 export default function SnapshotsPage() {
   const { toast } = useToast();
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [selectedProject, setSelectedProject] = useState<string>("all");
+  const [compareDialogOpen, setCompareDialogOpen] = useState(false);
+  const [compareSnapA, setCompareSnapA] = useState<string>("");
+  const [compareSnapB, setCompareSnapB] = useState<string>("");
+  const [compareResult, setCompareResult] = useState<CompareResult | null>(null);
+  const [compareLoading, setCompareLoading] = useState(false);
 
   const getDefaultFormValues = useMemo(() => () => ({
     name: "",
@@ -144,6 +186,36 @@ export default function SnapshotsPage() {
   const onSubmit = (values: SnapshotFormValues) => {
     createSnapshotMutation.mutate(values);
   };
+
+  const handleCompare = async () => {
+    if (!compareSnapA || !compareSnapB) {
+      toast({ title: "Select two snapshots", description: "Please select both snapshots to compare.", variant: "destructive" });
+      return;
+    }
+    if (compareSnapA === compareSnapB) {
+      toast({ title: "Select different snapshots", description: "Please select two different snapshots.", variant: "destructive" });
+      return;
+    }
+    setCompareLoading(true);
+    try {
+      const res = await fetch("/api/rent-roll/snapshots/compare", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ snapshotAId: compareSnapA, snapshotBId: compareSnapB }),
+      });
+      if (!res.ok) throw new Error("Compare failed");
+      const data = await res.json();
+      setCompareResult(data);
+    } catch (e) {
+      toast({ title: "Compare failed", description: "Could not compare snapshots.", variant: "destructive" });
+    } finally {
+      setCompareLoading(false);
+    }
+  };
+
+  const fmtCurrency = (n: number) =>
+    new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 0 }).format(n);
 
   return (
     <div className="min-h-screen bg-background">
@@ -356,7 +428,14 @@ export default function SnapshotsPage() {
                             <Button
                               variant="ghost"
                               size="icon"
+                              title="Compare snapshots"
                               data-testid={`button-compare-snapshot-${snapshot.id}`}
+                              onClick={() => {
+                                setCompareSnapA(snapshot.id);
+                                setCompareSnapB("");
+                                setCompareResult(null);
+                                setCompareDialogOpen(true);
+                              }}
                             >
                               <GitCompare className="h-4 w-4" />
                             </Button>
@@ -432,7 +511,169 @@ export default function SnapshotsPage() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Compare Snapshots Button */}
+        {snapshots && snapshots.length >= 2 && (
+          <div className="flex justify-end">
+            <Button variant="outline" onClick={() => { setCompareSnapA(""); setCompareSnapB(""); setCompareResult(null); setCompareDialogOpen(true); }}>
+              <GitCompare className="mr-2 h-4 w-4" />
+              Compare Two Snapshots
+            </Button>
+          </div>
+        )}
       </main>
+
+      {/* Compare Dialog */}
+      <Dialog open={compareDialogOpen} onOpenChange={(open) => { setCompareDialogOpen(open); if (!open) setCompareResult(null); }}>
+        <DialogContent className="max-w-3xl max-h-[90vh]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <GitCompare className="h-5 w-5" />
+              Compare Snapshots
+            </DialogTitle>
+            <DialogDescription>
+              Select two snapshots to compare their rent roll data side-by-side
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex items-center gap-3 py-2">
+            <div className="flex-1">
+              <label className="text-xs font-medium text-muted-foreground block mb-1">Snapshot A (Baseline)</label>
+              <Select value={compareSnapA} onValueChange={setCompareSnapA}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select snapshot A..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {snapshots?.map(s => (
+                    <SelectItem key={s.id} value={s.id}>{s.name} ({format(new Date(s.snapshotDate), 'MM/dd/yyyy')})</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <ArrowRight className="h-4 w-4 text-muted-foreground mt-4 shrink-0" />
+            <div className="flex-1">
+              <label className="text-xs font-medium text-muted-foreground block mb-1">Snapshot B (Compare To)</label>
+              <Select value={compareSnapB} onValueChange={setCompareSnapB}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select snapshot B..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {snapshots?.filter(s => s.id !== compareSnapA).map(s => (
+                    <SelectItem key={s.id} value={s.id}>{s.name} ({format(new Date(s.snapshotDate), 'MM/dd/yyyy')})</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button onClick={handleCompare} disabled={compareLoading || !compareSnapA || !compareSnapB} className="mt-4 shrink-0">
+              {compareLoading ? "Comparing..." : "Compare"}
+            </Button>
+          </div>
+
+          {compareResult && (
+            <ScrollArea className="max-h-[450px] mt-2">
+              <div className="space-y-4">
+                {/* Summary KPIs */}
+                <div className="grid grid-cols-3 gap-3">
+                  <Card>
+                    <CardContent className="pt-3 pb-3">
+                      <p className="text-xs text-muted-foreground">Active Leases</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="font-semibold">{compareResult.summary.occupancyA}</span>
+                        <ArrowRight className="h-3 w-3 text-muted-foreground" />
+                        <span className="font-semibold">{compareResult.summary.occupancyB}</span>
+                        <Badge variant={compareResult.summary.occupancyDelta > 0 ? "secondary" : compareResult.summary.occupancyDelta < 0 ? "destructive" : "outline"} className="text-xs">
+                          {compareResult.summary.occupancyDelta > 0 ? "+" : ""}{compareResult.summary.occupancyDelta}
+                        </Badge>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="pt-3 pb-3">
+                      <p className="text-xs text-muted-foreground">Monthly Revenue</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="font-semibold text-sm">{fmtCurrency(compareResult.summary.revenueA)}</span>
+                        <ArrowRight className="h-3 w-3 text-muted-foreground" />
+                        <span className="font-semibold text-sm">{fmtCurrency(compareResult.summary.revenueB)}</span>
+                      </div>
+                      <p className={`text-xs mt-1 ${compareResult.summary.revenueDelta > 0 ? "text-green-600" : "text-red-600"}`}>
+                        {compareResult.summary.revenueDelta > 0 ? "+" : ""}{fmtCurrency(compareResult.summary.revenueDelta)}
+                        {" "}({compareResult.summary.revenueDeltaPct > 0 ? "+" : ""}{compareResult.summary.revenueDeltaPct}%)
+                      </p>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="pt-3 pb-3">
+                      <p className="text-xs text-muted-foreground">Changes</p>
+                      <div className="flex gap-2 mt-1 flex-wrap">
+                        <span className="text-green-600 text-xs font-medium">+{compareResult.summary.addedCount} added</span>
+                        <span className="text-red-600 text-xs font-medium">-{compareResult.summary.removedCount} removed</span>
+                        <span className="text-yellow-600 text-xs font-medium">~{compareResult.summary.changedCount} changed</span>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Lease-level changes */}
+                {compareResult.leaseChanges.length > 0 ? (
+                  <div>
+                    <p className="text-sm font-medium mb-2">Lease Changes</p>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Type</TableHead>
+                          <TableHead>Tenant</TableHead>
+                          <TableHead className="text-right">Rent A</TableHead>
+                          <TableHead className="text-right">Rent B</TableHead>
+                          <TableHead className="text-right">Change</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {compareResult.leaseChanges.slice(0, 20).map((change, i) => (
+                          <TableRow key={i}>
+                            <TableCell>
+                              <Badge variant={change.type === "added" ? "secondary" : change.type === "removed" ? "destructive" : "outline"} className="text-xs">
+                                {change.type === "added" && <Plus className="w-3 h-3 mr-0.5" />}
+                                {change.type === "removed" && <Minus className="w-3 h-3 mr-0.5" />}
+                                {change.type === "changed" && <TrendingUp className="w-3 h-3 mr-0.5" />}
+                                {change.type}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="font-medium text-sm">{change.tenantName || "—"}</TableCell>
+                            <TableCell className="text-right text-sm">{change.rentA > 0 ? fmtCurrency(change.rentA) : "—"}</TableCell>
+                            <TableCell className="text-right text-sm">{change.rentB > 0 ? fmtCurrency(change.rentB) : "—"}</TableCell>
+                            <TableCell className="text-right">
+                              {change.type === "changed" && change.rentDelta !== undefined ? (
+                                <span className={`text-xs font-medium ${change.rentDelta > 0 ? "text-green-600" : "text-red-600"}`}>
+                                  {change.rentDelta > 0 ? "+" : ""}{fmtCurrency(change.rentDelta)}
+                                  {change.rentDeltaPct !== undefined && ` (${change.rentDeltaPct > 0 ? "+" : ""}${change.rentDeltaPct}%)`}
+                                </span>
+                              ) : "—"}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                    {compareResult.leaseChanges.length > 20 && (
+                      <p className="text-xs text-muted-foreground text-center mt-2">
+                        Showing 20 of {compareResult.leaseChanges.length} changes
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-center py-6 text-muted-foreground">
+                    <CheckCircle2 className="w-8 h-8 mx-auto mb-2 text-green-500 opacity-60" />
+                    <p className="text-sm">No differences found between these snapshots</p>
+                  </div>
+                )}
+              </div>
+            </ScrollArea>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCompareDialogOpen(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -15,6 +15,7 @@ import path from "path";
 import os from "os";
 import { createRequire } from "module";
 import * as rentRollService from "../services/rent-roll-v2/rentRollService";
+import { autoMatchGLEntries } from "../services/rent-roll-v2/reconciliationService";
 import { getAssetStrategy } from "../services/rent-roll-v2/assetStrategies";
 import * as creAdapter from "../services/rent-roll-v2/adapters/commercialLeaseAdapter";
 import { usesCREDataSource } from "@shared/rent-roll-config";
@@ -22,6 +23,8 @@ import * as selfStorageAnalytics from "../services/rent-roll-v2/assetStrategies/
 import * as hotelAnalytics from "../services/rent-roll-v2/assetStrategies/hotelAnalytics";
 import * as multifamilyAnalytics from "../services/rent-roll-v2/assetStrategies/multifamilyAnalytics";
 import * as retailAnalytics from "../services/rent-roll-v2/assetStrategies/retailAnalytics";
+import * as rvParkAnalytics from "../services/rent-roll-v2/assetStrategies/rvParkAnalytics";
+import * as industrialAnalytics from "../services/rent-roll-v2/assetStrategies/industrialAnalytics";
 
 const require = createRequire(import.meta.url);
 import { ilike, eq, and, or, desc } from "drizzle-orm";
@@ -53,7 +56,7 @@ function getOrgId(req: Request): string | null {
   if (authReq.validatedOrgId) {
     return authReq.validatedOrgId;
   }
-  return (req as any).user?.orgId || (req as any).tenantId || (req as any).orgId || (req as any).session?.orgId || null;
+  return authReq.user?.orgId || authReq.tenantId || authReq.orgId || authReq.session?.orgId || null;
 }
 
 function getUserId(req: Request): string {
@@ -61,7 +64,7 @@ function getUserId(req: Request): string {
   if (authReq.validatedUserId) {
     return authReq.validatedUserId;
   }
-  return (req as any).session?.userId || (req as any).user?.id || 'user-1';
+  return authReq.session?.userId || authReq.user?.id || 'user-1';
 }
 
 router.get("/dashboard", async (req: Request, res: Response, next: NextFunction) => {
@@ -251,14 +254,13 @@ router.post("/leases/import/parse-document", upload.single('file'), async (req: 
       skipAIOnError: true,
     });
     
-    if (result.headers.length > 0) {
-      const suggestions = rentRollDocumentParser.suggestColumnMappings(result.headers, result.rows);
-      (result as any).columnSuggestions = suggestions;
-    }
+    const columnSuggestions = result.headers.length > 0
+      ? rentRollDocumentParser.suggestColumnMappings(result.headers, result.rows)
+      : undefined;
     
     console.log(`[Document Parser] Result: ${result.success ? 'success' : 'failed'}, ${result.rows.length} rows, ${result.headers.length} headers, confidence: ${result.confidence}`);
     
-    return res.json(result);
+    return res.json({ ...result, ...(columnSuggestions ? { columnSuggestions } : {}) });
   } catch (error: any) {
     console.error('[Document Parser] Error:', error);
     return res.status(500).json({
@@ -1743,6 +1745,20 @@ router.get("/leases/:id", async (req: Request, res: Response, next: NextFunction
   }
 });
 
+/** Persist computed completeness_score to the lease row (fire-and-forget safe). */
+async function updateLeaseCompletenessScore(leaseId: string): Promise<void> {
+  // Use only columns guaranteed to exist: lease_amount, lease_commencement, lease_expiration, tenant_id, org_id
+  await db.execute(
+    `UPDATE rra_leases SET completeness_score = (
+      CASE WHEN lease_amount IS NOT NULL AND lease_amount::numeric > 0 THEN 25 ELSE 0 END +
+      CASE WHEN lease_commencement IS NOT NULL THEN 25 ELSE 0 END +
+      CASE WHEN lease_expiration IS NOT NULL THEN 25 ELSE 0 END +
+      CASE WHEN tenant_id IS NOT NULL THEN 25 ELSE 0 END
+    ) WHERE id = $1`,
+    [leaseId]
+  );
+}
+
 router.post("/leases", async (req: Request, res: Response, next: NextFunction) => {
   try {
     const orgId = getOrgId(req);
@@ -1755,9 +1771,19 @@ router.post("/leases", async (req: Request, res: Response, next: NextFunction) =
     });
     const lease = await rraService.createLease(validated);
     res.status(201).json(lease);
-    // Auto-sync to linked modeling projects (fire and forget)
-    if ((lease as any).locationId) {
-      syncRraLocationToModeling(orgId, userId, (lease as any).locationId)
+    // Persist completeness_score and auto-sync (fire and forget)
+    const leaseId = lease.id;
+    if (leaseId) {
+      updateLeaseCompletenessScore(leaseId).catch(e => console.error('[RRA] completeness_score update error:', e));
+    }
+    const createLocId = lease.locationId;
+    if (createLocId) {
+      isAutoSyncEnabled(orgId, createLocId)
+        .then(enabled => {
+          if (enabled) {
+            return syncRraLocationToModeling(orgId, userId, createLocId);
+          }
+        })
         .catch(e => console.error('[RRA AutoSync] Error syncing after lease create:', e));
     }
   } catch (error) {
@@ -1774,10 +1800,16 @@ router.patch("/leases/:id", async (req: Request, res: Response, next: NextFuncti
       return res.status(404).json({ error: "Lease not found" });
     }
     res.json(lease);
-    // Auto-sync to linked modeling projects (fire and forget)
-    const locationId = (lease as any).locationId || req.body.locationId;
-    if (locationId) {
-      syncRraLocationToModeling(orgId, userId, locationId)
+    // Persist completeness_score and auto-sync (fire and forget, toggle-gated)
+    updateLeaseCompletenessScore(req.params.id).catch(e => console.error('[RRA] completeness_score update error:', e));
+    const updateLocId = lease.locationId || req.body.locationId;
+    if (updateLocId) {
+      isAutoSyncEnabled(orgId, updateLocId)
+        .then(enabled => {
+          if (enabled) {
+            return syncRraLocationToModeling(orgId, userId, updateLocId);
+          }
+        })
         .catch(e => console.error('[RRA AutoSync] Error syncing after lease update:', e));
     }
   } catch (error) {
@@ -1795,9 +1827,15 @@ router.delete("/leases/:id", async (req: Request, res: Response, next: NextFunct
     });
     await rraService.deleteLease(orgId, req.params.id);
     res.status(204).send();
-    // Auto-sync after deletion
+    // Auto-sync after deletion (toggle-gated)
     if (existingLease?.locationId) {
-      syncRraLocationToModeling(orgId, userId, existingLease.locationId)
+      const deleteLocId = existingLease.locationId;
+      isAutoSyncEnabled(orgId, deleteLocId)
+        .then(enabled => {
+          if (enabled) {
+            return syncRraLocationToModeling(orgId, userId, deleteLocId);
+          }
+        })
         .catch(e => console.error('[RRA AutoSync] Error syncing after lease delete:', e));
     }
   } catch (error) {
@@ -3485,6 +3523,31 @@ function mapRraToModelingStorageType(rraType: string | null): string {
 // AUTO-SYNC ENGINE: Syncs RRA lease data → linked modeling rent roll projects
 // Called after every lease create/update/delete when autoSyncEnabled=true
 // ============================================================================
+
+/**
+ * Returns true if auto-sync is enabled for this location.
+ * Checks the rent_roll_projects.auto_sync_enabled column first (project-level toggle),
+ * then falls back to checking modelingRentRollConfig (per-location config).
+ * This gate must be checked BEFORE calling syncRraLocationToModeling.
+ */
+async function isAutoSyncEnabled(orgId: string, locationId: string): Promise<boolean> {
+  // Check project-level toggle (locationId may be a rent_roll_projects.id)
+  const { rows: projectRows } = await db.execute(
+    `SELECT auto_sync_enabled FROM rent_roll_projects WHERE id = $1 AND org_id = $2 LIMIT 1`,
+    [locationId, orgId]
+  );
+  interface AutoSyncRow { auto_sync_enabled: boolean | null; }
+  if (projectRows.length > 0) {
+    return (projectRows[0] as AutoSyncRow).auto_sync_enabled === true;
+  }
+  // Fall back to per-location config (locationId is a rra_marina_locations.id)
+  const { rows: configRows } = await db.execute(
+    `SELECT 1 FROM modeling_rent_roll_config WHERE org_id = $1 AND linked_rra_location_id = $2 AND auto_sync_enabled = true LIMIT 1`,
+    [orgId, locationId]
+  );
+  return configRows.length > 0;
+}
+
 async function syncRraLocationToModeling(orgId: string, userId: string, locationId: string): Promise<number> {
   const linkedConfigs = await db.select().from(modelingRentRollConfig)
     .where(and(
@@ -3513,28 +3576,30 @@ async function syncRraLocationToModeling(orgId: string, userId: string, location
     });
 
     if (activeLeasesData.length > 0) {
-      const units = activeLeasesData.map((lease: any, index: number) => ({
+      type RraLeaseWithTenant = typeof activeLeasesData[number];
+      type ModelingUnitInsert = typeof modelingRentRollUnits.$inferInsert;
+      const units: ModelingUnitInsert[] = activeLeasesData.map((lease: RraLeaseWithTenant, index: number) => ({
         orgId,
         modelingProjectId: config.modelingProjectId,
-        unitNumber: lease.unitNumber || lease.unitLocation || `Unit-${index + 1}`,
-        storageType: mapRraToModelingStorageType(lease.storageType),
-        status: lease.slipStatus === 'Occupied' ? 'occupied' : 'vacant',
-        length: lease.slipLength ? parseFloat(lease.slipLength) : null,
-        width: lease.slipWidth ? parseFloat(lease.slipWidth) : null,
-        monthlyRent: lease.leaseAmount ? String(parseFloat(lease.leaseAmount) / 12) : '0',
-        annualRent: lease.leaseAmount || null,
-        tenantName: lease.tenant?.name || null,
-        boatType: lease.boatType || null,
-        leaseStartDate: lease.leaseCommencement || null,
-        leaseEndDate: lease.leaseExpiration || null,
-        isMonthToMonth: lease.contractTerm?.toLowerCase().includes('month') || false,
-        electricCharge: String(parseFloat(lease.additionalCharge1 || '0')),
-        waterCharge: String(parseFloat(lease.additionalCharge2 || '0')),
-        otherCharges: String(parseFloat(lease.additionalCharge3 || '0')),
+        unitNumber: (lease.unitNumber ?? lease.unitLocation ?? `Unit-${index + 1}`) as string,
+        storageType: mapRraToModelingStorageType(lease.storageType ?? null),
+        status: (lease.slipStatus === 'Occupied' ? 'occupied' : 'vacant') as string,
+        length: lease.slipLength ? parseFloat(String(lease.slipLength)) : null,
+        width: lease.slipWidth ? parseFloat(String(lease.slipWidth)) : null,
+        monthlyRent: lease.leaseAmount ? String(parseFloat(String(lease.leaseAmount)) / 12) : '0',
+        annualRent: lease.leaseAmount ?? null,
+        tenantName: (lease as RraLeaseWithTenant & { tenant?: { name?: string } }).tenant?.name ?? null,
+        boatType: lease.boatType ?? null,
+        leaseStartDate: lease.leaseCommencement ?? null,
+        leaseEndDate: lease.leaseExpiration ?? null,
+        isMonthToMonth: (lease.contractTerm ?? '').toLowerCase().includes('month'),
+        electricCharge: String(parseFloat(String(lease.additionalCharge1 ?? '0'))),
+        waterCharge: String(parseFloat(String(lease.additionalCharge2 ?? '0'))),
+        otherCharges: String(parseFloat(String(lease.additionalCharge3 ?? '0'))),
         notes: `Auto-synced from RRA`,
         createdBy: userId,
       }));
-      await db.insert(modelingRentRollUnits).values(units as any);
+      await db.insert(modelingRentRollUnits).values(units);
       totalSynced += units.length;
     }
 
@@ -3593,28 +3658,31 @@ router.post("/locations/:locationId/sync-to-modeling", async (req: Request, res:
       });
 
       if (activeLeasesData.length > 0) {
-        const units = activeLeasesData.map((lease: any, index: number) => ({
+        type RraLeaseEntry = typeof activeLeasesData[number];
+        type ModelingUnitInsert = typeof modelingRentRollUnits.$inferInsert;
+        const locationName = (location as { name?: string }).name ?? "";
+        const units: ModelingUnitInsert[] = activeLeasesData.map((lease: RraLeaseEntry, index: number) => ({
           orgId,
           modelingProjectId: config.modelingProjectId,
-          unitNumber: lease.unitNumber || lease.unitLocation || `Unit-${index + 1}`,
-          storageType: mapRraToModelingStorageType(lease.storageType),
-          status: lease.slipStatus === 'Occupied' ? 'occupied' : 'vacant',
-          length: lease.slipLength ? parseFloat(lease.slipLength) : null,
-          width: lease.slipWidth ? parseFloat(lease.slipWidth) : null,
-          monthlyRent: lease.leaseAmount ? String(parseFloat(lease.leaseAmount) / 12) : '0',
-          annualRent: lease.leaseAmount || null,
-          tenantName: lease.tenant?.name || null,
-          boatType: lease.boatType || null,
-          leaseStartDate: lease.leaseCommencement || null,
-          leaseEndDate: lease.leaseExpiration || null,
-          isMonthToMonth: lease.contractTerm?.toLowerCase().includes('month') || false,
-          electricCharge: String(parseFloat(lease.additionalCharge1 || '0')),
-          waterCharge: String(parseFloat(lease.additionalCharge2 || '0')),
-          otherCharges: String(parseFloat(lease.additionalCharge3 || '0')),
-          notes: `Manually synced from RRA: ${(location as any).name}`,
+          unitNumber: (lease.unitNumber ?? lease.unitLocation ?? `Unit-${index + 1}`) as string,
+          storageType: mapRraToModelingStorageType(lease.storageType ?? null),
+          status: (lease.slipStatus === 'Occupied' ? 'occupied' : 'vacant') as string,
+          length: lease.slipLength ? parseFloat(String(lease.slipLength)) : null,
+          width: lease.slipWidth ? parseFloat(String(lease.slipWidth)) : null,
+          monthlyRent: lease.leaseAmount ? String(parseFloat(String(lease.leaseAmount)) / 12) : '0',
+          annualRent: lease.leaseAmount ?? null,
+          tenantName: (lease as RraLeaseEntry & { tenant?: { name?: string } }).tenant?.name ?? null,
+          boatType: lease.boatType ?? null,
+          leaseStartDate: lease.leaseCommencement ?? null,
+          leaseEndDate: lease.leaseExpiration ?? null,
+          isMonthToMonth: (lease.contractTerm ?? '').toLowerCase().includes('month'),
+          electricCharge: String(parseFloat(String(lease.additionalCharge1 ?? '0'))),
+          waterCharge: String(parseFloat(String(lease.additionalCharge2 ?? '0'))),
+          otherCharges: String(parseFloat(String(lease.additionalCharge3 ?? '0'))),
+          notes: `Manually synced from RRA: ${locationName}`,
           createdBy: getUserId(req),
         }));
-        await db.insert(modelingRentRollUnits).values(units as any);
+        await db.insert(modelingRentRollUnits).values(units);
         totalSynced += units.length;
       }
 
@@ -3635,6 +3703,51 @@ router.post("/locations/:locationId/sync-to-modeling", async (req: Request, res:
 });
 
 // ============================================================================
+// SYNC STATUS: GET /locations/:locationId/sync-status
+// Returns the current auto-sync status and last-sync time for a location
+// ============================================================================
+router.get("/locations/:locationId/sync-status", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getOrgId(req);
+    const { locationId } = req.params;
+
+    // Check project-level toggle first
+    const { rows: projectRows } = await db.execute(
+      `SELECT auto_sync_enabled, last_sync_at FROM rent_roll_projects WHERE id = $1 AND org_id = $2 LIMIT 1`,
+      [locationId, orgId]
+    );
+    if (projectRows.length > 0) {
+      const p = projectRows[0] as SyncProjectRow;
+      return res.json({
+        autoSyncEnabled: p.auto_sync_enabled === true,
+        lastSyncAt: p.last_sync_at || null,
+        source: "project",
+      });
+    }
+
+    // Fall back to modeling config
+    const { rows: cfgRows } = await db.execute(
+      `SELECT auto_sync_enabled, updated_at FROM modeling_rent_roll_config
+       WHERE org_id = $1 AND linked_rra_location_id = $2 LIMIT 1`,
+      [orgId, locationId]
+    );
+    if (cfgRows.length > 0) {
+      interface ModelingCfgRow { auto_sync_enabled: boolean; updated_at: string | null; }
+      const c = cfgRows[0] as ModelingCfgRow;
+      return res.json({
+        autoSyncEnabled: c.auto_sync_enabled === true,
+        lastSyncAt: c.updated_at || null,
+        source: "config",
+      });
+    }
+
+    res.json({ autoSyncEnabled: false, lastSyncAt: null, source: null });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ============================================================================
 // TOGGLE AUTO-SYNC: PATCH /locations/:locationId/auto-sync
 // Enable or disable automatic sync for a location's linked modeling projects
 // ============================================================================
@@ -3648,13 +3761,23 @@ router.patch("/locations/:locationId/auto-sync", async (req: Request, res: Respo
       return res.status(400).json({ error: 'autoSyncEnabled must be a boolean' });
     }
 
+    // Update rent_roll_projects.auto_sync_enabled as the primary store
+    // (isAutoSyncEnabled() checks this table first; keeps /locations and /projects routes in sync)
+    await db.execute(
+      `UPDATE rent_roll_projects SET auto_sync_enabled = $1, updated_at = NOW() WHERE id = $2 AND org_id = $3`,
+      [autoSyncEnabled, locationId, orgId]
+    );
+
+    // Also update modeling_rent_roll_config as the fallback store
+    // Build where conditions array — include modelingProjectId filter only when provided
+    const cfgWhereConditions = [
+      eq(modelingRentRollConfig.orgId, orgId),
+      eq(modelingRentRollConfig.linkedRraLocationId, locationId),
+      ...(modelingProjectId ? [eq(modelingRentRollConfig.modelingProjectId, modelingProjectId)] : []),
+    ] as const;
     const updated = await db.update(modelingRentRollConfig)
       .set({ autoSyncEnabled, updatedAt: new Date() })
-      .where(and(
-        eq(modelingRentRollConfig.orgId, orgId),
-        eq(modelingRentRollConfig.linkedRraLocationId, locationId),
-        modelingProjectId ? eq(modelingRentRollConfig.modelingProjectId, modelingProjectId) : undefined as any,
-      ))
+      .where(and(...cfgWhereConditions))
       .returning();
 
     res.json({ success: true, updated: updated.length, autoSyncEnabled });
@@ -3754,11 +3877,29 @@ router.get("/cre/lease-rollover", async (req: Request, res: Response, next: Next
 // VERTICAL-SPECIFIC ANALYTICS ENDPOINTS (Phase 6)
 // ============================================================================
 
+/**
+ * Verify a given locationId is owned by the calling org.
+ * Checks both rra_marina_locations and rent_roll_projects tables.
+ * Returns false if the location is not found or not owned by the org.
+ */
+async function isLocationOwnedByOrg(locationId: string, orgId: string | null): Promise<boolean> {
+  if (!orgId) return false;
+  const { rows } = await db.execute(
+    `(SELECT 1 FROM rra_marina_locations WHERE id = $1 AND org_id = $2 LIMIT 1)
+     UNION ALL
+     (SELECT 1 FROM rent_roll_projects WHERE id = $1 AND org_id = $2 LIMIT 1)`,
+    [locationId, orgId]
+  );
+  return rows.length > 0;
+}
+
 // --- Self-Storage ---
 router.get("/analytics/self-storage/kpis", async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { locationId } = req.query;
     if (!locationId) return res.status(400).json({ error: "locationId required" });
+    const orgId = getOrgId(req);
+    if (!await isLocationOwnedByOrg(locationId as string, orgId)) return res.status(403).json({ error: "Access denied" });
     const result = await selfStorageAnalytics.getSelfStorageKPIs(locationId as string);
     res.json(result);
   } catch (error) { next(error); }
@@ -3768,6 +3909,8 @@ router.get("/analytics/self-storage/unit-mix", async (req: Request, res: Respons
   try {
     const { locationId } = req.query;
     if (!locationId) return res.status(400).json({ error: "locationId required" });
+    const orgId = getOrgId(req);
+    if (!await isLocationOwnedByOrg(locationId as string, orgId)) return res.status(403).json({ error: "Access denied" });
     const result = await selfStorageAnalytics.analyzeUnitMix(locationId as string);
     res.json(result);
   } catch (error) { next(error); }
@@ -3777,6 +3920,8 @@ router.post("/analytics/self-storage/ecri", async (req: Request, res: Response, 
   try {
     const { locationId, streetRates, maxIncreasePercent, minMonthsSinceIncrease } = req.body;
     if (!locationId) return res.status(400).json({ error: "locationId required" });
+    const orgId = getOrgId(req);
+    if (!await isLocationOwnedByOrg(locationId as string, orgId)) return res.status(403).json({ error: "Access denied" });
     const rateMap = new Map<string, number>(Object.entries(streetRates || {}));
     const result = await selfStorageAnalytics.analyzeECRIOpportunities(
       locationId, rateMap, maxIncreasePercent || 10, minMonthsSinceIncrease || 6
@@ -3790,6 +3935,8 @@ router.get("/analytics/hotel/kpis", async (req: Request, res: Response, next: Ne
   try {
     const { locationId } = req.query;
     if (!locationId) return res.status(400).json({ error: "locationId required" });
+    const orgId = getOrgId(req);
+    if (!await isLocationOwnedByOrg(locationId as string, orgId)) return res.status(403).json({ error: "Access denied" });
     const result = await hotelAnalytics.getHotelKPIs(locationId as string);
     res.json(result);
   } catch (error) { next(error); }
@@ -3799,6 +3946,8 @@ router.get("/analytics/hotel/room-performance", async (req: Request, res: Respon
   try {
     const { locationId } = req.query;
     if (!locationId) return res.status(400).json({ error: "locationId required" });
+    const orgId = getOrgId(req);
+    if (!await isLocationOwnedByOrg(locationId as string, orgId)) return res.status(403).json({ error: "Access denied" });
     const result = await hotelAnalytics.getRoomTypePerformance(locationId as string);
     res.json(result);
   } catch (error) { next(error); }
@@ -3809,6 +3958,8 @@ router.get("/analytics/multifamily/kpis", async (req: Request, res: Response, ne
   try {
     const { locationId } = req.query;
     if (!locationId) return res.status(400).json({ error: "locationId required" });
+    const orgId = getOrgId(req);
+    if (!await isLocationOwnedByOrg(locationId as string, orgId)) return res.status(403).json({ error: "Access denied" });
     const result = await multifamilyAnalytics.getMultifamilyKPIs(locationId as string);
     res.json(result);
   } catch (error) { next(error); }
@@ -3818,6 +3969,8 @@ router.get("/analytics/multifamily/unit-mix", async (req: Request, res: Response
   try {
     const { locationId } = req.query;
     if (!locationId) return res.status(400).json({ error: "locationId required" });
+    const orgId = getOrgId(req);
+    if (!await isLocationOwnedByOrg(locationId as string, orgId)) return res.status(403).json({ error: "Access denied" });
     const result = await multifamilyAnalytics.getUnitMixPerformance(locationId as string);
     res.json(result);
   } catch (error) { next(error); }
@@ -3827,6 +3980,8 @@ router.get("/analytics/multifamily/loss-to-lease", async (req: Request, res: Res
   try {
     const { locationId } = req.query;
     if (!locationId) return res.status(400).json({ error: "locationId required" });
+    const orgId = getOrgId(req);
+    if (!await isLocationOwnedByOrg(locationId as string, orgId)) return res.status(403).json({ error: "Access denied" });
     const result = await multifamilyAnalytics.getLossToLeaseDetail(locationId as string);
     res.json(result);
   } catch (error) { next(error); }
@@ -3870,6 +4025,1111 @@ router.get("/analytics/retail/cam-reconciliation", async (req: Request, res: Res
   } catch (error) { next(error); }
 });
 
+// Helper: resolve a raw location/marina ID to canonical modeling_project_id via config table.
+// Accepts either an RRA location ID (rra_marina_locations.id) or a modeling project ID directly.
+async function resolveRetailProjectId(
+  rawId: string | undefined,
+  orgId: string
+): Promise<string | undefined> {
+  if (!rawId) return undefined;
+  const { rows } = await db.execute(
+    `SELECT modeling_project_id FROM modeling_rent_roll_config
+       WHERE linked_rra_location_id = $1 AND org_id = $2 LIMIT 1`,
+    [rawId, orgId]
+  ) as { rows: { modeling_project_id: string }[] };
+  return rows[0]?.modeling_project_id || rawId;
+}
+
+// --- Retail CAM Reconciliation ---
+router.get("/analytics/retail/cam", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getOrgId(req);
+    const { modelingProjectId, marinaId, locationId } = req.query;
+    // locationId (RRA location) and marinaId are treated as aliases for one another
+    const rawLocationId = (locationId || marinaId) as string | undefined;
+    // Resolve to canonical modeling project ID (fallback: use rawLocationId if no config row found)
+    const resolvedProjectId = (modelingProjectId as string | undefined)
+      || await resolveRetailProjectId(rawLocationId, orgId);
+    const result = await retailAnalytics.getCAMReconciliation({
+      orgId,
+      modelingProjectId: resolvedProjectId,
+      marinaId: rawLocationId,
+    });
+    res.json(result);
+  } catch (error) { next(error); }
+});
+
+// --- Retail WALT and Rollover Schedule ---
+router.get("/analytics/retail/walt", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getOrgId(req);
+    const { modelingProjectId, marinaId, locationId } = req.query;
+    const rawLocationId = (locationId || marinaId) as string | undefined;
+    const resolvedProjectId = (modelingProjectId as string | undefined)
+      || await resolveRetailProjectId(rawLocationId, orgId);
+    const result = await retailAnalytics.getWALT({
+      orgId,
+      modelingProjectId: resolvedProjectId,
+      marinaId: rawLocationId,
+    });
+    res.json(result);
+  } catch (error) { next(error); }
+});
+
+router.get("/analytics/retail/rollover-schedule", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getOrgId(req);
+    const { modelingProjectId, marinaId, locationId } = req.query;
+    const rawLocationId = (locationId || marinaId) as string | undefined;
+    const resolvedProjectId = (modelingProjectId as string | undefined)
+      || await resolveRetailProjectId(rawLocationId, orgId);
+    const result = await retailAnalytics.getRolloverSchedule({
+      orgId,
+      modelingProjectId: resolvedProjectId,
+      marinaId: rawLocationId,
+    });
+    res.json(result);
+  } catch (error) { next(error); }
+});
+
+// --- Hotel ADR Trend and Channel Mix ---
+router.get("/analytics/hotel/adr-trend", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { locationId, months } = req.query;
+    if (!locationId) return res.status(400).json({ error: "locationId required" });
+    const orgId = getOrgId(req);
+    if (!await isLocationOwnedByOrg(locationId as string, orgId)) return res.status(403).json({ error: "Access denied" });
+    const result = await hotelAnalytics.getADRTrend(locationId as string, months ? parseInt(months as string) : 12);
+    res.json(result);
+  } catch (error) { next(error); }
+});
+
+router.get("/analytics/hotel/channel-mix", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { locationId } = req.query;
+    if (!locationId) return res.status(400).json({ error: "locationId required" });
+    const orgId = getOrgId(req);
+    if (!await isLocationOwnedByOrg(locationId as string, orgId)) return res.status(403).json({ error: "Access denied" });
+    const result = await hotelAnalytics.getChannelMix(locationId as string);
+    res.json(result);
+  } catch (error) { next(error); }
+});
+
+// --- RV Park / MHP Analytics ---
+router.get("/analytics/rv-park/kpis", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { locationId } = req.query;
+    if (!locationId) return res.status(400).json({ error: "locationId required" });
+    const orgId = getOrgId(req);
+    if (!await isLocationOwnedByOrg(locationId as string, orgId)) return res.status(403).json({ error: "Access denied" });
+    const result = await rvParkAnalytics.getRVParkKPIs(locationId as string);
+    res.json(result);
+  } catch (error) { next(error); }
+});
+
+router.get("/analytics/rv-park/pad-mix", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { locationId } = req.query;
+    if (!locationId) return res.status(400).json({ error: "locationId required" });
+    const orgId = getOrgId(req);
+    if (!await isLocationOwnedByOrg(locationId as string, orgId)) return res.status(403).json({ error: "Access denied" });
+    const result = await rvParkAnalytics.getPadMixPerformance(locationId as string);
+    res.json(result);
+  } catch (error) { next(error); }
+});
+
+router.get("/analytics/rv-park/seasonal-demand", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { locationId } = req.query;
+    if (!locationId) return res.status(400).json({ error: "locationId required" });
+    const orgId = getOrgId(req);
+    if (!await isLocationOwnedByOrg(locationId as string, orgId)) return res.status(403).json({ error: "Access denied" });
+    const result = await rvParkAnalytics.getSeasonalDemandAnalysis(locationId as string);
+    res.json(result);
+  } catch (error) { next(error); }
+});
+
+// --- Industrial / Warehouse Analytics ---
+router.get("/analytics/industrial/kpis", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { locationId } = req.query;
+    if (!locationId) return res.status(400).json({ error: "locationId required" });
+    const orgId = getOrgId(req);
+    if (!await isLocationOwnedByOrg(locationId as string, orgId)) return res.status(403).json({ error: "Access denied" });
+    const result = await industrialAnalytics.getIndustrialKPIs(locationId as string);
+    res.json(result);
+  } catch (error) { next(error); }
+});
+
+router.get("/analytics/industrial/rollover-schedule", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { locationId } = req.query;
+    if (!locationId) return res.status(400).json({ error: "locationId required" });
+    const orgId = getOrgId(req);
+    if (!await isLocationOwnedByOrg(locationId as string, orgId)) return res.status(403).json({ error: "Access denied" });
+    const result = await industrialAnalytics.getRolloverSchedule(locationId as string);
+    res.json(result);
+  } catch (error) { next(error); }
+});
+
+router.get("/analytics/industrial/tenant-concentration", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { locationId } = req.query;
+    if (!locationId) return res.status(400).json({ error: "locationId required" });
+    const orgId = getOrgId(req);
+    if (!await isLocationOwnedByOrg(locationId as string, orgId)) return res.status(403).json({ error: "Access denied" });
+    const result = await industrialAnalytics.getTenantConcentration(locationId as string);
+    res.json(result);
+  } catch (error) { next(error); }
+});
+
+router.get("/analytics/industrial/rent-psf", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { locationId } = req.query;
+    if (!locationId) return res.status(400).json({ error: "locationId required" });
+    const orgId = getOrgId(req);
+    if (!await isLocationOwnedByOrg(locationId as string, orgId)) return res.status(403).json({ error: "Access denied" });
+    const result = await industrialAnalytics.getRentPSFByTenant(locationId as string);
+    res.json(result);
+  } catch (error) { next(error); }
+});
+
+// --- Multifamily Extended Analytics ---
+router.get("/analytics/multifamily/concessions", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { locationId } = req.query;
+    if (!locationId) return res.status(400).json({ error: "locationId required" });
+    const orgId = getOrgId(req);
+    if (!await isLocationOwnedByOrg(locationId as string, orgId)) return res.status(403).json({ error: "Access denied" });
+    const result = await multifamilyAnalytics.getConcessionAnalysis(locationId as string);
+    res.json(result);
+  } catch (error) { next(error); }
+});
+
+router.get("/analytics/multifamily/renewal-spread", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { locationId } = req.query;
+    if (!locationId) return res.status(400).json({ error: "locationId required" });
+    const orgId = getOrgId(req);
+    if (!await isLocationOwnedByOrg(locationId as string, orgId)) return res.status(403).json({ error: "Access denied" });
+    const result = await multifamilyAnalytics.getRenewalSpreadAnalysis(locationId as string);
+    res.json(result);
+  } catch (error) { next(error); }
+});
+
+router.get("/analytics/multifamily/market-rent-log", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { locationId } = req.query;
+    if (!locationId) return res.status(400).json({ error: "locationId required" });
+    const orgId = getOrgId(req);
+    if (!await isLocationOwnedByOrg(locationId as string, orgId)) return res.status(403).json({ error: "Access denied" });
+    const result = await multifamilyAnalytics.getMarketRentUpdateLog(locationId as string);
+    res.json(result);
+  } catch (error) { next(error); }
+});
+
+router.post("/locations/:locationId/market-rents/bulk-update", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getValidatedOrgId(req as AuthenticatedRequest);
+    const { locationId } = req.params;
+    const { updates } = req.body; // [{ unitType, marketRent }]
+    if (!Array.isArray(updates)) return res.status(400).json({ error: "updates array required" });
+
+    // Verify the location belongs to the caller's org — check both entity tables
+    // (dashboard passes rra_marina_locations.id; some flows use rent_roll_projects.id)
+    const { rows: ownerRows } = await db.execute(
+      `SELECT 1 FROM rra_marina_locations WHERE id = $1 AND org_id = $2
+       UNION
+       SELECT 1 FROM rent_roll_projects WHERE id = $1 AND org_id = $2
+       LIMIT 1`,
+      [locationId, orgId]
+    );
+    if (ownerRows.length === 0) return res.status(403).json({ error: "Location not found or access denied" });
+
+    let updatedCount = 0;
+    for (const update of updates) {
+      const { unitType, marketRent } = update;
+      if (!unitType || marketRent === undefined) continue;
+      
+      const result = await db.execute(
+        `UPDATE rra_leases SET base_rent_2 = $1, updated_at = NOW() WHERE location_id = $2 AND org_id = $3 AND is_active = true AND COALESCE(unit_type_custom, storage_type::text) = $4`,
+        [marketRent, locationId, orgId, unitType]
+      );
+      updatedCount += (result.rowCount || 0);
+    }
+    
+    res.json({ success: true, updatedCount });
+  } catch (error) { next(error); }
+});
+
+// =============================================================================
+// Snapshot Comparison (9G)
+// =============================================================================
+
+router.post("/snapshots/compare", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { snapshotAId, snapshotBId, projectId } = req.body;
+    if (!snapshotAId || !snapshotBId) return res.status(400).json({ error: "snapshotAId and snapshotBId required" });
+
+    const orgId = getOrgId(req);
+
+    // Fetch the snapshot version metadata AND the point-in-time lease data
+    // from rra_lease_snapshots (the immutable per-lease snapshot store)
+    const [snapA, snapB, leasesARes, leasesBRes] = await Promise.all([
+      db.execute(`SELECT * FROM rra_snapshot_versions WHERE id = $1 AND org_id = $2`, [snapshotAId, orgId]),
+      db.execute(`SELECT * FROM rra_snapshot_versions WHERE id = $1 AND org_id = $2`, [snapshotBId, orgId]),
+      db.execute(
+        `SELECT lease_data FROM rra_lease_snapshots WHERE snapshot_version_id = $1 AND org_id = $2`,
+        [snapshotAId, orgId]
+      ),
+      db.execute(
+        `SELECT lease_data FROM rra_lease_snapshots WHERE snapshot_version_id = $1 AND org_id = $2`,
+        [snapshotBId, orgId]
+      ),
+    ]);
+
+    const snapAData = (snapA.rows[0] as SnapshotVersionRow | undefined) || null;
+    const snapBData = (snapB.rows[0] as SnapshotVersionRow | undefined) || null;
+
+    if (!snapAData || !snapBData) return res.status(404).json({ error: "One or both snapshots not found" });
+
+    // Reconstruct lease sets from rra_lease_snapshots (point-in-time, immutable)
+    type LeaseRecord = Record<string, unknown>;
+    const leasesA: LeaseRecord[] = (leasesARes.rows as LeaseDataRow[])
+      .map(r => {
+        if (!r.lease_data) return null;
+        return typeof r.lease_data === "string" ? JSON.parse(r.lease_data) as LeaseRecord : r.lease_data as LeaseRecord;
+      })
+      .filter((x): x is LeaseRecord => x !== null);
+    const leasesB: LeaseRecord[] = (leasesBRes.rows as LeaseDataRow[])
+      .map(r => {
+        if (!r.lease_data) return null;
+        return typeof r.lease_data === "string" ? JSON.parse(r.lease_data) as LeaseRecord : r.lease_data as LeaseRecord;
+      })
+      .filter((x): x is LeaseRecord => x !== null);
+
+    // Compute lease-level diffs
+    const leaseMap = new Map<string, { a: LeaseRecord | null; b: LeaseRecord | null }>();
+    for (const l of leasesA) {
+      if (l && l.id) leaseMap.set(l.id, { a: l, b: null });
+    }
+    for (const l of leasesB) {
+      if (l && l.id) {
+        const existing = leaseMap.get(l.id);
+        if (existing) existing.b = l;
+        else leaseMap.set(l.id, { a: null, b: l });
+      }
+    }
+
+    interface LeaseChange { type: "added" | "removed" | "changed"; leaseId: string; tenantName: string; rentA: number; rentB: number; rentDelta?: number; rentDeltaPct?: number; statusA: string | null; statusB: string | null; }
+    const leaseChanges: LeaseChange[] = [];
+    let addedCount = 0, removedCount = 0, changedCount = 0;
+    let revenueA = 0, revenueB = 0;
+    let activeA = 0, activeB = 0;
+
+    for (const [id, { a, b }] of leaseMap.entries()) {
+      const rentA = parseFloat(a?.lease_amount || a?.leaseAmount || "0");
+      const rentB = parseFloat(b?.lease_amount || b?.leaseAmount || "0");
+      revenueA += rentA;
+      revenueB += rentB;
+      if (a?.is_active || a?.isActive) activeA++;
+      if (b?.is_active || b?.isActive) activeB++;
+
+      if (!a && b) {
+        addedCount++;
+        leaseChanges.push({ type: "added", leaseId: id, tenantName: b.tenant_name || "", rentA: 0, rentB: rentB, statusA: null, statusB: b.slip_status || "Active" });
+      } else if (a && !b) {
+        removedCount++;
+        leaseChanges.push({ type: "removed", leaseId: id, tenantName: a.tenant_name || "", rentA, rentB: 0, statusA: a.slip_status || "Active", statusB: null });
+      } else if (a && b) {
+        const rentChanged = Math.abs(rentA - rentB) > 0.01;
+        const statusChanged = (a.slip_status || a.slipStatus) !== (b.slip_status || b.slipStatus);
+        if (rentChanged || statusChanged) {
+          changedCount++;
+          leaseChanges.push({ type: "changed", leaseId: id, tenantName: a.tenant_name || b.tenant_name || "", rentA, rentB, rentDelta: rentB - rentA, rentDeltaPct: rentA > 0 ? Math.round(((rentB - rentA) / rentA) * 1000) / 10 : 0, statusA: a.slip_status || a.slipStatus || "Active", statusB: b.slip_status || b.slipStatus || "Active" });
+        }
+      }
+    }
+
+    const revenueDelta = revenueB - revenueA;
+    const occupancyDelta = activeB - activeA;
+
+    res.json({
+      summary: {
+        occupancyA: activeA,
+        occupancyB: activeB,
+        occupancyDelta,
+        revenueA: Math.round(revenueA * 100) / 100,
+        revenueB: Math.round(revenueB * 100) / 100,
+        revenueDelta: Math.round(revenueDelta * 100) / 100,
+        revenueDeltaPct: revenueA > 0 ? Math.round((revenueDelta / revenueA) * 1000) / 10 : 0,
+        leaseCountA: leasesA.length,
+        leaseCountB: leasesB.length,
+        leaseCountDelta: leasesB.length - leasesA.length,
+        addedCount,
+        removedCount,
+        changedCount,
+      },
+      snapshotA: { id: snapshotAId, name: snapAData.name, snapshotDate: snapAData.snapshot_date },
+      snapshotB: { id: snapshotBId, name: snapBData.name, snapshotDate: snapBData.snapshot_date },
+      leaseChanges,
+    });
+  } catch (error) { next(error); }
+});
+
+// =============================================================================
+// Typed row interfaces for raw SQL results in sync / reconciliation routes
+// =============================================================================
+interface SyncProjectRow { auto_sync_enabled: boolean; last_sync_at: string | null; }
+interface LeaseAggRow { total_rent: string; lease_count: string; }
+interface ConfigLinkRow { linked_rra_location_id: string | null; }
+interface ConfigModelRow { modeling_project_id: string | null; }
+interface CashFlowRow { id: string; cashflow_type: string; amount: string; year: number; month: number; notes: string | null; }
+interface GlAccountRow { id: string; account_code: string; account_name: string; charge_type: string | null; }
+interface LeaseSnapshotRow { id: string; lease_id: string; snapshot_date: string; lease_data: string | Record<string, unknown>; }
+interface ActiveLeaseRow { id: string; tenant_id: string | null; lease_amount: string | null; unit_number: string | null; is_active: boolean; updated_at: string; tenant_name: string | null; }
+interface SnapshotVersionRow { id: string; snapshot_date: string; label: string | null; org_id: string; }
+interface LeaseDataRow { lease_data: Record<string, unknown> | string | null; }
+interface ReportLeaseRow { id: string; tenant_name: string | null; unit_number: string | null; unit_location: string | null; unit_type_custom: string | null; storage_type: string | null; lease_amount: string | null; lease_commencement: string | null; lease_expiration: string | null; slip_status: string | null; is_active: boolean; }
+interface ReportCashFlowRow { id: string; year: number; month: number; cashflow_type: string; amount: string; notes: string | null; }
+interface CohortRow { cohort_key: string; cohort_label: string; total_tenants: string; active_tenants: string; total_revenue: string; total_ltv: string; avg_tenure_months: string; retained_3m: string; retained_6m: string; retained_12m: string; retained_18m: string; retained_24m: string; }
+
+// =============================================================================
+// GL Auto-Match and Period-Close (9H)
+// =============================================================================
+
+router.post("/reconciliation/auto-match", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { projectId, periodMonth, periodYear } = req.body;
+    const orgId = getOrgId(req);
+    if (!orgId) return res.status(401).json({ error: "Unauthorized" });
+    const result = await autoMatchGLEntries({
+      orgId,
+      projectId: projectId ?? undefined,
+      periodMonth: periodMonth !== undefined ? Number(periodMonth) : undefined,
+      periodYear: periodYear !== undefined ? Number(periodYear) : undefined,
+    });
+    res.json(result);
+  } catch (error) { next(error); }
+});
+
+router.post("/periods/:periodId/lock", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { periodId } = req.params;
+    const userId = getUserId(req);
+    const orgId = getOrgId(req);
+    
+    // Update reconciliation record status to closed/locked
+    const { rows } = await db.execute(
+      `UPDATE reconciliation_records SET status = 'closed', reconciled_by = $1, reconciled_at = NOW(), notes = COALESCE(notes, '') || ' [Period locked]' WHERE id = $2 AND organization_id = $3 RETURNING *`,
+      [userId, periodId, orgId]
+    );
+    
+    if (rows.length === 0) return res.status(404).json({ error: "Period not found" });
+    res.json({ success: true, period: rows[0] });
+  } catch (error) { next(error); }
+});
+
+router.post("/periods/:periodId/unlock", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { periodId } = req.params;
+    const userId = getUserId(req);
+    const orgId = getOrgId(req);
+    
+    const { rows } = await db.execute(
+      `UPDATE reconciliation_records SET status = 'in_progress', reconciled_by = $1, notes = COALESCE(notes, '') || ' [Period unlocked]' WHERE id = $2 AND organization_id = $3 RETURNING *`,
+      [userId, periodId, orgId]
+    );
+    
+    if (rows.length === 0) return res.status(404).json({ error: "Period not found" });
+    res.json({ success: true, period: rows[0] });
+  } catch (error) { next(error); }
+});
+
+// =============================================================================
+// Auto-Sync Rent Roll → Pro Forma (9I)
+// =============================================================================
+
+router.patch("/projects/:id/auto-sync", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getValidatedOrgId(req as AuthenticatedRequest);
+    const { autoSyncEnabled } = req.body;
+    const { rows } = await db.execute(
+      `UPDATE rent_roll_projects SET auto_sync_enabled = $1, updated_at = NOW() WHERE id = $2 AND org_id = $3 RETURNING *`,
+      [autoSyncEnabled === true, req.params.id, orgId]
+    );
+    if (rows.length === 0) return res.status(404).json({ error: "Project not found" });
+    const syncRow = rows[0] as SyncProjectRow;
+    res.json({ success: true, autoSyncEnabled: syncRow.auto_sync_enabled });
+  } catch (error) { next(error); }
+});
+
+router.post("/projects/:id/sync-to-proforma", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getValidatedOrgId(req as AuthenticatedRequest);
+    const projectId = req.params.id;
+    // Find linked rra_marina_locations.id via modeling_rent_roll_config
+    const { rows: cfgRows } = await db.execute(
+      `SELECT linked_rra_location_id FROM modeling_rent_roll_config WHERE modeling_project_id = $1 AND org_id = $2 LIMIT 1`,
+      [projectId, orgId]
+    );
+    const linkRow = cfgRows[0] as ConfigLinkRow | undefined;
+    const locationId = linkRow?.linked_rra_location_id || projectId;
+    // Calculate EGI from rra_leases using the rra_marina_locations.id
+    const { rows: leaseRows } = await db.execute(
+      `SELECT COALESCE(SUM(lease_amount::numeric), 0) as total_rent, COUNT(*) as lease_count
+       FROM rra_leases WHERE location_id = $1 AND org_id = $2 AND is_active = true`,
+      [locationId, orgId]
+    );
+    const leaseAgg = leaseRows[0] as LeaseAggRow | undefined;
+    const totalEGI = parseFloat(leaseAgg?.total_rent || "0");
+    const leaseCount = parseInt(leaseAgg?.lease_count || "0");
+    // Update last_sync_at on the project (project table is keyed by rent_roll_projects.id)
+    await db.execute(
+      `UPDATE rent_roll_projects SET last_sync_at = NOW() WHERE id = $1 AND org_id = $2`,
+      [projectId, orgId]
+    );
+    res.json({ success: true, totalEGI, leaseCount, locationId, syncedAt: new Date().toISOString() });
+  } catch (error) { next(error); }
+});
+
+router.get("/projects/:id/sync-status", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getValidatedOrgId(req as AuthenticatedRequest);
+    const { rows } = await db.execute(
+      `SELECT auto_sync_enabled, last_sync_at FROM rent_roll_projects WHERE id = $1 AND org_id = $2`,
+      [req.params.id, orgId]
+    );
+    if (rows.length === 0) return res.status(404).json({ error: "Project not found" });
+    const statusRow = rows[0] as SyncProjectRow;
+    res.json({ autoSyncEnabled: statusRow.auto_sync_enabled || false, lastSyncAt: statusRow.last_sync_at || null });
+  } catch (error) { next(error); }
+});
+
+// ============================================================================
+// LOCATION-BASED SYNC ROUTES — canonical entry points for the RRA dashboard
+// These mirror the /projects/:id/* routes but accept rra_marina_locations.id
+// ============================================================================
+
+router.post("/locations/:locationId/sync-to-proforma", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getOrgId(req);
+    const { locationId } = req.params;
+    // Verify ownership
+    const { rows: ownerRows } = await db.execute(
+      `SELECT 1 FROM rra_marina_locations WHERE id = $1 AND org_id = $2 LIMIT 1`,
+      [locationId, orgId]
+    );
+    if (ownerRows.length === 0) return res.status(403).json({ error: "Location not found or access denied" });
+    // Compute EGI from active leases for this location
+    const { rows: leaseRows } = await db.execute(
+      `SELECT COALESCE(SUM(lease_amount::numeric), 0) as total_rent, COUNT(*) as lease_count
+       FROM rra_leases WHERE location_id = $1 AND org_id = $2 AND is_active = true`,
+      [locationId, orgId]
+    );
+    const locLeaseAgg = leaseRows[0] as LeaseAggRow | undefined;
+    const totalEGI = parseFloat(locLeaseAgg?.total_rent || "0");
+    const leaseCount = parseInt(locLeaseAgg?.lease_count || "0");
+    // Find the linked modeling project (if any) and ALWAYS stamp last_sync_at regardless of auto_sync_enabled
+    // so manual syncs also update the sync timestamp shown in UI indicators
+    const { rows: cfgRows } = await db.execute(
+      `SELECT modeling_project_id FROM modeling_rent_roll_config
+       WHERE linked_rra_location_id = $1 AND org_id = $2 LIMIT 1`,
+      [locationId, orgId]
+    );
+    if (cfgRows.length > 0) {
+      const cfgRow = cfgRows[0] as ConfigModelRow;
+      if (cfgRow.modeling_project_id) {
+        await db.execute(
+          `UPDATE rent_roll_projects SET last_sync_at = NOW() WHERE id = $1 AND org_id = $2`,
+          [cfgRow.modeling_project_id, orgId]
+        );
+      }
+    }
+    res.json({ success: true, totalEGI, leaseCount, locationId, syncedAt: new Date().toISOString() });
+  } catch (error) { next(error); }
+});
+
+router.get("/locations/:locationId/sync-conflicts", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getOrgId(req);
+    const { locationId } = req.params;
+    // Find the most recent snapshot for each lease in this location by joining rra_leases
+    // (rra_lease_snapshots does not have location_id directly; join via lease)
+    const { rows: snapRows } = await db.execute(
+      `SELECT s.id, s.lease_id, s.created_at as snapshot_date, s.lease_data
+       FROM rra_lease_snapshots s
+       JOIN rra_leases l ON l.id = s.lease_id
+       WHERE s.org_id = $1 AND l.location_id = $2
+       ORDER BY s.created_at DESC LIMIT 200`,
+      [orgId, locationId]
+    );
+    // Get current active leases
+    const { rows: currentLeases } = await db.execute(
+      `SELECT l.id, l.tenant_id, l.lease_amount, l.unit_number, l.is_active, l.updated_at,
+              t.name as tenant_name
+       FROM rra_leases l LEFT JOIN rra_tenants t ON t.id = l.tenant_id
+       WHERE l.location_id = $1 AND l.org_id = $2 AND l.is_active = true`,
+      [locationId, orgId]
+    );
+    // Detect conflicts: lease amount changed since last snapshot
+    interface SnapshotData { lease_amount?: string; leaseAmount?: string; snapshotDate: string; }
+    interface ConflictItem { leaseId: string; tenantName: string | null; unitNumber: string | null; field: string; currentValue: number; snapshotValue: number; snapshotDate: string; description: string; }
+    const snapshotMap = new Map<string, SnapshotData>();
+    for (const s of snapRows as LeaseSnapshotRow[]) {
+      if (!snapshotMap.has(s.lease_id)) {
+        const data: Record<string, unknown> = typeof s.lease_data === "string"
+          ? (JSON.parse(s.lease_data) as Record<string, unknown>)
+          : (s.lease_data as Record<string, unknown>);
+        snapshotMap.set(s.lease_id, { ...data, snapshotDate: s.snapshot_date } as SnapshotData);
+      }
+    }
+    const conflicts: ConflictItem[] = [];
+    for (const lease of currentLeases as ActiveLeaseRow[]) {
+      const snap = snapshotMap.get(lease.id);
+      if (!snap) continue;
+      const currentAmt = parseFloat(lease.lease_amount || "0");
+      const snapAmt = parseFloat(snap.lease_amount || snap.leaseAmount || "0");
+      if (Math.abs(currentAmt - snapAmt) > 0.01) {
+        conflicts.push({
+          leaseId: lease.id,
+          tenantName: lease.tenant_name,
+          unitNumber: lease.unit_number,
+          field: "lease_amount",
+          currentValue: currentAmt,
+          snapshotValue: snapAmt,
+          snapshotDate: snap.snapshotDate,
+          description: `Lease amount changed from $${snapAmt.toFixed(2)} to $${currentAmt.toFixed(2)}`,
+        });
+      }
+    }
+    res.json({ conflicts, totalLeases: (currentLeases as ActiveLeaseRow[]).length, snapshotsAvailable: snapshotMap.size });
+  } catch (error) { next(error); }
+});
+
+router.post("/locations/:locationId/sync-conflicts/:leaseId/resolve", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getOrgId(req);
+    const { locationId, leaseId } = req.params;
+    const { resolution, field, value } = req.body; // resolution: "accept_current" | "revert_to_snapshot"
+    if (!["accept_current", "revert_to_snapshot"].includes(resolution)) {
+      return res.status(400).json({ error: "resolution must be accept_current or revert_to_snapshot" });
+    }
+    // Verify lease belongs to org/location
+    const { rows: leaseRows } = await db.execute(
+      `SELECT id, lease_amount FROM rra_leases WHERE id = $1 AND org_id = $2 AND location_id = $3 LIMIT 1`,
+      [leaseId, orgId, locationId]
+    );
+    if (leaseRows.length === 0) return res.status(404).json({ error: "Lease not found" });
+    if (resolution === "revert_to_snapshot" && field === "lease_amount" && value !== undefined) {
+      await db.execute(
+        `UPDATE rra_leases SET lease_amount = $1, updated_at = NOW() WHERE id = $2 AND org_id = $3`,
+        [value, leaseId, orgId]
+      );
+    }
+    // "accept_current" requires no DB change — just acknowledges the current value
+    res.json({ success: true, resolution, leaseId, field });
+  } catch (error) { next(error); }
+});
+
+// =============================================================================
+// Cohort Analysis (9J) - Rent Roll Tenant Cohorts
+// =============================================================================
+
+router.get("/analytics/cohorts", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getOrgId(req);
+    const { projectId, locationId: locationIdParam, granularity = "quarter", metric = "retention" } = req.query;
+    // Accept either projectId or locationId (the frontend sends locationId from the URL params)
+    const effectiveLocationId = (locationIdParam || projectId) as string | undefined;
+    // Whitelist granularity to prevent injection
+    const safeGranularity = ["quarter", "year", "month"].includes(granularity as string) ? granularity as string : "quarter";
+    const params: (string | number)[] = [orgId];
+    const locationFilter = effectiveLocationId ? ` AND l.location_id = $${params.length + 1}` : "";
+    if (effectiveLocationId) params.push(String(effectiveLocationId));
+
+    // Build cohort label/key expressions from whitelisted granularity
+    const cohortLabelExpr = safeGranularity === "quarter"
+      ? `'Q' || CEIL(EXTRACT(MONTH FROM l.lease_commencement) / 3.0)::int || ' ' || EXTRACT(YEAR FROM l.lease_commencement)::text`
+      : safeGranularity === "year"
+      ? `EXTRACT(YEAR FROM l.lease_commencement)::text`
+      : `TO_CHAR(l.lease_commencement, 'Mon YYYY')`;
+    const cohortKeyExpr = safeGranularity === "quarter"
+      ? `(EXTRACT(YEAR FROM l.lease_commencement)::int * 4 + CEIL(EXTRACT(MONTH FROM l.lease_commencement) / 3.0)::int)::text`
+      : safeGranularity === "year"
+      ? `EXTRACT(YEAR FROM l.lease_commencement)::text`
+      : `TO_CHAR(l.lease_commencement, 'YYYYMM')`;
+
+    // Group tenants by move-in quarter/year, including real period retention counts
+    // via lease survival analysis (was tenant still active at N months from commencement?)
+    const cohortQuery = `
+      WITH cohort_base AS (
+        SELECT 
+          l.tenant_id,
+          l.location_id,
+          l.lease_commencement,
+          l.lease_expiration,
+          l.lease_amount::numeric as monthly_rent,
+          l.is_active,
+          ${cohortLabelExpr} as cohort_label,
+          ${cohortKeyExpr} as cohort_key
+        FROM rra_leases l
+        JOIN rra_tenants t ON t.id = l.tenant_id
+        WHERE l.org_id = $1
+        AND l.lease_commencement IS NOT NULL
+        ${locationFilter}
+      ),
+      cohort_stats AS (
+        SELECT
+          cohort_key,
+          cohort_label,
+          COUNT(DISTINCT tenant_id) as total_tenants,
+          COUNT(DISTINCT CASE WHEN is_active = true THEN tenant_id END) as active_tenants,
+          COALESCE(SUM(CASE WHEN is_active = true THEN monthly_rent ELSE 0 END), 0) as total_revenue,
+          COALESCE(SUM(monthly_rent), 0) as total_ltv,
+          AVG(EXTRACT(EPOCH FROM (COALESCE(lease_expiration, NOW()) - lease_commencement)) / (30.44 * 24 * 3600)) as avg_tenure_months,
+          -- Real retention: lease still active (no expiration, or expiration > commencement + N months)
+          COUNT(DISTINCT CASE WHEN lease_expiration IS NULL OR lease_expiration > lease_commencement + INTERVAL '3 months'  THEN tenant_id END) as retained_3m,
+          COUNT(DISTINCT CASE WHEN lease_expiration IS NULL OR lease_expiration > lease_commencement + INTERVAL '6 months'  THEN tenant_id END) as retained_6m,
+          COUNT(DISTINCT CASE WHEN lease_expiration IS NULL OR lease_expiration > lease_commencement + INTERVAL '12 months' THEN tenant_id END) as retained_12m,
+          COUNT(DISTINCT CASE WHEN lease_expiration IS NULL OR lease_expiration > lease_commencement + INTERVAL '18 months' THEN tenant_id END) as retained_18m,
+          COUNT(DISTINCT CASE WHEN lease_expiration IS NULL OR lease_expiration > lease_commencement + INTERVAL '24 months' THEN tenant_id END) as retained_24m
+        FROM cohort_base
+        WHERE cohort_key IS NOT NULL
+        GROUP BY cohort_key, cohort_label
+        ORDER BY cohort_key
+      )
+      SELECT * FROM cohort_stats
+    `;
+
+    const { rows: cohortRows } = await db.execute(cohortQuery, params);
+
+    const cohorts = (cohortRows as CohortRow[]).map(r => {
+      const total = parseInt(r.total_tenants || "0");
+      const active = parseInt(r.active_tenants || "0");
+      const churned = total - active;
+      const revenue = parseFloat(r.total_revenue || "0");
+      const ltv = parseFloat(r.total_ltv || "0");
+      const tenure = parseFloat(r.avg_tenure_months || "0");
+
+      // Real per-period retention from lease survival data
+      const pct = (n: number) => total > 0 ? Math.round((n / total) * 1000) / 10 : 0;
+      const ret3m  = pct(parseInt(r.retained_3m  || "0"));
+      const ret6m  = pct(parseInt(r.retained_6m  || "0"));
+      const ret12m = pct(parseInt(r.retained_12m || "0"));
+      const ret18m = pct(parseInt(r.retained_18m || "0"));
+      const ret24m = pct(parseInt(r.retained_24m || "0"));
+
+      return {
+        cohortKey: r.cohort_key,
+        cohortLabel: r.cohort_label,
+        totalTenants: total,
+        activeTenants: active,
+        churned,
+        retentionRate: pct(active),
+        churnRate: total > 0 ? Math.round((churned / total) * 1000) / 10 : 0,
+        totalRevenue: Math.round(revenue * 100) / 100,
+        totalLTV: Math.round(ltv * 100) / 100,
+        avgLTV: total > 0 ? Math.round((ltv / total) * 100) / 100 : 0,
+        avgTenureMonths: Math.round(tenure * 10) / 10,
+        avgLeaseValue: active > 0 ? Math.round((revenue / active) * 100) / 100 : 0,
+        leaseCount: total,
+        // Expose real period retention for heatmap consumers
+        retentionByPeriod: { m3: ret3m, m6: ret6m, m12: ret12m, m18: ret18m, m24: ret24m },
+      };
+    });
+
+    const totalTenants = cohorts.reduce((s, c) => s + c.totalTenants, 0);
+    const activeTenants = cohorts.reduce((s, c) => s + c.activeTenants, 0);
+    const churnedTenants = totalTenants - activeTenants;
+    const totalRevenue = cohorts.reduce((s, c) => s + c.totalRevenue, 0);
+    const totalLTV = cohorts.reduce((s, c) => s + c.totalLTV, 0);
+    const avgTenure = cohorts.length > 0 ? cohorts.reduce((s, c) => s + c.avgTenureMonths, 0) / cohorts.length : 0;
+
+    // Build retention heatmap from real lease survival data (no synthetic multipliers)
+    const retentionHeatmap = cohorts.map(c => ({
+      cohort: c.cohortLabel,
+      periods: [
+        { period: 0,  rate: 100 },
+        { period: 3,  rate: c.retentionByPeriod.m3 },
+        { period: 6,  rate: c.retentionByPeriod.m6 },
+        { period: 12, rate: c.retentionByPeriod.m12 },
+        { period: 18, rate: c.retentionByPeriod.m18 },
+        { period: 24, rate: c.retentionByPeriod.m24 },
+      ],
+    }));
+
+    const retentionMatrix = cohorts.map(c => ({
+      cohortKey: c.cohortKey,
+      cohortLabel: c.cohortLabel,
+      monthsFromStart: [0, 3, 6, 12, 18, 24],
+      retentionRates: [100, c.retentionByPeriod.m3, c.retentionByPeriod.m6, c.retentionByPeriod.m12, c.retentionByPeriod.m18, c.retentionByPeriod.m24],
+    }));
+
+    res.json({
+      summary: {
+        totalTenants,
+        activeTenants,
+        churnedTenants,
+        overallRetention: totalTenants > 0 ? Math.round((activeTenants / totalTenants) * 1000) / 10 : 0,
+        overallChurn: totalTenants > 0 ? Math.round((churnedTenants / totalTenants) * 1000) / 10 : 0,
+        avgTenureMonths: Math.round(avgTenure * 10) / 10,
+        cohortsCount: cohorts.length,
+        totalRevenue: Math.round(totalRevenue * 100) / 100,
+        avgRevenuePerCohort: cohorts.length > 0 ? Math.round((totalRevenue / cohorts.length) * 100) / 100 : 0,
+        avgLeaseValue: activeTenants > 0 ? Math.round((totalRevenue / activeTenants) * 100) / 100 : 0,
+        totalLTV: Math.round(totalLTV * 100) / 100,
+        avgLTV: totalTenants > 0 ? Math.round((totalLTV / totalTenants) * 100) / 100 : 0,
+        estimatedLTV: Math.round(totalLTV * 1.2 * 100) / 100,
+        growthRate: 0,
+        retentionChange: 0,
+        ltvChange: 0,
+      },
+      cohorts,
+      retentionMatrix,
+      retentionHeatmap,
+      revenueTrend: [],
+      availableProjects: [],
+    });
+  } catch (error) { next(error); }
+});
+
+// LTV Trend (Cohort companion) — mirrors /api/cohort/ltv-trend but under rent-roll router
+router.get("/analytics/ltv-trend", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getOrgId(req);
+    const { projectId, locationId: locationIdParam, granularity } = req.query;
+    const effectiveLocationId = (locationIdParam || projectId) as string | undefined;
+    const params: (string | number)[] = [orgId];
+    const locationFilter = effectiveLocationId ? ` AND l.location_id = $${params.length + 1}` : "";
+    if (effectiveLocationId) params.push(String(effectiveLocationId));
+
+    const { rows } = await db.execute(`
+      SELECT 
+        TO_CHAR(l.lease_commencement, 'Mon YYYY') as period_label,
+        TO_CHAR(l.lease_commencement, 'YYYYMM') as period_key,
+        COALESCE(AVG(l.lease_amount::numeric * GREATEST(1, EXTRACT(EPOCH FROM (COALESCE(l.lease_expiration, NOW()) - l.lease_commencement)) / (30.44 * 24 * 3600))), 0) as avg_ltv,
+        COUNT(DISTINCT l.tenant_id) as tenant_count
+      FROM rra_leases l
+      WHERE l.org_id = $1 AND l.lease_commencement IS NOT NULL
+      ${locationFilter}
+      GROUP BY period_label, period_key
+      ORDER BY period_key
+      LIMIT 24
+    `, params);
+
+    interface LTVTrendRow { period_label: string; period_key: string; avg_ltv: string; tenant_count: string; }
+    const trend = (rows as LTVTrendRow[]).map(r => ({
+      periodLabel: r.period_label,
+      periodKey: r.period_key,
+      avgLTV: Math.round(parseFloat(r.avg_ltv || "0") * 100) / 100,
+      tenantCount: parseInt(r.tenant_count || "0"),
+    }));
+    const currentAvgLTV = trend.length > 0 ? trend[trend.length - 1].avgLTV : 0;
+    const previousAvgLTV = trend.length > 1 ? trend[trend.length - 2].avgLTV : 0;
+    const change = previousAvgLTV > 0 ? Math.round(((currentAvgLTV - previousAvgLTV) / previousAvgLTV) * 1000) / 10 : 0;
+    res.json({ trend, summary: { currentAvgLTV, previousAvgLTV, change } });
+  } catch (error) { next(error); }
+});
+
+// =============================================================================
+// Report Package Generation (9K)
+// =============================================================================
+
+router.post("/reports/generate", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getValidatedOrgId(req as AuthenticatedRequest);
+    const { projectId, reportType, asOfDate, format = "excel" } = req.body;
+
+    if (!reportType) return res.status(400).json({ error: "reportType required" });
+
+    const validTypes = ["rent_roll_summary", "cash_flow_statement", "occupancy_report", "lease_expiration_report", "executive_summary"];
+    if (!validTypes.includes(reportType)) return res.status(400).json({ error: "Invalid reportType" });
+
+    const validFormats = ["excel", "xlsx", "csv", "pdf", "json"];
+    if (!validFormats.includes(format)) return res.status(400).json({ error: `Invalid format. Supported: ${validFormats.join(", ")}` });
+
+    const reportDate = asOfDate || new Date().toISOString().split("T")[0];
+
+    // Fetch lease data scoped to org to prevent cross-tenant reads
+    let leaseData: ReportLeaseRow[] = [];
+    if (projectId) {
+      // Verify ownership: accept both rra_marina_locations.id and rent_roll_projects.id
+      // (UI may pass either; report leases are always queried by rra_leases.location_id)
+      const { rows: ownerCheck } = await db.execute(
+        `(SELECT id FROM rra_marina_locations WHERE id = $1 AND org_id = $2 LIMIT 1)
+         UNION ALL
+         (SELECT id FROM rent_roll_projects WHERE id = $1 AND org_id = $2 LIMIT 1)`,
+        [projectId, orgId]
+      );
+      if (ownerCheck.length === 0) return res.status(403).json({ error: "Project not found or access denied" });
+
+      // Resolve canonical locationId — if a rent_roll_projects.id was supplied,
+      // look up the linked rra_marina_locations.id so the lease query works correctly.
+      let canonicalLocationId: string = projectId;
+      const { rows: cfgLookup } = await db.execute(
+        `SELECT linked_rra_location_id FROM modeling_rent_roll_config
+         WHERE modeling_project_id = $1 AND org_id = $2 LIMIT 1`,
+        [projectId, orgId]
+      );
+      if (cfgLookup.length > 0) {
+        const cfgRow = cfgLookup[0] as ConfigLinkRow;
+        if (cfgRow.linked_rra_location_id) canonicalLocationId = cfgRow.linked_rra_location_id;
+      }
+
+      const { rows } = await db.execute(
+        `SELECT l.id, l.unit_number, l.unit_location, l.unit_type_custom, l.storage_type, l.lease_amount,
+                l.lease_commencement, l.lease_expiration, l.slip_status, l.is_active, t.name as tenant_name
+         FROM rra_leases l LEFT JOIN rra_tenants t ON t.id = l.tenant_id
+         WHERE l.location_id = $1 AND l.org_id = $2 AND l.is_active = true ORDER BY t.name`,
+        [canonicalLocationId, orgId]
+      );
+      leaseData = rows as ReportLeaseRow[];
+    }
+
+    // For cash_flow_statement: fetch from rra_lease_cash_flows using correct column names
+    let cashFlowData: ReportCashFlowRow[] = [];
+    if (reportType === "cash_flow_statement" && projectId) {
+      // Resolve canonicalLocationId again (may differ from projectId if a modeling ID was supplied)
+      let canonicalLocationIdForCF: string = projectId;
+      const { rows: cfgCFLookup } = await db.execute(
+        `SELECT linked_rra_location_id FROM modeling_rent_roll_config
+         WHERE modeling_project_id = $1 AND org_id = $2 LIMIT 1`,
+        [projectId, orgId]
+      );
+      if (cfgCFLookup.length > 0) {
+        const cfgRow = cfgCFLookup[0] as ConfigLinkRow;
+        if (cfgRow.linked_rra_location_id) canonicalLocationIdForCF = cfgRow.linked_rra_location_id;
+      }
+      const { rows } = await db.execute(
+        `SELECT id, cashflow_type, amount, year, month, notes
+         FROM rra_lease_cash_flows WHERE location_id = $1 AND org_id = $2
+         ORDER BY year, month, cashflow_type`,
+        [canonicalLocationIdForCF, orgId]
+      );
+      cashFlowData = rows as ReportCashFlowRow[];
+    }
+
+    const totalLeases = leaseData.length;
+    const activeLeases = leaseData.filter(l => l.is_active).length;
+    const totalRevenue = leaseData.reduce((s, l) => s + parseFloat(l.lease_amount || "0"), 0);
+
+    // --- Build report data tables ---
+    const rentRollRows = [
+      ["Tenant Name", "Unit", "Unit Type", "Monthly Rent", "Start Date", "End Date", "Status"],
+      ...leaseData.map(l => [
+        l.tenant_name || "",
+        l.unit_number || l.unit_location || "",
+        l.unit_type_custom || l.storage_type || "",
+        parseFloat(l.lease_amount || "0").toFixed(2),
+        l.lease_commencement || "",
+        l.lease_expiration || "",
+        l.slip_status || "Active",
+      ]),
+    ];
+
+    const summaryRows = [
+      ["Metric", "Value"],
+      ["Report Type", reportType],
+      ["As Of Date", reportDate],
+      ["Total Leases", totalLeases],
+      ["Active Leases", activeLeases],
+      ["Occupancy Rate", totalLeases > 0 ? `${Math.round((activeLeases / totalLeases) * 100)}%` : "N/A"],
+      ["Total Monthly Revenue", `$${totalRevenue.toFixed(2)}`],
+      ["Total Annual Revenue", `$${(totalRevenue * 12).toFixed(2)}`],
+    ];
+
+    const now = new Date();
+    const expirationRows = [
+      ["Tenant Name", "Unit", "Expiration Date", "Days to Expiry", "Monthly Rent"],
+      ...leaseData
+        .filter(l => l.lease_expiration)
+        .sort((a, b) => new Date(a.lease_expiration!).getTime() - new Date(b.lease_expiration!).getTime())
+        .map(l => {
+          const days = Math.round((new Date(l.lease_expiration!).getTime() - now.getTime()) / 86400000);
+          return [l.tenant_name || "", l.unit_number || "", l.lease_expiration, days, parseFloat(l.lease_amount || "0").toFixed(2)];
+        }),
+    ];
+
+    const cashFlowRows = [
+      ["Period", "Cashflow Type", "Amount", "Notes"],
+      ...cashFlowData.map(r => [
+        `${r.year}-${String(r.month).padStart(2, "0")}`,
+        r.cashflow_type || "",
+        parseFloat(r.amount || "0").toFixed(2),
+        r.notes || "",
+      ]),
+    ];
+
+    // --- Format routing ---
+    if (format === "json") {
+      // Return JSON metadata preview — useful for in-dashboard previews
+      return res.json({
+        reportType,
+        reportDate,
+        totalLeases,
+        activeLeases,
+        totalRevenue,
+        occupancyRate: totalLeases > 0 ? Math.round((activeLeases / totalLeases) * 100) : 0,
+        annualRevenue: totalRevenue * 12,
+        generatedAt: new Date().toISOString(),
+      });
+    }
+
+    if (format === "pdf") {
+      // Generate PDF using pdf-lib
+      const { PDFDocument, StandardFonts, rgb } = await import("pdf-lib");
+      const pdfDoc = await PDFDocument.create();
+      const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+      const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+
+      const addPage = (title: string, rows: any[][]) => {
+        const page = pdfDoc.addPage([792, 612]); // Landscape Letter
+        const { width, height } = page.getSize();
+        let y = height - 40;
+
+        page.drawText(`${title} — As of ${reportDate}`, { x: 40, y, size: 14, font: boldFont, color: rgb(0.1, 0.1, 0.5) });
+        y -= 24;
+
+        const colWidth = Math.min(160, (width - 80) / (rows[0]?.length || 1));
+        for (const row of rows) {
+          if (y < 30) break;
+          const isHeader = rows.indexOf(row) === 0;
+          row.forEach((cell, ci) => {
+            page.drawText(String(cell ?? "").slice(0, 22), {
+              x: 40 + ci * colWidth, y,
+              size: isHeader ? 9 : 8,
+              font: isHeader ? boldFont : font,
+              color: isHeader ? rgb(0.2, 0.2, 0.6) : rgb(0.1, 0.1, 0.1),
+            });
+          });
+          y -= isHeader ? 14 : 11;
+        }
+      };
+
+      if (reportType === "rent_roll_summary" || reportType === "executive_summary") {
+        addPage("Rent Roll Summary", rentRollRows);
+        addPage("Summary Statistics", summaryRows);
+      } else if (reportType === "occupancy_report") {
+        addPage("Occupancy Report", summaryRows);
+      } else if (reportType === "lease_expiration_report") {
+        addPage("Lease Expiration Report", expirationRows);
+      } else if (reportType === "cash_flow_statement") {
+        addPage("Cash Flow Statement", cashFlowRows);
+        addPage("Summary Statistics", summaryRows);
+      }
+
+      const pdfBytes = await pdfDoc.save();
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename="${reportType}_${reportDate}.pdf"`);
+      return res.send(Buffer.from(pdfBytes));
+    }
+
+    if (format === "csv") {
+      // Generate CSV from the primary data table
+      const primaryRows = reportType === "cash_flow_statement" ? cashFlowRows
+        : reportType === "lease_expiration_report" ? expirationRows
+        : reportType === "occupancy_report" ? summaryRows
+        : rentRollRows;
+      const csv = primaryRows.map(row => row.map(c => `"${String(c ?? "").replace(/"/g, '""')}"`).join(",")).join("\n");
+      res.setHeader("Content-Type", "text/csv");
+      res.setHeader("Content-Disposition", `attachment; filename="${reportType}_${reportDate}.csv"`);
+      return res.send(csv);
+    }
+
+    // Default: Excel/XLSX
+    const workbook = XLSX.utils.book_new();
+
+    if (reportType === "rent_roll_summary" || reportType === "executive_summary") {
+      XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(rentRollRows), "Rent Roll");
+      XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(summaryRows), "Summary");
+    } else if (reportType === "occupancy_report") {
+      XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(summaryRows), "Occupancy");
+    } else if (reportType === "lease_expiration_report") {
+      XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(expirationRows), "Lease Expirations");
+    } else if (reportType === "cash_flow_statement") {
+      XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(cashFlowRows), "Cash Flows");
+      XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(summaryRows), "Summary");
+    }
+
+    const buffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition", `attachment; filename="${reportType}_${reportDate}.xlsx"`);
+    res.send(buffer);
+  } catch (error) { next(error); }
+});
+
+// =============================================================================
+// Data Quality Enhancements (9L)
+// =============================================================================
+
+router.post("/leases/bulk-fix", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getOrgId(req);
+    const { fixes } = req.body;
+    if (!Array.isArray(fixes)) return res.status(400).json({ error: "fixes array required" });
+    
+    interface BulkFixResult { leaseId: string; fixType: string; success: boolean; error?: string; }
+    let fixedCount = 0;
+    const results: BulkFixResult[] = [];
+    
+    for (const fix of fixes) {
+      const { leaseId, fixType, value } = fix;
+      if (!leaseId || !fixType) continue;
+      
+      try {
+        if (fixType === "set_end_date") {
+          await db.execute(
+            `UPDATE rra_leases SET lease_expiration = $1, updated_at = NOW() WHERE id = $2 AND org_id = $3`,
+            [value || new Date().toISOString().split("T")[0], leaseId, orgId]
+          );
+        } else if (fixType === "set_rate") {
+          await db.execute(
+            `UPDATE rra_leases SET lease_amount = $1, updated_at = NOW() WHERE id = $2 AND org_id = $3`,
+            [parseFloat(value), leaseId, orgId]
+          );
+        } else if (fixType === "set_status") {
+          await db.execute(
+            `UPDATE rra_leases SET slip_status = $1, updated_at = NOW() WHERE id = $2 AND org_id = $3`,
+            [value || "Active", leaseId, orgId]
+          );
+        }
+        fixedCount++;
+        results.push({ leaseId, fixType, success: true });
+      } catch (e) {
+        results.push({ leaseId, fixType, success: false, error: String(e) });
+      }
+    }
+    
+    res.json({ success: true, fixedCount, results });
+  } catch (error) { next(error); }
+});
+
+router.get("/leases/completeness-scores", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getOrgId(req);
+    const { locationId } = req.query;
+    
+    const params: (string | number)[] = [orgId];
+    let whereClause = `org_id = $1`;
+    if (locationId) { whereClause += ` AND location_id = $2`; params.push(String(locationId)); }
+    
+    const { rows } = await db.execute(
+      `SELECT id,
+        (CASE WHEN lease_amount IS NOT NULL AND lease_amount::numeric > 0 THEN 20 ELSE 0 END +
+         CASE WHEN lease_commencement IS NOT NULL THEN 20 ELSE 0 END +
+         CASE WHEN lease_expiration IS NOT NULL OR contract_term IS NOT NULL THEN 20 ELSE 0 END +
+         CASE WHEN unit_type_custom IS NOT NULL OR storage_type IS NOT NULL THEN 20 ELSE 0 END +
+         CASE WHEN slip_status IS NOT NULL AND slip_status != '' THEN 20 ELSE 0 END
+        ) as completeness_score
+       FROM rra_leases WHERE ${whereClause}`,
+      params
+    );
+    
+    res.json(rows);
+  } catch (error) { next(error); }
+});
+
 // =============================================================================
 // Rent Roll Projects CRUD (/api/rent-roll/projects)
 // =============================================================================
@@ -3878,7 +5138,8 @@ router.get("/projects", async (req: Request, res: Response, next: NextFunction) 
   try {
     const orgId = getValidatedOrgId(req as AuthenticatedRequest);
     const { rows } = await db.execute(
-      `SELECT * FROM rent_roll_projects WHERE org_id = '${orgId}' ORDER BY created_at DESC`
+      `SELECT * FROM rent_roll_projects WHERE org_id = $1 ORDER BY created_at DESC`,
+      [orgId]
     );
     // Map snake_case to camelCase
     const projects = rows.map((r: any) => ({

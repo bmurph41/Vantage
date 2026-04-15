@@ -34,7 +34,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { queryClient } from "@/lib/queryClient";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 import DashboardNav from "../components/navigation/DashboardNav";
 import RentRollSummaryCards from "../components/rent-roll/RentRollSummaryCards";
 import RentRollCashFlowGrid from "../components/rent-roll/RentRollCashFlowGrid";
@@ -51,6 +51,13 @@ import { LeaseExpirationCalendar } from "../components/rent-roll/LeaseExpiration
 import { RenewalRemindersPanel } from "../components/rent-roll/RenewalRemindersPanel";
 import { type TimePeriodFilter, type TimePeriodType, getAvailableMonths, getAvailableQuarters } from "@shared/timePeriodUtils";
 import { deleteLocation } from "../lib/locationApi";
+import RVParkAnalyticsPanel from "../components/rent-roll/RVParkAnalyticsPanel";
+import IndustrialAnalyticsPanel from "../components/rent-roll/IndustrialAnalyticsPanel";
+import CAMReconciliationPanel from "../components/rent-roll/CAMReconciliationPanel";
+import { Warehouse, TentTree, Building2 as Building2Icon, Home, Hotel, DollarSign, RefreshCw } from "lucide-react";
+import HotelAnalyticsPanel from "../components/rent-roll/HotelAnalyticsPanel";
+import MultifamilyAnalyticsPanel from "../components/rent-roll/MultifamilyAnalyticsPanel";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from "@/components/ui/sheet";
 
 interface MarinaLocation {
   id: string;
@@ -96,6 +103,18 @@ export default function RentRollDashboard() {
     enabled: !!locationId,
   });
 
+  // Fetch auto-sync status for the header badge
+  const { data: syncStatus } = useQuery<{ autoSyncEnabled: boolean; lastSyncAt: string | null; source: string | null }>({
+    queryKey: ['/api/rent-roll/locations', locationId, 'sync-status'],
+    queryFn: async () => {
+      const response = await fetch(`/api/rent-roll/locations/${locationId}/sync-status`);
+      if (!response.ok) return { autoSyncEnabled: false, lastSyncAt: null, source: null };
+      return response.json();
+    },
+    enabled: !!locationId,
+    staleTime: 30_000,
+  });
+
   // Fetch all locations for quick-switcher
   const { data: allLocations } = useQuery<MarinaLocation[]>({
     queryKey: ['/api/rent-roll/locations'],
@@ -122,6 +141,14 @@ export default function RentRollDashboard() {
   const [periodFilter, setPeriodFilter] = useState<TimePeriodFilter>({
     type: "TTM",
   });
+  const [analyticsAssetClass, setAnalyticsAssetClass] = useState<string>("general");
+  const [isMarketRentDrawerOpen, setIsMarketRentDrawerOpen] = useState(false);
+  const [marketRentUpdates, setMarketRentUpdates] = useState<{ unitType: string; marketRent: string }[]>([
+    { unitType: "Studio", marketRent: "" },
+    { unitType: "1BR/1BA", marketRent: "" },
+    { unitType: "2BR/2BA", marketRent: "" },
+    { unitType: "3BR/2BA", marketRent: "" },
+  ]);
 
   // Effect to handle URL param changes (from KPI modal navigation)
   // Runs on mount and whenever currentPath changes (includes query string changes)
@@ -246,6 +273,18 @@ export default function RentRollDashboard() {
     },
   });
 
+  const marketRentUpdateMutation = useMutation({
+    mutationFn: (updates: { unitType: string; marketRent: number }[]) =>
+      apiRequest('POST', `/api/rent-roll/locations/${locationId}/market-rents/bulk-update`, { updates }),
+    onSuccess: () => {
+      toast({ title: "Market rents updated", description: "Bulk market rents have been saved." });
+      setIsMarketRentDrawerOpen(false);
+    },
+    onError: () => {
+      toast({ title: "Failed to update market rents", variant: "destructive" });
+    },
+  });
+
   const handleEditName = () => {
     if (locationData) {
       setEditedName(locationData.name || "");
@@ -352,6 +391,17 @@ export default function RentRollDashboard() {
                       </Badge>
                       {locationData.status && (
                         <Badge variant="outline" data-testid="badge-location-status">{locationData.status}</Badge>
+                      )}
+                      {syncStatus && (
+                        <Badge
+                          variant={syncStatus.autoSyncEnabled ? "default" : "outline"}
+                          className={syncStatus.autoSyncEnabled ? "bg-green-600 hover:bg-green-700 text-white gap-1" : "text-muted-foreground gap-1"}
+                          data-testid="badge-sync-status"
+                          title={syncStatus.lastSyncAt ? `Last synced: ${new Date(syncStatus.lastSyncAt).toLocaleString()}` : "Auto-sync not configured"}
+                        >
+                          <RefreshCw className="h-3 w-3" />
+                          {syncStatus.autoSyncEnabled ? "Auto-Sync On" : "Auto-Sync Off"}
+                        </Badge>
                       )}
                     </div>
                     <p className="text-sm text-muted-foreground mt-1">
@@ -564,10 +614,77 @@ export default function RentRollDashboard() {
 
           {/* Analytics Tab */}
           <TabsContent value="analytics" className="space-y-6">
-            <div className="grid gap-6">
-              <OccupancyTrendCharts locationId={locationId} />
-              <SeasonalRateComparison locationId={locationId} />
+            {/* Asset Class Selector */}
+            <div className="flex flex-wrap gap-2">
+              {[
+                { key: "general", label: "General", icon: Building2Icon },
+                { key: "rv-park", label: "RV Park / MHP", icon: TentTree },
+                { key: "industrial", label: "Industrial / Warehouse", icon: Warehouse },
+                { key: "retail", label: "Retail CAM", icon: Building2Icon },
+                { key: "hotel", label: "Hotel / STR", icon: Hotel },
+                { key: "multifamily", label: "Multifamily", icon: Home },
+              ].map(({ key, label, icon: Icon }) => (
+                <Button
+                  key={key}
+                  variant={analyticsAssetClass === key ? "default" : "outline"}
+                  size="sm"
+                  className="gap-1.5"
+                  onClick={() => setAnalyticsAssetClass(key)}
+                >
+                  <Icon className="w-3.5 h-3.5" />
+                  {label}
+                </Button>
+              ))}
             </div>
+
+            {analyticsAssetClass === "general" && (
+              <div className="grid gap-6">
+                <OccupancyTrendCharts locationId={locationId} />
+                <SeasonalRateComparison locationId={locationId} />
+              </div>
+            )}
+
+            {analyticsAssetClass === "rv-park" && locationId && (
+              <RVParkAnalyticsPanel locationId={locationId} />
+            )}
+
+            {analyticsAssetClass === "industrial" && locationId && (
+              <IndustrialAnalyticsPanel locationId={locationId} />
+            )}
+
+            {analyticsAssetClass === "retail" && (
+              <CAMReconciliationPanel orgId="" marinaId={locationId || undefined} />
+            )}
+
+            {analyticsAssetClass === "hotel" && (
+              <HotelAnalyticsPanel locationId={locationId} />
+            )}
+
+            {analyticsAssetClass === "multifamily" && (
+              <div className="grid gap-6">
+                <MultifamilyAnalyticsPanel locationId={locationId} />
+                {locationId && (
+                  <div className="flex justify-end">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setIsMarketRentDrawerOpen(true)}
+                      data-testid="button-update-market-rents"
+                    >
+                      <DollarSign className="w-4 h-4 mr-1" />
+                      Bulk Update Market Rents
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {!locationId && analyticsAssetClass !== "general" && (
+              <div className="text-center py-12 text-muted-foreground">
+                <Building2Icon className="w-10 h-10 mx-auto mb-3 opacity-30" />
+                <p className="text-sm">Select a project to view asset-class analytics</p>
+              </div>
+            )}
           </TabsContent>
 
           {/* Lease Management Tab */}
@@ -607,6 +724,73 @@ export default function RentRollDashboard() {
         onClose={() => setIsImportDrawerOpen(false)}
         locationId={locationId}
       />
+
+      {/* Market Rent Bulk-Update Drawer (Multifamily) */}
+      <Sheet open={isMarketRentDrawerOpen} onOpenChange={setIsMarketRentDrawerOpen}>
+        <SheetContent className="w-[400px] sm:w-[500px]">
+          <SheetHeader>
+            <SheetTitle>Bulk Update Market Rents</SheetTitle>
+            <SheetDescription>
+              Set market rent benchmarks by unit type. These values are used for variance analysis and pro forma sync.
+            </SheetDescription>
+          </SheetHeader>
+          <div className="py-6 space-y-4">
+            {marketRentUpdates.map((row, idx) => (
+              <div key={idx} className="flex items-center gap-3">
+                <div className="flex-1">
+                  <Label className="text-xs text-muted-foreground mb-1 block">{row.unitType}</Label>
+                  <div className="relative">
+                    <DollarSign className="absolute left-2 top-2.5 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      type="number"
+                      min="0"
+                      placeholder="Market rent"
+                      value={row.marketRent}
+                      className="pl-8"
+                      onChange={(e) => {
+                        const updated = [...marketRentUpdates];
+                        updated[idx] = { ...updated[idx], marketRent: e.target.value };
+                        setMarketRentUpdates(updated);
+                      }}
+                      data-testid={`input-market-rent-${row.unitType.replace(/\//g, '-')}`}
+                    />
+                  </div>
+                </div>
+              </div>
+            ))}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-xs"
+              onClick={() => setMarketRentUpdates(prev => [...prev, { unitType: "", marketRent: "" }])}
+            >
+              + Add Unit Type
+            </Button>
+          </div>
+          <SheetFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsMarketRentDrawerOpen(false)}
+              disabled={marketRentUpdateMutation.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                const updates = marketRentUpdates
+                  .filter(r => r.unitType.trim() && r.marketRent !== "")
+                  .map(r => ({ unitType: r.unitType, marketRent: parseFloat(r.marketRent) }));
+                marketRentUpdateMutation.mutate(updates);
+              }}
+              disabled={marketRentUpdateMutation.isPending}
+              data-testid="button-save-market-rents"
+            >
+              <RefreshCw className={`w-4 h-4 mr-1 ${marketRentUpdateMutation.isPending ? "animate-spin" : ""}`} />
+              {marketRentUpdateMutation.isPending ? "Saving..." : "Save Market Rents"}
+            </Button>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
 
       {/* Edit Project Name Dialog */}
       <Dialog open={isEditNameDialogOpen} onOpenChange={setIsEditNameDialogOpen}>

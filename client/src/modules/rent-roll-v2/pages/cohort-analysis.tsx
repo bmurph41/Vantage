@@ -210,7 +210,7 @@ export default function CohortAnalysisPage() {
   const periodKey = JSON.stringify(periodFilter);
 
   const { data: cohortData, isLoading } = useQuery<CohortAnalysisData>({
-    queryKey: ["/api/cohort/analysis", granularity, periodKey, effectiveProject],
+    queryKey: ["/api/rent-roll/analytics/cohorts", granularity, periodKey, effectiveProject],
     queryFn: async () => {
       const params = new URLSearchParams({ 
         granularity,
@@ -220,7 +220,7 @@ export default function CohortAnalysisPage() {
       if (effectiveProject !== "all") {
         params.append("locationId", effectiveProject);
       }
-      const response = await fetch(`/api/cohort/analysis?${params.toString()}`);
+      const response = await fetch(`/api/rent-roll/analytics/cohorts?${params.toString()}`);
       if (!response.ok) throw new Error("Failed to fetch cohort data");
       return response.json();
     },
@@ -228,13 +228,13 @@ export default function CohortAnalysisPage() {
 
   // LTV Trend query - only fetches when modal is open
   const { data: ltvTrendData, isLoading: ltvTrendLoading } = useQuery<LTVTrendResponse>({
-    queryKey: ["/api/cohort/ltv-trend", ltvGranularity, effectiveProject],
+    queryKey: ["/api/rent-roll/analytics/ltv-trend", ltvGranularity, effectiveProject],
     queryFn: async () => {
       const params = new URLSearchParams({ granularity: ltvGranularity });
       if (effectiveProject !== "all") {
         params.append("locationId", effectiveProject);
       }
-      const response = await fetch(`/api/cohort/ltv-trend?${params.toString()}`);
+      const response = await fetch(`/api/rent-roll/analytics/ltv-trend?${params.toString()}`);
       if (!response.ok) throw new Error("Failed to fetch LTV trend data");
       return response.json();
     },
@@ -321,7 +321,7 @@ export default function CohortAnalysisPage() {
             <DashboardNav />
             <div className="flex flex-wrap items-center gap-3">
               <TimePeriodSelector value={periodFilter} onChange={setPeriodFilter} />
-              <Select value={granularity} onValueChange={(v) => setGranularity(v as any)}>
+              <Select value={granularity} onValueChange={(v) => setGranularity(v as "month" | "quarter" | "year")}>
                 <SelectTrigger className="w-[140px]" data-testid="select-granularity">
                   <SelectValue placeholder="Granularity" />
                 </SelectTrigger>

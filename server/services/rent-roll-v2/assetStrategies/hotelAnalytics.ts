@@ -29,12 +29,12 @@ export interface HotelKPIs {
 
 export interface RoomTypePerformance {
   roomType: string;
-  totalKeys: number;
-  occupiedKeys: number;
-  occupancyRate: number;
-  avgDailyRate: number;
+  totalUnits: number;       // UI field: totalUnits (was totalKeys)
+  occupiedUnits: number;    // UI field: occupiedUnits (was occupiedKeys)
+  occupancyPct: number;     // UI field: occupancyPct (was occupancyRate)
+  avgNightlyRate: number;   // UI field: avgNightlyRate (was avgDailyRate)
   revpar: number;
-  monthlyRevenue: number;
+  totalRevenue: number;     // UI field: totalRevenue (was monthlyRevenue)
   revenueShare: number;           // % of total revenue
 }
 
@@ -126,13 +126,129 @@ export async function getRoomTypePerformance(projectId: string): Promise<RoomTyp
 
     return {
       roomType: r.roomType,
-      totalKeys: total,
-      occupiedKeys: occupied,
-      occupancyRate: Math.round(occ * 10) / 10,
-      avgDailyRate: Math.round(avgRate * 100) / 100,
+      totalUnits: total,
+      occupiedUnits: occupied,
+      occupancyPct: Math.round(occ * 10) / 10,
+      avgNightlyRate: Math.round(avgRate * 100) / 100,
       revpar: Math.round(avgRate * (occ / 100) * 100) / 100,
-      monthlyRevenue: Math.round(rev * 100) / 100,
+      totalRevenue: Math.round(rev * 100) / 100,
       revenueShare: totalRev > 0 ? Math.round((rev / totalRev) * 1000) / 10 : 0,
+    };
+  });
+}
+
+// ============================================================================
+// New Analytics: ADR Trend & Channel Mix (Phase 9C)
+// ============================================================================
+
+export interface ADRTrendPoint {
+  month: number;
+  year: number;
+  monthLabel: string;
+  adr: number;
+  occupancyPct: number;
+  revpar: number;
+}
+
+export interface ChannelMixItem {
+  channel: string;
+  leaseCount: number;
+  totalRevenue: number;
+  pctOfRevenue: number;
+  avgADR: number;
+}
+
+const MONTH_LABELS_H = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+/**
+ * Get month-by-month ADR and occupancy trend (trailing N months)
+ */
+export async function getADRTrend(projectId: string, months: number = 12): Promise<ADRTrendPoint[]> {
+  const [location] = await db
+    .select({ capacity: locations.capacity })
+    .from(locations)
+    .where(eq(locations.id, projectId))
+    .limit(1);
+
+  const totalKeys = location?.capacity || 1;
+  const now = new Date();
+  const result: ADRTrendPoint[] = [];
+
+  for (let i = months - 1; i >= 0; i--) {
+    const targetDate = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const month = targetDate.getMonth() + 1;
+    const year = targetDate.getFullYear();
+
+    const firstDay = `${year}-${String(month).padStart(2, "0")}-01`;
+    const lastDay = new Date(year, month, 0);
+    const lastDayStr = `${year}-${String(month).padStart(2, "0")}-${String(lastDay.getDate()).padStart(2, "0")}`;
+
+    // Filter leases that were active during this specific month period
+    const [stats] = await db
+      .select({
+        activeCount: sql<number>`COUNT(*)::int`,
+        avgRate: sql<string>`AVG(${leases.leaseAmount}::numeric)`,
+      })
+      .from(leases)
+      .where(
+        and(
+          eq(leases.locationId, projectId),
+          eq(leases.isActive, true),
+          sql`(${leases.leaseCommencement} IS NULL OR ${leases.leaseCommencement} <= ${lastDayStr}::date)`,
+          sql`(${leases.leaseExpiration} IS NULL OR ${leases.leaseExpiration} >= ${firstDay}::date)`
+        )
+      );
+
+    const occupied = stats?.activeCount || 0;
+    const adr = parseFloat(stats?.avgRate?.toString() || "0");
+    const occupancyPct = totalKeys > 0 ? Math.round((occupied / totalKeys) * 1000) / 10 : 0;
+    const revpar = Math.round(adr * (occupancyPct / 100) * 100) / 100;
+
+    result.push({
+      month,
+      year,
+      monthLabel: `${MONTH_LABELS_H[month - 1]} '${String(year).slice(2)}`,
+      adr: Math.round(adr * 100) / 100,
+      occupancyPct,
+      revpar,
+    });
+  }
+
+  return result;
+}
+
+/**
+ * Get revenue breakdown by booking source (channel mix).
+ * Uses unitLocation field as booking source proxy.
+ * Falls back to a synthetic distribution if no channel data exists.
+ */
+export async function getChannelMix(projectId: string): Promise<ChannelMixItem[]> {
+  const results = await db
+    .select({
+      channel: sql<string>`COALESCE(NULLIF(${leases.unitLocation}, ''), 'Direct')`,
+      leaseCount: sql<number>`COUNT(*)::int`,
+      totalRevenue: sql<string>`COALESCE(SUM(CASE WHEN ${leases.isActive} = true THEN ${leases.leaseAmount}::numeric * 30 ELSE 0 END), 0)`,
+      avgRate: sql<string>`AVG(CASE WHEN ${leases.isActive} = true THEN ${leases.leaseAmount}::numeric END)`,
+    })
+    .from(leases)
+    .where(eq(leases.locationId, projectId))
+    .groupBy(sql`COALESCE(NULLIF(${leases.unitLocation}, ''), 'Direct')`);
+
+  const totalRevenue = results.reduce((s, r) => s + parseFloat(r.totalRevenue?.toString() || "0"), 0);
+
+  if (totalRevenue === 0) {
+    // No channel data exists yet — return empty array (caller shows "no data" state)
+    return [];
+  }
+
+  return results.map(r => {
+    const rev = parseFloat(r.totalRevenue?.toString() || "0");
+    return {
+      channel: r.channel,
+      leaseCount: r.leaseCount,
+      totalRevenue: Math.round(rev * 100) / 100,
+      pctOfRevenue: totalRevenue > 0 ? Math.round((rev / totalRevenue) * 1000) / 10 : 0,
+      avgADR: Math.round(parseFloat(r.avgRate?.toString() || "0") * 100) / 100,
     };
   });
 }

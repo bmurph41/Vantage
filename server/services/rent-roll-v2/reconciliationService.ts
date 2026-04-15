@@ -1,402 +1,144 @@
-// @ts-nocheck
-// NOTE: This module is not yet wired to routes. GL reconciliation tables
-// (glAccounts, glMappings, reconciliationRecords, reconciliationLineItems)
-// must be created in schema.ts before this service can be activated.
 import { db } from "../../db";
-import { eq, and, desc, sql } from "drizzle-orm";
-import {
-  glAccounts,
-  glMappings,
-  reconciliationRecords,
-  reconciliationLineItems,
-  leases,
-  marinaLocations,
-  leaseCashFlows,
-  periods,
-  InsertGlAccount,
-  InsertGlMapping,
-  InsertReconciliationRecord,
-  GlAccount,
-  GlMapping,
-  ReconciliationRecord,
-  ReconciliationLineItem,
-} from "@shared/schema";
-import { startOfMonth, endOfMonth, format } from "date-fns";
 
-export interface ReconciliationSummary {
+// ---------------------------------------------------------------------------
+// Typed row interfaces
+// ---------------------------------------------------------------------------
+
+export interface GlCashFlowRow {
   id: string;
-  projectId: string | null;
-  projectName: string | null;
-  periodYear: number;
-  periodMonth: number;
-  status: string;
-  rentRollTotal: number;
-  glTotal: number | null;
-  varianceAmount: number | null;
-  variancePercent: number | null;
-  reconciledBy: string | null;
-  reconciledAt: Date | null;
+  cashflow_type: string;
+  amount: string;
+  year: number;
+  month: number;
+  notes: string | null;
 }
 
-export interface ReconciliationBreakdown {
-  glAccountId: string;
-  glAccountCode: string;
-  glAccountName: string;
-  category: string;
-  rentRollAmount: number;
-  glAmount: number | null;
-  varianceAmount: number;
-  lineItems: ReconciliationLineItem[];
+export interface GlAccountMatchRow {
+  id: string;
+  account_code: string;
+  account_name: string;
+  charge_type: string | null;
 }
 
-export class ReconciliationService {
-  async createGlAccount(data: InsertGlAccount): Promise<GlAccount> {
-    const [account] = await db.insert(glAccounts).values(data).returning();
-    return account;
-  }
+export interface AutoMatchResult {
+  rentRoll: GlCashFlowRow;
+  glEntry: GlAccountMatchRow;
+  confidence: number;
+  matchType: "cashflow_type" | "account_name_contains" | "account_code_prefix";
+}
 
-  async getGlAccounts(organizationId: string): Promise<GlAccount[]> {
-    return db
-      .select()
-      .from(glAccounts)
-      .where(
-        and(
-          eq(glAccounts.organizationId, organizationId),
-          eq(glAccounts.isActive, true)
-        )
-      )
-      .orderBy(glAccounts.accountCode);
-  }
+export interface AutoMatchSummary {
+  matched: AutoMatchResult[];
+  unmatchedRentRoll: GlCashFlowRow[];
+  unmatchedGL: GlAccountMatchRow[];
+  summary: {
+    totalRentRoll: number;
+    totalGL: number;
+    matchedCount: number;
+    matchPct: number;
+    unmatchedRRCount: number;
+    unmatchedGLCount: number;
+  };
+}
 
-  async getGlAccountById(id: string, organizationId: string): Promise<GlAccount | null> {
-    const [account] = await db
-      .select()
-      .from(glAccounts)
-      .where(
-        and(
-          eq(glAccounts.id, id),
-          eq(glAccounts.organizationId, organizationId)
-        )
+/**
+ * Match rent roll cash flows against GL account type definitions.
+ *
+ * Note: this system stores GL account definitions (chart of accounts), not
+ * live GL transaction entries. Matching is therefore category-to-account-type
+ * rather than amount-to-transaction. The three tiers are:
+ *   1. Exact charge_type mapping  (confidence 0.9)
+ *   2. Account name keyword match (confidence 0.7)
+ *   3. Account code prefix match  (confidence 0.4)
+ */
+export async function autoMatchGLEntries(params: {
+  orgId: string;
+  projectId?: string;
+  periodMonth?: number;
+  periodYear?: number;
+}): Promise<AutoMatchSummary> {
+  const { orgId, projectId, periodMonth, periodYear } = params;
+
+  // -- Fetch rent roll cash flows --
+  let query = `SELECT id, cashflow_type, amount, year, month, notes FROM rra_lease_cash_flows WHERE org_id = $1`;
+  const qParams: (string | number)[] = [orgId];
+  let idx = 2;
+  if (projectId) { query += ` AND location_id = $${idx++}`; qParams.push(projectId); }
+  if (periodMonth !== undefined) { query += ` AND month = $${idx++}`; qParams.push(periodMonth); }
+  if (periodYear !== undefined) { query += ` AND year = $${idx++}`; qParams.push(periodYear); }
+
+  const { rows: cfRows } = await db.execute(query, qParams);
+  const cashFlows = cfRows as GlCashFlowRow[];
+
+  // -- Fetch GL account definitions with optional charge_type mapping --
+  const { rows: glRows } = await db.execute(
+    `SELECT ga.id, ga.account_code, ga.account_name, gm.charge_type
+     FROM gl_accounts ga
+     LEFT JOIN gl_mappings gm ON gm.gl_account_id = ga.id
+     WHERE ga.organization_id = $1 AND ga.is_active = true`,
+    [orgId]
+  );
+  const glEntries = glRows as GlAccountMatchRow[];
+
+  // -- Category-based matching (non-consuming) --
+  // GL entries are account *definitions* (chart of accounts), not unique transactions.
+  // Many rent roll cashflow rows of the same charge type must all be able to match
+  // the same GL account definition — so we never remove entries from the candidate pool.
+  // "unmatchedGL" = account definitions that no cashflow row could map to.
+
+  const matched: AutoMatchResult[] = [];
+  const unmatchedRentRoll: GlCashFlowRow[] = [];
+  const matchedGlIds = new Set<string>();
+
+  for (const cf of cashFlows) {
+    const cfType = String(cf.cashflow_type || "");
+
+    // Tier 1: exact charge_type match (confidence 0.9)
+    let glMatch: GlAccountMatchRow | undefined = glEntries.find(g => g.charge_type === cfType);
+    let confidence = 0.9;
+    let matchType: AutoMatchResult["matchType"] = "cashflow_type";
+
+    // Tier 2: account name contains cashflow_type keyword (confidence 0.7)
+    if (!glMatch) {
+      glMatch = glEntries.find(g =>
+        (g.account_name || "").toLowerCase().includes(cfType.toLowerCase())
       );
-    return account || null;
-  }
-
-  async updateGlAccount(id: string, organizationId: string, data: Partial<InsertGlAccount>): Promise<GlAccount | null> {
-    const [account] = await db
-      .update(glAccounts)
-      .set({ ...data, updatedAt: new Date() })
-      .where(
-        and(
-          eq(glAccounts.id, id),
-          eq(glAccounts.organizationId, organizationId)
-        )
-      )
-      .returning();
-    return account || null;
-  }
-
-  async deleteGlAccount(id: string, organizationId: string): Promise<boolean> {
-    const result = await db
-      .delete(glAccounts)
-      .where(
-        and(
-          eq(glAccounts.id, id),
-          eq(glAccounts.organizationId, organizationId)
-        )
-      );
-    return true;
-  }
-
-  async createGlMapping(data: InsertGlMapping): Promise<GlMapping> {
-    const [mapping] = await db.insert(glMappings).values(data).returning();
-    return mapping;
-  }
-
-  async getGlMappings(organizationId: string): Promise<GlMapping[]> {
-    return db
-      .select()
-      .from(glMappings)
-      .where(
-        and(
-          eq(glMappings.organizationId, organizationId),
-          eq(glMappings.isActive, true)
-        )
-      )
-      .orderBy(desc(glMappings.priority));
-  }
-
-  async updateGlMapping(id: string, organizationId: string, data: Partial<InsertGlMapping>): Promise<GlMapping | null> {
-    const [mapping] = await db
-      .update(glMappings)
-      .set({ ...data, updatedAt: new Date() })
-      .where(
-        and(
-          eq(glMappings.id, id),
-          eq(glMappings.organizationId, organizationId)
-        )
-      )
-      .returning();
-    return mapping || null;
-  }
-
-  async deleteGlMapping(id: string, organizationId: string): Promise<boolean> {
-    await db
-      .delete(glMappings)
-      .where(
-        and(
-          eq(glMappings.id, id),
-          eq(glMappings.organizationId, organizationId)
-        )
-      );
-    return true;
-  }
-
-  async getReconciliationRecords(organizationId: string, projectId?: string): Promise<ReconciliationSummary[]> {
-    let query = db
-      .select({
-        id: reconciliationRecords.id,
-        projectId: reconciliationRecords.projectId,
-        projectName: marinaLocations.name,
-        periodYear: reconciliationRecords.periodYear,
-        periodMonth: reconciliationRecords.periodMonth,
-        status: reconciliationRecords.status,
-        rentRollTotal: reconciliationRecords.rentRollTotal,
-        glTotal: reconciliationRecords.glTotal,
-        varianceAmount: reconciliationRecords.varianceAmount,
-        variancePercent: reconciliationRecords.variancePercent,
-        reconciledBy: reconciliationRecords.reconciledBy,
-        reconciledAt: reconciliationRecords.reconciledAt,
-      })
-      .from(reconciliationRecords)
-      .leftJoin(marinaLocations, eq(reconciliationRecords.projectId, marinaLocations.id))
-      .where(eq(reconciliationRecords.organizationId, organizationId))
-      .orderBy(desc(reconciliationRecords.periodYear), desc(reconciliationRecords.periodMonth));
-
-    const results = await query;
-    return results.map(r => ({
-      ...r,
-      rentRollTotal: Number(r.rentRollTotal) || 0,
-      glTotal: r.glTotal ? Number(r.glTotal) : null,
-      varianceAmount: r.varianceAmount ? Number(r.varianceAmount) : null,
-      variancePercent: r.variancePercent ? Number(r.variancePercent) : null,
-    }));
-  }
-
-  async getOrCreateReconciliationRecord(
-    organizationId: string,
-    projectId: string | null,
-    year: number,
-    month: number
-  ): Promise<ReconciliationRecord> {
-    const [existing] = await db
-      .select()
-      .from(reconciliationRecords)
-      .where(
-        and(
-          eq(reconciliationRecords.organizationId, organizationId),
-          projectId 
-            ? eq(reconciliationRecords.projectId, projectId)
-            : sql`${reconciliationRecords.projectId} IS NULL`,
-          eq(reconciliationRecords.periodYear, year),
-          eq(reconciliationRecords.periodMonth, month)
-        )
-      );
-
-    if (existing) {
-      return existing;
+      confidence = 0.7;
+      matchType = "account_name_contains";
     }
 
-    const [record] = await db
-      .insert(reconciliationRecords)
-      .values({
-        organizationId,
-        projectId,
-        periodYear: year,
-        periodMonth: month,
-        status: "pending",
-      })
-      .returning();
-
-    return record;
-  }
-
-  async calculateRentRollTotal(
-    organizationId: string,
-    projectId: string | null,
-    year: number,
-    month: number
-  ): Promise<{ total: number; breakdown: Map<string, number> }> {
-    const cashFlowsQuery = db
-      .select({
-        leaseId: leaseCashFlows.leaseId,
-        rentAmount: leaseCashFlows.rentAmount,
-        isActiveInPeriod: leaseCashFlows.isActiveInPeriod,
-        storageType: leases.storageType,
-      })
-      .from(leaseCashFlows)
-      .innerJoin(periods, eq(leaseCashFlows.periodId, periods.id))
-      .innerJoin(leases, eq(leaseCashFlows.leaseId, leases.id))
-      .innerJoin(marinaLocations, eq(leases.locationId, marinaLocations.id))
-      .where(
-        and(
-          eq(marinaLocations.organizationId, organizationId),
-          projectId ? eq(leases.locationId, projectId) : sql`1=1`,
-          eq(periods.year, year),
-          eq(periods.month, month),
-          eq(leaseCashFlows.isActiveInPeriod, true)
-        )
-      );
-
-    const cashFlows = await cashFlowsQuery;
-
-    let total = 0;
-    const breakdown = new Map<string, number>();
-
-    for (const cf of cashFlows) {
-      const amount = Number(cf.rentAmount) || 0;
-      total += amount;
-
-      const storageType = cf.storageType || "Wet Slip";
-      breakdown.set(storageType, (breakdown.get(storageType) || 0) + amount);
-    }
-
-    return { total, breakdown };
-  }
-
-  async runReconciliation(
-    organizationId: string,
-    recordId: string,
-    glTotals: Map<string, number>
-  ): Promise<ReconciliationRecord> {
-    const [record] = await db
-      .select()
-      .from(reconciliationRecords)
-      .where(
-        and(
-          eq(reconciliationRecords.id, recordId),
-          eq(reconciliationRecords.organizationId, organizationId)
-        )
-      );
-
-    if (!record) {
-      throw new Error("Reconciliation record not found");
-    }
-
-    const rentRollData = await this.calculateRentRollTotal(
-      organizationId,
-      record.projectId,
-      record.periodYear,
-      record.periodMonth
-    );
-
-    let glTotal = 0;
-    glTotals.forEach((amount) => {
-      glTotal += amount;
-    });
-
-    const varianceAmount = rentRollData.total - glTotal;
-    const variancePercent = glTotal !== 0 ? (varianceAmount / glTotal) * 100 : 0;
-
-    const status = Math.abs(varianceAmount) < 0.01 ? "reconciled" : "variance_identified";
-
-    const [updated] = await db
-      .update(reconciliationRecords)
-      .set({
-        rentRollTotal: rentRollData.total.toFixed(2),
-        glTotal: glTotal.toFixed(2),
-        varianceAmount: varianceAmount.toFixed(2),
-        variancePercent: variancePercent.toFixed(2),
-        status,
-        updatedAt: new Date(),
-      })
-      .returning();
-
-    return updated;
-  }
-
-  async updateReconciliationStatus(
-    organizationId: string,
-    recordId: string,
-    status: "pending" | "in_progress" | "reconciled" | "variance_identified" | "closed",
-    userId?: string
-  ): Promise<ReconciliationRecord | null> {
-    const updates: any = {
-      status,
-      updatedAt: new Date(),
-    };
-
-    if (status === "reconciled" || status === "closed") {
-      updates.reconciledBy = userId || null;
-      updates.reconciledAt = new Date();
-    }
-
-    const [updated] = await db
-      .update(reconciliationRecords)
-      .set(updates)
-      .where(
-        and(
-          eq(reconciliationRecords.id, recordId),
-          eq(reconciliationRecords.organizationId, organizationId)
-        )
-      )
-      .returning();
-
-    return updated || null;
-  }
-
-  async getReconciliationBreakdown(
-    organizationId: string,
-    recordId: string
-  ): Promise<ReconciliationBreakdown[]> {
-    const [record] = await db
-      .select()
-      .from(reconciliationRecords)
-      .where(
-        and(
-          eq(reconciliationRecords.id, recordId),
-          eq(reconciliationRecords.organizationId, organizationId)
-        )
-      );
-
-    if (!record) {
-      return [];
-    }
-
-    const lineItems = await db
-      .select({
-        lineItem: reconciliationLineItems,
-        glAccount: glAccounts,
-      })
-      .from(reconciliationLineItems)
-      .leftJoin(glAccounts, eq(reconciliationLineItems.glAccountId, glAccounts.id))
-      .where(eq(reconciliationLineItems.reconciliationRecordId, recordId));
-
-    const breakdownMap = new Map<string, ReconciliationBreakdown>();
-
-    for (const { lineItem, glAccount } of lineItems) {
-      const accountId = lineItem.glAccountId || "unmapped";
-      
-      if (!breakdownMap.has(accountId)) {
-        breakdownMap.set(accountId, {
-          glAccountId: accountId,
-          glAccountCode: glAccount?.accountCode || "N/A",
-          glAccountName: glAccount?.accountName || "Unmapped",
-          category: glAccount?.category || "revenue",
-          rentRollAmount: 0,
-          glAmount: null,
-          varianceAmount: 0,
-          lineItems: [],
-        });
+    // Tier 3: account code prefix (≥2 chars) matches cashflow_type initial chars (confidence 0.4)
+    if (!glMatch) {
+      const prefix = cfType.slice(0, 3).toLowerCase();
+      if (prefix.length >= 2) {
+        glMatch = glEntries.find(g => (g.account_code || "").toLowerCase().startsWith(prefix));
       }
-
-      const breakdown = breakdownMap.get(accountId)!;
-      breakdown.rentRollAmount += Number(lineItem.rentRollAmount) || 0;
-      breakdown.varianceAmount += Number(lineItem.varianceAmount) || 0;
-      breakdown.lineItems.push(lineItem);
+      confidence = 0.4;
+      matchType = "account_code_prefix";
     }
 
-    return Array.from(breakdownMap.values());
+    if (glMatch) {
+      matchedGlIds.add(glMatch.id);
+      matched.push({ rentRoll: cf, glEntry: glMatch, confidence, matchType });
+    } else {
+      unmatchedRentRoll.push(cf);
+    }
   }
-}
 
-export const reconciliationService = new ReconciliationService();
+  // GL accounts that were never matched by any cashflow row
+  const unmatchedGL = glEntries.filter(g => !matchedGlIds.has(g.id));
+
+  return {
+    matched,
+    unmatchedRentRoll,
+    unmatchedGL,
+    summary: {
+      totalRentRoll: cashFlows.length,
+      totalGL: glEntries.length,
+      matchedCount: matched.length,
+      matchPct: cashFlows.length > 0 ? Math.round((matched.length / cashFlows.length) * 100) : 0,
+      unmatchedRRCount: unmatchedRentRoll.length,
+      unmatchedGLCount: unmatchedGL.length,
+    },
+  };
+}

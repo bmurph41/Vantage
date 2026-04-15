@@ -71,7 +71,26 @@ import ColumnSettingsDialog from "./ColumnSettingsDialog";
 import CashFlowDrawer from "./CashFlowDrawer";
 import { useRentRollColumns } from "../../hooks/useRentRollColumns";
 import { ImportedDataBadge } from "@/components/integrations/ImportedDataBadge";
-import type { RentRollColumnConfig, LeaseWithTenant } from "@shared/schema";
+import type { RentRollColumnConfig, LeaseWithTenant, RraTenant } from "@shared/schema";
+
+// Extended type for lease rows returned by the API.
+// The API JOIN may include integration-tracking fields and loa that are not in the
+// Drizzle-inferred RraLease type but are present at runtime in the response payload.
+interface ExtendedLeaseRow extends LeaseWithTenant {
+  // Flattened tenant boat fields (API may include them directly on the lease object)
+  boatLength?: string | null;
+  boatWidth?: string | null;
+  loa?: string | null;
+  // Integration-tracking fields (present when lease/tenant was imported via integration)
+  integrationSource?: string | null;
+  externalId?: string | null;
+  lastSyncedAt?: string | null;
+  tenant: RraTenant & {
+    integrationSource?: string | null;
+    externalId?: string | null;
+    lastSyncedAt?: string | null;
+  };
+}
 
 // Rolling/MTM contract term types that have no fixed expiration
 const ROLLING_CONTRACT_TERMS = ['monthly', 'mtm', 'month-to-month', 'weekly', 'daily', 'daily/nightly'];
@@ -213,6 +232,7 @@ export default function LeasesTable({ onEditLease, locationId }: LeasesTableProp
   const [stateFilter, setStateFilter] = useState("all");
   // Default to "all" when viewing a specific project to show incomplete/default-date leases
   const [statusFilter, setStatusFilter] = useState(locationId ? "all" : "active");
+  const [completenessFilter, setCompletenessFilter] = useState<"all" | "complete" | "incomplete">("all");
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
   const [isColumnSettingsOpen, setIsColumnSettingsOpen] = useState(false);
   const [selectedLeases, setSelectedLeases] = useState<Set<string>>(new Set());
@@ -370,25 +390,44 @@ export default function LeasesTable({ onEditLease, locationId }: LeasesTableProp
     },
   });
 
-  const rawLeases = data?.leases || [];
+  const rawLeases = (data?.leases || []) as ExtendedLeaseRow[];
 
-  // Apply client-side search filtering
-  const filteredLeases = rawLeases.filter((lease) => {
-    if (!searchTerm.trim()) return true;
-    
-    const term = searchTerm.toLowerCase().trim();
-    const searchableFields = [
-      lease.tenant?.name,
-      lease.unitLocation,
-      lease.contractTerm,
-      lease.tenant?.boatMake,
-      lease.tenant?.boatSize,
-      lease.leaseKey,
+  // Compute completeness score for a lease (mirrors renderCellContent scoring, 0-100)
+  const computeCompletenessScore = (lease: ExtendedLeaseRow): number => {
+    const checks = [
+      !!(lease.leaseAmount && parseFloat(lease.leaseAmount) > 0),
+      !!lease.leaseCommencement,
+      !!(lease.leaseExpiration || lease.contractTerm),
+      !!(lease.unitTypeCustom || lease.storageType),
+      !!(lease.slipStatus && lease.slipStatus !== ""),
     ];
-    
-    return searchableFields.some(field => 
-      field && String(field).toLowerCase().includes(term)
-    );
+    return checks.filter(Boolean).length * 20;
+  };
+
+  // Apply client-side search + completeness filtering
+  const filteredLeases = rawLeases.filter((lease) => {
+    if (searchTerm.trim()) {
+      const term = searchTerm.toLowerCase().trim();
+      const searchableFields = [
+        lease.tenant?.name,
+        lease.unitLocation,
+        lease.contractTerm,
+        lease.tenant?.boatMake,
+        lease.tenant?.boatSize,
+        lease.leaseKey,
+      ];
+      if (!searchableFields.some(field => field && String(field).toLowerCase().includes(term))) {
+        return false;
+      }
+    }
+
+    if (completenessFilter !== "all") {
+      const score = computeCompletenessScore(lease);
+      if (completenessFilter === "complete" && score < 80) return false;
+      if (completenessFilter === "incomplete" && score >= 80) return false;
+    }
+
+    return true;
   });
 
   // Apply client-side sorting based on column config
@@ -398,8 +437,8 @@ export default function LeasesTable({ onEditLease, locationId }: LeasesTableProp
     const { columnId, direction } = config.sort;
     const multiplier = direction === 'asc' ? 1 : -1;
     
-    let aVal: any;
-    let bVal: any;
+    let aVal: string | number;
+    let bVal: string | number;
     
     switch (columnId) {
       case 'tenant':
@@ -433,8 +472,8 @@ export default function LeasesTable({ onEditLease, locationId }: LeasesTableProp
         bVal = b.unitLocation?.toLowerCase() || '';
         break;
       case 'boatDimensions':
-        aVal = parseFloat((a as any).boatLength || '0');
-        bVal = parseFloat((b as any).boatLength || '0');
+        aVal = parseFloat(a.boatLength || '0');
+        bVal = parseFloat(b.boatLength || '0');
         break;
       case 'slipSize':
         aVal = parseFloat(a.slipLength || '0');
@@ -468,12 +507,12 @@ export default function LeasesTable({ onEditLease, locationId }: LeasesTableProp
         bVal = bStorageRev + (bCharge1 + bCharge2 + bCharge3) * bNumMonths;
         break;
       case 'boatLength':
-        aVal = parseFloat((a as any).boatLength || '0');
-        bVal = parseFloat((b as any).boatLength || '0');
+        aVal = parseFloat(a.boatLength || '0');
+        bVal = parseFloat(b.boatLength || '0');
         break;
       case 'boatWidth':
-        aVal = parseFloat((a as any).boatWidth || '0');
-        bVal = parseFloat((b as any).boatWidth || '0');
+        aVal = parseFloat(a.boatWidth || '0');
+        bVal = parseFloat(b.boatWidth || '0');
         break;
       case 'slipLength':
         aVal = parseFloat(a.slipLength || '0');
@@ -484,30 +523,30 @@ export default function LeasesTable({ onEditLease, locationId }: LeasesTableProp
         bVal = parseFloat(b.slipWidth || '0');
         break;
       case 'slipUtilization':
-        const aBoatLenUtil = parseFloat((a as any).boatLength || '0');
-        const bBoatLenUtil = parseFloat((b as any).boatLength || '0');
+        const aBoatLenUtil = parseFloat(a.boatLength || '0');
+        const bBoatLenUtil = parseFloat(b.boatLength || '0');
         const aSlipLenUtil = parseFloat(a.slipLength || '0');
         const bSlipLenUtil = parseFloat(b.slipLength || '0');
         aVal = (aBoatLenUtil > 0 && aSlipLenUtil > 0) ? (aBoatLenUtil / aSlipLenUtil) : 0;
         bVal = (bBoatLenUtil > 0 && bSlipLenUtil > 0) ? (bBoatLenUtil / bSlipLenUtil) : 0;
         break;
       case 'ratePerFtMo':
-        const aBoatLen1 = parseFloat((a as any).boatLength || '0');
-        const bBoatLen1 = parseFloat((b as any).boatLength || '0');
+        const aBoatLen1 = parseFloat(a.boatLength || '0');
+        const bBoatLen1 = parseFloat(b.boatLength || '0');
         aVal = aBoatLen1 > 0 ? calculateMonthlyRent(a as LeaseWithTenant) / aBoatLen1 : 0;
         bVal = bBoatLen1 > 0 ? calculateMonthlyRent(b as LeaseWithTenant) / bBoatLen1 : 0;
         break;
       case 'ratePerFtYr':
-        const aBoatLen2 = parseFloat((a as any).boatLength || '0');
-        const bBoatLen2 = parseFloat((b as any).boatLength || '0');
+        const aBoatLen2 = parseFloat(a.boatLength || '0');
+        const bBoatLen2 = parseFloat(b.boatLength || '0');
         const aIsAnnual = isAnnualContract(a.contractTerm);
         const bIsAnnual = isAnnualContract(b.contractTerm);
         aVal = (aBoatLen2 > 0 && aIsAnnual) ? calculateTotalValue(a as LeaseWithTenant) / aBoatLen2 : 0;
         bVal = (bBoatLen2 > 0 && bIsAnnual) ? calculateTotalValue(b as LeaseWithTenant) / bBoatLen2 : 0;
         break;
       case 'ratePerFtSeason':
-        const aBoatLen3 = parseFloat((a as any).boatLength || '0');
-        const bBoatLen3 = parseFloat((b as any).boatLength || '0');
+        const aBoatLen3 = parseFloat(a.boatLength || '0');
+        const bBoatLen3 = parseFloat(b.boatLength || '0');
         const aIsSeasonal = !isAnnualContract(a.contractTerm);
         const bIsSeasonal = !isAnnualContract(b.contractTerm);
         aVal = (aBoatLen3 > 0 && aIsSeasonal) ? calculateTotalValue(a as LeaseWithTenant) / aBoatLen3 : 0;
@@ -531,36 +570,36 @@ export default function LeasesTable({ onEditLease, locationId }: LeasesTableProp
         bVal = getCustomerTotalById(b as LeaseWithTenant);
         break;
       case 'status':
-        aVal = ((a as any).slipStatus || (a.isActive ? 'Occupied' : 'Vacant')).toLowerCase();
-        bVal = ((b as any).slipStatus || (b.isActive ? 'Occupied' : 'Vacant')).toLowerCase();
+        aVal = (a.slipStatus || (a.isActive ? 'Occupied' : 'Vacant')).toLowerCase();
+        bVal = (b.slipStatus || (b.isActive ? 'Occupied' : 'Vacant')).toLowerCase();
         break;
       case 'isLiveaboard':
-        aVal = (a as any).isLiveaboard ? 1 : 0;
-        bVal = (b as any).isLiveaboard ? 1 : 0;
+        aVal = a.isLiveaboard ? 1 : 0;
+        bVal = b.isLiveaboard ? 1 : 0;
         break;
       case 'electricCharge':
-        aVal = parseFloat((a as any).electricCharge || '0');
-        bVal = parseFloat((b as any).electricCharge || '0');
+        aVal = parseFloat(a.electricCharge || '0');
+        bVal = parseFloat(b.electricCharge || '0');
         break;
       case 'liveaboardRate':
-        aVal = parseFloat((a as any).liveaboardRate || '0');
-        bVal = parseFloat((b as any).liveaboardRate || '0');
+        aVal = parseFloat(a.liveaboardRate || '0');
+        bVal = parseFloat(b.liveaboardRate || '0');
         break;
       case 'waterCharge':
-        aVal = parseFloat((a as any).waterCharge || '0');
-        bVal = parseFloat((b as any).waterCharge || '0');
+        aVal = parseFloat(a.waterCharge || '0');
+        bVal = parseFloat(b.waterCharge || '0');
         break;
       case 'sewerCharge':
-        aVal = parseFloat((a as any).sewerCharge || '0');
-        bVal = parseFloat((b as any).sewerCharge || '0');
+        aVal = parseFloat(a.sewerCharge || '0');
+        bVal = parseFloat(b.sewerCharge || '0');
         break;
       case 'pumpoutCharge':
-        aVal = parseFloat((a as any).pumpoutCharge || '0');
-        bVal = parseFloat((b as any).pumpoutCharge || '0');
+        aVal = parseFloat(a.pumpoutCharge || '0');
+        bVal = parseFloat(b.pumpoutCharge || '0');
         break;
       case 'taxesCharge':
-        aVal = parseFloat((a as any).taxesCharge || '0');
-        bVal = parseFloat((b as any).taxesCharge || '0');
+        aVal = parseFloat(a.taxesCharge || '0');
+        bVal = parseFloat(b.taxesCharge || '0');
         break;
       default:
         return 0;
@@ -751,17 +790,36 @@ export default function LeasesTable({ onEditLease, locationId }: LeasesTableProp
     const tenant = lease?.tenant || {};
     
     switch (columnId) {
-      case "tenant":
+      case "tenant": {
         const isIncompleteLease = lease.isIncomplete || !lease.leaseCommencement || !lease.leaseAmount;
         const usesDefaultDates = lease.usesDefaultDates === true;
+        // Compute completeness score (0-100) from 5 key fields
+        const completenessChecks = [
+          !!(lease.leaseAmount && parseFloat(lease.leaseAmount) > 0),
+          !!lease.leaseCommencement,
+          !!(lease.leaseExpiration || lease.contractTerm),
+          !!(lease.unitTypeCustom || lease.storageType),
+          !!(lease.slipStatus && lease.slipStatus !== ""),
+        ];
+        const completenessScore = completenessChecks.filter(Boolean).length * 20;
         return (
           <div className="flex items-center gap-2">
             <span className="font-medium">{tenant.name || "N/A"}</span>
             <ImportedDataBadge
-              integrationSource={(lease as any).integrationSource || (tenant as any).integrationSource}
-              externalId={(lease as any).externalId || (tenant as any).externalId}
-              lastSyncedAt={(lease as any).lastSyncedAt || (tenant as any).lastSyncedAt}
+              integrationSource={lease.integrationSource || tenant.integrationSource}
+              externalId={lease.externalId || tenant.externalId}
+              lastSyncedAt={lease.lastSyncedAt || tenant.lastSyncedAt}
             />
+            {completenessScore < 100 && (
+              <span
+                className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold tabular-nums ${
+                  completenessScore >= 80 ? "bg-yellow-100 text-yellow-700" : "bg-red-100 text-red-700"
+                }`}
+                title={`Data completeness: ${completenessScore}%`}
+              >
+                {completenessScore}%
+              </span>
+            )}
             {isIncompleteLease && (
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -796,6 +854,7 @@ export default function LeasesTable({ onEditLease, locationId }: LeasesTableProp
             )}
           </div>
         );
+      }
       
       case "commencement":
         return <span className="text-sm tabular-nums">{formatDate(lease.leaseCommencement)}</span>;
@@ -912,7 +971,7 @@ export default function LeasesTable({ onEditLease, locationId }: LeasesTableProp
       
       case "seasonSummary":
         // Display seasonal breakdown from line items (winter/summer rates and slips)
-        const seasonLineItems = (lease as any).lineItems || [];
+        const seasonLineItems = lease.lineItems || [];
         
         // Find winter and summer line items
         const winterItems = seasonLineItems.filter((item: any) => 
@@ -993,7 +1052,7 @@ export default function LeasesTable({ onEditLease, locationId }: LeasesTableProp
       
       case "lineItems":
         // Display summary of line items (fee breakdown)
-        const leaseLineItems = (lease as any).lineItems || [];
+        const leaseLineItems = lease.lineItems || [];
         if (leaseLineItems.length === 0) {
           return <span className="text-sm text-muted-foreground">—</span>;
         }
@@ -1043,9 +1102,9 @@ export default function LeasesTable({ onEditLease, locationId }: LeasesTableProp
         return <span className="text-sm">{lease.unitLocation || "N/A"}</span>;
       
       case "boatDimensions":
-        const boatLength = (lease as any).boatLength;
-        const boatWidth = (lease as any).boatWidth;
-        const loa = (lease as any).loa;
+        const boatLength = lease.boatLength;
+        const boatWidth = lease.boatWidth;
+        const loa = lease.loa;
         
         let dimensionDisplay = "—";
         if (boatLength && boatWidth) {
@@ -1142,7 +1201,7 @@ export default function LeasesTable({ onEditLease, locationId }: LeasesTableProp
       
       case "status":
         // Display actual slip status if available, otherwise fallback to Active/Inactive
-        const slipStatusValue = (lease as any).slipStatus || (lease.isActive ? "Occupied" : "Vacant");
+        const slipStatusValue = lease.slipStatus || (lease.isActive ? "Occupied" : "Vacant");
         
         // Style based on status type
         const isInactive = ["Vacant", "Unusable", "Occupied; Not-Paying"].includes(slipStatusValue);
@@ -1176,7 +1235,7 @@ export default function LeasesTable({ onEditLease, locationId }: LeasesTableProp
         return <span className="text-sm">{lease.storageType || "—"}</span>;
       
       case "slipStatus":
-        const ssValue = (lease as any).slipStatus || "—";
+        const ssValue = lease.slipStatus || "—";
         return <span className="text-sm">{ssValue}</span>;
       
       case "rateType":
@@ -1207,7 +1266,7 @@ export default function LeasesTable({ onEditLease, locationId }: LeasesTableProp
         );
       
       case "slipUtilization":
-        const utilizationBoatLength = parseFloat((lease as any).boatLength || '0');
+        const utilizationBoatLength = parseFloat(lease.boatLength || '0');
         const utilizationSlipLength = parseFloat(lease.slipLength || '0');
         if (utilizationBoatLength > 0 && utilizationSlipLength > 0) {
           const utilization = (utilizationBoatLength / utilizationSlipLength) * 100;
@@ -1257,14 +1316,14 @@ export default function LeasesTable({ onEditLease, locationId }: LeasesTableProp
         );
       
       case "isLiveaboard":
-        return (lease as any).isLiveaboard ? (
+        return lease.isLiveaboard ? (
           <Badge variant="secondary" className="text-xs">Yes</Badge>
         ) : (
           <span className="text-muted-foreground">—</span>
         );
       
       case "electricCharge":
-        const elecCharge = (lease as any).electricCharge ? parseFloat((lease as any).electricCharge) : 0;
+        const elecCharge = lease.electricCharge ? parseFloat(lease.electricCharge) : 0;
         return elecCharge > 0 ? (
           <span className="tabular-nums">{formatCurrency(elecCharge)}</span>
         ) : (
@@ -1272,7 +1331,7 @@ export default function LeasesTable({ onEditLease, locationId }: LeasesTableProp
         );
       
       case "liveaboardRate":
-        const lbRate = (lease as any).liveaboardRate ? parseFloat((lease as any).liveaboardRate) : 0;
+        const lbRate = lease.liveaboardRate ? parseFloat(lease.liveaboardRate) : 0;
         return lbRate > 0 ? (
           <span className="tabular-nums">{formatCurrency(lbRate)}</span>
         ) : (
@@ -1280,7 +1339,7 @@ export default function LeasesTable({ onEditLease, locationId }: LeasesTableProp
         );
       
       case "waterCharge":
-        const waterCh = (lease as any).waterCharge ? parseFloat((lease as any).waterCharge) : 0;
+        const waterCh = lease.waterCharge ? parseFloat(lease.waterCharge) : 0;
         return waterCh > 0 ? (
           <span className="tabular-nums">{formatCurrency(waterCh)}</span>
         ) : (
@@ -1288,7 +1347,7 @@ export default function LeasesTable({ onEditLease, locationId }: LeasesTableProp
         );
       
       case "sewerCharge":
-        const sewerCh = (lease as any).sewerCharge ? parseFloat((lease as any).sewerCharge) : 0;
+        const sewerCh = lease.sewerCharge ? parseFloat(lease.sewerCharge) : 0;
         return sewerCh > 0 ? (
           <span className="tabular-nums">{formatCurrency(sewerCh)}</span>
         ) : (
@@ -1296,7 +1355,7 @@ export default function LeasesTable({ onEditLease, locationId }: LeasesTableProp
         );
       
       case "pumpoutCharge":
-        const pumpCh = (lease as any).pumpoutCharge ? parseFloat((lease as any).pumpoutCharge) : 0;
+        const pumpCh = lease.pumpoutCharge ? parseFloat(lease.pumpoutCharge) : 0;
         return pumpCh > 0 ? (
           <span className="tabular-nums">{formatCurrency(pumpCh)}</span>
         ) : (
@@ -1304,7 +1363,7 @@ export default function LeasesTable({ onEditLease, locationId }: LeasesTableProp
         );
       
       case "taxesCharge":
-        const taxCh = (lease as any).taxesCharge ? parseFloat((lease as any).taxesCharge) : 0;
+        const taxCh = lease.taxesCharge ? parseFloat(lease.taxesCharge) : 0;
         return taxCh > 0 ? (
           <span className="tabular-nums">{formatCurrency(taxCh)}</span>
         ) : (
@@ -1457,6 +1516,16 @@ export default function LeasesTable({ onEditLease, locationId }: LeasesTableProp
               <SelectItem value="all">All Status</SelectItem>
               <SelectItem value="active">Active</SelectItem>
               <SelectItem value="inactive">Inactive</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={completenessFilter} onValueChange={(v) => setCompletenessFilter(v as "all" | "complete" | "incomplete")}>
+            <SelectTrigger className="w-36" data-testid="select-completeness-filter">
+              <SelectValue placeholder="Completeness" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Records</SelectItem>
+              <SelectItem value="complete">Complete (≥80%)</SelectItem>
+              <SelectItem value="incomplete">Incomplete (&lt;80%)</SelectItem>
             </SelectContent>
           </Select>
           <Button
@@ -2044,7 +2113,7 @@ export default function LeasesTable({ onEditLease, locationId }: LeasesTableProp
                     <Label htmlFor="bulk-discount-type">Discount Type</Label>
                     <Select 
                       value={bulkEditData.discountType || ""} 
-                      onValueChange={(v) => setBulkEditData(prev => ({ ...prev, discountType: (v || undefined) as any }))}
+                      onValueChange={(v) => setBulkEditData(prev => ({ ...prev, discountType: (v || undefined) as "PERCENT_OFF" | "FLAT_RATE" | "AMOUNT_OFF" | undefined }))}
                     >
                       <SelectTrigger id="bulk-discount-type" data-testid="select-bulk-discount-type">
                         <SelectValue placeholder="Select type" />
