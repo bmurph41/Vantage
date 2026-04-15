@@ -988,6 +988,68 @@ export class BillingService {
       effectiveDate: now.toISOString(),
     };
   }
+
+  /**
+   * Check whether a broker user currently has an active broker_plan Stripe
+   * subscription. Used by publish gates and entitlement enforcement.
+   *
+   * Strategy:
+   *   1. In production (Stripe configured): resolve the user's org → customer
+   *      id via billing_subscriptions, list active Stripe subscriptions for
+   *      that customer, and require one tagged with sku=broker_plan and
+   *      brokerUserId matching this user.
+   *   2. In dev (no STRIPE_SECRET_KEY): fall back to trusting the denormalized
+   *      brokerProfiles.brokerTier + isPublishable state that the webhook
+   *      would otherwise maintain.
+   */
+  async hasActiveBrokerPlan(
+    userId: string,
+  ): Promise<{ active: boolean; tier?: BrokerTier }> {
+    if (!stripe) {
+      const [profile] = await db
+        .select()
+        .from(brokerProfiles)
+        .where(eq(brokerProfiles.userId, userId))
+        .limit(1);
+      if (profile?.brokerTier && profile.brokerTier in BROKER_TIERS) {
+        return { active: true, tier: profile.brokerTier as BrokerTier };
+      }
+      return { active: false };
+    }
+
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+    if (!user?.orgId) return { active: false };
+
+    const [sub] = await db
+      .select()
+      .from(billingSubscriptions)
+      .where(eq(billingSubscriptions.orgId, user.orgId))
+      .limit(1);
+    if (!sub?.stripeCustomerId) return { active: false };
+
+    const stripeSubs = await stripe.subscriptions.list({
+      customer: sub.stripeCustomerId,
+      status: 'active',
+      limit: 100,
+    });
+
+    for (const s of stripeSubs.data) {
+      const md = (s.metadata || {}) as Record<string, string | undefined>;
+      if (
+        md.sku === 'broker_plan' &&
+        md.brokerUserId === userId &&
+        md.tier &&
+        md.tier in BROKER_TIERS
+      ) {
+        return { active: true, tier: md.tier as BrokerTier };
+      }
+    }
+    return { active: false };
+  }
 }
 
 const billingService = new BillingService();

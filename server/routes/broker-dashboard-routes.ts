@@ -21,6 +21,7 @@ import {
 } from "@shared/schema";
 import { and, desc, eq, sql, gte } from "drizzle-orm";
 import { getBrokerTierDefinition } from "../services/broker-tiers";
+import billingService from "../services/billing-service";
 import {
   backfillClaimsForProfile,
   releaseUnpublishedProfileClaims,
@@ -173,13 +174,19 @@ router.post("/my-profile/publish", async (req: Request, res: Response) => {
     const profile = await getOwnedProfile(ctx.userId);
     if (!profile) return res.status(404).json({ error: "No broker profile found" });
 
-    // TODO: verify active broker plan via Stripe subscription lookup once
-    // billing integration is wired. For now, accept presence of broker_tier.
-    if (!profile.brokerTier) {
+    const planCheck = await billingService.hasActiveBrokerPlan(ctx.userId);
+    if (!planCheck.active) {
       return res.status(403).json({
         error: "no_active_broker_plan",
-        message: "You must have an active broker plan to publish your profile.",
+        message:
+          "You must have an active broker plan to publish your profile.",
       });
+    }
+    if (planCheck.tier && planCheck.tier !== profile.brokerTier) {
+      await db
+        .update(brokerProfiles)
+        .set({ brokerTier: planCheck.tier, updatedAt: new Date() })
+        .where(eq(brokerProfiles.id, profile.id));
     }
 
     const published = await db.transaction(async (tx) => {
