@@ -96,6 +96,61 @@ export function encryptPiiFields(body: Record<string, any>): void {
 }
 
 /**
+ * Encrypt contact fields used by lead-capture / portal submission flows.
+ * Handles contactName / contactEmail / contactPhone. Returns a NEW object —
+ * does not mutate the input — so callers can safely keep a plaintext copy
+ * in memory for downstream processing (notifications) without leaking.
+ */
+export function encryptContactFields<T extends Record<string, any>>(row: T): T {
+  const out: Record<string, any> = { ...row };
+  for (const key of ['contactName', 'contactEmail', 'contactPhone']) {
+    const v = out[key];
+    if (typeof v === 'string' && v.length > 0 && !isEncrypted(v)) {
+      out[key] = encrypt(v);
+    }
+  }
+  return out as T;
+}
+
+/** Decrypt contact fields on a row read from the DB. */
+export function decryptContactFields<T extends Record<string, any>>(row: T): T {
+  if (!row) return row;
+  const out: Record<string, any> = { ...row };
+  for (const key of ['contactName', 'contactEmail', 'contactPhone']) {
+    const v = out[key];
+    if (typeof v === 'string' && isEncrypted(v)) {
+      try {
+        out[key] = decrypt(v);
+      } catch (e) {
+        console.error(`[encryption-service] Failed to decrypt ${key}:`, e);
+        out[key] = null;
+      }
+    }
+  }
+  return out as T;
+}
+
+/** Decrypt contact fields on every row in an array (non-mutating). */
+export function decryptContactFieldsMany<T extends Record<string, any>>(rows: T[]): T[] {
+  return rows.map((r) => decryptContactFields(r));
+}
+
+/**
+ * Redact contact fields out of a raw_payload JSONB blob so the plaintext
+ * copy isn't stored alongside the encrypted columns. Returns a new object.
+ */
+export function redactContactFieldsFromPayload(
+  payload: Record<string, any> | null | undefined,
+): Record<string, any> | null {
+  if (!payload || typeof payload !== 'object') return null;
+  const out: Record<string, any> = { ...payload };
+  for (const key of ['contactName', 'contactEmail', 'contactPhone', 'contact_name', 'contact_email', 'contact_phone']) {
+    if (key in out) delete out[key];
+  }
+  return out;
+}
+
+/**
  * Process an investor record for API response, handling PII decryption/masking.
  * - Admin/owner roles: decrypt and return full values
  * - Other roles: return masked values

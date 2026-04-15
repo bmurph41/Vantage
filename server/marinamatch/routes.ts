@@ -6,6 +6,12 @@ import intelRouter from "./intel-routes";
 import { WorkflowEngine } from './workflow-engine';
 import workflowRouter from './workflow-routes';
 import {
+  encryptContactFields,
+  decryptContactFields,
+  decryptContactFieldsMany,
+  redactContactFieldsFromPayload,
+} from '../services/encryption-service';
+import {
   dealSources,
   investmentMandates,
   mandateCriteria,
@@ -987,7 +993,7 @@ router.get("/broker-portal-submissions", requireProspecting, async (req: Request
       filtered = filtered.filter(s => s.status === status);
     }
 
-    res.json(filtered);
+    res.json(decryptContactFieldsMany(filtered));
   } catch (error) {
     console.error("Error fetching portal submissions:", error);
     res.status(500).json({ error: "Failed to fetch submissions" });
@@ -1007,7 +1013,7 @@ router.post("/broker-portal-submissions/:id/review", requireProspecting, async (
       return res.status(400).json({ error: "Invalid action. Must be 'approve' or 'reject'" });
     }
 
-    const [submission] = await db
+    const [submissionRaw] = await db
       .select()
       .from(brokerPortalSubmissions)
       .where(and(
@@ -1015,7 +1021,8 @@ router.post("/broker-portal-submissions/:id/review", requireProspecting, async (
         eq(brokerPortalSubmissions.orgId, orgId)
       ));
 
-    if (!submission) return res.status(404).json({ error: "Submission not found" });
+    if (!submissionRaw) return res.status(404).json({ error: "Submission not found" });
+    const submission = decryptContactFields(submissionRaw);
 
     if (action === "approve") {
       // Create sourced deal from submission
@@ -1148,7 +1155,14 @@ router.post("/public/broker-portal/:token/submit", async (req: Request, res: Res
     // Generate submission token for tracking
     const submissionToken = crypto.randomBytes(16).toString("hex");
 
-    // Create portal submission (pending review)
+    // Create portal submission (pending review).
+    // Contact fields are PII — encrypt before persisting, and strip the
+    // plaintext copy from raw_payload so it isn't stored twice.
+    const encryptedContact = encryptContactFields({
+      contactName: req.body.contactName,
+      contactEmail: req.body.contactEmail,
+      contactPhone: req.body.contactPhone,
+    });
     const [submission] = await db.insert(brokerPortalSubmissions).values({
       orgId: broker.orgId,
       brokerId: broker.id,
@@ -1162,11 +1176,11 @@ router.post("/public/broker-portal/:token/submit", async (req: Request, res: Res
       totalSlips: req.body.totalSlips,
       grossRevenue: req.body.grossRevenue,
       description: req.body.description,
-      contactName: req.body.contactName,
-      contactEmail: req.body.contactEmail,
-      contactPhone: req.body.contactPhone,
+      contactName: encryptedContact.contactName,
+      contactEmail: encryptedContact.contactEmail,
+      contactPhone: encryptedContact.contactPhone,
       additionalNotes: req.body.additionalNotes,
-      rawPayload: req.body,
+      rawPayload: redactContactFieldsFromPayload(req.body),
       submitterIp: req.ip,
       submitterUserAgent: req.get("user-agent"),
     }).returning();
