@@ -23,6 +23,7 @@ import {
   ensureKnowledgeBaseSchema,
   getGlobalKnowledgeStats,
 } from '../services/knowledge-base-service';
+import { resolveDealContext } from '../services/deal-context-resolver';
 
 const router = Router();
 
@@ -30,6 +31,28 @@ const router = Router();
 ensureKnowledgeBaseSchema().catch(err =>
   console.error('[AI Routes] Schema bootstrap error:', err)
 );
+
+// ─── Context summary (for frontend badge) ────────────────────────────────────
+
+router.get('/context-summary', async (req: Request, res: Response) => {
+  try {
+    const dealId = req.query.dealId as string | undefined;
+    const modelingProjectId = req.query.modelingProjectId as string | undefined;
+    const workspaceId = req.query.workspaceId as string | undefined;
+
+    if (!dealId && !modelingProjectId && !workspaceId) {
+      return res.json({ summary: null });
+    }
+
+    const orgId = (req as any).user?.orgId ?? 'org-1';
+    const result = await resolveDealContext(orgId, { dealId, modelingProjectId, workspaceId });
+
+    return res.json({ summary: result?.summary ?? null });
+  } catch (error: any) {
+    console.error('[AI Routes] Context summary error:', error);
+    return res.json({ summary: null });
+  }
+});
 
 // ─── Chat (non-streaming) ─────────────────────────────────────────────────────
 
@@ -41,12 +64,14 @@ router.post('/chat', async (req: Request, res: Response) => {
       conversationHistory = [],
       advisoryMode,
       conversationId,
+      entityContext,
     } = req.body as {
       message: string;
       context: AssistantContext;
       conversationHistory?: ConversationMessage[];
       advisoryMode?: AdvisoryMode;
       conversationId?: string;
+      entityContext?: { dealId?: string; modelingProjectId?: string; workspaceId?: string };
     };
 
     if (!message?.trim()) return res.status(400).json({ error: 'Message is required' });
@@ -61,6 +86,18 @@ router.post('/chat', async (req: Request, res: Response) => {
       orgId,
       advisoryMode: advisoryMode ?? context.advisoryMode ?? 'general',
     };
+
+    // Resolve deal/project context and inject it into the system prompt
+    if (entityContext?.dealId || entityContext?.modelingProjectId || entityContext?.workspaceId) {
+      const resolved = await resolveDealContext(orgId, {
+        dealId: entityContext.dealId,
+        modelingProjectId: entityContext.modelingProjectId,
+        workspaceId: entityContext.workspaceId,
+      });
+      if (resolved) {
+        enrichedContext.injectedContextBlock = resolved.contextBlock;
+      }
+    }
 
     const convId = await getOrCreateConversation({ orgId, userId, conversationId, advisoryMode: enrichedContext.advisoryMode });
     await saveMessage({ conversationId: convId, role: 'user', content: message, advisoryMode: enrichedContext.advisoryMode, page: context.currentPage });
@@ -91,12 +128,14 @@ router.post('/chat/stream', async (req: Request, res: Response) => {
       conversationHistory = [],
       advisoryMode,
       conversationId: reqConvId,
+      entityContext,
     } = req.body as {
       message: string;
       context: AssistantContext;
       conversationHistory?: ConversationMessage[];
       advisoryMode?: AdvisoryMode;
       conversationId?: string;
+      entityContext?: { dealId?: string; modelingProjectId?: string; workspaceId?: string };
     };
 
     if (!message?.trim()) return res.status(400).json({ error: 'Message is required' });
@@ -111,6 +150,18 @@ router.post('/chat/stream', async (req: Request, res: Response) => {
       orgId,
       advisoryMode: advisoryMode ?? context.advisoryMode ?? 'general',
     };
+
+    // Resolve deal/project context and inject it into the system prompt
+    if (entityContext?.dealId || entityContext?.modelingProjectId || entityContext?.workspaceId) {
+      const resolved = await resolveDealContext(orgId, {
+        dealId: entityContext.dealId,
+        modelingProjectId: entityContext.modelingProjectId,
+        workspaceId: entityContext.workspaceId,
+      });
+      if (resolved) {
+        enrichedContext.injectedContextBlock = resolved.contextBlock;
+      }
+    }
 
     const convId = await getOrCreateConversation({ orgId, userId, conversationId: reqConvId, advisoryMode: enrichedContext.advisoryMode });
     await saveMessage({ conversationId: convId, role: 'user', content: message, advisoryMode: enrichedContext.advisoryMode, page: context.currentPage });

@@ -37,6 +37,7 @@ import {
   Scale,
   Zap,
   Globe,
+  Info,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -49,6 +50,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { Badge } from '@/components/ui/badge';
 import { useQuery } from '@tanstack/react-query';
 
@@ -145,22 +152,80 @@ export function AIAssistant() {
 
   // Detect entity context from URL
   const entityContext = useMemo((): Partial<AssistantContext> => {
-    const parts = location.split('/');
-    // Patterns: /crm/deals/:id, /modeling/:id, /dd/projects/:id, /crm/properties/:id
-    if (parts[1] === 'crm' && parts[2] === 'deals' && parts[3]) {
-      return { entityType: 'deal', entityId: parts[3] };
+    const parts = location.split('/').filter(Boolean);
+    // /crm/deals/:id
+    if (parts[0] === 'crm' && parts[1] === 'deals' && parts[2]) {
+      return { entityType: 'deal', entityId: parts[2] };
     }
-    if (parts[1] === 'modeling' && parts[2] && parts[2] !== 'new') {
+    // /modeling/projects/:projectId (or /modeling/projects/:projectId/*)
+    if (parts[0] === 'modeling' && parts[1] === 'projects' && parts[2] && parts[2] !== 'new') {
       return { entityType: 'modeling_project', entityId: parts[2] };
     }
-    if (parts[1] === 'dd' && parts[2] === 'projects' && parts[3]) {
-      return { entityType: 'dd_project', entityId: parts[3] };
+    // /workspaces/:workspaceId — deal workspace hub
+    if (parts[0] === 'workspaces' && parts[1] && parts[1] !== 'new') {
+      return { entityType: 'workspace', entityId: parts[1] };
     }
-    if (parts[1] === 'crm' && parts[2] === 'properties' && parts[3]) {
-      return { entityType: 'property', entityId: parts[3] };
+    // /dd/projects/:id
+    if (parts[0] === 'dd' && parts[1] === 'projects' && parts[2]) {
+      return { entityType: 'dd_project', entityId: parts[2] };
+    }
+    // /crm/properties/:id
+    if (parts[0] === 'crm' && parts[1] === 'properties' && parts[2]) {
+      return { entityType: 'property', entityId: parts[2] };
     }
     return {};
   }, [location]);
+
+  // Derive entity context params for server-side context injection
+  const entityContextParams = useMemo((): { dealId?: string; modelingProjectId?: string; workspaceId?: string } => {
+    if (entityContext.entityType === 'deal' && entityContext.entityId) {
+      return { dealId: entityContext.entityId };
+    }
+    if (entityContext.entityType === 'modeling_project' && entityContext.entityId) {
+      return { modelingProjectId: entityContext.entityId };
+    }
+    if (entityContext.entityType === 'workspace' && entityContext.entityId) {
+      return { workspaceId: entityContext.entityId };
+    }
+    return {};
+  }, [entityContext]);
+
+  const hasEntityContext = !!(
+    entityContextParams.dealId ||
+    entityContextParams.modelingProjectId ||
+    entityContextParams.workspaceId
+  );
+
+  // Fetch context summary for the badge (only when on a deal/project page and panel is open)
+  const contextSummaryParams = hasEntityContext && isOpen
+    ? new URLSearchParams(
+        Object.entries(entityContextParams)
+          .filter(([, v]) => v)
+          .map(([k, v]) => [k, v as string])
+      ).toString()
+    : null;
+
+  const {
+    data: contextSummaryData,
+    isLoading: contextSummaryLoading,
+  } = useQuery({
+    queryKey: ['/api/ai-assistant/context-summary', contextSummaryParams],
+    enabled: !!contextSummaryParams,
+    queryFn: async () => {
+      const res = await fetch(`/api/ai-assistant/context-summary?${contextSummaryParams}`);
+      if (!res.ok) return null;
+      const data = await res.json();
+      return data.summary as {
+        dealName?: string;
+        projectName?: string;
+        injectedSections: string[];
+      } | null;
+    },
+    staleTime: 30_000,
+  });
+
+  const contextSummary = contextSummaryData ?? null;
+  const contextLoaded = !contextSummaryLoading;
 
   // Fetch conversation history
   const { data: conversations = [] } = useQuery({
@@ -280,6 +345,7 @@ export function AIAssistant() {
           })),
           advisoryMode,
           conversationId,
+          ...(hasEntityContext ? { entityContext: entityContextParams } : {}),
         }),
       });
 
@@ -439,20 +505,58 @@ export function AIAssistant() {
 
           {/* Header */}
           <div className="flex items-center justify-between px-3 py-2.5 border-b bg-background shrink-0">
-            <div className="flex items-center gap-2">
-              <div className="h-7 w-7 rounded-lg bg-blue-600 flex items-center justify-center">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="h-7 w-7 rounded-lg bg-blue-600 flex items-center justify-center shrink-0">
                 <Sparkles className="h-4 w-4 text-white" />
               </div>
-              <div>
-                <span className="text-sm font-semibold">AI Advisor</span>
-                {entityContext.entityId && (
-                  <span className="ml-2 text-xs text-blue-600 font-medium">
-                    · Analyzing {entityContext.entityType?.replace('_', ' ')}
+              <div className="flex items-center gap-1.5 min-w-0">
+                <span className="text-sm font-semibold shrink-0">AI Advisor</span>
+                {/* Context badge — visible when deal/project context is active */}
+                {hasEntityContext && contextSummary && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="inline-flex items-center gap-1 bg-blue-50 border border-blue-200 text-blue-700 rounded-full px-2 py-0.5 text-xs font-medium cursor-default max-w-[160px] truncate">
+                          <Info className="h-3 w-3 shrink-0" />
+                          <span className="truncate">
+                            {contextSummary.dealName ?? contextSummary.projectName ?? 'Context loaded'}
+                          </span>
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" className="max-w-[260px]">
+                        <p className="font-semibold text-xs mb-1">Context loaded</p>
+                        {contextSummary.dealName && (
+                          <p className="text-xs text-muted-foreground">Deal: {contextSummary.dealName}</p>
+                        )}
+                        {contextSummary.projectName && contextSummary.projectName !== contextSummary.dealName && (
+                          <p className="text-xs text-muted-foreground">Project: {contextSummary.projectName}</p>
+                        )}
+                        {contextSummary.injectedSections.length > 0 && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Injected: {contextSummary.injectedSections.join(', ')}
+                          </p>
+                        )}
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
+                {/* Loading indicator while fetching context */}
+                {hasEntityContext && !contextLoaded && (
+                  <span className="inline-flex items-center gap-1 bg-muted border border-border text-muted-foreground rounded-full px-2 py-0.5 text-xs font-medium">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    Loading context…
+                  </span>
+                )}
+                {/* Fallback badge when context is active but summary unavailable */}
+                {hasEntityContext && contextLoaded && !contextSummary && (
+                  <span className="inline-flex items-center gap-1 bg-blue-50 border border-blue-200 text-blue-700 rounded-full px-2 py-0.5 text-xs font-medium">
+                    <Info className="h-3 w-3 shrink-0" />
+                    Context active
                   </span>
                 )}
               </div>
               {/* Global learning indicator */}
-              <span title="Learning from all platform users" className="ml-1">
+              <span title="Learning from all platform users" className="ml-0.5 shrink-0">
                 <Globe className="h-3 w-3 text-green-500 opacity-70" />
               </span>
             </div>
@@ -630,13 +734,17 @@ export function AIAssistant() {
                     <Sparkles className="h-5 w-5 text-blue-600" />
                   </div>
                   <p className="text-sm font-semibold text-foreground">
-                    {entityContext.entityId
+                    {hasEntityContext && contextSummary
+                      ? `Ready to analyze: ${contextSummary.dealName ?? contextSummary.projectName ?? 'this deal'}`
+                      : hasEntityContext
                       ? `Ready to analyze this ${entityContext.entityType?.replace('_', ' ')}`
                       : 'Your Investment Advisor'
                     }
                   </p>
                   <p className="text-xs mt-1 max-w-[280px] mx-auto leading-relaxed">
-                    {entityContext.entityId
+                    {hasEntityContext && contextSummary
+                      ? `Live data loaded: ${contextSummary.injectedSections.join(', ')}. Ask me to critique it, analyze returns, benchmark, or write a decision memo.`
+                      : hasEntityContext
                       ? 'I have access to this deal\'s data. Ask me to critique it, run a risk analysis, benchmark it, or generate a decision memo.'
                       : 'Analyze deals, compare benchmarks, identify risks, and make better investment decisions.'
                     }
@@ -814,8 +922,10 @@ export function AIAssistant() {
             </div>
             <div className="flex items-center justify-between mt-1.5">
               <p className="text-xs text-muted-foreground">
-                {entityContext.entityId
-                  ? <span className="text-blue-600">Live entity data loaded</span>
+                {hasEntityContext && contextSummary
+                  ? <span className="text-blue-600">Context: {contextSummary.injectedSections.join(', ')}</span>
+                  : hasEntityContext && !contextLoaded
+                  ? <span className="text-blue-600">Live data loading…</span>
                   : 'AI Advisor for CRE & Marina investments'
                 }
               </p>

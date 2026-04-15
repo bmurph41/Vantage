@@ -45,6 +45,7 @@ export interface AssistantContext {
   advisoryMode?: AdvisoryMode;
   entityData?: Record<string, any>;
   compareEntityIds?: string[];   // For deal comparison
+  injectedContextBlock?: string; // Pre-resolved deal/project context block
 }
 
 export interface ConversationMessage {
@@ -905,6 +906,10 @@ async function buildSystemPrompt(
 
   if (context.entityName) {
     prompt += `\n**Viewing Entity**: ${context.entityType ?? 'item'} — "${context.entityName}"`;
+  }
+
+  if (context.injectedContextBlock) {
+    prompt += `\n\n${context.injectedContextBlock}`;
   }
 
   if (Object.keys(entityData).length > 0) {
