@@ -16,7 +16,7 @@ const router = Router();
 
 router.get("/summary", async (req: any, res) => {
   try {
-    const orgId = req.orgId as string;
+    const orgId = (req.user?.orgId || req.tenantId) as string;
 
     // ── Core project aggregates ─────────────────────────────────────────────
     const projectAgg = await db.execute(sql`
@@ -47,29 +47,16 @@ router.get("/summary", async (req: any, res) => {
 
     const stackData = (stackAgg.rows[0] || {}) as any;
 
-    // ── Avg DSCR from modeling financial periods (year 1 projected) ────────
     const dscrAgg = await db.execute(sql`
       SELECT
-        COALESCE(AVG(mfp.dscr), 0)::numeric(8,4)               AS avg_dscr
-      FROM modeling_financial_periods mfp
-      INNER JOIN modeling_projects mp ON mp.id = mfp.modeling_project_id
-      WHERE mp.org_id = ${orgId}
-        AND mfp.period_type = 'projected'
-        AND mfp.sort_order = 1
-    `);
-
-    // Fallback: use debt_yield from capital_stacks if no projected year-1 data
-    const dscrAggFallback = await db.execute(sql`
-      SELECT
-        COALESCE(AVG(cs.debt_yield), 0)::numeric(8,4)           AS avg_dscr
+        COALESCE(AVG(cs.debt_yield), 0)::numeric(8,4) AS avg_dscr
       FROM capital_stacks cs
       INNER JOIN modeling_projects mp ON mp.id = cs.modeling_project_id
       WHERE mp.org_id = ${orgId}
         AND cs.is_active = true
     `);
 
-    const avgDscr = Number((dscrAgg.rows[0] as any)?.avg_dscr || 0) ||
-      Number((dscrAggFallback.rows[0] as any)?.avg_dscr || 0);
+    const avgDscr = Number((dscrAgg.rows[0] as any)?.avg_dscr || 0);
 
     // ── Avg levered IRR from valuation snapshots ─────────────────────────
     const irrAgg = await db.execute(sql`

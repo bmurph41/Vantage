@@ -44,17 +44,17 @@ router.get("/velocity", async (req, res) => {
     // Calculate avg days in current stage per deal
     const result = await db.execute(sql.raw(`
       SELECT 
-        d.pipeline_stage as stage,
+        d.stage as stage,
         COUNT(*)::int as deal_count,
         COALESCE(AVG(
-          EXTRACT(EPOCH FROM (NOW() - COALESCE(d.stage_changed_at, d.updated_at, d.created_at))) / 86400
+          EXTRACT(EPOCH FROM (NOW() - COALESCE(d.current_stage_entered_at, d.updated_at, d.created_at))) / 86400
         ), 0)::numeric(10,1) as avg_days,
         COALESCE(SUM(d.amount), 0)::numeric as total_value
       FROM crm_deals d
-      WHERE ${whereClause} AND d.status = 'open'
-      GROUP BY d.pipeline_stage
+      WHERE ${whereClause} AND d.is_closed = false
+      GROUP BY d.stage
       ORDER BY 
-        CASE d.pipeline_stage
+        CASE d.stage
           WHEN 'lead' THEN 0
           WHEN 'qualified' THEN 1
           WHEN 'loi' THEN 2
@@ -71,15 +71,15 @@ router.get("/velocity", async (req, res) => {
       const acResult = await db.execute(sql.raw(`
         SELECT 
           COALESCE(d.asset_class, 'marina') as asset_class,
-          d.pipeline_stage as stage,
+          d.stage as stage,
           COUNT(*)::int as deal_count,
           COALESCE(AVG(
-            EXTRACT(EPOCH FROM (NOW() - COALESCE(d.stage_changed_at, d.updated_at, d.created_at))) / 86400
+            EXTRACT(EPOCH FROM (NOW() - COALESCE(d.current_stage_entered_at, d.updated_at, d.created_at))) / 86400
           ), 0)::numeric(10,1) as avg_days
         FROM crm_deals d
-        WHERE ${whereClause} AND d.status = 'open'
-        GROUP BY d.asset_class, d.pipeline_stage
-        ORDER BY d.asset_class, d.pipeline_stage
+        WHERE ${whereClause} AND d.is_closed = false
+        GROUP BY d.asset_class, d.stage
+        ORDER BY d.asset_class, d.stage
       `));
       byAssetClass = acResult.rows;
     }
@@ -114,18 +114,17 @@ router.get("/conversion", async (req, res) => {
     
     const whereClause = conditions.join(" AND ");
 
-    // Get counts per stage (including won/lost for conversion calc)
     const stageResult = await db.execute(sql.raw(`
       SELECT 
-        d.pipeline_stage as stage,
-        d.status,
+        d.stage as stage,
+        CASE WHEN d.is_closed = false THEN 'open' WHEN d.lost_reason IS NULL THEN 'won' ELSE 'lost' END as status,
         COUNT(*)::int as count,
         COALESCE(SUM(d.amount), 0)::numeric as total_value
       FROM crm_deals d
       WHERE ${whereClause}
-      GROUP BY d.pipeline_stage, d.status
+      GROUP BY d.stage, CASE WHEN d.is_closed = false THEN 'open' WHEN d.lost_reason IS NULL THEN 'won' ELSE 'lost' END
       ORDER BY 
-        CASE d.pipeline_stage
+        CASE d.stage
           WHEN 'lead' THEN 0
           WHEN 'qualified' THEN 1
           WHEN 'loi' THEN 2
@@ -136,16 +135,15 @@ router.get("/conversion", async (req, res) => {
         END
     `));
 
-    // By source
     const sourceResult = await db.execute(sql.raw(`
       SELECT 
-        COALESCE(d.source, 'unknown') as source,
-        d.status,
+        COALESCE(d.lead_source, 'unknown') as source,
+        CASE WHEN d.is_closed = false THEN 'open' WHEN d.lost_reason IS NULL THEN 'won' ELSE 'lost' END as status,
         COUNT(*)::int as count,
         COALESCE(SUM(d.amount), 0)::numeric as total_value
       FROM crm_deals d
       WHERE ${whereClause}
-      GROUP BY d.source, d.status
+      GROUP BY d.lead_source, CASE WHEN d.is_closed = false THEN 'open' WHEN d.lost_reason IS NULL THEN 'won' ELSE 'lost' END
     `));
 
     res.json({
@@ -172,54 +170,50 @@ router.get("/win-loss", async (req, res) => {
     
     const whereClause = conditions.join(" AND ");
 
-    // Overall win/loss
     const overallResult = await db.execute(sql.raw(`
       SELECT
-        d.status,
+        CASE WHEN d.lost_reason IS NULL THEN 'won' ELSE 'lost' END as status,
         COUNT(*)::int as count,
         COALESCE(SUM(d.amount), 0)::numeric as total_value,
         COALESCE(AVG(d.amount), 0)::numeric(12,0) as avg_deal_size
       FROM crm_deals d
-      WHERE ${whereClause} AND d.status IN ('won', 'lost')
-      GROUP BY d.status
+      WHERE ${whereClause} AND d.is_closed = true
+      GROUP BY CASE WHEN d.lost_reason IS NULL THEN 'won' ELSE 'lost' END
     `));
 
-    // By asset class
     const byAssetClassResult = await db.execute(sql.raw(`
       SELECT
         COALESCE(d.asset_class, 'marina') as asset_class,
-        d.status,
+        CASE WHEN d.lost_reason IS NULL THEN 'won' ELSE 'lost' END as status,
         COUNT(*)::int as count,
         COALESCE(SUM(d.amount), 0)::numeric as total_value
       FROM crm_deals d
-      WHERE ${whereClause} AND d.status IN ('won', 'lost')
-      GROUP BY d.asset_class, d.status
+      WHERE ${whereClause} AND d.is_closed = true
+      GROUP BY d.asset_class, CASE WHEN d.lost_reason IS NULL THEN 'won' ELSE 'lost' END
     `));
 
-    // By source
     const bySourceResult = await db.execute(sql.raw(`
       SELECT
-        COALESCE(d.source, 'unknown') as source,
-        d.status,
+        COALESCE(d.lead_source, 'unknown') as source,
+        CASE WHEN d.lost_reason IS NULL THEN 'won' ELSE 'lost' END as status,
         COUNT(*)::int as count,
         COALESCE(SUM(d.amount), 0)::numeric as total_value
       FROM crm_deals d
-      WHERE ${whereClause} AND d.status IN ('won', 'lost')
-      GROUP BY d.source, d.status
+      WHERE ${whereClause} AND d.is_closed = true
+      GROUP BY d.lead_source, CASE WHEN d.lost_reason IS NULL THEN 'won' ELSE 'lost' END
     `));
 
-    // Monthly trend (last 12 months)
     const trendResult = await db.execute(sql.raw(`
       SELECT
-        TO_CHAR(d.updated_at, 'YYYY-MM') as month,
-        d.status,
+        TO_CHAR(d.closed_at, 'YYYY-MM') as month,
+        CASE WHEN d.lost_reason IS NULL THEN 'won' ELSE 'lost' END as status,
         COUNT(*)::int as count,
         COALESCE(SUM(d.amount), 0)::numeric as total_value
       FROM crm_deals d
       WHERE ${whereClause} 
-        AND d.status IN ('won', 'lost')
-        AND d.updated_at >= NOW() - INTERVAL '12 months'
-      GROUP BY TO_CHAR(d.updated_at, 'YYYY-MM'), d.status
+        AND d.is_closed = true
+        AND d.closed_at >= NOW() - INTERVAL '12 months'
+      GROUP BY TO_CHAR(d.closed_at, 'YYYY-MM'), CASE WHEN d.lost_reason IS NULL THEN 'won' ELSE 'lost' END
       ORDER BY month
     `));
 
@@ -256,20 +250,20 @@ router.get("/win-loss", async (req, res) => {
 
 router.get("/health", async (req, res) => {
   try {
-    const orgId = (req as any).orgId;
+    const orgId = ((req as any).user?.orgId || (req as any).tenantId) as string;
 
     const result = await db.execute(sql.raw(`
       SELECT
-        COUNT(*) FILTER (WHERE status = 'open')::int as open_deals,
-        COUNT(*) FILTER (WHERE status = 'won')::int as won_deals,
-        COUNT(*) FILTER (WHERE status = 'lost')::int as lost_deals,
-        COALESCE(SUM(amount) FILTER (WHERE status = 'open'), 0)::numeric as pipeline_value,
-        COALESCE(SUM(amount) FILTER (WHERE status = 'won'), 0)::numeric as won_value,
+        COUNT(*) FILTER (WHERE is_closed = false)::int as open_deals,
+        COUNT(*) FILTER (WHERE is_closed = true AND lost_reason IS NULL)::int as won_deals,
+        COUNT(*) FILTER (WHERE is_closed = true AND lost_reason IS NOT NULL)::int as lost_deals,
+        COALESCE(SUM(amount) FILTER (WHERE is_closed = false), 0)::numeric as pipeline_value,
+        COALESCE(SUM(amount) FILTER (WHERE is_closed = true AND lost_reason IS NULL), 0)::numeric as won_value,
         COALESCE(AVG(
-          EXTRACT(EPOCH FROM (NOW() - COALESCE(stage_changed_at, updated_at, created_at))) / 86400
-        ) FILTER (WHERE status = 'open'), 0)::numeric(10,1) as avg_age_days,
+          EXTRACT(EPOCH FROM (NOW() - COALESCE(current_stage_entered_at, updated_at, created_at))) / 86400
+        ) FILTER (WHERE is_closed = false), 0)::numeric(10,1) as avg_age_days,
         COUNT(*) FILTER (
-          WHERE status = 'open' 
+          WHERE is_closed = false
           AND COALESCE(updated_at, created_at) < NOW() - INTERVAL '30 days'
         )::int as stale_count
       FROM crm_deals
@@ -350,22 +344,21 @@ router.get("/health", async (req, res) => {
 
 router.get("/", async (req, res) => {
   try {
-    const orgId = (req as any).orgId as string;
+    const orgId = ((req as any).user?.orgId || (req as any).tenantId) as string;
 
-    // Velocity: avg days per stage
     const velocityResult = await db.execute(sql`
       SELECT
-        d.pipeline_stage AS stage,
+        d.stage AS stage,
         COUNT(*)::int AS deal_count,
         COALESCE(AVG(
-          EXTRACT(EPOCH FROM (NOW() - COALESCE(d.stage_changed_at, d.updated_at, d.created_at))) / 86400
+          EXTRACT(EPOCH FROM (NOW() - COALESCE(d.current_stage_entered_at, d.updated_at, d.created_at))) / 86400
         ), 0)::numeric(10,1) AS avg_days,
         COALESCE(SUM(d.amount), 0)::numeric AS total_value
       FROM crm_deals d
-      WHERE d.org_id = ${orgId} AND d.status = 'open'
-      GROUP BY d.pipeline_stage
+      WHERE d.org_id = ${orgId} AND d.is_closed = false
+      GROUP BY d.stage
       ORDER BY
-        CASE d.pipeline_stage
+        CASE d.stage
           WHEN 'lead' THEN 0
           WHEN 'qualified' THEN 1
           WHEN 'loi' THEN 2
@@ -387,49 +380,46 @@ router.get("/", async (req, res) => {
         COALESCE(AVG(dsh.duration_seconds), 0)::numeric(12,0) AS avg_duration_seconds
       FROM crm_pipeline_stages ps
       LEFT JOIN crm_deal_stage_history dsh
-        ON dsh.stage_id = ps.id AND dsh.org_id = ${orgId}
+        ON dsh.stage_id = ps.id
       WHERE ps.org_id = ${orgId}
         AND ps.is_active = true
       GROUP BY ps.id, ps.name, ps.stage_order
       ORDER BY ps.stage_order ASC NULLS LAST
     `);
 
-    // Win/loss breakdown
     const winLossResult = await db.execute(sql`
       SELECT
-        d.status,
+        CASE WHEN d.lost_reason IS NULL THEN 'won' ELSE 'lost' END AS status,
         COUNT(*)::int AS count,
         COALESCE(SUM(d.amount), 0)::numeric AS total_value,
         COALESCE(AVG(d.amount), 0)::numeric(12,0) AS avg_deal_size
       FROM crm_deals d
-      WHERE d.org_id = ${orgId} AND d.status IN ('won', 'lost')
-      GROUP BY d.status
+      WHERE d.org_id = ${orgId} AND d.is_closed = true
+      GROUP BY CASE WHEN d.lost_reason IS NULL THEN 'won' ELSE 'lost' END
     `);
 
-    // Avg deal size per stage (open deals only)
     const dealSizeResult = await db.execute(sql`
       SELECT
-        d.pipeline_stage AS stage,
+        d.stage AS stage,
         COALESCE(AVG(d.amount), 0)::numeric(12,0) AS avg_deal_size,
         COUNT(*)::int AS deal_count
       FROM crm_deals d
-      WHERE d.org_id = ${orgId} AND d.status = 'open'
-      GROUP BY d.pipeline_stage
+      WHERE d.org_id = ${orgId} AND d.is_closed = false
+      GROUP BY d.stage
     `);
 
-    // Health summary
     const healthResult = await db.execute(sql`
       SELECT
-        COUNT(*) FILTER (WHERE status = 'open')::int AS open_deals,
-        COUNT(*) FILTER (WHERE status = 'won')::int AS won_deals,
-        COUNT(*) FILTER (WHERE status = 'lost')::int AS lost_deals,
-        COALESCE(SUM(amount) FILTER (WHERE status = 'open'), 0)::numeric AS pipeline_value,
-        COALESCE(SUM(amount) FILTER (WHERE status = 'won'), 0)::numeric AS won_value,
+        COUNT(*) FILTER (WHERE is_closed = false)::int AS open_deals,
+        COUNT(*) FILTER (WHERE is_closed = true AND lost_reason IS NULL)::int AS won_deals,
+        COUNT(*) FILTER (WHERE is_closed = true AND lost_reason IS NOT NULL)::int AS lost_deals,
+        COALESCE(SUM(amount) FILTER (WHERE is_closed = false), 0)::numeric AS pipeline_value,
+        COALESCE(SUM(amount) FILTER (WHERE is_closed = true AND lost_reason IS NULL), 0)::numeric AS won_value,
         COALESCE(AVG(
-          EXTRACT(EPOCH FROM (NOW() - COALESCE(stage_changed_at, updated_at, created_at))) / 86400
-        ) FILTER (WHERE status = 'open'), 0)::numeric(10,1) AS avg_age_days,
+          EXTRACT(EPOCH FROM (NOW() - COALESCE(current_stage_entered_at, updated_at, created_at))) / 86400
+        ) FILTER (WHERE is_closed = false), 0)::numeric(10,1) AS avg_age_days,
         COUNT(*) FILTER (
-          WHERE status = 'open'
+          WHERE is_closed = false
           AND COALESCE(updated_at, created_at) < NOW() - INTERVAL '30 days'
         )::int AS stale_count
       FROM crm_deals
@@ -440,14 +430,14 @@ router.get("/", async (req, res) => {
     const leaderboardResult = await db.execute(sql`
       SELECT
         d.id,
-        d.name,
-        d.pipeline_stage AS stage,
-        d.status,
+        d.title AS name,
+        d.stage AS stage,
+        CASE WHEN d.is_closed = false THEN 'open' WHEN d.lost_reason IS NULL THEN 'won' ELSE 'lost' END AS status,
         COALESCE(d.amount, 0)::numeric AS amount,
         d.asset_class,
         d.owner_id
       FROM crm_deals d
-      WHERE d.org_id = ${orgId} AND d.status = 'open'
+      WHERE d.org_id = ${orgId} AND d.is_closed = false
       ORDER BY d.amount DESC NULLS LAST
       LIMIT 10
     `);
@@ -541,18 +531,18 @@ router.get("/", async (req, res) => {
 
 router.get("/summary", async (req, res) => {
   try {
-    const orgId = (req as any).orgId;
+    const orgId = ((req as any).user?.orgId || (req as any).tenantId) as string;
 
     const result = await db.execute(sql.raw(`
       SELECT
-        COUNT(*) FILTER (WHERE status = 'open')::int as open_count,
-        COUNT(*) FILTER (WHERE status = 'won')::int as won_count,
-        COUNT(*) FILTER (WHERE status = 'lost')::int as lost_count,
-        COALESCE(SUM(amount) FILTER (WHERE status = 'open'), 0)::numeric as open_value,
-        COALESCE(SUM(amount) FILTER (WHERE status = 'won'), 0)::numeric as won_value,
-        COALESCE(AVG(amount) FILTER (WHERE status = 'open'), 0)::numeric(12,0) as avg_open_deal,
+        COUNT(*) FILTER (WHERE is_closed = false)::int as open_count,
+        COUNT(*) FILTER (WHERE is_closed = true AND lost_reason IS NULL)::int as won_count,
+        COUNT(*) FILTER (WHERE is_closed = true AND lost_reason IS NOT NULL)::int as lost_count,
+        COALESCE(SUM(amount) FILTER (WHERE is_closed = false), 0)::numeric as open_value,
+        COALESCE(SUM(amount) FILTER (WHERE is_closed = true AND lost_reason IS NULL), 0)::numeric as won_value,
+        COALESCE(AVG(amount) FILTER (WHERE is_closed = false), 0)::numeric(12,0) as avg_open_deal,
         COUNT(DISTINCT COALESCE(asset_class, 'marina'))::int as asset_class_count,
-        COUNT(DISTINCT pipeline_stage) FILTER (WHERE status = 'open')::int as active_stages
+        COUNT(DISTINCT stage) FILTER (WHERE is_closed = false)::int as active_stages
       FROM crm_deals
       WHERE org_id = '${orgId}'
     `));
