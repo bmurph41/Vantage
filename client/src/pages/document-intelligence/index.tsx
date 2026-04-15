@@ -5,6 +5,7 @@ import { DocumentUploader } from '@/components/document-intelligence/DocumentUpl
 import { ExtractionReview } from '@/components/document-intelligence/ExtractionReview';
 import { ExtractionStatusPoller } from '@/components/document-intelligence/ExtractionStatusPoller';
 import { Brain, History, ChevronRight, FileText, Table2, Clock } from 'lucide-react';
+import { BillingGate } from '@/components/billing/BillingGate';
 
 type View = 'upload' | 'history';
 
@@ -19,6 +20,11 @@ export default function DocumentIntelligencePage({ projectId }: Props) {
   const [view, setView] = useState<View>('upload');
 
   return (
+    <BillingGate
+      feature="document_intelligence"
+      title="Document Intelligence — Institutional Plan Required"
+      description="AI-powered document extraction and intelligence requires the Institutional plan."
+    >
     <div className="h-full flex flex-col bg-white dark:bg-slate-950">
       {/* Header */}
       <div className="px-8 py-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
@@ -143,6 +149,7 @@ export default function DocumentIntelligencePage({ projectId }: Props) {
         }} />
       )}
     </div>
+    </BillingGate>
   );
 }
 

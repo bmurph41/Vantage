@@ -20,6 +20,7 @@ import { requireApprovalCheck } from "./services/fuel/fuel-route-utils";
 import { findAllPotentialDuplicates, getDuplicateExplanation } from "./services/duplicate-finder";
 import { findCompanyDuplicates, type CompanyDuplicateMatch } from "./services/company-duplicate-service";
 import { requirePermission, requireRole } from "./middleware/rbac";
+import { requireEntitlement } from "./middleware/feature-gate";
 import { AuditService } from "./services/audit-service";
 import { setTenantContext, clearTenantContext } from "./middleware/tenant-context";
 import { enforceTenant, requireTenantMatch } from "./middleware/tenant-isolation";
@@ -593,7 +594,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ── Billing (auth required except for public plan catalog and webhooks) ──
   app.use("/api/billing", (req: any, res: any, next: any) => {
     // Allow public access to plan catalog and webhook endpoints
-    if (req.path === '/plans' || req.path.startsWith('/webhooks')) {
+    if (req.path === '/plans' || req.path.startsWith('/webhooks') || req.path.startsWith('/webhook')) {
       return next();
     }
     authenticateUser(req, res, next);
@@ -1013,7 +1014,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.use("/api/listings/v2", authenticateUser, enforceTenant, liv2Routes);
   app.use("/api/marketplace", authenticateUser, enforceTenant, marketplaceRoutes);
-  app.use("/api/funds", authenticateUser, requireFundManagement());
+  app.use("/api/funds", authenticateUser, requireEntitlement("lp_portal"), requireFundManagement());
   app.use("/api/vdr", authenticateUser, vdrRouter);
   app.use(authenticateUser, enforceTenant, vdrActivityRouter);
   app.use(authenticateUser, enforceTenant, dealWorkspaceRouter);
@@ -1033,10 +1034,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/integration", authenticateUser, integrationRouter);
   app.use(authenticateUser, enforceTenant, integrationsRouter);
   app.use("/api/vantage", authenticateUser, vantageRouter);
-  app.use("/api/om", authenticateUser, omRouter);
-  app.use(authenticateUser, omBuilderRouter);
+  app.use("/api/om", authenticateUser, requireEntitlement("ai_narratives"), omRouter);
+  app.use(authenticateUser, requireEntitlement("ai_narratives"), omBuilderRouter);
   app.use("/api/document-builder", authenticateUser, documentBuilderRouter);
-  app.use("/api/v1/document-extraction", authenticateUser, documentExtractionRouter);
+  app.use("/api/v1/document-extraction", authenticateUser, requireEntitlement("document_intelligence"), documentExtractionRouter);
   app.use(authenticateUser, coaRoutes);
   app.use(authenticateUser, coaTaxonomyRoutes);
 
@@ -1051,7 +1052,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use(authenticateUser, propertyDataRouter);
   app.use("/api/asset-classes", authenticateUser, assetClassContextRouter);
   app.use("/api/ic", authenticateUser, enforceTenant, icRouter);
-  app.use("/api/lp", authenticateUser, enforceTenant, lpRouter);
+  app.use("/api/lp", authenticateUser, enforceTenant, requireEntitlement("lp_portal"), lpRouter);
   app.use("/api/lead-scoring", authenticateUser, enforceTenant, leadScoringRouter);
   app.use("/api/crm-ext", authenticateUser, enforceTenant, crmExtendedRouter);
   app.use("/api/exit-planning", authenticateUser, enforceTenant, exitPlanningExtRouter);

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation, useRoute } from "wouter";
+import { BillingGate } from "@/components/billing/BillingGate";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, useSensor, useSensors, PointerSensor, closestCenter } from "@dnd-kit/core";
 import { arrayMove, SortableContext, verticalListSortingStrategy, useSortable } from "@dnd-kit/sortable";
@@ -610,6 +611,12 @@ export default function OMBuilder() {
   }
 
   return (
+    <BillingGate
+      feature="ai_narratives"
+      title="OM Builder — Growth Plan Required"
+      description="The OM Builder with AI-powered narrative generation requires the Growth plan or above."
+      showBlurredPreview={false}
+    >
     <div className="h-full bg-background overflow-hidden flex flex-col">
       <header className="h-12 border-b border-border bg-background flex items-center px-4 justify-between shrink-0 z-10">
         <div className="flex items-center gap-3">
@@ -1542,5 +1549,6 @@ export default function OMBuilder() {
         }}
       />
     </div>
+    </BillingGate>
   );
 }

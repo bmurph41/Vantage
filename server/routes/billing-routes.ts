@@ -105,6 +105,65 @@ router.post('/create-setup-intent', async (req: Request, res: Response, next: Ne
   }
 });
 
+// POST /checkout — create Stripe Checkout Session for new subscription (redirect flow)
+router.post('/checkout', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const stripe = process.env.STRIPE_SECRET_KEY
+      ? new Stripe(process.env.STRIPE_SECRET_KEY)
+      : null;
+
+    if (!stripe) {
+      return res.status(503).json({ error: 'Stripe is not configured. Please add STRIPE_SECRET_KEY.' });
+    }
+
+    const orgId = getOrgId(req);
+    const email = getUserEmail(req);
+    const { tier, billingCycle } = req.body;
+
+    if (!tier || !billingCycle) {
+      return res.status(400).json({ error: 'tier and billingCycle are required' });
+    }
+
+    const tierDef = SUBSCRIPTION_TIERS[tier as keyof typeof SUBSCRIPTION_TIERS];
+    if (!tierDef || tierDef.priceMonthly === null) {
+      return res.status(400).json({ error: 'Invalid or non-self-serve tier' });
+    }
+
+    const priceAmount = billingCycle === 'annual' ? tierDef.priceAnnual : tierDef.priceMonthly;
+    const interval = billingCycle === 'annual' ? 'year' : 'month';
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+
+    const session = await stripe.checkout.sessions.create({
+      mode: 'subscription',
+      line_items: [
+        {
+          price_data: {
+            currency: 'usd',
+            product_data: {
+              name: `Vantage ${tierDef.name} Plan`,
+              description: `${tierDef.name} subscription — billed ${billingCycle}`,
+            },
+            recurring: { interval },
+            unit_amount: Math.round((priceAmount ?? 0) * 100),
+          },
+          quantity: 1,
+        },
+      ],
+      customer_email: email || undefined,
+      success_url: `${baseUrl}/settings/billing?success=true&tier=${tier}`,
+      cancel_url: `${baseUrl}/settings/billing?canceled=true`,
+      metadata: { orgId: orgId ?? '', tier, billingCycle },
+      subscription_data: {
+        metadata: { orgId: orgId ?? '', tier, billingCycle },
+      },
+    });
+
+    res.json({ url: session.url });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // POST /change-plan — change subscription tier
 router.post('/change-plan', async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -320,9 +379,19 @@ router.post('/prorate-preview', async (req: Request, res: Response, next: NextFu
   }
 });
 
+// Raw body capture for both /webhook (singular) and /webhooks (plural) paths
+router.use('/webhook', express.raw({ type: 'application/json' }), (req: Request, _res: Response, next: NextFunction) => {
+  if (Buffer.isBuffer(req.body)) {
+    (req as any).rawBody = req.body;
+    req.body = JSON.parse(req.body.toString('utf8'));
+  }
+  next();
+});
+
+// POST /webhook — singular alias for Stripe webhook handler
 // POST /webhooks — Stripe webhook handler (NO auth middleware)
 // This should be mounted BEFORE auth middleware in the Express app
-router.post('/webhooks', async (req: Request, res: Response, next: NextFunction) => {
+async function handleStripeWebhook(req: Request, res: Response, next: NextFunction) {
   try {
     const stripe = process.env.STRIPE_SECRET_KEY
       ? new Stripe(process.env.STRIPE_SECRET_KEY)
@@ -356,6 +425,9 @@ router.post('/webhooks', async (req: Request, res: Response, next: NextFunction)
   } catch (err) {
     next(err);
   }
-});
+}
+
+router.post('/webhook', handleStripeWebhook);
+router.post('/webhooks', handleStripeWebhook);
 
 export const billingRouter = router;

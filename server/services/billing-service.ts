@@ -451,6 +451,7 @@ export class BillingService {
         break;
       }
 
+      case 'invoice.paid':
       case 'invoice.payment_succeeded': {
         const invoice = event.data.object as Stripe.Invoice;
         const customerId = typeof invoice.customer === 'string'
@@ -661,6 +662,60 @@ export class BillingService {
 
       console.log(`[billing webhook] granted marketplace_plus/${tier} to user=${userId} org=${orgId}`);
       return;
+    }
+
+    // ── Core platform subscription (Starter / Growth / Institutional) ──
+    // Fired when /api/billing/checkout session completes for Vantage SaaS plans.
+    if (!sku) {
+      const orgId = metadata.orgId;
+      const tier = metadata.tier;
+      const billingCycle = (metadata.billingCycle || 'monthly') as 'monthly' | 'annual';
+
+      if (orgId && tier && SUBSCRIPTION_TIERS[tier as keyof typeof SUBSCRIPTION_TIERS]) {
+        const tierDef = SUBSCRIPTION_TIERS[tier as keyof typeof SUBSCRIPTION_TIERS];
+        const stripeCustomerId =
+          typeof session.customer === 'string'
+            ? session.customer
+            : (session.customer as any)?.id || null;
+        const now = new Date();
+        const periodEnd =
+          billingCycle === 'annual'
+            ? new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000)
+            : new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+
+        await db
+          .insert(billingSubscriptions)
+          .values({
+            orgId,
+            stripeCustomerId,
+            stripeSubscriptionId,
+            tier,
+            status: 'active',
+            billingCycle,
+            currentPeriodStart: now,
+            currentPeriodEnd: periodEnd,
+            seatLimit: tierDef.limits.seats === -1 ? null : tierDef.limits.seats,
+            dealLimit: tierDef.limits.deals === -1 ? null : tierDef.limits.deals,
+            aiQueryLimit: tierDef.limits.aiQueries === -1 ? null : tierDef.limits.aiQueries,
+            storageGbLimit: tierDef.limits.storageGb === -1 ? null : tierDef.limits.storageGb,
+          } as any)
+          .onConflictDoUpdate({
+            target: billingSubscriptions.orgId,
+            set: {
+              tier,
+              status: 'active',
+              stripeCustomerId,
+              stripeSubscriptionId,
+              currentPeriodStart: now,
+              currentPeriodEnd: periodEnd,
+              updatedAt: new Date(),
+            } as any,
+          });
+
+        await this.provisionFeatureFlags(orgId, tier);
+        console.log(`[billing webhook] provisioned core platform subscription ${tier} for org=${orgId}`);
+        return;
+      }
     }
 
     // ── Broker plan (broker-facing SaaS subscription) ──

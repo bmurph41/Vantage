@@ -10,6 +10,7 @@ import { SUBSCRIPTION_TIERS } from "../services/billing-service";
  *
  * Usage:
  *   router.get('/api/lp/dashboard', authenticate, requireFeature('lp_portal'), handler);
+ *   router.get('/api/lp/dashboard', authenticate, requireEntitlement('lp_portal'), handler);
  */
 export function requireFeature(feature: string) {
   return async (req: Request, res: Response, next: NextFunction) => {
@@ -19,7 +20,7 @@ export function requireFeature(feature: string) {
         return res.status(401).json({ error: "Authentication required" });
       }
 
-      // Dev bypass: if no subscription exists and NODE_ENV=development, allow
+      // Dev bypass: if no subscription exists and running in development, allow access
       if (process.env.NODE_ENV === "development") {
         const [sub] = await db.select().from(billingSubscriptions).where(eq(billingSubscriptions.orgId, user.orgId));
         if (!sub) return next();
@@ -168,3 +169,11 @@ export function checkUsageLimit(limitType: LimitType) {
     }
   };
 }
+
+/**
+ * Alias for requireFeature — preferred name for entitlement-based route protection.
+ *
+ * Usage:
+ *   router.get('/api/ai/advisor', authenticate, requireEntitlement('ai_narratives'), handler);
+ */
+export const requireEntitlement = requireFeature;

@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
+import { BillingGate } from '@/components/billing/BillingGate';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -11,7 +12,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { formatCurrency, formatPercent } from '@/lib/utils';
-import { PackGate } from '@/contexts/PackContext';
 import {
   Briefcase,
   TrendingUp,
@@ -619,11 +619,12 @@ function LPPortalContent() {
 
 export default function LPPortal() {
   return (
-    <PackGate 
-      pack={['fund_management', 'lp_portal']}
-      upgradeMessage="LP Portal is a premium add-on that provides a dedicated investor portal with capital account statements, distribution tracking, and K-1 access. Requires Fund Management pack."
+    <BillingGate
+      feature="lp_portal"
+      title="LP Portal — Growth Plan Required"
+      description="The LP Portal provides a dedicated investor portal with capital account statements, distributions, and K-1 access. Available on the Growth plan and above."
     >
       <LPPortalContent />
-    </PackGate>
+    </BillingGate>
   );
 }

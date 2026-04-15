@@ -1,190 +1,759 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { CreditCard, Package, ExternalLink, Check, Zap } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { Separator } from "@/components/ui/separator";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  CreditCard,
+  Package,
+  ExternalLink,
+  Check,
+  Zap,
+  Download,
+  AlertTriangle,
+  TrendingUp,
+  Calendar,
+  Users,
+  FileText,
+  Database,
+  ChevronUp,
+  ChevronDown,
+} from "lucide-react";
+
+interface TierDef {
+  name: string;
+  priceMonthly: number | null;
+  priceAnnual: number | null;
+  features: string[];
+  limits: {
+    deals: number;
+    seats: number;
+    storageGb: number;
+    aiQueries: number;
+    lpInvestors?: number;
+  };
+}
+
+interface BillingSubscription {
+  id: string;
+  orgId: string;
+  tier: string;
+  status: string;
+  billingCycle: string;
+  currentPeriodStart: string | null;
+  currentPeriodEnd: string | null;
+  trialEnd: string | null;
+  cancelAtPeriodEnd?: boolean;
+  stripeCustomerId: string | null;
+  seatLimit: number | null;
+  dealLimit: number | null;
+  aiQueryLimit: number | null;
+}
+
+interface UsageData {
+  deals: number;
+  models: number;
+  users: number;
+  aiQueries?: number;
+}
+
+interface BillingInvoice {
+  id: string;
+  stripeInvoiceId: string | null;
+  amount: number | null;
+  currency: string | null;
+  status: string | null;
+  invoiceUrl: string | null;
+  pdfUrl: string | null;
+  periodStart: string | null;
+  periodEnd: string | null;
+  paidAt: string | null;
+  createdAt: string;
+}
+
+const TIER_ORDER = ["starter", "growth", "institutional"];
+
+const TIER_FEATURE_LABELS: Record<string, string[]> = {
+  starter: [
+    "Deal workspace",
+    "Basic CRM",
+    "Financial modeling",
+    "Document vault",
+    "DD checklist",
+    "Basic reporting",
+  ],
+  growth: [
+    "Everything in Starter",
+    "LP Portal & capital calls",
+    "Workflow automation",
+    "Gantt view",
+    "AI narratives",
+    "Email & SMS alerts",
+    "Lease abstractor",
+  ],
+  institutional: [
+    "Everything in Growth",
+    "Portfolio dashboard",
+    "Benchmark engine",
+    "AI underwriting",
+    "Document intelligence",
+    "Fund accounting",
+    "SSO & audit trail",
+    "White label & API access",
+  ],
+};
+
+function formatCurrency(cents: number | null, currency = "usd") {
+  if (cents == null) return "—";
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: currency.toUpperCase(),
+  }).format(cents / 100);
+}
+
+function formatDate(iso: string | null) {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+type BadgeVariant = "default" | "secondary" | "destructive" | "outline";
+
+function statusColor(status: string | null): BadgeVariant {
+  if (!status) return "secondary";
+  if (status === "active") return "default";
+  if (status === "trialing") return "secondary";
+  if (status === "paid") return "default";
+  if (status === "past_due" || status === "failed") return "destructive";
+  if (status === "canceled" || status === "cancelled") return "destructive";
+  return "secondary";
+}
+
+function UsageBar({
+  label,
+  icon: Icon,
+  used,
+  limit,
+}: {
+  label: string;
+  icon: React.ElementType;
+  used: number;
+  limit: number | null;
+}) {
+  const unlimited = limit === null || limit === -1;
+  const pct = unlimited || limit === 0 ? 0 : Math.min((used / limit) * 100, 100);
+  const warning = pct >= 80;
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1.5">
+        <div className="flex items-center gap-1.5 text-sm font-medium">
+          <Icon className="h-4 w-4 text-muted-foreground" />
+          {label}
+        </div>
+        <span className="text-sm text-muted-foreground">
+          {unlimited ? `${used} / Unlimited` : `${used} / ${limit}`}
+        </span>
+      </div>
+      <Progress
+        value={unlimited ? 0 : pct}
+        className={warning ? "accent-destructive" : ""}
+      />
+      {warning && !unlimited && (
+        <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
+          <AlertTriangle className="h-3 w-3" />
+          {Math.round(pct)}% used — consider upgrading
+        </p>
+      )}
+    </div>
+  );
+}
 
 export default function BillingSettingsPage() {
   const { toast } = useToast();
+  const [pendingTier, setPendingTier] = useState<string | null>(null);
+  const [showChangePlanDialog, setShowChangePlanDialog] = useState(false);
 
-  const { data: plans = [] } = useQuery<any[]>({
+  const {
+    data: subData,
+    isLoading: subLoading,
+  } = useQuery<{ subscription: BillingSubscription | null; usage: UsageData }>({
+    queryKey: ["/api/billing/subscription"],
+  });
+
+  const { data: plans, isLoading: plansLoading } = useQuery<Record<string, TierDef>>({
     queryKey: ["/api/billing/plans"],
   });
 
-  const { data: subscription } = useQuery<any>({
-    queryKey: ["/api/billing/subscription"],
+  const { data: invoices = [], isLoading: invoicesLoading } = useQuery<BillingInvoice[]>({
+    queryKey: ["/api/billing/invoices"],
   });
 
   const { data: appConfig } = useQuery<any>({
     queryKey: ["/api/config"],
     staleTime: 5 * 60 * 1000,
   });
-  const stripeStatus = { configured: appConfig?.stripeConfigured ?? false };
-
-  const checkout = useMutation({
-    mutationFn: async ({ packType, billingCycle }: { packType: string; billingCycle: string }) => {
-      const res = await apiRequest("POST", "/api/stripe/checkout", { packType, billingCycle });
-      return res.json();
-    },
-    onSuccess: (data) => {
-      if (data.url) {
-        window.location.href = data.url;
-      } else {
-        toast({ title: "Checkout session created", description: "Redirecting to payment..." });
-      }
-    },
-    onError: (err: any) => {
-      toast({ title: "Checkout failed", description: err.message, variant: "destructive" });
-    },
-  });
+  const stripeConfigured = appConfig?.stripeConfigured ?? false;
 
   const openPortal = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/stripe/portal");
+      const res = await apiRequest("POST", "/api/billing/portal", {
+        returnUrl: window.location.href,
+      });
       return res.json();
     },
     onSuccess: (data) => {
       if (data.url) window.location.href = data.url;
     },
-    onError: (err: any) => {
-      toast({ title: "Portal unavailable", description: err.message, variant: "destructive" });
+    onError: (err: Error) => {
+      toast({
+        title: "Portal unavailable",
+        description: err.message,
+        variant: "destructive",
+      });
     },
   });
 
-  const sub = subscription?.subscription;
-  const usage = subscription?.usage;
+  const changePlan = useMutation({
+    mutationFn: async (newTier: string) => {
+      const res = await apiRequest("POST", "/api/billing/change-plan", { newTier });
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Plan updated", description: "Your subscription has been updated." });
+      queryClient.invalidateQueries({ queryKey: ["/api/billing/subscription"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/billing/plans"] });
+      setShowChangePlanDialog(false);
+      setPendingTier(null);
+    },
+    onError: (err: Error) => {
+      toast({ title: "Plan change failed", description: err.message, variant: "destructive" });
+    },
+  });
 
-  // Check URL params for success/cancel
+  const checkout = useMutation({
+    mutationFn: async ({ tier, billingCycle }: { tier: string; billingCycle: string }) => {
+      const res = await apiRequest("POST", "/api/billing/checkout", {
+        tier,
+        billingCycle,
+      });
+      return res.json();
+    },
+    onSuccess: (data: { url?: string }) => {
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        toast({ title: "Subscription created", description: "Your plan is now active." });
+        queryClient.invalidateQueries({ queryKey: ["/api/billing/subscription"] });
+      }
+    },
+    onError: (err: Error) => {
+      toast({ title: "Checkout failed", description: err.message, variant: "destructive" });
+    },
+  });
+
   const urlParams = new URLSearchParams(window.location.search);
   const success = urlParams.get("success");
   const canceled = urlParams.get("canceled");
+  const highlightFeature = urlParams.get("feature");
+  const showUpgrade = urlParams.get("upgrade") === "true";
 
-  // Invalidate subscription and entitlement queries on successful checkout return
   useEffect(() => {
     if (success === "true") {
       queryClient.invalidateQueries({ queryKey: ["/api/billing/subscription"] });
       queryClient.invalidateQueries({ queryKey: ["/api/billing/plans"] });
       queryClient.invalidateQueries({ queryKey: ["/api/config"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/subscription/current-tier"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/packs"] });
     }
   }, [success]);
 
+  const sub = subData?.subscription;
+  const usage = subData?.usage;
+  const currentTier = sub?.tier;
+
+  function getTierIndex(tier: string | undefined) {
+    if (!tier) return -1;
+    return TIER_ORDER.indexOf(tier);
+  }
+
+  function handlePlanAction(tier: string) {
+    if (!sub) {
+      checkout.mutate({ tier, billingCycle: "monthly" });
+      return;
+    }
+    setPendingTier(tier);
+    setShowChangePlanDialog(true);
+  }
+
+  const planFeatureMap = plans ?? {};
+
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-6 p-6 max-w-5xl">
       <div>
         <h1 className="text-2xl font-bold">Billing & Subscription</h1>
-        <p className="text-muted-foreground">Manage your plan, payment method, and invoices</p>
+        <p className="text-muted-foreground">
+          Manage your plan, payment method, invoices, and usage
+        </p>
       </div>
 
       {success === "true" && (
-        <Card className="border-green-200 bg-green-50">
-          <CardContent className="pt-6 flex items-center gap-3">
-            <Check className="h-6 w-6 text-green-600" />
+        <Card className="border-green-200 bg-green-50 dark:bg-green-950/20 dark:border-green-900">
+          <CardContent className="pt-5 flex items-center gap-3">
+            <Check className="h-5 w-5 text-green-600 shrink-0" />
             <div>
-              <p className="font-medium text-green-800">Payment successful!</p>
-              <p className="text-sm text-green-600">Your subscription is now active. Features will be available immediately.</p>
+              <p className="font-medium text-green-800 dark:text-green-300">
+                Payment successful!
+              </p>
+              <p className="text-sm text-green-700 dark:text-green-400">
+                Your subscription is now active. Features are available immediately.
+              </p>
             </div>
           </CardContent>
         </Card>
       )}
 
       {canceled === "true" && (
-        <Card className="border-orange-200 bg-orange-50">
-          <CardContent className="pt-6">
-            <p className="text-orange-800">Checkout was canceled. You can try again anytime.</p>
+        <Card className="border-amber-200 bg-amber-50 dark:bg-amber-950/20">
+          <CardContent className="pt-5 flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0" />
+            <p className="text-amber-800 dark:text-amber-300">
+              Checkout was canceled. You can try again anytime below.
+            </p>
           </CardContent>
         </Card>
       )}
 
-      {/* Current Plan */}
+      {showUpgrade && highlightFeature && (
+        <Card className="border-primary/30 bg-primary/5">
+          <CardContent className="pt-5 flex items-center gap-3">
+            <Zap className="h-5 w-5 text-primary shrink-0" />
+            <p className="text-sm">
+              The feature{" "}
+              <span className="font-mono bg-muted px-1 rounded text-xs">
+                {highlightFeature}
+              </span>{" "}
+              requires a higher plan. Upgrade below to unlock it.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ─── Current Plan Card ─── */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2"><Package className="h-5 w-5" />Current Plan</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <Package className="h-5 w-5" />
+            Current Plan
+          </CardTitle>
         </CardHeader>
         <CardContent>
-          {sub ? (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
+          {subLoading ? (
+            <div className="space-y-2">
+              <Skeleton className="h-6 w-48" />
+              <Skeleton className="h-4 w-64" />
+            </div>
+          ) : sub ? (
+            <div className="space-y-4">
+              <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
-                  <p className="text-lg font-bold">{sub.planName || sub.planKey || "Free"}</p>
-                  <Badge variant={sub.status === "active" ? "default" : sub.status === "trialing" ? "secondary" : "destructive"}>
-                    {sub.status}
-                  </Badge>
+                  <div className="flex items-center gap-2 mb-1">
+                    <p className="text-xl font-bold capitalize">
+                      {planFeatureMap[sub.tier]?.name ?? sub.tier}
+                    </p>
+                    <Badge variant={statusColor(sub.status)}>
+                      {sub.status}
+                    </Badge>
+                    {sub.billingCycle && (
+                      <Badge variant="outline" className="capitalize">
+                        {sub.billingCycle}
+                      </Badge>
+                    )}
+                  </div>
+                  {sub.currentPeriodEnd && (
+                    <p className="text-sm text-muted-foreground flex items-center gap-1">
+                      <Calendar className="h-3.5 w-3.5" />
+                      {sub.cancelAtPeriodEnd ? "Cancels" : "Renews"} on{" "}
+                      {formatDate(sub.currentPeriodEnd)}
+                    </p>
+                  )}
+                  {sub.trialEnd && sub.status === "trialing" && (
+                    <p className="text-sm text-amber-600 flex items-center gap-1 mt-1">
+                      <AlertTriangle className="h-3.5 w-3.5" />
+                      Trial ends {formatDate(sub.trialEnd)}
+                    </p>
+                  )}
                 </div>
-                <Button variant="outline" onClick={() => openPortal.mutate()} disabled={openPortal.isPending}>
-                  <CreditCard className="h-4 w-4 mr-2" />
-                  Manage Subscription
-                  <ExternalLink className="h-3 w-3 ml-1" />
-                </Button>
+                <div className="flex gap-2">
+                  {stripeConfigured && sub.stripeCustomerId && (
+                    <Button
+                      variant="outline"
+                      onClick={() => openPortal.mutate()}
+                      disabled={openPortal.isPending}
+                      size="sm"
+                    >
+                      <CreditCard className="h-4 w-4 mr-2" />
+                      Manage Subscription
+                      <ExternalLink className="h-3 w-3 ml-1" />
+                    </Button>
+                  )}
+                </div>
               </div>
-              {sub.currentPeriodEnd && (
-                <p className="text-sm text-muted-foreground">
-                  {sub.cancelAtPeriodEnd ? "Cancels" : "Renews"} on {new Date(sub.currentPeriodEnd).toLocaleDateString()}
-                </p>
-              )}
+
               {usage && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 pt-3 border-t">
-                  <div><p className="text-sm text-muted-foreground">Deals</p><p className="font-bold">{usage.deals || 0}</p></div>
-                  <div><p className="text-sm text-muted-foreground">Models</p><p className="font-bold">{usage.models || 0}</p></div>
-                  <div><p className="text-sm text-muted-foreground">Users</p><p className="font-bold">{usage.users || 0}</p></div>
-                </div>
+                <>
+                  <Separator />
+                  <div>
+                    <p className="text-sm font-medium mb-3 text-muted-foreground uppercase tracking-wide">
+                      Usage
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <UsageBar
+                        label="Deals"
+                        icon={FileText}
+                        used={usage.deals ?? 0}
+                        limit={sub.dealLimit}
+                      />
+                      <UsageBar
+                        label="Team Members"
+                        icon={Users}
+                        used={usage.users ?? 0}
+                        limit={sub.seatLimit}
+                      />
+                      <UsageBar
+                        label="AI Queries"
+                        icon={Zap}
+                        used={usage.aiQueries ?? 0}
+                        limit={sub.aiQueryLimit}
+                      />
+                      <UsageBar
+                        label="Storage"
+                        icon={Database}
+                        used={0}
+                        limit={null}
+                      />
+                    </div>
+                  </div>
+                </>
               )}
             </div>
           ) : (
             <div className="text-center py-6">
-              <p className="text-muted-foreground mb-3">No active subscription. Choose a plan below to get started.</p>
+              <Package className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
+              <p className="text-muted-foreground mb-1">No active subscription</p>
+              <p className="text-sm text-muted-foreground">
+                Choose a plan below to get started.
+              </p>
             </div>
           )}
         </CardContent>
       </Card>
 
-      {/* Available Plans */}
+      {/* ─── Plan Comparison / Upgrade-Downgrade ─── */}
       <div>
-        <h2 className="text-lg font-semibold mb-4">Available Packs</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {(Array.isArray(plans) ? plans : Object.values(plans)).map((plan: any) => (
-            <Card key={plan.key || plan.packType || plan.name} className="relative">
-              <CardHeader>
-                <CardTitle className="text-lg">{plan.name || plan.key}</CardTitle>
-                <CardDescription>{plan.description}</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="mb-4">
-                  <span className="text-3xl font-bold">${((plan.monthlyPriceCents || plan.price || 0) / 100).toFixed(0)}</span>
-                  <span className="text-muted-foreground">/mo</span>
-                </div>
-                {plan.features && (
-                  <ul className="space-y-1 mb-4">
-                    {((plan.features || []) as string[]).slice(0, 5).map((f: string, i: number) => (
-                      <li key={i} className="flex items-center gap-2 text-sm">
-                        <Check className="h-3 w-3 text-green-600 shrink-0" />
-                        {f}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-                <Button
-                  className="w-full"
-                  variant={plan.isCore ? "default" : "outline"}
-                  onClick={() => checkout.mutate({
-                    packType: plan.packType || plan.key,
-                    billingCycle: "monthly",
-                  })}
-                  disabled={checkout.isPending || !stripeStatus?.configured}
+        <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+          <TrendingUp className="h-5 w-5" />
+          Available Plans
+        </h2>
+        {plansLoading ? (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {[0, 1, 2].map((i) => (
+              <Skeleton key={i} className="h-64 rounded-lg" />
+            ))}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {TIER_ORDER.map((tierKey) => {
+              const tier = planFeatureMap[tierKey];
+              if (!tier) return null;
+              const isCurrent = currentTier === tierKey;
+              const currentIdx = getTierIndex(currentTier);
+              const tierIdx = getTierIndex(tierKey);
+              const isUpgrade = currentIdx !== -1 && tierIdx > currentIdx;
+              const isDowngrade = currentIdx !== -1 && tierIdx < currentIdx;
+
+              return (
+                <Card
+                  key={tierKey}
+                  className={
+                    isCurrent
+                      ? "border-2 border-primary shadow-sm"
+                      : "border"
+                  }
                 >
-                  <Zap className="h-4 w-4 mr-2" />
-                  {stripeStatus?.configured ? "Subscribe" : "Coming Soon"}
-                </Button>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+                  {isCurrent && (
+                    <div className="bg-primary text-primary-foreground text-xs text-center py-1 rounded-t-lg font-medium">
+                      Current Plan
+                    </div>
+                  )}
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-lg">{tier.name}</CardTitle>
+                      {tierKey === "growth" && (
+                        <Badge variant="secondary">Popular</Badge>
+                      )}
+                    </div>
+                    <CardDescription>
+                      {tier.priceMonthly != null ? (
+                        <>
+                          <span className="text-2xl font-bold text-foreground">
+                            ${tier.priceMonthly}
+                          </span>
+                          <span className="text-muted-foreground">/mo</span>
+                          {tier.priceAnnual && (
+                            <span className="text-xs text-muted-foreground block">
+                              ${tier.priceAnnual}/mo billed annually
+                            </span>
+                          )}
+                        </>
+                      ) : (
+                        <span className="text-lg font-semibold">
+                          Custom pricing
+                        </span>
+                      )}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <ul className="space-y-1.5">
+                      {(TIER_FEATURE_LABELS[tierKey] ?? tier.features.slice(0, 7)).map(
+                        (f, i) => (
+                          <li key={i} className="flex items-start gap-2 text-sm">
+                            <Check className="h-3.5 w-3.5 text-green-600 shrink-0 mt-0.5" />
+                            {f}
+                          </li>
+                        )
+                      )}
+                    </ul>
+
+                    <div className="text-xs text-muted-foreground space-y-0.5 border-t pt-3">
+                      <p>
+                        Deals:{" "}
+                        {tier.limits.deals === -1 ? "Unlimited" : tier.limits.deals}
+                      </p>
+                      <p>
+                        Seats:{" "}
+                        {tier.limits.seats === -1 ? "Unlimited" : tier.limits.seats}
+                      </p>
+                    </div>
+
+                    {!isCurrent && (
+                      <Button
+                        className="w-full"
+                        variant={isUpgrade ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => handlePlanAction(tierKey)}
+                        disabled={
+                          changePlan.isPending ||
+                          checkout.isPending
+                        }
+                      >
+                        {isUpgrade ? (
+                          <>
+                            <ChevronUp className="h-4 w-4 mr-1" />
+                            Upgrade to {tier.name}
+                          </>
+                        ) : isDowngrade ? (
+                          <>
+                            <ChevronDown className="h-4 w-4 mr-1" />
+                            Downgrade to {tier.name}
+                          </>
+                        ) : (
+                          <>
+                            <Zap className="h-4 w-4 mr-1" />
+                            Select {tier.name}
+                          </>
+                        )}
+                      </Button>
+                    )}
+                    {isCurrent && (
+                      <Button className="w-full" variant="outline" size="sm" disabled>
+                        <Check className="h-4 w-4 mr-1" />
+                        Active Plan
+                      </Button>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        )}
       </div>
+
+      {/* ─── Invoice History ─── */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <FileText className="h-5 w-5" />
+            Invoice History
+          </CardTitle>
+          <CardDescription>
+            Download receipts and review past charges
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {invoicesLoading ? (
+            <div className="space-y-2">
+              {[0, 1, 2].map((i) => (
+                <Skeleton key={i} className="h-10 w-full" />
+              ))}
+            </div>
+          ) : invoices.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <FileText className="h-8 w-8 mx-auto mb-2 opacity-50" />
+              <p className="text-sm">No invoices yet</p>
+              <p className="text-xs mt-1">
+                Invoices appear here once you have an active paid subscription.
+              </p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b text-muted-foreground">
+                    <th className="text-left py-2 pr-4 font-medium">Date</th>
+                    <th className="text-left py-2 pr-4 font-medium">Period</th>
+                    <th className="text-left py-2 pr-4 font-medium">Amount</th>
+                    <th className="text-left py-2 pr-4 font-medium">Status</th>
+                    <th className="text-right py-2 font-medium">Receipt</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {invoices.map((inv) => (
+                    <tr
+                      key={inv.id}
+                      className="border-b last:border-0 hover:bg-muted/30"
+                    >
+                      <td className="py-2.5 pr-4">
+                        {formatDate(inv.paidAt ?? inv.createdAt)}
+                      </td>
+                      <td className="py-2.5 pr-4 text-muted-foreground">
+                        {inv.periodStart && inv.periodEnd
+                          ? `${formatDate(inv.periodStart)} – ${formatDate(inv.periodEnd)}`
+                          : "—"}
+                      </td>
+                      <td className="py-2.5 pr-4 font-medium">
+                        {formatCurrency(inv.amount, inv.currency ?? "usd")}
+                      </td>
+                      <td className="py-2.5 pr-4">
+                        <Badge
+                          variant={statusColor(inv.status)}
+                          className="capitalize"
+                        >
+                          {inv.status ?? "—"}
+                        </Badge>
+                      </td>
+                      <td className="py-2.5 text-right">
+                        {inv.pdfUrl ? (
+                          <a
+                            href={inv.pdfUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            <Button size="sm" variant="ghost" className="h-7 gap-1">
+                              <Download className="h-3.5 w-3.5" />
+                              PDF
+                            </Button>
+                          </a>
+                        ) : inv.invoiceUrl ? (
+                          <a
+                            href={inv.invoiceUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            <Button size="sm" variant="ghost" className="h-7 gap-1">
+                              <ExternalLink className="h-3.5 w-3.5" />
+                              View
+                            </Button>
+                          </a>
+                        ) : (
+                          <span className="text-muted-foreground text-xs">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* ─── Change Plan Confirmation Dialog ─── */}
+      <AlertDialog
+        open={showChangePlanDialog}
+        onOpenChange={setShowChangePlanDialog}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {pendingTier && getTierIndex(pendingTier) > getTierIndex(currentTier)
+                ? "Upgrade Plan"
+                : "Downgrade Plan"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingTier && (
+                <>
+                  You are about to switch from{" "}
+                  <strong className="capitalize">
+                    {planFeatureMap[currentTier ?? ""]?.name ?? currentTier ?? "your current plan"}
+                  </strong>{" "}
+                  to{" "}
+                  <strong className="capitalize">
+                    {planFeatureMap[pendingTier]?.name ?? pendingTier}
+                  </strong>
+                  .
+                  {getTierIndex(pendingTier) < getTierIndex(currentTier ?? "") && (
+                    <span className="block mt-2 text-amber-600">
+                      Downgrading may remove access to features in your current
+                      plan.
+                    </span>
+                  )}
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              onClick={() => {
+                setShowChangePlanDialog(false);
+                setPendingTier(null);
+              }}
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (pendingTier) changePlan.mutate(pendingTier);
+              }}
+              disabled={changePlan.isPending}
+            >
+              {changePlan.isPending ? "Updating…" : "Confirm"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
