@@ -1833,22 +1833,36 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
                 <span className="text-sm font-medium truncate">{item.name}</span>
               </div>
               {item.isEnabled && (
-                <div className="flex items-center gap-2">
-                  <Input
-                    placeholder="Count"
-                    value={item.count}
-                    onChange={(e) => updateStorageField(item.id, listKey, 'count', e.target.value)}
-                    className="h-7 w-20 text-xs"
-                    type="number"
-                  />
-                  <Input
-                    placeholder="Occ %"
-                    value={item.occupancy}
-                    onChange={(e) => updateStorageField(item.id, listKey, 'occupancy', e.target.value)}
-                    className="h-7 w-20 text-xs"
-                    type="number"
-                    max={100}
-                  />
+                <div className="flex items-center gap-2 shrink-0">
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-[9px] font-semibold text-muted-foreground text-center uppercase tracking-wider leading-none">Count</span>
+                    <div className="relative">
+                      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground font-medium select-none">#</span>
+                      <Input
+                        placeholder="0"
+                        value={item.count}
+                        onChange={(e) => updateStorageField(item.id, listKey, 'count', e.target.value)}
+                        className="h-7 w-[62px] text-xs pl-5 text-right font-medium"
+                        type="number"
+                        min={0}
+                      />
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-[9px] font-semibold text-muted-foreground text-center uppercase tracking-wider leading-none">Occ %</span>
+                    <div className="relative">
+                      <Input
+                        placeholder="0"
+                        value={item.occupancy}
+                        onChange={(e) => updateStorageField(item.id, listKey, 'occupancy', e.target.value)}
+                        className="h-7 w-[62px] text-xs pr-5 text-right font-medium"
+                        type="number"
+                        min={0}
+                        max={100}
+                      />
+                      <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground font-medium select-none">%</span>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
