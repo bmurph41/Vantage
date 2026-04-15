@@ -13,9 +13,11 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { AddressInput, type AddressComponents } from "@/components/address-input";
+import { AddressInput, type AddressComponents, parseAddressString } from "@/components/address-input";
 import type { MarinaRateDatabase } from "@shared/schema";
 import { US_REGIONS, US_STATES } from "@shared/salescomps-constants";
+import { GooglePlaceSearch, type PlaceDetails } from "@/components/GooglePlaceSearch";
+import { Label } from "@/components/ui/label";
 
 const WATER_TYPES = ["Saltwater", "Freshwater", "Brackish"];
 
@@ -194,6 +196,25 @@ export default function AddEditMarinaDialog({ open, onOpenChange, marina, onSucc
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            {/* Google Places quick-fill */}
+            {!isEditing && (
+              <div className="space-y-1.5 pb-2 border-b">
+                <Label className="text-sm font-medium">Search Google Places (optional)</Label>
+                <GooglePlaceSearch
+                  searchType="establishment"
+                  placeholder="Search for a marina to auto-fill..."
+                  onSelect={(place: PlaceDetails) => {
+                    const parsed = parseAddressString(place.address || "");
+                    if (place.name) form.setValue("marinaName", place.name);
+                    if (parsed.street) form.setValue("address", parsed.street);
+                    if (parsed.city) form.setValue("city", parsed.city);
+                    if (parsed.state) form.setValue("state", parsed.state);
+                    if (parsed.zipCode) form.setValue("zip", parsed.zipCode);
+                  }}
+                />
+                <p className="text-xs text-muted-foreground">Selecting a result auto-fills the fields below.</p>
+              </div>
+            )}
             {/* Basic Info */}
             <div className="space-y-4">
               <h4 className="font-medium text-sm text-muted-foreground">Basic Information</h4>

@@ -12,7 +12,140 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plug, Search, CheckCircle, XCircle, RefreshCw, Settings, Clock, Zap } from "lucide-react";
+import { Plug, Search, CheckCircle, XCircle, RefreshCw, Settings, Clock, Zap, Map as MapIcon, Eye, EyeOff, Loader2, TestTube } from "lucide-react";
+import { SiGooglemaps } from "react-icons/si";
+
+function GoogleMapsCard() {
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const [apiKeyInput, setApiKeyInput] = useState("");
+  const [showKey, setShowKey] = useState(false);
+
+  const { data: gmSettings, isLoading: gmLoading } = useQuery<{ configured: boolean; maskedKey: string | null }>({
+    queryKey: ["/api/google-places/settings"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/google-places/settings");
+      return res.json();
+    },
+  });
+
+  const saveKey = useMutation({
+    mutationFn: async (apiKey: string) => {
+      const res = await apiRequest("POST", "/api/google-places/settings", { apiKey });
+      return res.json();
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/google-places/settings"] });
+      setApiKeyInput("");
+      toast({ title: "Google API key saved", description: "The key has been encrypted and stored." });
+    },
+    onError: (err: unknown) => {
+      toast({ title: "Failed to save key", description: err instanceof Error ? err.message : "Unexpected error", variant: "destructive" });
+    },
+  });
+
+  const deleteKey = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("DELETE", "/api/google-places/settings");
+      return res.json();
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/google-places/settings"] });
+      toast({ title: "Google API key removed" });
+    },
+  });
+
+  const testKey = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("GET", "/api/google-places/autocomplete?input=marina&types=establishment");
+      return res.json();
+    },
+    onSuccess: (data) => {
+      if (data.predictions !== undefined) {
+        toast({ title: "Connection successful", description: "Google Places API is working correctly." });
+      } else {
+        toast({ title: "Connection failed", description: data.error || "Unexpected response", variant: "destructive" });
+      }
+    },
+    onError: (err: unknown) => {
+      toast({ title: "Connection test failed", description: err instanceof Error ? err.message : "Unexpected error", variant: "destructive" });
+    },
+  });
+
+  return (
+    <Card className={gmSettings?.configured ? "border-green-200" : ""}>
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <SiGooglemaps className="h-5 w-5 text-red-500" />
+            <CardTitle className="text-base">Google Maps & Places</CardTitle>
+          </div>
+          {gmLoading ? (
+            <Skeleton className="h-5 w-20" />
+          ) : gmSettings?.configured ? (
+            <Badge variant="default" className="bg-green-600"><CheckCircle className="h-3 w-3 mr-1" />Connected</Badge>
+          ) : (
+            <Badge variant="outline">Not configured</Badge>
+          )}
+        </div>
+        <CardDescription className="text-xs">
+          Enables address autocomplete and place search across the platform. Your API key is stored encrypted — it is never exposed to the browser.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {gmSettings?.configured ? (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 text-sm">
+              <span className="text-muted-foreground">API Key:</span>
+              <code className="font-mono text-xs bg-muted px-2 py-0.5 rounded">{gmSettings.maskedKey}</code>
+            </div>
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" className="flex-1" onClick={() => testKey.mutate()} disabled={testKey.isPending}>
+                {testKey.isPending ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <TestTube className="h-3 w-3 mr-1" />}
+                Test Connection
+              </Button>
+              <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => deleteKey.mutate()} disabled={deleteKey.isPending}>
+                <XCircle className="h-3 w-3 mr-1" />Remove
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <Label className="text-xs">Google API Key</Label>
+            <div className="relative">
+              <Input
+                type={showKey ? "text" : "password"}
+                placeholder="AIza..."
+                value={apiKeyInput}
+                onChange={(e) => setApiKeyInput(e.target.value)}
+                className="pr-9 font-mono text-sm"
+              />
+              <button
+                type="button"
+                onClick={() => setShowKey(v => !v)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Requires <strong>Places API</strong> and <strong>Geocoding API</strong> enabled in Google Cloud Console.
+            </p>
+            <Button
+              size="sm"
+              className="w-full"
+              onClick={() => saveKey.mutate(apiKeyInput)}
+              disabled={!apiKeyInput || saveKey.isPending}
+            >
+              {saveKey.isPending ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <MapIcon className="h-3 w-3 mr-1" />}
+              Save API Key
+            </Button>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function IntegrationsMarketplacePage() {
   const { toast } = useToast();
@@ -88,6 +221,14 @@ export default function IntegrationsMarketplacePage() {
       <div>
         <h1 className="text-2xl font-bold flex items-center gap-2"><Plug className="h-6 w-6" />Integrations</h1>
         <p className="text-muted-foreground">{catalog?.total || 0} available, {catalog?.connected || 0} connected</p>
+      </div>
+
+      {/* First-party platform integrations */}
+      <div>
+        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">Platform Keys</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <GoogleMapsCard />
+        </div>
       </div>
 
       {/* Filters */}

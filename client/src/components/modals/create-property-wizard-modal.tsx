@@ -17,6 +17,8 @@ import {
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { toast } from "@/hooks/use-toast";
+import { GooglePlaceSearch, type PlaceDetails } from "@/components/GooglePlaceSearch";
+import { Label } from "@/components/ui/label";
 
 interface CreatePropertyWizardModalProps {
   open: boolean;
@@ -180,6 +182,38 @@ export function CreatePropertyWizardModal({ open, onOpenChange, onPropertyCreate
       case 1:
         return (
           <div className="space-y-4">
+            <div>
+              <Label className="text-sm font-medium mb-1.5 block">Search Google Places (optional)</Label>
+              <GooglePlaceSearch
+                searchType="establishment"
+                placeholder="Search for the marina or property..."
+                onSelect={(place: PlaceDetails) => {
+                  const parts = (place.address || "").split(",");
+                  const street = parts[0]?.trim() || "";
+                  let city = "";
+                  let stateAbbr = "";
+                  let zip = "";
+                  if (parts.length >= 2) {
+                    const cityStateZip = parts.slice(1).join(",").trim();
+                    const match = cityStateZip.match(/^([^,]+),\s*([A-Z]{2})\s*(\d{5})?/);
+                    if (match) {
+                      city = match[1]?.trim() || "";
+                      stateAbbr = match[2]?.trim() || "";
+                      zip = match[3]?.trim() || "";
+                    }
+                  }
+                  setState(s => ({
+                    ...s,
+                    name: place.name || s.name,
+                    address: street || s.address,
+                    city: city || s.city,
+                    state: stateAbbr || s.state,
+                    zipCode: zip || s.zipCode,
+                  }));
+                }}
+              />
+              <p className="text-xs text-muted-foreground mt-1">Selecting a result will auto-fill the fields below.</p>
+            </div>
             <MMInput
               label="Property Name"
               required

@@ -14,6 +14,7 @@ import { Separator } from "@/components/ui/separator";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Plus, X, User, Building, Link2, Search, MapPin } from "lucide-react";
 import { AddressInput, type AddressComponents } from "@/components/address-input";
+import { GooglePlaceSearch, type PlaceDetails } from "@/components/GooglePlaceSearch";
 import { StateSelect } from "@/components/ui/state-select";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -700,6 +701,25 @@ export default function PropertyFormModal({ isOpen, onClose, property }: Propert
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">Search Google Places (optional)</Label>
+                  <GooglePlaceSearch
+                    searchType="address"
+                    placeholder="Search for an address..."
+                    onSelect={(place: PlaceDetails) => {
+                      const parts = (place.address || "").split(",");
+                      const street = parts[0]?.trim() || "";
+                      const rest = parts.slice(1).join(",").trim();
+                      const match = rest.match(/^([^,]+),\s*([A-Z]{2})\s*(\d{5})?/);
+                      if (street) setAddress(street);
+                      if (match) {
+                        if (match[1]) setCity(match[1].trim());
+                        if (match[2]) setState(match[2].trim());
+                        if (match[3]) setZipCode(match[3].trim());
+                      }
+                    }}
+                  />
+                </div>
                 <div className="space-y-2">
                   <AddressInput
                     value={address}

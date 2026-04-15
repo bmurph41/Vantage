@@ -37,6 +37,7 @@ import { toStateAbbr } from "@/lib/state-utils";
 import { DealContactsBlock, type DealContactEntry } from "@/components/deals/deal-contacts-block";
 import { DepositScheduleBlock, type DepositEntry } from "@/components/deals/deposit-schedule-block";
 import { DealTimelineVisualizer } from "@/components/deals/deal-timeline-visualizer";
+import { GooglePlaceSearch } from "@/components/GooglePlaceSearch";
 
 interface DealFormModalProps {
   isOpen: boolean;
@@ -1496,6 +1497,24 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
                     {/* Location */}
                     <div>
                       <h4 className="font-semibold text-sm mb-3">Location</h4>
+                      <div className="mb-3">
+                        <Label className="text-xs text-muted-foreground mb-1 block">Quick-fill from Google Places</Label>
+                        <GooglePlaceSearch
+                          placeholder="Search for a marina or address..."
+                          onSelect={(place) => {
+                            if (place.address) {
+                              const parts = place.address.split(',').map((s: string) => s.trim());
+                              if (parts.length >= 3) {
+                                form.setValue('ddCity', parts[parts.length - 3] || '');
+                                const statePart = (parts[parts.length - 2] || '').split(' ')[0];
+                                form.setValue('ddState', toStateAbbr(statePart) || statePart);
+                              } else if (parts.length === 2) {
+                                form.setValue('ddCity', parts[0] || '');
+                              }
+                            }
+                          }}
+                        />
+                      </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <FormField
                           control={form.control}
