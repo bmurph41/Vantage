@@ -1,6 +1,97 @@
 # MarinaMatch Platform Journal
 
-## Current State (2026-04-01)
+## Current State (2026-04-15)
+
+### ✅ COMPLETE — Deal Marketplace + Broker Platform (2026-04-15)
+
+Multi-week work on the universal Deal Marketplace and broker-facing SaaS landed
+on branch `feat/exit-engine-patches`. Committed in `307460e2` ("Git commit prior
+to merge", ~11,113 lines across 46 files) plus `191cf37c` (Stripe plan gate on
+publish). DB migrations already applied (`scripts/step1_marketplace_schema.mjs`,
+`step2_broker_subscriptions_schema.mjs`, `step3_broker_entitlements_fix.mjs`,
+`seed_stripe_broker_skus.mjs`).
+
+**Schema / DB**
+- `shared/schema.ts` — universal marketplace columns on `marina_listings`
+  (`listing_category` enum, `asset_class`, `cre_metrics`/`business_metrics` jsonb,
+  `broker_profile_id` FK, `currency`, `price_on_request`, `is_location_confidential`,
+  `is_active`, `published_at`, `last_seen_at`, `source_listing_id_canonical`) +
+  `marketplace_sources` and `marketplace_scrape_runs` tables
+- `shared/marketplace/asset-class-taxonomy.ts` — cross-asset taxonomy shared
+  between scrapers, filters, and frontend
+- New/updated broker tables: `broker_profiles`, `broker_registrations`,
+  `broker_subscriptions`, `broker_advisory_packages`, `broker_advisory_content`,
+  `broker_advisory_messages`, `broker_listing_claims`, `broker_listing_claim_disputes`,
+  `broker_activity_log`, `broker_follow_history`, `broker_portal_submissions`,
+  `broker_relationships`
+
+**Backend services**
+- `server/services/broker-tiers.ts` — broker SKU definitions (starter/pro/enterprise,
+  feature flags, Stripe price IDs via env)
+- `server/services/broker-entitlements.ts` — buyer-side Marketplace+ tiers
+  (free/solo/pro/institutional) with precedence: user override → org → free default
+- `server/services/broker-claim-service.ts` — listing claim lifecycle
+  (backfill on publish, release on unpublish)
+- `server/services/billing-service.ts` — new Stripe webhook handlers:
+  `checkout.session.completed` splits on `metadata.sku` for `marketplace_plus`
+  vs `broker_plan`; `customer.subscription.deleted/updated` downgrades
+  entitlements. New `hasActiveBrokerPlan(userId)` helper used by the publish
+  gate (Stripe-first with dev fallback to `brokerProfiles.brokerTier`).
+
+**Backend ingestion framework** (`server/ingestion/`)
+- `dedupe.ts`, `persistence.ts`, `registry.ts`, `scheduler.ts`, `scrapers/base.ts`,
+  `scrapers/bizbuysell.ts` — generic adapter-based scraper pipeline that writes
+  through to `marina_listings` with `listing_category` + `business_metrics`
+- `server/listings/ingestion_v2/routes.ts` — `GET /listings` now queries the
+  canonical `marina_listings` table with category / asset-class / business-metric
+  filters (`minRevenue`, `maxRevenue`, `minEbitda`, `maxEbitda`, `minSde`, `maxSde`);
+  legacy `liv2_listings_current` passthrough via `?legacy=1`
+
+**Backend routes** (all mounted under `authenticateUser + enforceTenant`)
+- `POST/GET /api/broker-subscriptions/*` — subscriber-side follow/advisory billing
+- `POST/GET /api/broker-registration/*` — broker self-registration + admin queue
+- `POST/GET /api/admin/broker/*` — registration approval / rejection
+- `POST/GET /api/broker-billing/*` — Stripe checkout/portal for broker plans
+- `POST/GET /api/broker-claims/*` — claim-a-scraped-listing flow with dispute support
+- `GET/POST/PATCH /api/broker-dashboard/*` — broker dashboard CRUD (profile,
+  listings, advisory packages, content, subscribers, analytics); publish now
+  gated on `billingService.hasActiveBrokerPlan()`
+- `/api/admin/marketplace-ingestion/*` — admin-only source CRUD, run triggers,
+  run history
+
+**Frontend**
+- `client/src/hooks/use-broker-admin.ts`, `use-broker-dashboard.ts`,
+  `use-broker-subscriptions.ts` — React Query hooks with invalidation
+- `client/src/components/broker/UpgradePrompt.tsx`
+- `client/src/pages/broker/` — BrokerRegister, BrokerDirectory, BrokerProfile,
+  BrokerFeed, MyBrokerSubscriptions
+- `client/src/pages/broker/dashboard/` — Layout + Overview, ProfileEditor,
+  ListingsManager, AdvisoryPackages, ContentPublisher, SubscribersList, Analytics
+- `client/src/pages/admin/BrokerRegistrationsQueue.tsx` — admin review queue
+- `client/src/pages/marinamatch/MarketplaceListings.tsx` — +429 lines:
+  asset-class and business-metric filters
+- `client/src/Router.tsx` — 13 new routes: `/broker/*`, `/brokers`,
+  `/brokers/:profileId`, `/brokers/feed`, `/admin/broker-registrations`,
+  `/settings/broker-subscriptions`
+
+**Smoke test (2026-04-15)** — all 6 broker routers return 200 on the dev server;
+`/api/admin/marketplace-ingestion/sources` correctly returns 403 (admin-gated);
+`/api/liv2/listings` returns 200 serving the new shape; publish endpoint
+returns 403 for unauthenticated callers (expected).
+
+**Known follow-ups**
+- Only one scraper adapter implemented (`bizbuysell.ts`); registry/scheduler are
+  generic and ready for more marketplace sources
+- Webhook cancel path resets `brokerTier='starter'` + `isPublishable:false`;
+  since `starter` is itself a paid tier, distinguishing "new starter purchase"
+  vs "canceled, demoted to starter" now relies on the Stripe lookup in
+  `hasActiveBrokerPlan()` rather than the denormalized column alone
+- No PII encryption yet on `broker_portal_submissions` (leads captured from
+  public broker pages)
+
+---
+
+## Previous State (2026-04-01)
 
 ### ✅ COMPLETE — Offering Memorandum Rendering Pipeline (2026-04-01)
 
