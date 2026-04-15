@@ -2,6 +2,60 @@
 
 ## Current State (2026-04-15)
 
+### ✅ COMPLETE — DD Timeline Animation (2026-04-15, evening)
+
+Animated horizontal Due Diligence timeline rendered on the modeling workspace
+overview tab for deals at LOI+ (or wherever `psaSignedDate` is set). Visualizes
+the original DD period, stacks executed extensions end-to-end with a Harbor
+Teal glow, shows a pulsing "today" marker and a closing-date flag. Extension
+grants animate live via framer-motion `layout` transitions when a new row
+flips `executed=true`.
+
+**Files**
+- `client/src/index.css` — added FM Design System v2 motion tokens
+  (`--motion-ease-standard`, `--motion-ease-emphasized`, `--motion-duration-quick`,
+  `--motion-duration-enter`, `--motion-duration-grant`). First cohesive motion
+  layer on the platform.
+- `client/src/components/dd/DDTimelineAnimation.tsx` NEW (~380 lines) —
+  presentational component. Computes geometry from `{psaSignedDate, ddPeriodDays,
+  ddExpirationDate, closingDate, extensions[]}`, renders rail + segments + PSA
+  node + DD-ends cap + closing flag + today marker, each with staggered
+  framer-motion entrance (rail draws L→R, segments scaleX grow, nodes spring
+  in, labels fade). `motion.div layout` on the DD-ends cap so it slides when
+  a new extension lands. Hover tooltips + legend.
+- `client/src/hooks/use-dd-timeline.ts` NEW — fetches `GET /api/deals/:id` +
+  `GET /api/crm/deals/:id/extensions`, derives `eligible` flag (true when
+  stage ∈ LOI+ set OR `psaSignedDate` set), computes `ddPeriodDays` if missing.
+- `client/src/pages/modeling/projects/workspace.tsx` — imported component +
+  hook, added `DDTimelineSection` wrapper inside the Overview tab, rendered
+  above `BrokerFeedbackPanel` when `project.dealId` is set and eligible.
+
+**Design choices**
+- Deep Marine Blue (`hsl(221, 83%, 35%)`) = original DD; Harbor Teal
+  (`hsl(177, 75%, 38%)`) = extensions; Amber = today marker; Emerald = closing.
+- Eligibility gate = stage in LOI_OR_LATER set OR `psaSignedDate` present.
+  LOI-stage deals without a signed PSA see a placeholder card instead of the
+  rail, so there's still a visible affordance.
+- Kept rendering scoped to modeling workspace overview only — portfolio
+  `dd-review.tsx` intentionally skipped for v1 (too dense with 20+ cards).
+  `dd-progress-report.tsx` can reuse the same component later with zero
+  changes since it's purely presentational.
+
+**Validation**
+- `tsc --noEmit` clean on all touched files
+- Dev server HMR picked up the changes without restart (tsx watching)
+
+**Known follow-ups**
+- Render custom deadlines (`crmDeals.customDeadlines` JSONB with
+  `showOnTimeline=true`) as small ticks above the rail
+- Compact variant for the portfolio DD review page
+- Milestone labels could collide when extensions overlap closing; add
+  smart label positioning
+- Pending-extension (not yet executed) rendering as dashed outline ghost
+  segments
+
+---
+
 ### ✅ COMPLETE — Broker Feedback & Evaluation Layer (2026-04-15, afternoon)
 
 Built the evaluator/training layer on top of the existing broker platform. Brokers

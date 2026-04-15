@@ -11,6 +11,17 @@
   display: none;
 }
 
+/* FM Design System v2 — motion tokens
+   Shared easing + duration scale used by animated platform surfaces
+   (DD Timeline, wizards, drawer transitions). Keep timing cohesive. */
+:root {
+  --motion-ease-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --motion-ease-emphasized: cubic-bezier(0.16, 1, 0.3, 1);
+  --motion-duration-quick: 180ms;
+  --motion-duration-enter: 500ms;
+  --motion-duration-grant: 600ms;
+}
+
 :root {
   --background: hsl(220 14% 96%);
   --foreground: hsl(220 26% 30%);

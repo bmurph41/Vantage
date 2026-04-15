@@ -4,6 +4,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import BrokerFeedbackPanel from '@/components/broker/BrokerFeedbackPanel';
+import DDTimelineAnimation from '@/components/dd/DDTimelineAnimation';
+import { useDDTimeline } from '@/hooks/use-dd-timeline';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
@@ -470,6 +472,12 @@ function StorageLeasesWorkspace({ projectId, projectName, onTabChange }: { proje
   );
 }
 
+function DDTimelineSection({ dealId }: { dealId: string | null }) {
+  const { data, stageLabel, eligible, isLoading } = useDDTimeline(dealId);
+  if (!dealId || !eligible || isLoading || !data) return null;
+  return <DDTimelineAnimation data={data} stageLabel={stageLabel ?? undefined} />;
+}
+
 export default function ProjectWorkspace() {
   const { projectId } = useParams<{ projectId: string }>();
   const [, navigate] = useLocation();
@@ -894,6 +902,7 @@ export default function ProjectWorkspace() {
 
         <TabsContent value="overview" className="mt-4 space-y-4">
           <OverviewDynamic project={project} pricingData={pricingData} financials={financials} onTabChange={handleTabChange} />
+          <DDTimelineSection dealId={project?.dealId ? String(project.dealId) : null} />
           {projectId && <BrokerFeedbackPanel targetType="modeling-project" targetId={projectId} />}
         </TabsContent>
 
