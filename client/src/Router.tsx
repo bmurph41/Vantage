@@ -114,6 +114,19 @@ const DataSourcesAdmin = lazy(() => import("@/pages/admin/DataSourcesAdmin"));
 const AssetClassManager = lazy(() => import("@/pages/admin/AssetClassManager"));
 const MasterCompsAdmin = lazy(() => import("@/pages/admin/MasterCompsAdmin"));
 const PlatformDashboard = lazy(() => import("@/pages/admin/PlatformDashboard"));
+const BrokerRegistrationsQueue = lazy(() => import("@/pages/admin/BrokerRegistrationsQueue"));
+const BrokerRegister = lazy(() => import("@/pages/broker/BrokerRegister"));
+const BrokerDashboardOverview = lazy(() => import("@/pages/broker/dashboard/BrokerDashboardOverview"));
+const BrokerProfileEditor = lazy(() => import("@/pages/broker/dashboard/BrokerProfileEditor"));
+const BrokerListingsManager = lazy(() => import("@/pages/broker/dashboard/BrokerListingsManager"));
+const BrokerAdvisoryPackagesPage = lazy(() => import("@/pages/broker/dashboard/BrokerAdvisoryPackages"));
+const BrokerContentPublisher = lazy(() => import("@/pages/broker/dashboard/BrokerContentPublisher"));
+const BrokerSubscribersList = lazy(() => import("@/pages/broker/dashboard/BrokerSubscribersList"));
+const BrokerAnalytics = lazy(() => import("@/pages/broker/dashboard/BrokerAnalytics"));
+const BrokerDirectory = lazy(() => import("@/pages/broker/BrokerDirectory"));
+const BrokerProfilePage = lazy(() => import("@/pages/broker/BrokerProfile"));
+const BrokerFeed = lazy(() => import("@/pages/broker/BrokerFeed"));
+const MyBrokerSubscriptions = lazy(() => import("@/pages/broker/MyBrokerSubscriptions"));
 const PredictiveAnalyticsPage = lazy(() => import("@/pages/analysis/predictive/index"));
 const CashFlowForecastingPage = lazy(() => import("@/pages/analysis/cash-flow/index"));
 const DealSourcingPage = lazy(() => import("@/pages/analysis/deal-sourcing/index"));
@@ -670,6 +683,97 @@ function Router() {
         {() => (
           <UnifiedLayout>
             <PlatformDashboard />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/admin/broker-registrations">
+        {() => (
+          <UnifiedLayout>
+            <BrokerRegistrationsQueue />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/broker/register">
+        {() => (
+          <UnifiedLayout>
+            <BrokerRegister />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/broker/dashboard/profile">
+        {() => (
+          <UnifiedLayout>
+            <BrokerProfileEditor />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/broker/dashboard/listings">
+        {() => (
+          <UnifiedLayout>
+            <BrokerListingsManager />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/broker/dashboard/advisory-packages">
+        {() => (
+          <UnifiedLayout>
+            <BrokerAdvisoryPackagesPage />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/broker/dashboard/content">
+        {() => (
+          <UnifiedLayout>
+            <BrokerContentPublisher />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/broker/dashboard/subscribers">
+        {() => (
+          <UnifiedLayout>
+            <BrokerSubscribersList />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/broker/dashboard/analytics">
+        {() => (
+          <UnifiedLayout>
+            <BrokerAnalytics />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/broker/dashboard">
+        {() => (
+          <UnifiedLayout>
+            <BrokerDashboardOverview />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/brokers/feed">
+        {() => (
+          <UnifiedLayout>
+            <BrokerFeed />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/brokers/:profileId">
+        {() => (
+          <UnifiedLayout>
+            <BrokerProfilePage />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/brokers">
+        {() => (
+          <UnifiedLayout>
+            <BrokerDirectory />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/settings/broker-subscriptions">
+        {() => (
+          <UnifiedLayout>
+            <MyBrokerSubscriptions />
           </UnifiedLayout>
         )}
       </Route>

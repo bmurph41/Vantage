@@ -6,9 +6,22 @@ import {
   billingFeatureFlags,
   crmDeals,
   users,
+  orgMarketplaceEntitlements,
+  brokerProfiles,
 } from '@shared/schema';
 import { eq, and, sql, count, desc } from 'drizzle-orm';
 import Stripe from 'stripe';
+import {
+  MARKETPLACE_PLUS_TIERS,
+  setUserBrokerEntitlement,
+  type MarketplacePlusTier,
+} from './broker-entitlements';
+import {
+  BROKER_TIERS,
+  resolveBrokerTierFromPriceId,
+  resolveMarketplacePlusTierFromPriceId,
+  type BrokerTier,
+} from './broker-tiers';
 
 const stripe = process.env.STRIPE_SECRET_KEY
   ? new Stripe(process.env.STRIPE_SECRET_KEY)
@@ -432,6 +445,12 @@ export class BillingService {
    */
   async handleWebhook(event: Stripe.Event) {
     switch (event.type) {
+      case 'checkout.session.completed': {
+        const session = event.data.object as Stripe.Checkout.Session;
+        await this.handleCheckoutSessionCompleted(session);
+        break;
+      }
+
       case 'invoice.payment_succeeded': {
         const invoice = event.data.object as Stripe.Invoice;
         const customerId = typeof invoice.customer === 'string'
@@ -505,6 +524,8 @@ export class BillingService {
             } as any)
             .where(eq(billingSubscriptions.stripeCustomerId, customerId));
         }
+
+        await this.handleSubscriptionCanceled(subscription);
         break;
       }
 
@@ -525,6 +546,12 @@ export class BillingService {
             } as any)
             .where(eq(billingSubscriptions.stripeCustomerId, customerId));
         }
+
+        // If the subscription transitioned to canceled (e.g. immediate cancel),
+        // also downgrade broker / Marketplace+ entitlements.
+        if (subscription.status === 'canceled' || subscription.status === 'unpaid') {
+          await this.handleSubscriptionCanceled(subscription);
+        }
         break;
       }
 
@@ -541,6 +568,209 @@ export class BillingService {
         }
         break;
       }
+    }
+  }
+
+  /**
+   * Handle `checkout.session.completed` for Marketplace+ and Broker SKUs.
+   * Core platform subscription checkouts are handled elsewhere (they are
+   * created via `createSubscription` and come back through invoice events).
+   */
+  async handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) {
+    const metadata = (session.metadata || {}) as Record<string, string | undefined>;
+    const sku = metadata.sku;
+
+    // Resolve price ID if metadata didn't specify tier cleanly
+    let priceId: string | null = null;
+    try {
+      if (stripe && session.id) {
+        const lineItems = await stripe.checkout.sessions.listLineItems(session.id, { limit: 1 });
+        priceId = lineItems.data[0]?.price?.id || null;
+      }
+    } catch (err) {
+      console.error('[billing webhook] could not list line items:', err);
+    }
+
+    const stripeSubscriptionId = typeof session.subscription === 'string'
+      ? session.subscription
+      : session.subscription?.id || null;
+
+    // ── Marketplace+ (user-facing buyer plan) ──
+    if (sku === 'marketplace_plus') {
+      const userId = metadata.userId;
+      const orgId = metadata.orgId;
+      let tier = metadata.tier as MarketplacePlusTier | undefined;
+
+      if (!tier && priceId) {
+        const resolved = resolveMarketplacePlusTierFromPriceId(priceId);
+        if (resolved) tier = resolved.tier;
+      }
+
+      if (!userId || !orgId || !tier || !(tier in MARKETPLACE_PLUS_TIERS)) {
+        console.error('[billing webhook] marketplace_plus checkout missing metadata', {
+          sessionId: session.id,
+          userId,
+          orgId,
+          tier,
+        });
+        return;
+      }
+
+      await setUserBrokerEntitlement({
+        userId,
+        orgId,
+        tier,
+        source: 'subscription',
+      });
+
+      const def = MARKETPLACE_PLUS_TIERS[tier];
+      const now = new Date();
+      await db
+        .insert(orgMarketplaceEntitlements)
+        .values({
+          orgId,
+          marketplacePlusTier: tier,
+          brokerFollowLimit: def.brokerFollowLimit,
+          brokerAdvisoryLimit: def.brokerAdvisoryLimit,
+          savedSearchLimit: def.savedSearchLimit,
+          listingExportLimitMonthly: def.listingExportLimitMonthly,
+          earlyAccessHours: def.earlyAccessHours,
+          allowBrokerMessaging: def.allowBrokerMessaging,
+          allowOffMarketAlerts: def.allowOffMarketAlerts,
+          source: 'subscription',
+          stripeSubscriptionId,
+          effectiveAt: now,
+        } as any)
+        .onConflictDoUpdate({
+          target: orgMarketplaceEntitlements.orgId,
+          set: {
+            marketplacePlusTier: tier,
+            brokerFollowLimit: def.brokerFollowLimit,
+            brokerAdvisoryLimit: def.brokerAdvisoryLimit,
+            savedSearchLimit: def.savedSearchLimit,
+            listingExportLimitMonthly: def.listingExportLimitMonthly,
+            earlyAccessHours: def.earlyAccessHours,
+            allowBrokerMessaging: def.allowBrokerMessaging,
+            allowOffMarketAlerts: def.allowOffMarketAlerts,
+            source: 'subscription',
+            stripeSubscriptionId,
+            effectiveAt: now,
+            updatedAt: now,
+          },
+        });
+
+      console.log(`[billing webhook] granted marketplace_plus/${tier} to user=${userId} org=${orgId}`);
+      return;
+    }
+
+    // ── Broker plan (broker-facing SaaS subscription) ──
+    if (sku === 'broker_plan') {
+      const brokerUserId = metadata.brokerUserId;
+      let tier = metadata.tier as BrokerTier | undefined;
+
+      if (!tier && priceId) {
+        const resolved = resolveBrokerTierFromPriceId(priceId);
+        if (resolved) tier = resolved.tier;
+      }
+
+      if (!brokerUserId || !tier || !(tier in BROKER_TIERS)) {
+        console.error('[billing webhook] broker_plan checkout missing metadata', {
+          sessionId: session.id,
+          brokerUserId,
+          tier,
+        });
+        return;
+      }
+
+      const [existingProfile] = await db
+        .select()
+        .from(brokerProfiles)
+        .where(eq(brokerProfiles.userId, brokerUserId))
+        .limit(1);
+
+      if (existingProfile) {
+        await db
+          .update(brokerProfiles)
+          .set({
+            brokerTier: tier,
+            isPublishable: true,
+            updatedAt: new Date(),
+          } as any)
+          .where(eq(brokerProfiles.id, existingProfile.id));
+        console.log(
+          `[billing webhook] upgraded broker profile ${existingProfile.id} to ${tier} (user=${brokerUserId})`,
+        );
+      } else {
+        console.warn(
+          `[billing webhook] broker_plan purchased but no broker_profile yet for user=${brokerUserId}. Profile will inherit tier=${tier} on approval.`,
+        );
+      }
+      return;
+    }
+  }
+
+  /**
+   * Downgrade Marketplace+ / Broker entitlements when a Stripe subscription
+   * is canceled or deleted. Identifies the SKU via subscription metadata.
+   */
+  async handleSubscriptionCanceled(subscription: Stripe.Subscription) {
+    const metadata = (subscription.metadata || {}) as Record<string, string | undefined>;
+    const sku = metadata.sku;
+
+    if (sku === 'marketplace_plus') {
+      const userId = metadata.userId;
+      const orgId = metadata.orgId;
+      if (!userId || !orgId) {
+        console.warn('[billing webhook] marketplace_plus cancel missing metadata', {
+          subscriptionId: subscription.id,
+        });
+        return;
+      }
+      await setUserBrokerEntitlement({
+        userId,
+        orgId,
+        tier: 'free',
+        source: 'default',
+      });
+      const freeDef = MARKETPLACE_PLUS_TIERS.free;
+      await db
+        .update(orgMarketplaceEntitlements)
+        .set({
+          marketplacePlusTier: 'free',
+          brokerFollowLimit: freeDef.brokerFollowLimit,
+          brokerAdvisoryLimit: freeDef.brokerAdvisoryLimit,
+          savedSearchLimit: freeDef.savedSearchLimit,
+          listingExportLimitMonthly: freeDef.listingExportLimitMonthly,
+          earlyAccessHours: freeDef.earlyAccessHours,
+          allowBrokerMessaging: freeDef.allowBrokerMessaging,
+          allowOffMarketAlerts: freeDef.allowOffMarketAlerts,
+          source: 'default',
+          stripeSubscriptionId: null,
+          updatedAt: new Date(),
+        } as any)
+        .where(eq(orgMarketplaceEntitlements.orgId, orgId));
+      console.log(`[billing webhook] downgraded marketplace_plus to free user=${userId} org=${orgId}`);
+      return;
+    }
+
+    if (sku === 'broker_plan') {
+      const brokerUserId = metadata.brokerUserId;
+      if (!brokerUserId) {
+        console.warn('[billing webhook] broker_plan cancel missing metadata', {
+          subscriptionId: subscription.id,
+        });
+        return;
+      }
+      await db
+        .update(brokerProfiles)
+        .set({
+          isPublishable: false,
+          brokerTier: 'starter',
+          updatedAt: new Date(),
+        } as any)
+        .where(eq(brokerProfiles.userId, brokerUserId));
+      console.log(`[billing webhook] deactivated broker profile for user=${brokerUserId}`);
+      return;
     }
   }
 

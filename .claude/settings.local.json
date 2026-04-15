@@ -185,7 +185,10 @@
       "Bash(awk '$1 > 1000')",
       "Bash(ALLOW_DEMO_AUTH=true npm run dev)",
       "Bash(pkill -9 -f node)",
-      "Bash(echo \"PID: $!\" sleep 15 cat /tmp/srv.log)"
+      "Bash(echo \"PID: $!\" sleep 15 cat /tmp/srv.log)",
+      "Bash(cp /tmp/step1_marketplace_schema.mjs ~/workspace/scripts/step1_marketplace_schema.mjs)",
+      "Bash(mkdir -p ~/workspace/scripts)",
+      "Bash(NODE_OPTIONS=\"--max-old-space-size=12288\" npx tsc --noEmit)"
     ]
   }
 }

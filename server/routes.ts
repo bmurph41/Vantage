@@ -158,6 +158,16 @@ import bulkEmailRoutes from "./routes/bulk-email-routes";
 import campaignScheduleRoutes from "./routes/campaign-schedule-routes";
 import camReconciliationRoutes from "./routes/cam-reconciliation-routes";
 import pipelineAutomationRoutes from "./routes/pipeline-automation-routes";
+import brokerSubscriptionsRoutes from "./routes/broker-subscriptions-routes";
+import {
+  brokerRegistrationRouter,
+  brokerAdminRouter,
+  requireAdminInline as requireBrokerAdminInline,
+} from "./routes/broker-registration-routes";
+import brokerBillingRoutes from "./routes/broker-billing-routes";
+import brokerClaimsRoutes from "./routes/broker-claims-routes";
+import brokerDashboardRoutes from "./routes/broker-dashboard-routes";
+import marketplaceIngestionRouter from "./routes/marketplace-ingestion-routes";
 import dealScoringRoutes from "./routes/deal-scoring-routes";
 import competitiveTrackingRoutes from "./routes/competitive-tracking-routes";
 import ddStatusReportRoutes from "./routes/dd-status-report-routes";
@@ -562,6 +572,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/sla", authenticateUser, enforceTenant, requirePack("crm_pipeline"), crmIntelligenceRoutes);
   app.use("/api/crm/analytics", authenticateUser, enforceTenant, requirePack("crm_pipeline"), pipelineAnalyticsRoutes);
   app.use("/api/pipeline/automation", authenticateUser, enforceTenant, pipelineAutomationRoutes);
+  app.use("/api/broker-subscriptions", authenticateUser, enforceTenant, brokerSubscriptionsRoutes);
+  app.use("/api/broker-registration", authenticateUser, enforceTenant, brokerRegistrationRouter);
+  app.use("/api/admin/broker", authenticateUser, enforceTenant, requireBrokerAdminInline, brokerAdminRouter);
+  app.use("/api/broker-billing", authenticateUser, enforceTenant, brokerBillingRoutes);
+  app.use("/api/broker-claims", authenticateUser, enforceTenant, brokerClaimsRoutes);
+  app.use("/api/broker-dashboard", authenticateUser, enforceTenant, brokerDashboardRoutes);
+  app.use(
+    "/api/admin/marketplace-ingestion",
+    authenticateUser,
+    enforceTenant,
+    marketplaceIngestionRouter,
+  );
   app.use("/api/workflow-automations", authenticateUser, enforceTenant, workflowAutomationRouter);
   app.use("/api/workflow-email", authenticateUser, enforceTenant, workflowEmailRouter);
   app.use("/api/google-places", authenticateUser, googlePlacesRouter);

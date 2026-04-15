@@ -7,8 +7,127 @@ import { insertLiv2SourceSchema } from './schema';
 import { checkMarketplaceScrapeUrl, getAllowedMarinaDomains } from './fetch/ssrfGuard';
 import { findDuplicatesInBatch, findDuplicatesForListing } from './identity/duplicateDetector';
 import { parsePagination, paginatedResponse } from '../../utils/pagination';
+import { pool } from '../../db';
 
 const router = Router();
+
+// ─── Marina Listings adapter ──────────────────────────────────────────────
+// Maps a raw marina_listings row (snake_case) into the Liv2ListingCurrent
+// shape the marketplace frontend already consumes. Covers both CRE metrics
+// (top-level columns + cre_metrics jsonb) and operating-business metrics
+// (business_metrics jsonb).
+function mapMarinaRowToLiv2Shape(r: any) {
+  const price = r.asking_price != null ? Number(r.asking_price) : null;
+  const capRate = r.cap_rate != null ? String(r.cap_rate) : null;
+  const noi = r.noi != null ? Math.round(Number(r.noi)) : null;
+  const revenue = r.gross_revenue != null ? Math.round(Number(r.gross_revenue)) : null;
+  return {
+    id: r.id,
+    canonicalListingId: r.id,
+    sourceId: r.source_platform || '',
+    domain: r.source_platform || '',
+    title: r.title || r.property_name || null,
+    listingType: r.marina_type || r.property_type || null,
+    status: r.status || 'active',
+    askingPrice: price,
+    currency: r.currency || 'USD',
+    address1: r.property_address,
+    city: r.city,
+    state: r.state,
+    postalCode: r.zip_code,
+    country: r.country || 'US',
+    lat: r.latitude != null ? String(r.latitude) : null,
+    lng: r.longitude != null ? String(r.longitude) : null,
+    description: r.description || r.original_description || null,
+    acreage: r.acreage != null ? String(r.acreage) : null,
+    waterfrontFeet: r.water_frontage != null ? Math.round(Number(r.water_frontage)) : null,
+    slips: r.total_slips,
+    dryRacks: r.dry_storage_spaces,
+    occupancy: r.occupancy_rate != null ? Math.round(Number(r.occupancy_rate)) : null,
+    capRate,
+    noi,
+    revenue,
+    yearBuilt: null,
+    zoning: null,
+    brokerName: r.broker_name,
+    brokerCompany: r.broker_company,
+    brokerPhone: r.broker_phone,
+    brokerEmail: r.broker_email,
+    heroImageUrl: r.hero_image_url,
+    imageCount: Array.isArray(r.images) ? r.images.length : 0,
+    sourceUrl: r.source_url,
+    publishedAt: r.published_at,
+    lastExtractedAt: r.last_scraped_at,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+    // Extended universal marketplace fields
+    listingCategory: r.listing_category || 'cre_property',
+    assetClass: r.asset_class || null,
+    creMetrics: r.cre_metrics || null,
+    businessMetrics: r.business_metrics || null,
+    brokerProfileId: r.broker_profile_id || null,
+    priceOnRequest: r.price_on_request || false,
+    isLocationConfidential: r.is_location_confidential || false,
+    isActive: r.is_active !== false,
+  };
+}
+
+async function queryMarinaListings(params: {
+  limit: number;
+  offset: number;
+  state?: string;
+  domain?: string;
+  category?: string;
+  assetClass?: string;
+  q?: string;
+  minRevenue?: number;
+  maxRevenue?: number;
+  minEbitda?: number;
+  maxEbitda?: number;
+  minSde?: number;
+  maxSde?: number;
+}) {
+  const where: string[] = ['(is_active IS NULL OR is_active = true)'];
+  const vals: any[] = [];
+  const add = (clause: string, v: any) => {
+    vals.push(v);
+    where.push(clause.replace('$?', `$${vals.length}`));
+  };
+  if (params.state) add('state = $?', params.state);
+  if (params.domain) add('source_platform = $?', params.domain);
+  if (params.category) add('listing_category = $?', params.category);
+  if (params.assetClass) add('asset_class = $?', params.assetClass);
+  if (params.q) {
+    vals.push(params.q);
+    const a = `$${vals.length}`;
+    vals.push(`%${params.q}%`);
+    const b = `$${vals.length}`;
+    where.push(`(search_vector @@ websearch_to_tsquery('english', ${a}) OR title ILIKE ${b} OR city ILIKE ${b} OR description ILIKE ${b})`);
+  }
+  if (params.minRevenue != null) add("(business_metrics->>'annual_revenue')::numeric >= $?", params.minRevenue);
+  if (params.maxRevenue != null) add("(business_metrics->>'annual_revenue')::numeric <= $?", params.maxRevenue);
+  if (params.minEbitda != null) add("(business_metrics->>'annual_ebitda')::numeric >= $?", params.minEbitda);
+  if (params.maxEbitda != null) add("(business_metrics->>'annual_ebitda')::numeric <= $?", params.maxEbitda);
+  if (params.minSde != null) add("(business_metrics->>'annual_cashflow_sde')::numeric >= $?", params.minSde);
+  if (params.maxSde != null) add("(business_metrics->>'annual_cashflow_sde')::numeric <= $?", params.maxSde);
+
+  const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
+  const countSql = `SELECT COUNT(*)::int AS total FROM marina_listings ${whereSql}`;
+  const listSql = `
+    SELECT * FROM marina_listings
+    ${whereSql}
+    ORDER BY COALESCE(published_at, updated_at, created_at) DESC
+    LIMIT ${params.limit} OFFSET ${params.offset}
+  `;
+  const [countRes, listRes] = await Promise.all([
+    pool.query(countSql, vals),
+    pool.query(listSql, vals),
+  ]);
+  return {
+    total: countRes.rows[0]?.total ?? 0,
+    items: listRes.rows.map(mapMarinaRowToLiv2Shape),
+  };
+}
 
 function requireLiv2(req: Request, res: Response, next: NextFunction) {
   if (!isLiv2Enabled()) {
@@ -113,16 +232,43 @@ router.get('/runs/:id', async (req, res) => {
 
 router.get('/listings', async (req, res) => {
   try {
-    const { domain, state } = req.query;
+    const q = req.query as Record<string, string | undefined>;
     const pag = parsePagination(req.query as Record<string, any>, { pageSize: 25 });
-    // Fetch all matching listings (repo handles domain/state filtering)
-    const allListings = await liv2Repo.getCurrentListings({
-      domain: domain as string,
-      state: state as string,
+    const num = (v: string | undefined) => (v != null && v !== '' ? Number(v) : undefined);
+
+    // Legacy passthrough for liv2_listings_current (explicit opt-in).
+    if (q.legacy === '1') {
+      const allListings = await liv2Repo.getCurrentListings({
+        domain: q.domain,
+        state: q.state,
+      });
+      const total = allListings.length;
+      const paged = allListings.slice(pag.offset, pag.offset + pag.limit);
+      const flat = paged.map((l: any) => ({ ...l, listingCategory: 'cre_property' }));
+      return res.json(paginatedResponse(flat, total, pag));
+    }
+
+    // Default: query the canonical marina_listings table with full filter support.
+    const result = await queryMarinaListings({
+      limit: pag.limit,
+      offset: pag.offset,
+      state: q.state,
+      domain: q.domain,
+      category: q.category,
+      assetClass: q.assetClass,
+      q: q.q,
+      minRevenue: num(q.minRevenue),
+      maxRevenue: num(q.maxRevenue),
+      minEbitda: num(q.minEbitda),
+      maxEbitda: num(q.maxEbitda),
+      minSde: num(q.minSde),
+      maxSde: num(q.maxSde),
     });
-    const total = allListings.length;
-    const paged = allListings.slice(pag.offset, pag.offset + pag.limit);
-    res.json(paginatedResponse(paged, total, pag));
+    // Shape the response to match frontend expectation: it reads an array directly
+    // (see MarketplaceListings.tsx `res.json()` typed as `Listing[]`), so return
+    // the items array. Callers that need pagination can read totalCount header.
+    res.setHeader('X-Total-Count', String(result.total));
+    res.json(result.items);
   } catch (error) {
     console.error('[LIV2] Get listings error:', error);
     res.status(500).json({ error: 'Failed to get listings' });

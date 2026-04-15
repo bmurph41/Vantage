@@ -125,6 +125,14 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
+import {
+  LISTING_CATEGORIES,
+  ASSET_CLASS_GROUPS,
+  ASSET_CLASSES as TAXONOMY_ASSET_CLASSES,
+  getAssetClassesByCategory,
+  type ListingCategory as TaxonomyListingCategory,
+} from "@shared/marketplace/asset-class-taxonomy";
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type ListingType = "marina" | "rv_park" | "mixed_use" | "land" | "business_only" | "other";
@@ -172,7 +180,18 @@ interface Listing {
   lastExtractedAt: string | null;
   createdAt: string;
   updatedAt: string;
+  // Universal marketplace fields (2026-04-15)
+  listingCategory?: TaxonomyListingCategory | null;
+  assetClass?: string | null;
+  creMetrics?: Record<string, any> | null;
+  businessMetrics?: Record<string, any> | null;
+  brokerProfileId?: string | null;
+  priceOnRequest?: boolean | null;
+  isLocationConfidential?: boolean | null;
+  isActive?: boolean | null;
 }
+
+type CategoryTab = "all" | "cre_property" | "operating_business" | "franchise" | "note_sale" | "subscriptions";
 
 interface MarketplaceSource {
   id: string;
@@ -197,6 +216,18 @@ interface Filters {
   sources: string[];
   statuses: ListingStatus[];
   showBookmarkedOnly: boolean;
+  // Universal marketplace filters
+  assetClassId: string | null;
+  revenueMin: number | null;
+  revenueMax: number | null;
+  sdeMin: number | null;
+  sdeMax: number | null;
+  ebitdaMin: number | null;
+  ebitdaMax: number | null;
+  yearEstablishedMin: number | null;
+  yearEstablishedMax: number | null;
+  employeesMin: number | null;
+  employeesMax: number | null;
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -268,7 +299,33 @@ const DEFAULT_FILTERS: Filters = {
   sources: [],
   statuses: ["active"],
   showBookmarkedOnly: false,
+  assetClassId: null,
+  revenueMin: null,
+  revenueMax: null,
+  sdeMin: null,
+  sdeMax: null,
+  ebitdaMin: null,
+  ebitdaMax: null,
+  yearEstablishedMin: null,
+  yearEstablishedMax: null,
+  employeesMin: null,
+  employeesMax: null,
 };
+
+const CATEGORY_TABS: { id: CategoryTab; label: string }[] = [
+  { id: "all", label: "All" },
+  { id: "cre_property", label: "Real Estate" },
+  { id: "operating_business", label: "Operating Businesses" },
+  { id: "franchise", label: "Franchises" },
+  { id: "note_sale", label: "Note Sales" },
+  { id: "subscriptions", label: "From My Brokers" },
+];
+
+function numOrNull(v: any): number | null {
+  if (v == null) return null;
+  const n = typeof v === "string" ? parseFloat(v) : Number(v);
+  return isFinite(n) ? n : null;
+}
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -338,6 +395,8 @@ export function MarketplaceListings() {
   const qc = useQueryClient();
 
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
+  const [categoryTab, setCategoryTab] = useState<CategoryTab>("all");
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [view, setView] = useState<ViewMode>("grid");
   const [sortField, setSortField] = useState<SortField>("updatedAt");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
@@ -350,15 +409,64 @@ export function MarketplaceListings() {
 
   // ── Data fetching ──────────────────────────────────────────────────────────
 
+  const categoryParam = useMemo(() => {
+    if (categoryTab === "all" || categoryTab === "subscriptions") return undefined;
+    return categoryTab;
+  }, [categoryTab]);
+
   const { data: rawListings = [], isLoading, isFetching, refetch, dataUpdatedAt } = useQuery<Listing[]>({
-    queryKey: ["/api/listings/v2/listings", filters.states[0], filters.sources[0]],
+    queryKey: [
+      "/api/listings/v2/listings",
+      categoryTab,
+      filters.states[0],
+      filters.sources[0],
+      filters.assetClassId,
+      filters.search,
+      filters.revenueMin, filters.revenueMax,
+      filters.sdeMin, filters.sdeMax,
+      filters.ebitdaMin, filters.ebitdaMax,
+    ],
     queryFn: async () => {
+      // "From My Brokers" uses a dedicated endpoint
+      if (categoryTab === "subscriptions") {
+        const res = await fetch(`/api/broker-subscriptions/me/feed/listings?limit=200`);
+        if (!res.ok) throw new Error("Failed to load broker feed");
+        const body = await res.json();
+        return (body.items ?? []) as Listing[];
+      }
       const params = new URLSearchParams({ limit: "500" });
       if (filters.states.length === 1) params.set("state", filters.states[0]);
       if (filters.sources.length === 1) params.set("domain", filters.sources[0]);
+      if (categoryParam) params.set("category", categoryParam);
+      if (filters.assetClassId) params.set("assetClass", filters.assetClassId);
+      if (filters.search) params.set("q", filters.search);
+      if (filters.revenueMin != null) params.set("minRevenue", String(filters.revenueMin));
+      if (filters.revenueMax != null) params.set("maxRevenue", String(filters.revenueMax));
+      if (filters.sdeMin != null) params.set("minSde", String(filters.sdeMin));
+      if (filters.sdeMax != null) params.set("maxSde", String(filters.sdeMax));
+      if (filters.ebitdaMin != null) params.set("minEbitda", String(filters.ebitdaMin));
+      if (filters.ebitdaMax != null) params.set("maxEbitda", String(filters.ebitdaMax));
       const res = await fetch(`/api/listings/v2/listings?${params}`);
       if (!res.ok) throw new Error("Failed to load listings");
-      return res.json();
+      const body = await res.json();
+      // Support both bare-array and paginated-envelope responses.
+      return Array.isArray(body) ? body : (body.data ?? body.items ?? []);
+    },
+  });
+
+  // Subscribed broker profiles — used to badge listings as "From a broker you follow"
+  const { data: subscribedBrokers } = useQuery<Set<string>>({
+    queryKey: ["/api/broker-subscriptions/me/subscriptions"],
+    queryFn: async () => {
+      try {
+        const res = await fetch("/api/broker-subscriptions/me/subscriptions");
+        if (!res.ok) return new Set<string>();
+        const body = await res.json();
+        const items = Array.isArray(body) ? body : (body.items ?? body.subscriptions ?? []);
+        return new Set<string>(items.map((s: any) => s.brokerProfileId).filter(Boolean));
+      } catch {
+        return new Set<string>();
+      }
     },
   });
 
@@ -436,6 +544,49 @@ export function MarketplaceListings() {
       result = result.filter(l => bookmarks.has(l.canonicalListingId));
     }
 
+    // Category filter (client-side safety net — backend also filters)
+    if (categoryTab !== "all" && categoryTab !== "subscriptions") {
+      result = result.filter(l => (l.listingCategory ?? "cre_property") === categoryTab);
+    }
+
+    // Asset class dropdown
+    if (filters.assetClassId) {
+      result = result.filter(l => l.assetClass === filters.assetClassId);
+    }
+
+    // Business-metric filters (subscriptions endpoint may not filter these)
+    const bmNum = (l: Listing, k: string) => numOrNull(l.businessMetrics?.[k]);
+    if (filters.revenueMin != null) result = result.filter(l => {
+      const v = bmNum(l, "annual_revenue"); return v != null && v >= filters.revenueMin!;
+    });
+    if (filters.revenueMax != null) result = result.filter(l => {
+      const v = bmNum(l, "annual_revenue"); return v != null && v <= filters.revenueMax!;
+    });
+    if (filters.sdeMin != null) result = result.filter(l => {
+      const v = bmNum(l, "annual_cashflow_sde"); return v != null && v >= filters.sdeMin!;
+    });
+    if (filters.sdeMax != null) result = result.filter(l => {
+      const v = bmNum(l, "annual_cashflow_sde"); return v != null && v <= filters.sdeMax!;
+    });
+    if (filters.ebitdaMin != null) result = result.filter(l => {
+      const v = bmNum(l, "annual_ebitda"); return v != null && v >= filters.ebitdaMin!;
+    });
+    if (filters.ebitdaMax != null) result = result.filter(l => {
+      const v = bmNum(l, "annual_ebitda"); return v != null && v <= filters.ebitdaMax!;
+    });
+    if (filters.yearEstablishedMin != null) result = result.filter(l => {
+      const v = bmNum(l, "year_established"); return v != null && v >= filters.yearEstablishedMin!;
+    });
+    if (filters.yearEstablishedMax != null) result = result.filter(l => {
+      const v = bmNum(l, "year_established"); return v != null && v <= filters.yearEstablishedMax!;
+    });
+    if (filters.employeesMin != null) result = result.filter(l => {
+      const v = bmNum(l, "employee_count"); return v != null && v >= filters.employeesMin!;
+    });
+    if (filters.employeesMax != null) result = result.filter(l => {
+      const v = bmNum(l, "employee_count"); return v != null && v <= filters.employeesMax!;
+    });
+
     // Sort
     result.sort((a, b) => {
       let av: any, bv: any;
@@ -452,7 +603,7 @@ export function MarketplaceListings() {
     });
 
     return result;
-  }, [rawListings, filters, sortField, sortDir, bookmarks]);
+  }, [rawListings, filters, sortField, sortDir, bookmarks, categoryTab]);
 
   const pagedListings = filteredListings.slice(page * PER_PAGE, (page + 1) * PER_PAGE);
   const totalPages = Math.ceil(filteredListings.length / PER_PAGE);
@@ -493,7 +644,7 @@ export function MarketplaceListings() {
   };
 
   // Reset page on filter change
-  useEffect(() => { setPage(0); }, [filters, sortField, sortDir]);
+  useEffect(() => { setPage(0); }, [filters, sortField, sortDir, categoryTab]);
 
   // ── Source health ──────────────────────────────────────────────────────────
   const activeSources = sourcesData?.sources ?? [];
@@ -523,6 +674,138 @@ export function MarketplaceListings() {
 
         {/* ── Main content ─────────────────────────────────────────────────── */}
         <div className="flex-1 min-w-0 flex flex-col">
+
+          {/* Category Tabs */}
+          <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-4 pt-2">
+            <div className="flex items-center gap-1 flex-wrap">
+              {CATEGORY_TABS.map(tab => {
+                const isActive = categoryTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setCategoryTab(tab.id)}
+                    data-testid={`tab-category-${tab.id}`}
+                    className={cn(
+                      "px-3 py-1.5 text-xs font-semibold border-b-2 transition-colors -mb-px",
+                      isActive
+                        ? "border-blue-600 text-blue-700 dark:text-blue-400"
+                        : "border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
+                    )}
+                  >
+                    {tab.label}
+                    {isActive && rawListings.length > 0 && (
+                      <span className="ml-1.5 text-[10px] font-semibold bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 rounded-full px-1.5 py-0.5">
+                        {rawListings.length}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Asset class + advanced metric filter bar (universal) */}
+          <div className="bg-slate-50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-800 px-4 py-2 flex items-center gap-2 flex-wrap">
+            <Select
+              value={filters.assetClassId ?? "__all__"}
+              onValueChange={v => setFilters(f => ({ ...f, assetClassId: v === "__all__" ? null : v }))}
+            >
+              <SelectTrigger className="h-8 text-xs w-56" data-testid="select-asset-class">
+                <SelectValue placeholder="Asset class" />
+              </SelectTrigger>
+              <SelectContent className="max-h-80">
+                <SelectItem value="__all__" className="text-xs">All asset classes</SelectItem>
+                {categoryTab === "all" || categoryTab === "subscriptions" ? (
+                  // Grouped listing
+                  Object.entries(ASSET_CLASS_GROUPS).map(([groupId, groupLabel]) => {
+                    const entries = TAXONOMY_ASSET_CLASSES.filter(a => a.group === groupId);
+                    if (!entries.length) return null;
+                    return (
+                      <div key={groupId}>
+                        <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 px-2 pt-2 pb-1">{groupLabel}</div>
+                        {entries.map(a => (
+                          <SelectItem key={a.id} value={a.id} className="text-xs">{a.label}</SelectItem>
+                        ))}
+                      </div>
+                    );
+                  })
+                ) : (
+                  getAssetClassesByCategory(categoryTab as TaxonomyListingCategory).map(a => (
+                    <SelectItem key={a.id} value={a.id} className="text-xs">{a.label}</SelectItem>
+                  ))
+                )}
+              </SelectContent>
+            </Select>
+
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 text-xs"
+              onClick={() => setShowAdvanced(v => !v)}
+              data-testid="button-advanced-filters"
+            >
+              <SlidersHorizontal className="h-3 w-3 mr-1" />
+              Advanced Filters
+              {showAdvanced ? <ChevronDown className="h-3 w-3 ml-1" /> : <ChevronRight className="h-3 w-3 ml-1" />}
+            </Button>
+
+            <div className="flex-1" />
+
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 text-xs text-slate-500"
+              onClick={() => toast({ title: "Save Search", description: "Saved searches are coming soon." })}
+              data-testid="button-save-search"
+            >
+              <Star className="h-3 w-3 mr-1" />
+              Save this search
+            </Button>
+          </div>
+
+          {/* Conditional metric filter panel (collapsible) */}
+          {showAdvanced && (
+            <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-4 py-3">
+              {(categoryTab === "cre_property" || categoryTab === "all") && (
+                <div className="mb-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 mb-2">CRE Metrics</p>
+                  <div className="flex flex-wrap gap-3">
+                    <RangePair label="Cap Rate %" min={filters.capRateMin} max={filters.capRateMax}
+                      onMin={v => setFilters(f => ({ ...f, capRateMin: v }))}
+                      onMax={v => setFilters(f => ({ ...f, capRateMax: v }))} step={0.25} />
+                    <RangePair label="NOI $" min={filters.noiMin} max={null}
+                      onMin={v => setFilters(f => ({ ...f, noiMin: v }))}
+                      onMax={() => {}} dollars hideMax />
+                    <RangePair label="Slip Count" min={filters.slipsMin} max={filters.slipsMax}
+                      onMin={v => setFilters(f => ({ ...f, slipsMin: v }))}
+                      onMax={v => setFilters(f => ({ ...f, slipsMax: v }))} />
+                  </div>
+                </div>
+              )}
+              {(categoryTab === "operating_business" || categoryTab === "franchise" || categoryTab === "all") && (
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 mb-2">Business Metrics</p>
+                  <div className="flex flex-wrap gap-3">
+                    <RangePair label="Annual Revenue $" min={filters.revenueMin} max={filters.revenueMax}
+                      onMin={v => setFilters(f => ({ ...f, revenueMin: v }))}
+                      onMax={v => setFilters(f => ({ ...f, revenueMax: v }))} dollars />
+                    <RangePair label="SDE $" min={filters.sdeMin} max={filters.sdeMax}
+                      onMin={v => setFilters(f => ({ ...f, sdeMin: v }))}
+                      onMax={v => setFilters(f => ({ ...f, sdeMax: v }))} dollars />
+                    <RangePair label="EBITDA $" min={filters.ebitdaMin} max={filters.ebitdaMax}
+                      onMin={v => setFilters(f => ({ ...f, ebitdaMin: v }))}
+                      onMax={v => setFilters(f => ({ ...f, ebitdaMax: v }))} dollars />
+                    <RangePair label="Year Est." min={filters.yearEstablishedMin} max={filters.yearEstablishedMax}
+                      onMin={v => setFilters(f => ({ ...f, yearEstablishedMin: v }))}
+                      onMax={v => setFilters(f => ({ ...f, yearEstablishedMax: v }))} />
+                    <RangePair label="Employees" min={filters.employeesMin} max={filters.employeesMax}
+                      onMin={v => setFilters(f => ({ ...f, employeesMin: v }))}
+                      onMax={v => setFilters(f => ({ ...f, employeesMax: v }))} />
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Toolbar */}
           <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-4 py-3">
@@ -709,6 +992,7 @@ export function MarketplaceListings() {
                     key={l.id}
                     listing={l}
                     isBookmarked={bookmarks.has(l.canonicalListingId)}
+                    isBrokerSubscribed={!!(l.brokerProfileId && subscribedBrokers?.has(l.brokerProfileId))}
                     onToggleBookmark={() => toggleBookmark(l.canonicalListingId)}
                     onSelect={() => setSelectedListing(l)}
                     onAddToPipeline={() => setPipelineTarget(l)}
@@ -1043,6 +1327,63 @@ function FilterSidebar({
   );
 }
 
+// ─── Range Pair (universal min/max input) ───────────────────────────────────
+
+function RangePair({
+  label,
+  min,
+  max,
+  onMin,
+  onMax,
+  dollars,
+  hideMax,
+  step,
+}: {
+  label: string;
+  min: number | null;
+  max: number | null;
+  onMin: (v: number | null) => void;
+  onMax: (v: number | null) => void;
+  dollars?: boolean;
+  hideMax?: boolean;
+  step?: number;
+}) {
+  const parse = (s: string): number | null => {
+    if (!s) return null;
+    const cleaned = s.replace(/[$,\s]/g, "");
+    const n = parseFloat(cleaned);
+    return isNaN(n) ? null : n;
+  };
+  return (
+    <div className="flex flex-col gap-0.5">
+      <Label className="text-[10px] text-slate-500 uppercase tracking-wide">{label}</Label>
+      <div className="flex items-center gap-1">
+        <Input
+          type={dollars ? "text" : "number"}
+          step={step}
+          className="h-8 text-xs w-24"
+          placeholder="Min"
+          value={min ?? ""}
+          onChange={e => onMin(parse(e.target.value))}
+        />
+        {!hideMax && (
+          <>
+            <span className="text-xs text-slate-400">–</span>
+            <Input
+              type={dollars ? "text" : "number"}
+              step={step}
+              className="h-8 text-xs w-24"
+              placeholder="Max"
+              value={max ?? ""}
+              onChange={e => onMax(parse(e.target.value))}
+            />
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Filter Section ───────────────────────────────────────────────────────────
 
 function FilterSection({ title, children }: { title: string; children: React.ReactNode }) {
@@ -1088,12 +1429,14 @@ function PriceInput({ value, onChange, placeholder }: { value: number | null; on
 function ListingCard({
   listing: l,
   isBookmarked,
+  isBrokerSubscribed,
   onToggleBookmark,
   onSelect,
   onAddToPipeline,
 }: {
   listing: Listing;
   isBookmarked: boolean;
+  isBrokerSubscribed?: boolean;
   onToggleBookmark: () => void;
   onSelect: () => void;
   onAddToPipeline: () => void;
@@ -1169,23 +1512,73 @@ function ListingCard({
           {locationStr(l)}
         </p>
 
-        {/* Metrics grid */}
+        {/* Metrics grid — category-aware */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-1.5 mb-3">
-          <MetricCell label="Price" value={fmt$$(l.askingPrice)} highlight />
-          <MetricCell label="Cap Rate" value={fmtPct(l.capRate)} />
-          <MetricCell label="NOI" value={fmt$$(l.noi)} />
-          <MetricCell label="Revenue" value={fmt$$(l.revenue)} />
-          {l.slips != null && <MetricCell label="Slips" value={fmtNum(l.slips)} />}
-          {l.dryRacks != null && <MetricCell label="Dry Racks" value={fmtNum(l.dryRacks)} />}
-          {l.acreage && <MetricCell label="Acres" value={parseFloat(l.acreage).toFixed(1)} />}
-          {l.waterfrontFeet != null && <MetricCell label="WF Feet" value={fmtNum(l.waterfrontFeet)} />}
+          <MetricCell
+            label={l.priceOnRequest ? "Price" : "Price"}
+            value={l.priceOnRequest ? "On Request" : fmt$$(l.askingPrice)}
+            highlight
+          />
+          {(l.listingCategory === "operating_business" ||
+            l.listingCategory === "franchise" ||
+            l.listingCategory === "mixed_use_with_business") ? (
+            <>
+              <MetricCell
+                label="Revenue"
+                value={fmt$$(numOrNull(l.businessMetrics?.annual_revenue) ?? l.revenue)}
+              />
+              <MetricCell
+                label="SDE"
+                value={fmt$$(numOrNull(l.businessMetrics?.annual_cashflow_sde))}
+              />
+              <MetricCell
+                label="EBITDA"
+                value={fmt$$(numOrNull(l.businessMetrics?.annual_ebitda))}
+              />
+              {l.businessMetrics?.year_established != null && (
+                <MetricCell label="Year Est." value={String(l.businessMetrics.year_established)} />
+              )}
+              {l.businessMetrics?.employee_count != null && (
+                <MetricCell label="Employees" value={fmtNum(Number(l.businessMetrics.employee_count))} />
+              )}
+            </>
+          ) : (
+            <>
+              <MetricCell label="Cap Rate" value={fmtPct(l.capRate)} />
+              <MetricCell label="NOI" value={fmt$$(l.noi)} />
+              <MetricCell label="Revenue" value={fmt$$(l.revenue)} />
+              {l.slips != null && <MetricCell label="Slips" value={fmtNum(l.slips)} />}
+              {l.dryRacks != null && <MetricCell label="Dry Racks" value={fmtNum(l.dryRacks)} />}
+              {l.acreage && <MetricCell label="Acres" value={parseFloat(l.acreage).toFixed(1)} />}
+              {l.waterfrontFeet != null && <MetricCell label="WF Feet" value={fmtNum(l.waterfrontFeet)} />}
+            </>
+          )}
         </div>
 
-        {/* Broker */}
-        {l.brokerName && (
-          <p className="text-[11px] text-slate-400 mb-3 truncate">
-            {l.brokerName}{l.brokerCompany ? ` · ${l.brokerCompany}` : ""}
-          </p>
+        {/* Broker attribution */}
+        {(l.brokerName || l.brokerProfileId) && (
+          <div className="flex items-center gap-1.5 text-[11px] text-slate-400 mb-3 truncate">
+            {l.brokerProfileId ? (
+              <a
+                href={`/brokers/${l.brokerProfileId}`}
+                className="truncate hover:text-blue-700 hover:underline"
+                onClick={e => e.stopPropagation()}
+              >
+                {l.brokerName || "View broker"}
+                {l.brokerCompany ? ` · ${l.brokerCompany}` : ""}
+              </a>
+            ) : (
+              <span className="truncate">{l.brokerName}{l.brokerCompany ? ` · ${l.brokerCompany}` : ""}</span>
+            )}
+            {isBrokerSubscribed && (
+              <span
+                className="ml-auto flex-shrink-0 text-[9px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full px-1.5 py-0.5"
+                data-testid="badge-subscribed"
+              >
+                Subscribed
+              </span>
+            )}
+          </div>
         )}
 
         <div className="flex-1" />

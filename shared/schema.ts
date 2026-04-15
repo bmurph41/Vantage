@@ -19331,6 +19331,21 @@ export const marinaListings = pgTable("marina_listings", {
   listingDate: timestamp("listing_date"),
   lastScrapedAt: timestamp("last_scraped_at").notNull().defaultNow(),
   expiresAt: timestamp("expires_at"),
+  // Universal marketplace fields (added 2026-04-15 for cross-asset-class support)
+  listingCategory: varchar("listing_category", { length: 30 }).notNull().default("cre_property"),
+  assetClass: varchar("asset_class", { length: 100 }),
+  creMetrics: jsonb("cre_metrics"),
+  businessMetrics: jsonb("business_metrics"),
+  brokerProfileId: varchar("broker_profile_id"),
+  country: varchar("country", { length: 2 }).default("US"),
+  currency: varchar("currency", { length: 3 }).default("USD"),
+  priceOnRequest: boolean("price_on_request").default(false),
+  isLocationConfidential: boolean("is_location_confidential").default(false),
+  description: text("description"),
+  publishedAt: timestamp("published_at"),
+  lastSeenAt: timestamp("last_seen_at").defaultNow(),
+  isActive: boolean("is_active").default(true),
+  sourceListingIdCanonical: varchar("source_listing_id_canonical", { length: 255 }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => ({
@@ -19339,7 +19354,308 @@ export const marinaListings = pgTable("marina_listings", {
   statusIdx: index("marina_listings_status_idx").on(table.status),
   stateIdx: index("marina_listings_state_idx").on(table.state),
   dedupeHashIdx: uniqueIndex("marina_listings_dedupe_hash_idx").on(table.dedupeHash),
+  categoryIdx: index("marina_listings_category_idx").on(table.listingCategory),
+  assetClassIdx: index("marina_listings_asset_class_idx").on(table.assetClass),
+  brokerProfileIdx: index("marina_listings_broker_profile_idx").on(table.brokerProfileId),
 }));
+
+// Marketplace sources — unified registry of scraper-able domains across
+// CRE, business, franchise, and note marketplaces. Replaces / supplements liv2_sources.
+export const marketplaceSources = pgTable("marketplace_sources", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()::text`),
+  name: varchar("name", { length: 255 }).notNull(),
+  domain: varchar("domain", { length: 255 }).notNull().unique(),
+  category: varchar("category", { length: 20 }).notNull().default("cre"), // cre | business | franchise | mixed
+  scraperType: varchar("scraper_type", { length: 50 }).notNull().default("custom"),
+  enabled: boolean("enabled").notNull().default(true),
+  rateLimitPerMin: integer("rate_limit_per_min").default(30),
+  lastRunAt: timestamp("last_run_at"),
+  lastSuccessAt: timestamp("last_success_at"),
+  successRate: numeric("success_rate", { precision: 5, scale: 2 }),
+  totalListingsIngested: integer("total_listings_ingested").default(0),
+  authConfig: jsonb("auth_config"),
+  respectsRobotsTxt: boolean("respects_robots_txt").default(true),
+  attributionRequired: boolean("attribution_required").default(true),
+  termsOfServiceUrl: text("terms_of_service_url"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => ({
+  categoryIdx: index("marketplace_sources_category_idx").on(table.category),
+}));
+
+export const marketplaceScrapeRuns = pgTable("marketplace_scrape_runs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()::text`),
+  sourceId: varchar("source_id").notNull().references(() => marketplaceSources.id, { onDelete: "cascade" }),
+  startedAt: timestamp("started_at").notNull().defaultNow(),
+  finishedAt: timestamp("finished_at"),
+  status: varchar("status", { length: 20 }).notNull().default("running"), // running | success | failed | partial
+  listingsFound: integer("listings_found").default(0),
+  listingsNew: integer("listings_new").default(0),
+  listingsUpdated: integer("listings_updated").default(0),
+  listingsFailed: integer("listings_failed").default(0),
+  errorMessage: text("error_message"),
+  runMetadata: jsonb("run_metadata"),
+}, (table) => ({
+  sourceIdx: index("marketplace_scrape_runs_source_idx").on(table.sourceId, table.startedAt),
+  statusIdx: index("marketplace_scrape_runs_status_idx").on(table.status),
+}));
+
+export type MarketplaceSource = typeof marketplaceSources.$inferSelect;
+export type InsertMarketplaceSource = typeof marketplaceSources.$inferInsert;
+export type MarketplaceScrapeRun = typeof marketplaceScrapeRuns.$inferSelect;
+
+// ============================================================================
+// Broker Subscriptions — public broker profiles, follow/advisory subscriptions,
+// listing claims, advisory content. Added 2026-04-15.
+// ============================================================================
+
+export const brokerRegistrations = pgTable("broker_registrations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()::text`),
+  userId: varchar("user_id").notNull(),
+  orgId: varchar("org_id").notNull(),
+  legalName: varchar("legal_name", { length: 255 }).notNull(),
+  companyName: varchar("company_name", { length: 255 }).notNull(),
+  email: varchar("email", { length: 255 }).notNull(),
+  phone: varchar("phone", { length: 50 }),
+  licenseNumber: varchar("license_number", { length: 100 }),
+  licenseState: varchar("license_state", { length: 2 }),
+  licenseExpiresAt: date("license_expires_at"),
+  licenseDocumentUrl: text("license_document_url"),
+  yearsExperience: integer("years_experience"),
+  specialties: jsonb("specialties"),
+  bio: text("bio"),
+  website: text("website"),
+  linkedinUrl: text("linkedin_url"),
+  status: varchar("status", { length: 20 }).notNull().default("pending"),
+  rejectionReason: text("rejection_reason"),
+  reviewedBy: varchar("reviewed_by"),
+  reviewedAt: timestamp("reviewed_at"),
+  submittedAt: timestamp("submitted_at").notNull().defaultNow(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => ({
+  userIdx: index("broker_registrations_user_idx").on(table.userId),
+  statusIdx: index("broker_registrations_status_idx").on(table.status),
+}));
+
+export const brokerProfiles = pgTable("broker_profiles", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()::text`),
+  registrationId: varchar("registration_id").notNull().references(() => brokerRegistrations.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull(),
+  orgId: varchar("org_id").notNull(),
+  slug: varchar("slug", { length: 100 }).notNull().unique(),
+  displayName: varchar("display_name", { length: 255 }).notNull(),
+  companyName: varchar("company_name", { length: 255 }).notNull(),
+  headshotUrl: text("headshot_url"),
+  coverImageUrl: text("cover_image_url"),
+  bio: text("bio"),
+  specialties: jsonb("specialties"),
+  languages: jsonb("languages"),
+  yearsExperience: integer("years_experience"),
+  licenseNumber: varchar("license_number", { length: 100 }),
+  licenseState: varchar("license_state", { length: 2 }),
+  contactEmail: varchar("contact_email", { length: 255 }),
+  contactPhone: varchar("contact_phone", { length: 50 }),
+  website: text("website"),
+  linkedinUrl: text("linkedin_url"),
+  isPublishable: boolean("is_publishable").notNull().default(false),
+  publishedAt: timestamp("published_at"),
+  brokerTier: varchar("broker_tier", { length: 20 }).default("starter"),
+  followerCount: integer("follower_count").notNull().default(0),
+  advisorySubscriberCount: integer("advisory_subscriber_count").notNull().default(0),
+  totalListingsPublished: integer("total_listings_published").notNull().default(0),
+  avgListingQuality: numeric("avg_listing_quality", { precision: 5, scale: 2 }),
+  averageResponseHours: numeric("average_response_hours", { precision: 6, scale: 2 }),
+  featuredUntil: timestamp("featured_until"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => ({
+  userIdx: index("broker_profiles_user_idx").on(table.userId),
+  orgIdx: index("broker_profiles_org_idx").on(table.orgId),
+  tierIdx: index("broker_profiles_tier_idx").on(table.brokerTier),
+}));
+
+export const brokerAdvisoryPackages = pgTable("broker_advisory_packages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()::text`),
+  brokerProfileId: varchar("broker_profile_id").notNull().references(() => brokerProfiles.id, { onDelete: "cascade" }),
+  name: varchar("name", { length: 255 }).notNull(),
+  tagline: varchar("tagline", { length: 500 }),
+  description: text("description"),
+  deliverables: jsonb("deliverables"),
+  priceMonthlyCents: integer("price_monthly_cents"),
+  priceAnnualCents: integer("price_annual_cents"),
+  currency: varchar("currency", { length: 3 }).default("USD"),
+  cadence: varchar("cadence", { length: 20 }).default("monthly"),
+  externalPaymentUrl: text("external_payment_url"),
+  maxSubscribers: integer("max_subscribers"),
+  sampleContentIds: jsonb("sample_content_ids"),
+  isActive: boolean("is_active").notNull().default(true),
+  sortOrder: integer("sort_order").default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => ({
+  profileIdx: index("broker_advisory_packages_profile_idx").on(table.brokerProfileId),
+}));
+
+export const brokerSubscriptions = pgTable("broker_subscriptions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()::text`),
+  userId: varchar("user_id").notNull(),
+  orgId: varchar("org_id").notNull(),
+  brokerProfileId: varchar("broker_profile_id").notNull().references(() => brokerProfiles.id, { onDelete: "cascade" }),
+  tier: varchar("tier", { length: 20 }).notNull().default("follow"),
+  advisoryPackageId: varchar("advisory_package_id").references(() => brokerAdvisoryPackages.id, { onDelete: "set null" }),
+  status: varchar("status", { length: 20 }).notNull().default("active"),
+  notifyNewListings: boolean("notify_new_listings").notNull().default(true),
+  notifyAdvisoryContent: boolean("notify_advisory_content").notNull().default(true),
+  notifyMarketUpdates: boolean("notify_market_updates").notNull().default(true),
+  grantedBy: varchar("granted_by"),
+  externalPaymentReference: varchar("external_payment_reference", { length: 255 }),
+  subscribedAt: timestamp("subscribed_at").notNull().defaultNow(),
+  advisoryStartedAt: timestamp("advisory_started_at"),
+  canceledAt: timestamp("canceled_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => ({
+  userIdx: index("broker_subscriptions_user_idx").on(table.userId),
+  brokerIdx: index("broker_subscriptions_broker_idx").on(table.brokerProfileId),
+  uniqUserBroker: uniqueIndex("broker_subscriptions_user_broker_unique").on(table.userId, table.brokerProfileId),
+}));
+
+export const brokerFollowHistory = pgTable("broker_follow_history", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()::text`),
+  userId: varchar("user_id").notNull(),
+  brokerProfileId: varchar("broker_profile_id").notNull().references(() => brokerProfiles.id, { onDelete: "cascade" }),
+  firstFollowedAt: timestamp("first_followed_at").notNull().defaultNow(),
+  currentlyFollowing: boolean("currently_following").notNull().default(true),
+  unfollowedAt: timestamp("unfollowed_at"),
+  refollowedCount: integer("refollowed_count").notNull().default(0),
+}, (table) => ({
+  userIdx: index("broker_follow_history_user_idx").on(table.userId),
+  uniqUserBroker: uniqueIndex("broker_follow_history_user_broker_unique").on(table.userId, table.brokerProfileId),
+}));
+
+export const brokerAdvisoryContent = pgTable("broker_advisory_content", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()::text`),
+  brokerProfileId: varchar("broker_profile_id").notNull().references(() => brokerProfiles.id, { onDelete: "cascade" }),
+  title: varchar("title", { length: 500 }).notNull(),
+  slug: varchar("slug", { length: 255 }),
+  excerpt: text("excerpt"),
+  body: text("body"),
+  contentType: varchar("content_type", { length: 30 }).notNull().default("note"),
+  attachedListingIds: jsonb("attached_listing_ids"),
+  attachedAttachments: jsonb("attached_attachments"),
+  visibility: varchar("visibility", { length: 20 }).notNull().default("advisory_only"),
+  teaserExcerpt: text("teaser_excerpt"),
+  publishedAt: timestamp("published_at"),
+  isPinned: boolean("is_pinned").default(false),
+  viewCount: integer("view_count").notNull().default(0),
+  likeCount: integer("like_count").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => ({
+  profileIdx: index("broker_advisory_content_profile_idx").on(table.brokerProfileId),
+  visibilityIdx: index("broker_advisory_content_visibility_idx").on(table.visibility),
+}));
+
+export const brokerListingClaims = pgTable("broker_listing_claims", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()::text`),
+  listingId: varchar("listing_id").notNull().unique(),
+  brokerProfileId: varchar("broker_profile_id").notNull().references(() => brokerProfiles.id, { onDelete: "cascade" }),
+  claimMethod: varchar("claim_method", { length: 30 }).notNull(),
+  verified: boolean("verified").notNull().default(false),
+  verificationEvidence: jsonb("verification_evidence"),
+  claimedAt: timestamp("claimed_at").notNull().defaultNow(),
+  verifiedAt: timestamp("verified_at"),
+  verifiedBy: varchar("verified_by"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => ({
+  brokerIdx: index("broker_listing_claims_broker_idx").on(table.brokerProfileId),
+}));
+
+export const brokerListingClaimDisputes = pgTable("broker_listing_claim_disputes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()::text`),
+  listingId: varchar("listing_id").notNull(),
+  existingClaimId: varchar("existing_claim_id").references(() => brokerListingClaims.id, { onDelete: "cascade" }),
+  challengerBrokerProfileId: varchar("challenger_broker_profile_id").notNull().references(() => brokerProfiles.id, { onDelete: "cascade" }),
+  reason: text("reason").notNull(),
+  evidence: jsonb("evidence"),
+  status: varchar("status", { length: 20 }).notNull().default("open"),
+  resolutionNotes: text("resolution_notes"),
+  resolvedBy: varchar("resolved_by"),
+  resolvedAt: timestamp("resolved_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  statusIdx: index("broker_claim_disputes_status_idx").on(table.status),
+  listingIdx: index("broker_claim_disputes_listing_idx").on(table.listingId),
+}));
+
+export const brokerAdvisoryMessages = pgTable("broker_advisory_messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()::text`),
+  subscriptionId: varchar("subscription_id").notNull().references(() => brokerSubscriptions.id, { onDelete: "cascade" }),
+  senderUserId: varchar("sender_user_id").notNull(),
+  senderRole: varchar("sender_role", { length: 10 }).notNull(),
+  body: text("body").notNull(),
+  attachments: jsonb("attachments"),
+  readAt: timestamp("read_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  subIdx: index("broker_advisory_messages_sub_idx").on(table.subscriptionId, table.createdAt),
+}));
+
+export type BrokerRegistration = typeof brokerRegistrations.$inferSelect;
+export type InsertBrokerRegistration = typeof brokerRegistrations.$inferInsert;
+export type BrokerProfile = typeof brokerProfiles.$inferSelect;
+export type InsertBrokerProfile = typeof brokerProfiles.$inferInsert;
+export type BrokerAdvisoryPackage = typeof brokerAdvisoryPackages.$inferSelect;
+export type InsertBrokerAdvisoryPackage = typeof brokerAdvisoryPackages.$inferInsert;
+export type BrokerSubscription = typeof brokerSubscriptions.$inferSelect;
+export type InsertBrokerSubscription = typeof brokerSubscriptions.$inferInsert;
+export type BrokerFollowHistory = typeof brokerFollowHistory.$inferSelect;
+export type BrokerAdvisoryContent = typeof brokerAdvisoryContent.$inferSelect;
+export type InsertBrokerAdvisoryContent = typeof brokerAdvisoryContent.$inferInsert;
+export type BrokerListingClaim = typeof brokerListingClaims.$inferSelect;
+export type BrokerListingClaimDispute = typeof brokerListingClaimDisputes.$inferSelect;
+export type BrokerAdvisoryMessage = typeof brokerAdvisoryMessages.$inferSelect;
+
+export const orgMarketplaceEntitlements = pgTable("org_marketplace_entitlements", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()::text`),
+  orgId: varchar("org_id").notNull().unique(),
+  marketplacePlusTier: varchar("marketplace_plus_tier", { length: 20 }).notNull().default("free"),
+  brokerFollowLimit: integer("broker_follow_limit").notNull().default(2),
+  brokerAdvisoryLimit: integer("broker_advisory_limit").notNull().default(0),
+  savedSearchLimit: integer("saved_search_limit").notNull().default(3),
+  listingExportLimitMonthly: integer("listing_export_limit_monthly").notNull().default(0),
+  earlyAccessHours: integer("early_access_hours").notNull().default(0),
+  allowBrokerMessaging: boolean("allow_broker_messaging").notNull().default(false),
+  allowOffMarketAlerts: boolean("allow_off_market_alerts").notNull().default(false),
+  source: varchar("source", { length: 30 }).notNull().default("default"),
+  stripeSubscriptionId: varchar("stripe_subscription_id", { length: 255 }),
+  effectiveAt: timestamp("effective_at").notNull().defaultNow(),
+  expiresAt: timestamp("expires_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const userBrokerEntitlements = pgTable("user_broker_entitlements", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()::text`),
+  userId: varchar("user_id").notNull().unique(),
+  orgId: varchar("org_id").notNull(),
+  tier: varchar("tier", { length: 20 }).notNull().default("free"),
+  brokerFollowLimit: integer("broker_follow_limit").notNull().default(2),
+  brokerAdvisoryLimit: integer("broker_advisory_limit").notNull().default(0),
+  source: varchar("source", { length: 30 }).notNull().default("default"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => ({
+  orgIdx: index("user_broker_entitlements_org_idx").on(table.orgId),
+}));
+
+export type OrgMarketplaceEntitlement = typeof orgMarketplaceEntitlements.$inferSelect;
+export type InsertOrgMarketplaceEntitlement = typeof orgMarketplaceEntitlements.$inferInsert;
+export type UserBrokerEntitlement = typeof userBrokerEntitlements.$inferSelect;
+export type InsertUserBrokerEntitlement = typeof userBrokerEntitlements.$inferInsert;
 
 export const investmentCriteriaProfiles = pgTable("investment_criteria_profiles", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()::text`),
