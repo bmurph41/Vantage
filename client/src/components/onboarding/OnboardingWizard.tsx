@@ -1379,6 +1379,186 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
             );
           })()}
         </div>
+
+        <div className="border-t pt-4 mt-2">
+          <div className="flex items-center gap-2 mb-3">
+            <KeyRound className="h-4 w-4 text-muted-foreground" />
+            <Label className="text-sm font-semibold">Ownership</Label>
+          </div>
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Ownership Type</Label>
+              <Select
+                value={state.ownership.type}
+                onValueChange={(v) => handleWizardOwnershipTypeChange(v as OwnershipType)}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="fee_simple">Fee Simple</SelectItem>
+                  <SelectItem value="ground_lease">Upland Lease</SelectItem>
+                  {state.assetClass === "marina" && <SelectItem value="submerged_land_lease">Submerged Land Lease</SelectItem>}
+                  <SelectItem value="combined">Combined (Multiple)</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                {state.ownership.type === 'fee_simple' && 'Full ownership of land and improvements'}
+                {state.ownership.type === 'ground_lease' && 'Operating on leased upland'}
+                {state.ownership.type === 'submerged_land_lease' && 'Fee simple upland, leased submerged land'}
+                {state.ownership.type === 'combined' && 'Mix of owned and leased parcels'}
+              </p>
+            </div>
+
+            {state.ownership.type !== 'fee_simple' && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium">Lease Details</span>
+                  <div className="flex gap-1">
+                    {(state.ownership.type === 'ground_lease' || state.ownership.type === 'combined') && (
+                      <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => addWizardLease('ground_lease')}>
+                        <Plus className="h-3 w-3 mr-1" />Upland Lease
+                      </Button>
+                    )}
+                    {(state.ownership.type === 'submerged_land_lease' || state.ownership.type === 'combined') && (
+                      <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => addWizardLease('submerged_land_lease')}>
+                        <Plus className="h-3 w-3 mr-1" />Submerged Lease
+                      </Button>
+                    )}
+                  </div>
+                </div>
+
+                {state.ownership.leases.map((lease) => (
+                  <div key={lease.id} className="border rounded-lg overflow-hidden">
+                    <div
+                      className="flex items-center justify-between p-2 bg-muted/30 cursor-pointer hover:bg-muted/50"
+                      onClick={() => toggleWizardLeaseExpanded(lease.id)}
+                    >
+                      <div className="flex items-center gap-2">
+                        {expandedLeases.has(lease.id) ? (
+                          <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                        ) : (
+                          <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+                        )}
+                        <Badge variant="secondary" className="text-[10px]">
+                          {lease.type === 'submerged_land_lease' ? 'Submerged Land' : 'Upland'}
+                        </Badge>
+                        <span className="text-xs font-medium">
+                          {lease.counterparty || 'Unnamed Lease'}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        {lease.annualRent && (
+                          <span className="text-[10px] text-muted-foreground">
+                            ${parseFloat(lease.annualRent).toLocaleString()}/yr
+                          </span>
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
+                          onClick={(e) => { e.stopPropagation(); removeWizardLease(lease.id); }}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </div>
+
+                    {expandedLeases.has(lease.id) && (
+                      <div className="p-3 space-y-3">
+                        <div className="space-y-1">
+                          <Label className="text-xs">Landlord / Lessor Entity</Label>
+                          <Input
+                            placeholder="e.g., State of Florida, City of Miami"
+                            value={lease.counterparty}
+                            onChange={(e) => updateWizardLease(lease.id, 'counterparty', e.target.value)}
+                            className="h-8 text-sm"
+                          />
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <Label className="text-xs">Annual Rent ($)</Label>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              placeholder="0.00"
+                              value={lease.annualRent}
+                              onChange={(e) => updateWizardLease(lease.id, 'annualRent', e.target.value)}
+                              className="h-8 text-sm"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs">Annual Escalator (%)</Label>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              placeholder="e.g., 3.00"
+                              value={lease.annualEscalator}
+                              onChange={(e) => updateWizardLease(lease.id, 'annualEscalator', e.target.value)}
+                              className="h-8 text-sm"
+                            />
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <Label className="text-xs">Term Remaining</Label>
+                            <div className="flex gap-1">
+                              <Input
+                                type="number"
+                                min="0"
+                                placeholder="0"
+                                value={lease.termRemaining}
+                                onChange={(e) => updateWizardLease(lease.id, 'termRemaining', e.target.value)}
+                                className="h-8 text-sm flex-1"
+                              />
+                              <Select
+                                value={lease.termUnit}
+                                onValueChange={(v) => updateWizardLease(lease.id, 'termUnit', v)}
+                              >
+                                <SelectTrigger className="w-20 h-8 text-xs"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="years">Years</SelectItem>
+                                  <SelectItem value="months">Months</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs">Expiration Date</Label>
+                            <Input
+                              type="date"
+                              value={lease.expirationDate}
+                              onChange={(e) => updateWizardLease(lease.id, 'expirationDate', e.target.value)}
+                              className="h-8 text-sm"
+                            />
+                          </div>
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs">Renewal Options</Label>
+                          <Input
+                            placeholder="e.g., Two 10-year renewals at market rate"
+                            value={lease.renewalOptions}
+                            onChange={(e) => updateWizardLease(lease.id, 'renewalOptions', e.target.value)}
+                            className="h-8 text-sm"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs">Notes</Label>
+                          <Input
+                            placeholder="Additional terms, escalation clauses, etc."
+                            value={lease.notes}
+                            onChange={(e) => updateWizardLease(lease.id, 'notes', e.target.value)}
+                            className="h-8 text-sm"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     );
   };

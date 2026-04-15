@@ -93,7 +93,7 @@ export const WIZARD_ASSET_CONFIGS: Record<string, WizardAssetConfig> = {
     supportsMultiBuilding: true,
     documentTypes: ['pnl','operating_statement','smith_travel','occupancy','franchise','debt_schedule'] },
   marina: { uploadLabel: 'Upload Financials', uploadDescription: 'Upload P&L statements, fuel sales reports, or operating statements.',
-    propertySizeFields: [{id:'uplandAcreage',label:'Upland Acreage',type:'number',suffix:'acres'}, {id:'submergedAcreage',label:'Submerged Acreage',type:'number',suffix:'acres'}, {id:'totalSlips',label:'Total Slips',type:'number'}],
+    propertySizeFields: [{id:'uplandAcreage',label:'Upland Acreage',type:'number',suffix:'acres'}, {id:'submergedAcreage',label:'Submerged Acreage',type:'number',suffix:'acres'}],
     documentTypes: ['pnl','operating_statement','fuel_sales','occupancy','environmental','debt_schedule'] },
   self_storage: { uploadLabel: 'Upload Financials', uploadDescription: 'Upload operating statements, unit mix schedules, or P&L statements.',
     propertySizeFields: [...SF, {id:'totalUnits',label:'Total Units',type:'number'}],
