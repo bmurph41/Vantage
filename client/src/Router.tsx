@@ -246,6 +246,7 @@ const SetupWizard = lazy(() => import("@/pages/modeling/projects/setup-wizard"))
 const ModelingProjectsIndex = lazy(() => import("@/pages/modeling/projects"));
 const ModelingPortfolio = lazy(() => import("@/pages/modeling/portfolio"));
 const PortfolioReturns = lazy(() => import("@/pages/modeling/portfolio/portfolio-returns"));
+const PortfolioModelingDashboard = lazy(() => import("@/pages/modeling/portfolio/dashboard"));
 const ModelingFunds = lazy(() => import("@/pages/modeling/funds"));
 const FundDetail = lazy(() => import("@/pages/modeling/funds/[fundId]"));
 const LPPortal = lazy(() => import("@/pages/modeling/lp-portal"));
@@ -2404,6 +2405,13 @@ function Router() {
         {() => (
           <GatedLayout pack="modeling_tools">
             <PortfolioReturns />
+          </GatedLayout>
+        )}
+      </Route>
+      <Route path="/modeling/portfolio/dashboard">
+        {() => (
+          <GatedLayout pack="modeling_tools">
+            <PortfolioModelingDashboard />
           </GatedLayout>
         )}
       </Route>

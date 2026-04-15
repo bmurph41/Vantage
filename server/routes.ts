@@ -37,6 +37,7 @@ import { workflowEmailRouter } from "./routes/workflow-email-routes";
 import { aiDealIntelligenceRouter } from "./routes/ai-deal-intelligence-routes";
 import { investorPortalRouter } from "./routes/investor-portal-routes";
 import { portfolioMarketRouter } from "./routes/portfolio-market-routes";
+import portfolioSummaryRoutes from "./routes/portfolio-summary-routes";
 import { operationsManagementRouter } from "./routes/operations-management-routes";
 import { capitalMarketsRouter } from "./routes/capital-markets-routes";
 import { crmRelationshipIntelligenceRouter } from "./routes/crm-relationship-intelligence-routes";
@@ -571,6 +572,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/crm", authenticateUser, enforceTenant, requirePack("crm_pipeline"), crmIntelligenceRoutes);
   app.use("/api/sla", authenticateUser, enforceTenant, requirePack("crm_pipeline"), crmIntelligenceRoutes);
   app.use("/api/crm/analytics", authenticateUser, enforceTenant, requirePack("crm_pipeline"), pipelineAnalyticsRoutes);
+  app.use("/api/pipeline/analytics", authenticateUser, enforceTenant, requirePack("crm_pipeline"), pipelineAnalyticsRoutes);
   app.use("/api/pipeline/automation", authenticateUser, enforceTenant, pipelineAutomationRoutes);
   app.use("/api/broker-subscriptions", authenticateUser, enforceTenant, brokerSubscriptionsRoutes);
   app.use("/api/broker-registration", authenticateUser, enforceTenant, brokerRegistrationRouter);
@@ -654,6 +656,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/investors", authenticateUser, enforceTenant, investorPortalRouter);
   // Sections 3-4: Portfolio Intelligence + Market Intelligence (3.1-4.5)
   app.use("/api/market", authenticateUser, enforceTenant, portfolioMarketRouter);
+  app.use("/api/portfolio", authenticateUser, enforceTenant, portfolioSummaryRoutes);
   // Section 5: Operations & Asset Management (5.1-5.4)
   app.use("/api/operations", authenticateUser, enforceTenant, operationsManagementRouter);
   // Section 6: Capital Markets Tools (6.1-6.4)

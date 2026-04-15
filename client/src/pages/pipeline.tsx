@@ -17,7 +17,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,8 +33,13 @@ import {
   TrendingUp, Filter, ArrowUpDown, Settings2, Edit2, Check, X,
   ExternalLink, Timer, AlertTriangle, Target, BarChart3, Award, Map,
   Flame, Skull, Zap, ChevronDown, Bookmark, Eye, MoreHorizontal,
-  Clock, ArrowRight, Phone, Mail, StickyNote, GanttChart,
+  Clock, ArrowRight, Phone, Mail, StickyNote, GanttChart, Activity,
+  RefreshCw,
 } from "lucide-react";
+import {
+  ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid,
+  Tooltip as RechartTooltip, Cell,
+} from "recharts";
 import { Link } from "wouter";
 import { format, differenceInDays, isAfter, addDays } from "date-fns";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -511,6 +516,314 @@ function PipelineColumn({ stage, deals, onDealClick, followUps }: PipelineColumn
   );
 }
 
+// ─── Pipeline Analytics View ─────────────────────────────────────────
+
+const STAGE_COLORS = ["#6366f1", "#8b5cf6", "#3b82f6", "#f59e0b", "#14b8a6", "#84cc16", "#10b981", "#ef4444"];
+
+interface PipelineAnalyticsViewProps {
+  analyticsData: any;
+  isLoading: boolean;
+  deals: DealWithRelations[];
+  stages: PipelineStage[];
+}
+
+function PipelineAnalyticsView({
+  analyticsData, isLoading, deals, stages,
+}: PipelineAnalyticsViewProps) {
+  // ── Velocity chart data (from consolidated endpoint) ──
+  const velocityStages = analyticsData?.velocity?.stages || [];
+  const velocityChartData = velocityStages.map((s: any, i: number) => ({
+    stage: (s.stage || "").replace(/_/g, " "),
+    avgDays: Number(s.avg_days || 0),
+    deals: Number(s.deal_count || 0),
+    fill: STAGE_COLORS[i % STAGE_COLORS.length],
+  }));
+
+  // ── Conversion funnel (transition-based, from endpoint) ──
+  // Prefer server-side transition data; fall back to live deal snapshot if no history
+  const serverStageConversions: any[] = analyticsData?.conversion?.stageConversions || [];
+  const funnelData = serverStageConversions.length > 0
+    ? serverStageConversions.map((s: any, i: number) => ({
+        stage: (s.stageName || "").replace(/_/g, " "),
+        count: Number(s.dealsEntered || 0),
+        value: 0,
+        fill: STAGE_COLORS[i % STAGE_COLORS.length],
+        conversionRate: s.conversionRate ?? null,
+      }))
+    : stages
+        .filter(s => !s.name.toLowerCase().includes("lost") && !s.name.toLowerCase().includes("won"))
+        .map((s, i) => {
+          const stageDeals = deals.filter(d => d.stageId === s.id || d.stage === s.name);
+          return {
+            stage: s.name.replace(/_/g, " "),
+            count: stageDeals.length,
+            value: stageDeals.reduce((sum, d) => sum + Number(d.amount || 0), 0),
+            fill: STAGE_COLORS[i % STAGE_COLORS.length],
+            conversionRate: null as number | null,
+          };
+        });
+
+  // Conversion rates: use server-computed rates (transition-based) with fallback to snapshot-based
+  const conversionRates = funnelData.map((s, i) => {
+    const rate = s.conversionRate !== undefined && s.conversionRate !== null
+      ? s.conversionRate
+      : (i > 0 && funnelData[i - 1].count > 0)
+        ? Math.round((s.count / funnelData[i - 1].count) * 100)
+        : null;
+    return { ...s, rate };
+  });
+
+  // ── Win rate and deal leaderboard (from consolidated endpoint) ──
+  const winRate = analyticsData?.winLoss?.winRate ?? 0;
+  const wonCount = analyticsData?.winLoss?.won?.count ?? 0;
+  const lostCount = analyticsData?.winLoss?.lost?.count ?? 0;
+  const wonValue = analyticsData?.winLoss?.won?.totalValue ?? 0;
+  const avgWonDealSize = analyticsData?.winLoss?.won?.avgDealSize ?? 0;
+
+  // Deal leaderboard: top 10 open deals by value (sorted from live deal objects for full field access)
+  const leaderboard = [...deals]
+    .filter(d => d.status === "open" || !d.status)
+    .sort((a, b) => Number(b.amount || 0) - Number(a.amount || 0))
+    .slice(0, 10);
+
+  // Health score (from consolidated endpoint)
+  const healthScore = analyticsData?.health?.score ?? 0;
+  const healthColor = healthScore >= 70 ? "text-green-600" : healthScore >= 45 ? "text-amber-600" : "text-red-600";
+
+  if (isLoading) {
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <Card key={i}><CardContent className="p-5 h-48 animate-pulse bg-gray-100 rounded-lg" /></Card>
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Last updated */}
+      {analyticsData?.generatedAt && (
+        <div className="flex items-center gap-1.5 text-xs text-gray-400">
+          <RefreshCw className="h-3.5 w-3.5" />
+          <span>Last updated {format(new Date(analyticsData.generatedAt), "MMM d, h:mm a")}</span>
+        </div>
+      )}
+
+      {/* ── KPI row ── */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {[
+          { label: "Win Rate", value: `${winRate.toFixed(1)}%`, sub: `${wonCount}W / ${lostCount}L`, color: "text-emerald-600" },
+          { label: "Won Value", value: formatCompactCurrency(wonValue), sub: `Avg ${formatCompactCurrency(avgWonDealSize)}`, color: "text-blue-600" },
+          { label: "Pipeline Health", value: `${healthScore}/100`, sub: healthScore >= 70 ? "Healthy" : healthScore >= 45 ? "Fair" : "At Risk", color: healthColor },
+          { label: "Avg Days in Pipeline", value: `${analyticsData?.health?.summary?.avgAgeDays ?? "—"}d`, sub: `${analyticsData?.health?.summary?.staleCount ?? 0} stale deals`, color: "text-orange-600" },
+        ].map((kpi) => (
+          <Card key={kpi.label}>
+            <CardContent className="p-4">
+              <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wide">{kpi.label}</p>
+              <p className={`text-xl font-bold mt-1 ${kpi.color}`}>{kpi.value}</p>
+              <p className="text-[10px] text-gray-400 mt-0.5">{kpi.sub}</p>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {/* ── Charts row ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Velocity: avg days per stage */}
+        <Card>
+          <CardContent className="p-4">
+            <h3 className="text-sm font-semibold text-gray-700 mb-3">Deal Velocity — Avg Days per Stage</h3>
+            {velocityChartData.length === 0 ? (
+              <div className="h-44 flex items-center justify-center text-sm text-gray-400">No open deals with stage data</div>
+            ) : (
+              <ResponsiveContainer width="100%" height={180}>
+                <BarChart data={velocityChartData} layout="vertical" margin={{ left: 16, right: 16, top: 4, bottom: 4 }}>
+                  <XAxis type="number" tick={{ fontSize: 10 }} unit="d" />
+                  <YAxis type="category" dataKey="stage" tick={{ fontSize: 10 }} width={90} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" horizontal={false} />
+                  <RechartTooltip
+                    formatter={(v: any, _: any, props: any) => [`${v}d avg — ${props.payload.deals} deals`, "Avg Days"]}
+                    contentStyle={{ fontSize: 11 }}
+                  />
+                  <Bar dataKey="avgDays" radius={[0, 3, 3, 0]}>
+                    {velocityChartData.map((entry: any, i: number) => (
+                      <Cell key={i} fill={entry.fill} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Conversion Funnel */}
+        <Card>
+          <CardContent className="p-4">
+            <h3 className="text-sm font-semibold text-gray-700 mb-3">Conversion Funnel</h3>
+            {funnelData.length === 0 ? (
+              <div className="h-44 flex items-center justify-center text-sm text-gray-400">No stage data</div>
+            ) : (
+              <div className="space-y-2">
+                {funnelData.map((s, i) => {
+                  const maxCount = funnelData[0].count || 1;
+                  const widthPct = maxCount > 0 ? Math.max((s.count / maxCount) * 100, s.count > 0 ? 8 : 0) : 0;
+                  const cr = conversionRates[i];
+                  return (
+                    <div key={s.stage}>
+                      <div className="flex items-center justify-between text-[11px] text-gray-500 mb-0.5">
+                        <span className="font-medium text-gray-700">{s.stage}</span>
+                        <div className="flex items-center gap-2">
+                          {cr.rate !== null && (
+                            <span className="text-[10px] text-gray-400">{cr.rate}% conv.</span>
+                          )}
+                          <span className="font-semibold text-gray-800">{s.count} deals</span>
+                          <span className="text-gray-400">{formatCompactCurrency(s.value)}</span>
+                        </div>
+                      </div>
+                      <div className="h-5 bg-gray-100 rounded-md overflow-hidden">
+                        <div
+                          className="h-full rounded-md transition-all duration-500"
+                          style={{ width: `${widthPct}%`, backgroundColor: s.fill }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* ── Deal Leaderboard by Value ── */}
+      <Card>
+        <CardContent className="p-4">
+          <h3 className="text-sm font-semibold text-gray-700 mb-3">
+            Deal Leaderboard by Value
+            <span className="text-[10px] font-normal text-gray-400 ml-2">(top 10 open deals)</span>
+          </h3>
+          {leaderboard.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-6">No open deals found</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-100">
+                    {["#", "Deal", "Stage", "Value", "Avg Days in Stage", "Priority"].map(h => (
+                      <th key={h} className="text-left text-[10px] font-medium text-gray-500 pb-2 px-1 uppercase tracking-wide">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {leaderboard.map((deal, i) => {
+                    const stageInfo = stages.find(s => s.id === deal.stageId || s.name === deal.stage);
+                    const daysInStage = calculateDaysInStage(deal.currentStageEnteredAt);
+                    const priority = getPriorityConfig(deal.priority || "medium");
+                    return (
+                      <tr key={deal.id} className="hover:bg-gray-50 transition-colors">
+                        <td className="py-2 px-1 text-gray-400 text-[11px]">#{i + 1}</td>
+                        <td className="py-2 px-1">
+                          <span className="font-medium text-gray-800 text-xs">{deal.title}</span>
+                          {deal.company && (
+                            <div className="text-[10px] text-gray-400">{deal.company.name}</div>
+                          )}
+                        </td>
+                        <td className="py-2 px-1">
+                          <Badge
+                            style={{
+                              backgroundColor: `${getStageColor(stageInfo?.name || "", stageInfo?.color)}15`,
+                              color: getStageColor(stageInfo?.name || "", stageInfo?.color),
+                              borderColor: getStageColor(stageInfo?.name || "", stageInfo?.color),
+                            }}
+                            className="border text-[10px]"
+                          >
+                            {stageInfo?.name || deal.stage || "—"}
+                          </Badge>
+                        </td>
+                        <td className="py-2 px-1 font-semibold text-green-700 text-xs">
+                          {formatCompactCurrency(Number(deal.amount || 0))}
+                        </td>
+                        <td className="py-2 px-1">
+                          <span className={`text-xs ${daysInStage > 30 ? "text-red-600 font-semibold" : "text-gray-600"}`}>
+                            {daysInStage}d
+                          </span>
+                        </td>
+                        <td className="py-2 px-1">
+                          <Badge className="text-[10px] text-white" style={{ backgroundColor: priority.color }}>
+                            {priority.label}
+                          </Badge>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* ── Avg Deal Size by Stage (from consolidated endpoint) ── */}
+      {(() => {
+        // Prefer endpoint-derived avg deal size; fall back to client-side computation
+        const serverDealSize: any[] = analyticsData?.dealSizeByStage || [];
+        const dealSizeChartData = serverDealSize.length > 0
+          ? serverDealSize.map((r: any, i: number) => ({
+              stage: (r.stage || "").replace(/_/g, " ").slice(0, 14),
+              avgValue: Number(r.avgDealSize || 0),
+              count: Number(r.dealCount || 0),
+              fill: STAGE_COLORS[i % STAGE_COLORS.length],
+            }))
+          : stages
+              .filter(s => !s.name.toLowerCase().includes("lost"))
+              .map((s, i) => {
+                const stageDeals = deals.filter(d => d.stageId === s.id || d.stage === s.name);
+                const avg = stageDeals.length > 0
+                  ? stageDeals.reduce((sum, d) => sum + Number(d.amount || 0), 0) / stageDeals.length
+                  : 0;
+                return {
+                  stage: s.name.replace(/_/g, " ").replace(/\s+/g, " ").slice(0, 14),
+                  avgValue: avg,
+                  count: stageDeals.length,
+                  fill: STAGE_COLORS[i % STAGE_COLORS.length],
+                };
+              });
+        if (dealSizeChartData.length === 0) return null;
+        return (
+          <Card>
+            <CardContent className="p-4">
+              <h3 className="text-sm font-semibold text-gray-700 mb-3">Avg Deal Size by Stage</h3>
+              <ResponsiveContainer width="100%" height={160}>
+                <BarChart data={dealSizeChartData} margin={{ top: 4, right: 8, left: 0, bottom: 4 }}>
+                  <XAxis dataKey="stage" tick={{ fontSize: 10 }} />
+                  <YAxis
+                    tick={{ fontSize: 10 }}
+                    tickFormatter={(v) => v >= 1_000_000 ? `$${(v / 1_000_000).toFixed(1)}M` : v >= 1000 ? `$${(v / 1000).toFixed(0)}K` : `$${v}`}
+                  />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                  <RechartTooltip
+                    formatter={(v: any, _: any, props: any) => [
+                      `${formatCompactCurrency(v)} avg (${props.payload.count} deals)`,
+                      "Avg Deal Size",
+                    ]}
+                    contentStyle={{ fontSize: 11 }}
+                  />
+                  <Bar dataKey="avgValue" radius={[3, 3, 0, 0]}>
+                    {dealSizeChartData.map((_: any, i: number) => (
+                      <Cell key={i} fill={STAGE_COLORS[i % STAGE_COLORS.length]} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        );
+      })()}
+    </div>
+  );
+}
+
 // ─── Main Pipeline Component ─────────────────────────────────────────
 
 export default function Pipeline() {
@@ -518,7 +831,7 @@ export default function Pipeline() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedPipelineId, setSelectedPipelineId] = useState<string>("");
   const [sortBy, setSortBy] = useState("value");
-  const [viewMode, setViewMode] = useState<"kanban" | "list" | "map" | "gantt" | "automations" | "templates" | "forecast">("kanban");
+  const [viewMode, setViewMode] = useState<"kanban" | "list" | "map" | "gantt" | "automations" | "templates" | "forecast" | "analytics">("kanban");
   const [isDealFormOpen, setIsDealFormOpen] = useState(false);
   const [selectedDeal, setSelectedDeal] = useState<DealWithRelations | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -543,6 +856,9 @@ export default function Pipeline() {
     closingThisMonth: false,
     isRotting: false,
   });
+  const [showNudges, setShowNudges] = useState(false);
+  const [showComparison, setShowComparison] = useState(false);
+  const [selectedForComparison, setSelectedForComparison] = useState<Set<string>>(new Set());
   const { toast } = useToast();
 
   const sensors = useSensors(
@@ -571,6 +887,13 @@ export default function Pipeline() {
   // Batch-fetch next follow-up task per deal
   const { data: followUps = {} } = useQuery<Record<string, FollowUpInfo>>({
     queryKey: ["/api/crm/pipeline-enhancements/deals/next-follow-ups"],
+    staleTime: 60_000,
+  });
+
+  // ── Analytics data (consolidated endpoint, lazy-loaded only when analytics view is active) ──
+  const { data: analyticsData, isLoading: analyticsLoading } = useQuery<any>({
+    queryKey: ["/api/pipeline/analytics"],
+    enabled: viewMode === "analytics",
     staleTime: 60_000,
   });
 
@@ -1014,6 +1337,14 @@ export default function Pipeline() {
             </Button>
 
             <Button
+              variant="outline" size="sm"
+              className={`h-8 text-xs ${viewMode === 'analytics' ? 'bg-violet-50 border-violet-300 text-violet-700' : ''}`}
+              onClick={() => setViewMode(viewMode === 'analytics' ? 'kanban' : 'analytics')}
+            >
+              <Activity className="w-3.5 h-3.5 mr-1" /> Analytics
+            </Button>
+
+            <Button
               variant={showNudges ? "default" : "outline"}
               size="sm"
               className="h-8 text-xs"
@@ -1307,6 +1638,18 @@ export default function Pipeline() {
         {viewMode === "forecast" && (
           <div className="flex-1 overflow-y-auto" data-testid="forecast-view">
             <ForecastChart pipelineId={selectedPipelineId} />
+          </div>
+        )}
+
+        {/* Analytics View */}
+        {viewMode === "analytics" && (
+          <div className="flex-1 overflow-y-auto p-4 space-y-4" data-testid="analytics-view">
+            <PipelineAnalyticsView
+              analyticsData={analyticsData}
+              isLoading={analyticsLoading}
+              deals={deals}
+              stages={stages}
+            />
           </div>
         )}
       </div>

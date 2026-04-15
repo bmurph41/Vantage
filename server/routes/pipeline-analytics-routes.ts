@@ -2,15 +2,20 @@
  * Pipeline Analytics Routes
  * 
  * Provides computed analytics for pipeline performance:
- *   GET /api/crm/analytics/velocity    → avg days per stage
- *   GET /api/crm/analytics/conversion  → stage-to-stage conversion rates
- *   GET /api/crm/analytics/win-loss    → win/loss breakdown
- *   GET /api/crm/analytics/health      → composite pipeline health score
- *   GET /api/crm/analytics/summary     → combined quick summary
+ *   GET /            → consolidated analytics (velocity + conversion + win-loss + health + leaderboard)
+ *                      uses crm_deal_stage_history for true stage-to-stage transition conversion rates
+ *   GET /velocity    → avg days per stage
+ *   GET /conversion  → stage/status counts (simple)
+ *   GET /win-loss    → win/loss breakdown
+ *   GET /health      → composite pipeline health score
+ *   GET /summary     → combined quick summary
  * 
- * Mount: app.use("/api/crm/analytics", authenticateUser, analyticsRoutes);
+ * Mounted at TWO paths in server/routes.ts:
+ *   app.use("/api/crm/analytics", ...)    → backward-compat CRM analytics prefix
+ *   app.use("/api/pipeline/analytics", .) → canonical pipeline analytics endpoint
+ *                                           GET / responds at /api/pipeline/analytics
  * 
- * All endpoints accept optional query params:
+ * All sub-endpoints accept optional query params:
  *   ?assetClass=marina  — filter by asset class
  *   ?from=2025-01-01&to=2025-12-31  — date range
  *   ?source=broker  — filter by deal source
@@ -335,6 +340,197 @@ router.get("/health", async (req, res) => {
         velocity: { score: 0, max: 25, value: 0 },
       },
       summary: { openDeals: 0, wonDeals: 0, lostDeals: 0, pipelineValue: 0, wonValue: 0, avgAgeDays: 0, staleCount: 0 },
+      generatedAt: new Date().toISOString(),
+      _fallback: true,
+    });
+  }
+});
+
+// ─── Consolidated Pipeline Analytics (all data in one call) ───────
+
+router.get("/", async (req, res) => {
+  try {
+    const orgId = (req as any).orgId as string;
+
+    // Velocity: avg days per stage
+    const velocityResult = await db.execute(sql`
+      SELECT
+        d.pipeline_stage AS stage,
+        COUNT(*)::int AS deal_count,
+        COALESCE(AVG(
+          EXTRACT(EPOCH FROM (NOW() - COALESCE(d.stage_changed_at, d.updated_at, d.created_at))) / 86400
+        ), 0)::numeric(10,1) AS avg_days,
+        COALESCE(SUM(d.amount), 0)::numeric AS total_value
+      FROM crm_deals d
+      WHERE d.org_id = ${orgId} AND d.status = 'open'
+      GROUP BY d.pipeline_stage
+      ORDER BY
+        CASE d.pipeline_stage
+          WHEN 'lead' THEN 0
+          WHEN 'qualified' THEN 1
+          WHEN 'loi' THEN 2
+          WHEN 'due_diligence' THEN 3
+          WHEN 'under_contract' THEN 4
+          WHEN 'closing' THEN 5
+          ELSE 6
+        END
+    `);
+
+    // True stage-to-stage conversion: count distinct deals that ENTERED each stage
+    // using crm_deal_stage_history for actual transition tracking
+    const conversionResult = await db.execute(sql`
+      SELECT
+        ps.id AS stage_id,
+        ps.name AS stage_name,
+        COALESCE(ps.stage_order, 0) AS sort_order,
+        COUNT(DISTINCT dsh.deal_id)::int AS deals_entered,
+        COALESCE(AVG(dsh.duration_seconds), 0)::numeric(12,0) AS avg_duration_seconds
+      FROM crm_pipeline_stages ps
+      LEFT JOIN crm_deal_stage_history dsh
+        ON dsh.stage_id = ps.id AND dsh.org_id = ${orgId}
+      WHERE ps.org_id = ${orgId}
+        AND ps.is_active = true
+      GROUP BY ps.id, ps.name, ps.stage_order
+      ORDER BY ps.stage_order ASC NULLS LAST
+    `);
+
+    // Win/loss breakdown
+    const winLossResult = await db.execute(sql`
+      SELECT
+        d.status,
+        COUNT(*)::int AS count,
+        COALESCE(SUM(d.amount), 0)::numeric AS total_value,
+        COALESCE(AVG(d.amount), 0)::numeric(12,0) AS avg_deal_size
+      FROM crm_deals d
+      WHERE d.org_id = ${orgId} AND d.status IN ('won', 'lost')
+      GROUP BY d.status
+    `);
+
+    // Avg deal size per stage (open deals only)
+    const dealSizeResult = await db.execute(sql`
+      SELECT
+        d.pipeline_stage AS stage,
+        COALESCE(AVG(d.amount), 0)::numeric(12,0) AS avg_deal_size,
+        COUNT(*)::int AS deal_count
+      FROM crm_deals d
+      WHERE d.org_id = ${orgId} AND d.status = 'open'
+      GROUP BY d.pipeline_stage
+    `);
+
+    // Health summary
+    const healthResult = await db.execute(sql`
+      SELECT
+        COUNT(*) FILTER (WHERE status = 'open')::int AS open_deals,
+        COUNT(*) FILTER (WHERE status = 'won')::int AS won_deals,
+        COUNT(*) FILTER (WHERE status = 'lost')::int AS lost_deals,
+        COALESCE(SUM(amount) FILTER (WHERE status = 'open'), 0)::numeric AS pipeline_value,
+        COALESCE(SUM(amount) FILTER (WHERE status = 'won'), 0)::numeric AS won_value,
+        COALESCE(AVG(
+          EXTRACT(EPOCH FROM (NOW() - COALESCE(stage_changed_at, updated_at, created_at))) / 86400
+        ) FILTER (WHERE status = 'open'), 0)::numeric(10,1) AS avg_age_days,
+        COUNT(*) FILTER (
+          WHERE status = 'open'
+          AND COALESCE(updated_at, created_at) < NOW() - INTERVAL '30 days'
+        )::int AS stale_count
+      FROM crm_deals
+      WHERE org_id = ${orgId}
+    `);
+
+    // Top deals leaderboard
+    const leaderboardResult = await db.execute(sql`
+      SELECT
+        d.id,
+        d.name,
+        d.pipeline_stage AS stage,
+        d.status,
+        COALESCE(d.amount, 0)::numeric AS amount,
+        d.asset_class,
+        d.owner_id
+      FROM crm_deals d
+      WHERE d.org_id = ${orgId} AND d.status = 'open'
+      ORDER BY d.amount DESC NULLS LAST
+      LIMIT 10
+    `);
+
+    const won = winLossResult.rows.find((r: any) => r.status === "won") || { count: 0, total_value: 0, avg_deal_size: 0 };
+    const lost = winLossResult.rows.find((r: any) => r.status === "lost") || { count: 0, total_value: 0, avg_deal_size: 0 };
+    const totalClosed = (Number((won as any).count) || 0) + (Number((lost as any).count) || 0);
+    const winRate = totalClosed > 0 ? ((Number((won as any).count) || 0) / totalClosed) * 100 : 0;
+
+    const h = (healthResult.rows[0] || {}) as any;
+    const openDeals = Number(h.open_deals || 0);
+    const wonDeals = Number(h.won_deals || 0);
+    const lostDeals = Number(h.lost_deals || 0);
+    const avgAgeDays = Number(h.avg_age_days || 0);
+    const staleCount = Number(h.stale_count || 0);
+    const pipelineValue = Number(h.pipeline_value || 0);
+    const wonValue = Number(h.won_value || 0);
+    const totalClosedH = wonDeals + lostDeals;
+    const wr = totalClosedH > 0 ? wonDeals / totalClosedH : 0.5;
+    const stalePct = openDeals > 0 ? staleCount / openDeals : 0;
+    const coverageRatio = wonValue > 0 ? pipelineValue / wonValue : openDeals > 0 ? 2 : 0;
+    const winRateScore = Math.min(25, Math.round(wr * 100 * 0.4));
+    const freshnessScore = Math.min(25, Math.round((1 - stalePct) * 25));
+    const coverageScore = coverageRatio >= 2 && coverageRatio <= 4 ? 25 : coverageRatio > 4 ? Math.max(15, 25 - Math.round((coverageRatio - 4) * 2)) : Math.round(coverageRatio * 12.5);
+    const velocityScore = avgAgeDays <= 45 ? 25 : Math.max(0, 25 - Math.round((avgAgeDays - 45) * 0.5));
+    const healthScore = Math.min(100, winRateScore + freshnessScore + coverageScore + velocityScore);
+
+    // Compute true stage-to-stage transition conversion rates
+    const stageRows = conversionResult.rows as any[];
+    const stageConversions = stageRows.map((s, i) => {
+      const entered = Number(s.deals_entered || 0);
+      const prev = i > 0 ? Number(stageRows[i - 1].deals_entered || 0) : null;
+      const conversionRate = prev !== null && prev > 0 ? Math.round((entered / prev) * 100) : null;
+      return {
+        stageId: s.stage_id,
+        stageName: s.stage_name,
+        sortOrder: Number(s.sort_order || 0),
+        dealsEntered: entered,
+        avgDurationSeconds: Number(s.avg_duration_seconds || 0),
+        conversionRate, // null for first stage
+      };
+    });
+
+    // Compute avg deal size by stage from DB (all open deals)
+    const dealSizeByStage = (dealSizeResult.rows as any[]).map((r: any) => ({
+      stage: r.stage,
+      avgDealSize: Number(r.avg_deal_size || 0),
+      dealCount: Number(r.deal_count || 0),
+    }));
+
+    res.json({
+      velocity: {
+        stages: velocityResult.rows,
+        generatedAt: new Date().toISOString(),
+      },
+      conversion: {
+        stageConversions,
+        generatedAt: new Date().toISOString(),
+      },
+      winLoss: {
+        won: { count: Number((won as any).count), totalValue: Number((won as any).total_value), avgDealSize: Number((won as any).avg_deal_size) },
+        lost: { count: Number((lost as any).count), totalValue: Number((lost as any).total_value), avgDealSize: Number((lost as any).avg_deal_size) },
+        winRate: Math.round(winRate * 10) / 10,
+        generatedAt: new Date().toISOString(),
+      },
+      dealSizeByStage,
+      health: {
+        score: healthScore,
+        summary: { openDeals, wonDeals, lostDeals, pipelineValue, wonValue, avgAgeDays: Math.round(avgAgeDays), staleCount },
+        generatedAt: new Date().toISOString(),
+      },
+      leaderboard: leaderboardResult.rows,
+      generatedAt: new Date().toISOString(),
+    });
+  } catch (error: any) {
+    console.error("Consolidated pipeline analytics error:", error);
+    res.json({
+      velocity: { stages: [], generatedAt: new Date().toISOString(), _fallback: true },
+      conversion: { stages: [], generatedAt: new Date().toISOString(), _fallback: true },
+      winLoss: { won: { count: 0, totalValue: 0, avgDealSize: 0 }, lost: { count: 0, totalValue: 0, avgDealSize: 0 }, winRate: 0, generatedAt: new Date().toISOString(), _fallback: true },
+      dealSizeByStage: [],
+      health: { score: 0, summary: { openDeals: 0, wonDeals: 0, lostDeals: 0, pipelineValue: 0, wonValue: 0, avgAgeDays: 0, staleCount: 0 }, generatedAt: new Date().toISOString(), _fallback: true },
+      leaderboard: [],
       generatedAt: new Date().toISOString(),
       _fallback: true,
     });
