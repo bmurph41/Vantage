@@ -14,6 +14,9 @@ import { SUBSCRIPTION_TIERS } from "../services/billing-service";
  */
 export function requireFeature(feature: string) {
   return async (req: Request, res: Response, next: NextFunction) => {
+    if (!req.originalUrl.startsWith('/api/')) {
+      return next();
+    }
     try {
       const user = (req as any).user;
       if (!user?.orgId) {
@@ -80,6 +83,9 @@ type LimitType = "deals" | "seats" | "ai_queries" | "storage";
  */
 export function checkUsageLimit(limitType: LimitType) {
   return async (req: Request, res: Response, next: NextFunction) => {
+    if (!req.originalUrl.startsWith('/api/')) {
+      return next();
+    }
     try {
       const user = (req as any).user;
       if (!user?.orgId) {

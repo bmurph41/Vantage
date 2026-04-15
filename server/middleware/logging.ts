@@ -28,26 +28,28 @@ export function requestIdMiddleware(req: Request, res: Response, next: NextFunct
 export function requestLoggingMiddleware(req: Request, res: Response, next: NextFunction) {
   const start = Date.now();
   
-  if (req.path.startsWith('/api')) {
-    const userId = (req as any).user?.id;
-    const tenantId = (req as any).user?.orgId;
-    
-    req.log.info({
-      type: 'request_start',
-      method: req.method,
-      url: req.originalUrl,
-      path: req.path,
-      userId,
-      tenantId,
-      userAgent: req.get('User-Agent'),
-      ip: req.ip || req.socket.remoteAddress,
-    });
+  if (!req.path.startsWith('/api/')) {
+    return next();
   }
+  
+  const userId = (req as any).user?.id;
+  const tenantId = (req as any).user?.orgId;
+  
+  req.log.info({
+    type: 'request_start',
+    method: req.method,
+    url: req.originalUrl,
+    path: req.path,
+    userId,
+    tenantId,
+    userAgent: req.get('User-Agent'),
+    ip: req.ip || req.socket.remoteAddress,
+  });
   
   res.on('finish', () => {
     const duration = Date.now() - start;
     
-    if (req.path.startsWith('/api')) {
+    {
       const logData = {
         type: 'request_complete',
         method: req.method,

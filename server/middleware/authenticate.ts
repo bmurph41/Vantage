@@ -16,7 +16,9 @@ const PUBLIC_PATHS = ['/api/auth/', '/api/health', '/api/stripe/webhook', '/api/
 
 export async function authenticateUser(req: Request, res: Response, next: NextFunction) {
   // Only protect API routes
-  if (!req.path.startsWith('/api/')) return next();
+  if (!req.path.startsWith('/api/')) {
+    return next();
+  }
 
   // Skip authentication for public routes
   if (PUBLIC_PATHS.some(p => req.path.startsWith(p))) return next();

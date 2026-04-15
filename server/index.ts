@@ -388,6 +388,7 @@ app.use(healthRoutes);
 // Clients should migrate to /api/v1/*
 app.use('/api', deprecationWarning('2027-06-01'));
 
+
 (async () => {
   try {
     const server = await registerRoutes(app);
@@ -411,9 +412,6 @@ app.use(ddChecklistRouter);
 
     app.use(centralizedErrorHandler);
 
-    // importantly only setup vite in development and after
-    // setting up all the other routes so the catch-all route
-    // doesn't interfere with the other routes
     if (app.get("env") === "development") {
       await setupVite(app, server);
     } else {

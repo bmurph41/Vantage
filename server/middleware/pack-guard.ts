@@ -19,6 +19,9 @@ declare global {
  */
 export function requirePack(...requiredPacks: PackType[]) {
   return async (req: Request, res: Response, next: NextFunction) => {
+    if (!req.originalUrl.startsWith('/api/')) {
+      return next();
+    }
     try {
       const user = (req as any).user;
       if (!user?.orgId) {
@@ -95,6 +98,9 @@ export function requireAnalyticsPro() {
  */
 export function requireRentRoll() {
   return async (req: Request, res: Response, next: NextFunction) => {
+    if (!req.originalUrl.startsWith('/api/')) {
+      return next();
+    }
     try {
       const user = (req as any).user;
       if (!user?.orgId) {
