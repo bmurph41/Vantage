@@ -41,6 +41,8 @@ const ALLOWED_MARINA_DOMAINS = [
   'sunbeltnetwork.com',
   'bizbuysell.com',
   'businessbroker.net',
+  'bizquest.com',
+  'franchisegator.com',
 ];
 
 const PRIVATE_IP_RANGES = [
