@@ -20,6 +20,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import ComparisonToggle from "@/components/comparison/ComparisonToggle";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
@@ -101,9 +102,12 @@ function DealCard({ deal, onClick }: DealCardProps) {
       >
         <CardContent className="p-4">
           <div className="space-y-3">
-            <h4 className="font-semibold text-sm text-gray-900 line-clamp-2">
-              {deal.title}
-            </h4>
+            <div className="flex items-start justify-between gap-2">
+              <h4 className="font-semibold text-sm text-gray-900 line-clamp-2 flex-1">
+                {deal.title}
+              </h4>
+              <ComparisonToggle dealId={deal.id} dealTitle={deal.title} />
+            </div>
 
             <div className="flex items-center space-x-1">
               <DollarSign className="h-4 w-4 text-green-600" />

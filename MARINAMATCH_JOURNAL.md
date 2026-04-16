@@ -1,6 +1,91 @@
 # MarinaMatch Platform Journal
 
-## Current State (2026-04-15)
+## Current State (2026-04-16)
+
+### ✅ COMPLETE — Deal Comparison in Workspace — Unification (2026-04-16)
+
+Unified three disconnected deal-comparison surfaces onto a single canonical
+page (`client/src/pages/deal-comparison-page.tsx`) and added a persistent
+global comparison cart so users can build a comparison from anywhere in the
+deal workspace.
+
+**Finding during discovery:** Three comparison pages already existed with
+different philosophies and none of them called the rich backend endpoint at
+`POST /api/crm/pipeline-enhancements/compare` (which returns 7 structured
+categories + rankings). Selection was only possible for deals with a linked
+modeling project via a popover in `deal-workspace.tsx`. State was local,
+lost on navigation.
+
+**Scope decision (confirmed with user):** unify on
+`deal-comparison-page.tsx` as the canonical view. Leave
+`client/src/components/crm/DealComparison.tsx` (weighted scoring + radar)
+and `client/src/pages/modeling/projects/workspace/deal-comparison.tsx` (full
+model compare) untouched in this pass; link to them from the main page in a
+future session.
+
+**Files**
+- `client/src/stores/comparison-cart-store.ts` NEW — Zustand store with
+  `persist` middleware (localStorage key `mm:comparison-cart`). Max 5 (matches
+  backend `/compare` endpoint cap). API: `toggle()`, `remove()`, `clear()`,
+  `has()`, plus `useIsInComparisonCart(id)` selector hook.
+- `client/src/components/comparison/ComparisonToggle.tsx` NEW — small
+  per-card checkbox button (Scale icon off-state, Check icon on-state).
+  Stops propagation so it doesn't trigger the card's onClick. Toasts when
+  the cart is full.
+- `client/src/components/comparison/ComparisonCartBar.tsx` NEW — floating
+  bottom bar with framer-motion slide-up entrance. Shows per-deal chips
+  (truncated title + remove button), Clear, and a primary "Compare →"
+  button that navigates to `/crm/deals/compare?ids=...`. Only the
+  Compare button is enabled when >= 2 deals selected.
+- `client/src/components/deals/DealKanbanBoard.tsx` — added
+  ComparisonToggle beside the priority badge on each deal card
+- `client/src/components/deal-workspace/PipelineView.tsx` — same, on the
+  secondary kanban card
+- `client/src/pages/deal-workspace.tsx` — mounted `<ComparisonCartBar />`
+  at root so it's visible across all workspace views (pipeline, list,
+  leads, activity, tasks)
+- `client/src/pages/deal-comparison-page.tsx` — extended:
+  - Hydrates `selectedDealIds` from cart on mount when `?ids=` URL param
+    is absent (only on mount; subsequent refinement is user-controlled)
+  - Max bumped from 4 → 5 (uses `MAX_COMPARISON_DEALS` constant)
+  - New `NewSignalsSection` component below the main metrics grid with
+    two sub-sections:
+    - **DD Timelines row** — per-deal compact DD bar using `DDSegmentRow`
+      with a local 420px coordinate system, fetches
+      `/api/crm/deals/:id/extensions` via `useQueries`. Deals without a
+      signed PSA get a "No DD period yet" placeholder.
+    - **Broker Feedback row** — per-deal verdicts from
+      `/api/broker-feedback/modeling-project/:id`, but only for deals
+      with a linked modeling project. Rendered as a table with brokers
+      as rows and deals as columns. Verdict chips match the broker
+      feedback panel visual language (pursue/watch/pass pills with
+      score). Gracefully degrades to an italic "follow brokers" prompt
+      when no feedback exists.
+  - Empty-state copy updated to point users at the new Scale icons on
+    kanban cards
+
+**Validation**
+- `tsc --noEmit` clean on all touched files (7 files)
+- No backend changes — pure frontend wiring on top of existing endpoints
+  (`POST /compare`, `GET /extensions`, `GET /broker-feedback`)
+
+**Known follow-ups**
+- The main comparison metrics table still fetches deals individually via
+  `GET /api/deals/:id` instead of the `POST /compare` endpoint — swapping
+  would consolidate rankings (value/probability/daysInStage) but would
+  also drop the asset-class-aware field unioning the existing code does
+  well. Reserved for a future pass.
+- Deal list view (`ListView`) rows don't yet have a ComparisonToggle —
+  toggle is only on kanban cards. Follow-up.
+- Broker feedback row can't show feedback for deals without a linked
+  modeling project. To fully support this would require extending the
+  evaluator service with a `loadDealTarget()` path — deferred.
+- The legacy `DealComparison.tsx` (weighted scoring + radar) and
+  `modeling/projects/workspace/deal-comparison.tsx` (full model compare)
+  are still accessible via their own routes but not linked from the
+  canonical page yet.
+
+---
 
 ### ✅ COMPLETE — Deal Timeline Gantt: A+B+C + Deposits Lane (2026-04-15, late evening)
 

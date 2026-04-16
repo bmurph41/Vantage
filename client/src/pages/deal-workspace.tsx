@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import ComparisonCartBar from "@/components/comparison/ComparisonCartBar";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -453,6 +454,9 @@ export default function DealWorkspace() {
       {/* ── Modals ── */}
       <DealFormModal open={isDealFormOpen} onOpenChange={setIsDealFormOpen} deal={editingDeal} />
       <LeadFormModal open={isLeadFormOpen} onOpenChange={setIsLeadFormOpen} lead={null} />
+
+      {/* ── Floating comparison cart ── */}
+      <ComparisonCartBar />
     </div>
   );
 }

@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { DollarSign, Calendar, AlertTriangle, Clock } from 'lucide-react';
 import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
+import ComparisonToggle from '@/components/comparison/ComparisonToggle';
 import type { Deal, Contact, Company, PipelineStage } from '@shared/schema';
 import { format, differenceInDays } from 'date-fns';
 import { formatCurrency } from '@/lib/utils';
@@ -37,14 +38,17 @@ function DealCard({ deal, onDealClick }: { deal: DealWithRelations; onDealClick:
           <h4 className="text-sm font-medium text-gray-900 line-clamp-2 flex-1">
             {deal.title}
           </h4>
-          {deal.priority && (
-            <Badge 
-              variant={deal.priority === 'high' || deal.priority === 'critical' ? 'destructive' : deal.priority === 'medium' ? 'default' : 'secondary'}
-              className="text-xs px-1.5 py-0.5 shrink-0"
-            >
-              {deal.priority}
-            </Badge>
-          )}
+          <div className="flex items-center gap-1 shrink-0">
+            {deal.priority && (
+              <Badge
+                variant={deal.priority === 'high' || deal.priority === 'critical' ? 'destructive' : deal.priority === 'medium' ? 'default' : 'secondary'}
+                className="text-xs px-1.5 py-0.5"
+              >
+                {deal.priority}
+              </Badge>
+            )}
+            <ComparisonToggle dealId={deal.id} dealTitle={deal.title} />
+          </div>
         </div>
 
         {deal.company && (

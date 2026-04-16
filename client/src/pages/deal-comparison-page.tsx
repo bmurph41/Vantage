@@ -13,16 +13,20 @@
  */
 
 import { useState, useMemo, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueries } from "@tanstack/react-query";
 import { useLocation, useSearch } from "wouter";
 import {
-  BarChart3, Plus, X, ArrowLeft, Copy, Check, ExternalLink,
+  BarChart3, Plus, X, ArrowLeft, Copy, Check, ExternalLink, Scale,
+  TrendingUp, Eye, Ban, Clock as ClockIcon,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useComparisonCart, MAX_COMPARISON_DEALS } from "@/stores/comparison-cart-store";
+import DDSegmentRow, { type DDExtensionInput } from "@/components/deals/dd-segment-row";
+import type { BrokerFeedbackResponse } from "@/hooks/use-broker-feedback";
 import {
   Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList,
 } from "@/components/ui/command";
@@ -83,14 +87,22 @@ export default function DealComparisonPage() {
   const [selectedDealIds, setSelectedDealIds] = useState<string[]>([]);
   const [addDealOpen, setAddDealOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const cartDeals = useComparisonCart((s) => s.deals);
+  const cartClear = useComparisonCart((s) => s.clear);
 
-  // Parse IDs from URL
+  // Parse IDs from URL; fall back to comparison cart if URL is empty
   useEffect(() => {
     const params = new URLSearchParams(searchString);
     const ids = params.get("ids");
     if (ids) {
       setSelectedDealIds(ids.split(",").filter(Boolean));
+    } else if (cartDeals.length > 0) {
+      setSelectedDealIds(cartDeals.map((d) => d.id));
     }
+    // Only hydrate on mount / when URL changes — intentionally NOT reacting
+    // to cart changes afterward so the user can refine their selection on
+    // the comparison page without it being overwritten.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchString]);
 
   // Fetch all deals for the selector
@@ -127,8 +139,12 @@ export default function DealComparisonPage() {
   }, [selectedDealIds]);
 
   const addDeal = (id: string) => {
-    if (selectedDealIds.length >= 4) {
-      toast({ title: "Maximum 4 deals", description: "Remove one before adding another.", variant: "destructive" });
+    if (selectedDealIds.length >= MAX_COMPARISON_DEALS) {
+      toast({
+        title: `Maximum ${MAX_COMPARISON_DEALS} deals`,
+        description: "Remove one before adding another.",
+        variant: "destructive",
+      });
       return;
     }
     if (!selectedDealIds.includes(id)) {
@@ -202,7 +218,7 @@ export default function DealComparisonPage() {
           <DealColumnHeader key={deal.id} deal={deal} index={i} onRemove={() => removeDeal(String(deal.id))} />
         ))}
 
-        {selectedDealIds.length < 4 && (
+        {selectedDealIds.length < MAX_COMPARISON_DEALS && (
           <AddDealCard
             open={addDealOpen}
             onOpenChange={setAddDealOpen}
@@ -215,12 +231,19 @@ export default function DealComparisonPage() {
           <div className="flex-1 flex items-center justify-center border-2 border-dashed rounded-lg p-8 text-center">
             <div>
               <BarChart3 className="h-10 w-10 text-muted-foreground/30 mx-auto mb-3" />
-              <p className="text-sm text-muted-foreground">Select 2–4 deals to compare</p>
-              <p className="text-xs text-muted-foreground/60 mt-1">Click "Add Deal" to start</p>
+              <p className="text-sm text-muted-foreground">Select 2–{MAX_COMPARISON_DEALS} deals to compare</p>
+              <p className="text-xs text-muted-foreground/60 mt-1">
+                Use the Scale icon on any kanban card, then click Compare in the floating bar.
+              </p>
             </div>
           </div>
         )}
       </div>
+
+      {/* New signal rows — broker feedback + DD timelines */}
+      {comparisonDeals.length >= 2 && (
+        <NewSignalsSection deals={comparisonDeals} />
+      )}
 
       {/* Comparison Grid */}
       {comparisonDeals.length >= 2 && (
@@ -294,6 +317,220 @@ export default function DealComparisonPage() {
         </div>
       )}
     </div>
+  );
+}
+
+// ─── New Signals Section — broker feedback + DD timelines ────────
+//
+// Rendered below the main comparison grid. Fetches per-deal signals in
+// parallel:
+//   - /api/crm/deals/:id/extensions      → DD mini-bar via DDSegmentRow
+//   - /api/broker-feedback/modeling-project/:id → broker verdicts (only for
+//       deals that have a linked modeling project; else shows N/A chip)
+
+function NewSignalsSection({ deals }: { deals: Deal[] }) {
+  return (
+    <div className="space-y-4">
+      <DDTimelineCompareRow deals={deals} />
+      <BrokerFeedbackCompareRow deals={deals} />
+    </div>
+  );
+}
+
+function DDTimelineCompareRow({ deals }: { deals: Deal[] }) {
+  const extQueries = useQueries({
+    queries: deals.map((d) => ({
+      queryKey: ["/api/crm/deals", String(d.id), "extensions"],
+      queryFn: async (): Promise<DDExtensionInput[]> => {
+        const res = await fetch(`/api/crm/deals/${d.id}/extensions`, { credentials: "include" });
+        if (!res.ok) return [];
+        return res.json();
+      },
+      staleTime: 60_000,
+    })),
+  });
+
+  return (
+    <Card>
+      <CardHeader className="py-3 px-4 bg-muted/30">
+        <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+          <ClockIcon className="h-3 w-3" /> Due Diligence Timelines
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="p-4 space-y-3">
+        {deals.map((deal, i) => {
+          const d: any = deal;
+          const psa = d.psaSignedDate;
+          const ddDays = d.ddPeriodDays;
+          const extensions = extQueries[i]?.data || [];
+          return (
+            <div key={deal.id} className="flex items-center gap-3">
+              <div className="w-[180px] flex-shrink-0">
+                <p className="text-xs font-semibold text-slate-700 truncate">
+                  {d.name || d.title || `Deal ${i + 1}`}
+                </p>
+                <p className="text-[10px] text-muted-foreground">
+                  {psa && ddDays
+                    ? `${ddDays}d DD${extensions.filter((e) => e.executed).length > 0 ? ` + ${extensions.filter((e) => e.executed).length} ext` : ""}`
+                    : "PSA not signed"}
+                </p>
+              </div>
+              {psa && ddDays ? (
+                <CompactDDBar
+                  psaSignedDate={psa}
+                  ddPeriodDays={ddDays}
+                  extensions={extensions}
+                />
+              ) : (
+                <div className="flex-1 h-8 rounded-md border border-dashed border-slate-200 flex items-center px-3 text-[10px] text-slate-400 italic">
+                  No DD period yet
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </CardContent>
+    </Card>
+  );
+}
+
+function CompactDDBar({
+  psaSignedDate,
+  ddPeriodDays,
+  extensions,
+}: {
+  psaSignedDate: string;
+  ddPeriodDays: number;
+  extensions: DDExtensionInput[];
+}) {
+  // Build a local coordinate system: psa → psa + ddPeriodDays + total extensions + 15% pad
+  const MS = 86_400_000;
+  const totalExtDays = extensions.reduce((n, e) => n + (e.days || 0), 0);
+  const totalDays = Math.max(1, Math.round((ddPeriodDays + totalExtDays) * 1.15));
+  const width = 420; // fixed pixel width for the mini bar
+  const psa = new Date(psaSignedDate);
+  const end = new Date(psa.getTime() + totalDays * MS);
+  const getXPx = (d: Date) => {
+    const t = d.getTime();
+    const a = psa.getTime();
+    const b = end.getTime();
+    return ((t - a) / (b - a)) * width;
+  };
+  return (
+    <div className="relative flex-1 h-8" style={{ maxWidth: `${width}px` }}>
+      <div className="absolute left-0 right-0 top-1/2 h-[2px] bg-slate-200 rounded-full -translate-y-1/2" />
+      <DDSegmentRow
+        psaSignedDate={psaSignedDate}
+        ddPeriodDays={ddPeriodDays}
+        extensions={extensions}
+        getXPx={getXPx}
+        baseDelay={0}
+      />
+    </div>
+  );
+}
+
+function BrokerFeedbackCompareRow({ deals }: { deals: Deal[] }) {
+  const feedbackQueries = useQueries({
+    queries: deals.map((d) => {
+      const mpId = (d as any).modelingProjectId || (d as any).modeling_project_id;
+      return {
+        queryKey: ["/api/broker-feedback/modeling-project", String(mpId ?? `none-${d.id}`)],
+        queryFn: async (): Promise<BrokerFeedbackResponse | null> => {
+          if (!mpId) return null;
+          const res = await fetch(`/api/broker-feedback/modeling-project/${mpId}`, {
+            credentials: "include",
+          });
+          if (!res.ok) return null;
+          return res.json();
+        },
+        enabled: !!mpId,
+        staleTime: 5 * 60_000,
+        retry: false,
+      };
+    }),
+  });
+
+  // Derive the set of brokers a user follows across any of the deals (should
+  // be a stable set, but we union to be safe).
+  const brokerMap = new Map<string, { label: string }>();
+  feedbackQueries.forEach((q) => {
+    q.data?.feedback.forEach((f) => {
+      if (!brokerMap.has(f.brokerProfileId)) {
+        brokerMap.set(f.brokerProfileId, { label: `Broker ${f.brokerProfileId.slice(0, 6)}` });
+      }
+    });
+  });
+  const brokerList = Array.from(brokerMap.entries());
+
+  const hasAnyFeedback = feedbackQueries.some((q) => q.data && q.data.feedback.length > 0);
+
+  return (
+    <Card>
+      <CardHeader className="py-3 px-4 bg-muted/30">
+        <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+          <Scale className="h-3 w-3" /> Broker Feedback
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="p-4">
+        {!hasAnyFeedback ? (
+          <p className="text-xs text-muted-foreground italic">
+            Broker feedback is available for deals with a linked modeling project.
+            Follow brokers from the <a href="/brokers" className="underline">directory</a> to see their verdicts here.
+          </p>
+        ) : (
+          <table className="w-full">
+            <thead>
+              <tr className="border-b">
+                <th className="py-2 px-2 text-left text-[10px] font-medium text-muted-foreground uppercase tracking-wider w-[160px]">
+                  Broker
+                </th>
+                {deals.map((d, i) => (
+                  <th key={d.id} className="py-2 px-2 text-center text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+                    {(d as any).name || (d as any).title || `Deal ${i + 1}`}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {brokerList.map(([brokerId, meta]) => (
+                <tr key={brokerId} className="border-t">
+                  <td className="py-2 px-2 text-xs text-muted-foreground font-medium truncate">
+                    {meta.label}
+                  </td>
+                  {deals.map((d, di) => {
+                    const q = feedbackQueries[di];
+                    const entry = q.data?.feedback.find((f) => f.brokerProfileId === brokerId);
+                    if (!entry) {
+                      return (
+                        <td key={d.id} className="py-2 px-2 text-center text-[10px] text-muted-foreground">
+                          —
+                        </td>
+                      );
+                    }
+                    const vs =
+                      entry.verdict === "pursue"
+                        ? { Icon: TrendingUp, text: "Pursue", cls: "text-emerald-700 bg-emerald-50 border-emerald-200" }
+                        : entry.verdict === "watch"
+                          ? { Icon: Eye, text: "Watch", cls: "text-amber-700 bg-amber-50 border-amber-200" }
+                          : { Icon: Ban, text: "Pass", cls: "text-slate-600 bg-slate-50 border-slate-200" };
+                    return (
+                      <td key={d.id} className="py-2 px-2 text-center">
+                        <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full border ${vs.cls}`}>
+                          <vs.Icon className="h-2.5 w-2.5" />
+                          {vs.text}
+                          <span className="font-mono opacity-60 ml-0.5">{entry.score}</span>
+                        </span>
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
