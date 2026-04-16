@@ -23,8 +23,8 @@ export function requireFeature(feature: string) {
         return next();
       }
 
-      // Dev bypass: if no subscription exists and running in development, allow access
-      if (process.env.NODE_ENV === "development") {
+      // Demo bypass: if no subscription exists and running in demo/dev mode, allow access
+      if (process.env.ALLOW_DEMO_AUTH === "true") {
         const [sub] = await db.select().from(billingSubscriptions).where(eq(billingSubscriptions.orgId, user.orgId));
         if (!sub) return next();
       }
@@ -92,8 +92,8 @@ export function checkUsageLimit(limitType: LimitType) {
         return next();
       }
 
-      // Dev bypass
-      if (process.env.NODE_ENV === "development") {
+      // Demo bypass
+      if (process.env.ALLOW_DEMO_AUTH === "true") {
         const [sub] = await db.select().from(billingSubscriptions).where(eq(billingSubscriptions.orgId, user.orgId));
         if (!sub) return next();
       }

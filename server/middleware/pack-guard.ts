@@ -31,8 +31,8 @@ export function requirePack(...requiredPacks: PackType[]) {
       const activePacks = await packService.getActivePacks(user.orgId);
       req.activePacks = activePacks;
 
-      // In development, bypass pack checks when org has no packs configured yet
-      if (process.env.NODE_ENV === "development" && activePacks.length === 0) {
+      // Demo bypass: when running in demo mode and no packs configured, allow access
+      if (process.env.ALLOW_DEMO_AUTH === "true" && activePacks.length === 0) {
         return next();
       }
 
@@ -109,6 +109,11 @@ export function requireRentRoll() {
 
       const activePacks = await packService.getActivePacks(user.orgId);
       req.activePacks = activePacks;
+
+      // Demo bypass: allow access when no packs configured in demo mode
+      if (process.env.ALLOW_DEMO_AUTH === "true" && activePacks.length === 0) {
+        return next();
+      }
 
       // Operations pack includes Rent Roll access as a bundled feature
       const rentRollPacks: PackType[] = ["owner", "investor", "broker", "operations"];
