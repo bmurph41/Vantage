@@ -158,6 +158,7 @@ import retailOfficeOpsRoutes from "./routes/retail-office-ops-routes";
 import searchRoutes from "./routes/search-routes";
 import bulkEmailRoutes from "./routes/bulk-email-routes";
 import campaignScheduleRoutes from "./routes/campaign-schedule-routes";
+import campaignExecutionRoutes from "./routes/campaign-execution-routes";
 import camReconciliationRoutes from "./routes/cam-reconciliation-routes";
 import pipelineAutomationRoutes from "./routes/pipeline-automation-routes";
 import brokerSubscriptionsRoutes from "./routes/broker-subscriptions-routes";
@@ -682,6 +683,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api", authenticateUser, dealDDRoutes);
   app.use("/api/dd-review", authenticateUser, enforceTenant, ddReviewRouter);
   app.use("/api/prospecting", authenticateUser, requireProspecting());
+  app.use("/api/prospecting", authenticateUser, campaignExecutionRoutes);
   app.use("/api/sla", getSlaRouter());
   registerCommentRoutes(app);
   app.use("/api/email-marketing", authenticateUser, emailMarketingRoutes);

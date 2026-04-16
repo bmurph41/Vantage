@@ -4719,6 +4719,7 @@ export const outreachCampaigns = pgTable("outreach_campaigns", {
   orgId: varchar("org_id").notNull().references(() => organizations.id),
   name: text("name").notNull(),
   type: outreachCampaignTypeEnum("type").notNull().default("email"), // email, call, mixed
+  campaignType: text("campaign_type").notNull().default("outreach"), // 'outreach' | 'marketing'
   status: outreachCampaignStatusEnum("status").notNull().default("draft"), // draft, active, paused, completed, archived
   description: text("description"),
   // Target criteria (stored as JSON for flexibility)
@@ -4755,6 +4756,45 @@ export const outreachTemplates = pgTable("outreach_templates", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
+
+// Outreach Campaign Steps - Sequence of steps in a campaign
+export const outreachCampaignSteps = pgTable("outreach_campaign_steps", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  campaignId: varchar("campaign_id").notNull().references(() => outreachCampaigns.id, { onDelete: 'cascade' }),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  stepNumber: integer("step_number").notNull(), // 1-based ordering
+  type: text("type").notNull().default("email"), // 'email' | 'call' | 'wait'
+  delayDays: integer("delay_days").notNull().default(0), // days after previous step
+  templateId: varchar("template_id").references(() => outreachTemplates.id),
+  subject: text("subject"), // override or standalone subject
+  body: text("body"), // override or standalone body
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  campaignStepsIdx: index("outreach_campaign_steps_campaign_idx").on(table.campaignId),
+}));
+
+// Outreach Campaign Enrollments - Contact enrolled in a campaign
+export const outreachCampaignEnrollments = pgTable("outreach_campaign_enrollments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  campaignId: varchar("campaign_id").notNull().references(() => outreachCampaigns.id, { onDelete: 'cascade' }),
+  contactId: varchar("contact_id").notNull().references(() => crmContacts.id),
+  propertyId: varchar("property_id").references(() => crmProperties.id),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  status: text("status").notNull().default("active"), // 'active' | 'paused' | 'completed' | 'replied' | 'opted_out'
+  currentStep: integer("current_step").notNull().default(1),
+  startedAt: timestamp("started_at").defaultNow().notNull(),
+  nextStepAt: timestamp("next_step_at"), // when to execute the next step
+  completedAt: timestamp("completed_at"),
+  enrolledBy: varchar("enrolled_by").references(() => users.id),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  campaignEnrollIdx: index("outreach_campaign_enrollments_campaign_idx").on(table.campaignId),
+  contactEnrollIdx: index("outreach_campaign_enrollments_contact_idx").on(table.contactId),
+  activeEnrollIdx: index("outreach_campaign_enrollments_active_idx").on(table.status, table.nextStepAt),
+}));
 
 // Market Targets - Geographic/segment targets for prospecting
 export const marketTargets = pgTable("market_targets", {
@@ -7031,6 +7071,24 @@ export const insertOutreachTemplateSchema = createInsertSchema(outreachTemplates
 });
 export type InsertOutreachTemplate = z.infer<typeof insertOutreachTemplateSchema>;
 export type OutreachTemplate = typeof outreachTemplates.$inferSelect;
+
+// Outreach Campaign Steps schema
+export const insertOutreachCampaignStepSchema = createInsertSchema(outreachCampaignSteps).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertOutreachCampaignStep = z.infer<typeof insertOutreachCampaignStepSchema>;
+export type OutreachCampaignStep = typeof outreachCampaignSteps.$inferSelect;
+
+// Outreach Campaign Enrollments schema
+export const insertOutreachCampaignEnrollmentSchema = createInsertSchema(outreachCampaignEnrollments).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertOutreachCampaignEnrollment = z.infer<typeof insertOutreachCampaignEnrollmentSchema>;
+export type OutreachCampaignEnrollment = typeof outreachCampaignEnrollments.$inferSelect;
 
 // Market Targets schema
 export const insertMarketTargetSchema = createInsertSchema(marketTargets).omit({

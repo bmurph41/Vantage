@@ -522,6 +522,11 @@ server.listen({
         .then(() => console.log('[AssetClass] Canonical asset classes ready'))
         .catch((error) => console.error(`[AssetClass] Startup failed:`, error));
 
+      // Start campaign execution scheduler
+      import('./services/campaignExecutionService')
+        .then(({ startCampaignExecutionScheduler }) => startCampaignExecutionScheduler())
+        .catch((err) => console.error('[campaignExecution] Failed to start scheduler:', err));
+
     });
   } catch (error) {
     console.error('Fatal error during server initialization:', error);

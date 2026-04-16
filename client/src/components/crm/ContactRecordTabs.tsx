@@ -377,3 +377,93 @@ export function ContactCommissionHistoryTab({ contactId }: { contactId: string }
     </div>
   );
 }
+
+// ── Prospecting History Tab ───────────────────────────────────────────
+const activityTypeIcons: Record<string, any> = {
+  email: Mail,
+  call: Phone,
+  linkedin: MessageSquare,
+  text: MessageSquare,
+  note: FileText,
+  meeting: Calendar,
+};
+
+const activityTypeColors: Record<string, string> = {
+  email: 'bg-blue-100 text-blue-700',
+  call: 'bg-green-100 text-green-700',
+  linkedin: 'bg-indigo-100 text-indigo-700',
+  text: 'bg-purple-100 text-purple-700',
+  note: 'bg-gray-100 text-gray-700',
+  meeting: 'bg-amber-100 text-amber-700',
+};
+
+export function ContactProspectingHistoryTab({ contactId }: { contactId: string }) {
+  const { data, isLoading } = useQuery<any>({
+    queryKey: ['/api/prospecting/activities', contactId],
+    queryFn: () =>
+      fetch(`/api/prospecting/activities?contactId=${contactId}`, { credentials: 'include' }).then(r => r.json()),
+    enabled: !!contactId,
+  });
+
+  const activities: any[] = Array.isArray(data) ? data : (data?.data ?? []);
+
+  if (isLoading) {
+    return (
+      <div className="space-y-3">
+        {[1, 2, 3].map(i => <Skeleton key={i} className="h-16 w-full rounded-xl" />)}
+      </div>
+    );
+  }
+
+  if (!activities.length) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-center">
+        <Target className="h-10 w-10 text-gray-300 mb-3" />
+        <p className="text-sm font-medium text-gray-500">No prospecting history</p>
+        <p className="text-xs text-gray-400 mt-1">Activities logged via prospecting campaigns will appear here</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {activities.map((act: any) => {
+        const Icon = activityTypeIcons[act.type] ?? Activity;
+        const colorCls = activityTypeColors[act.type] ?? 'bg-gray-100 text-gray-700';
+        const date = act.completedAt ?? act.scheduledAt ?? act.createdAt;
+        return (
+          <Card key={act.id} className="hover:shadow-sm transition-shadow">
+            <CardContent className="p-4">
+              <div className="flex items-start gap-3">
+                <div className={`p-2 rounded-lg ${colorCls} shrink-0`}>
+                  <Icon className="h-4 w-4" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-sm font-semibold text-gray-900">{act.subject || act.type}</span>
+                    {act.status && (
+                      <Badge variant="outline" className="text-[10px]">
+                        {act.status}
+                      </Badge>
+                    )}
+                    {act.direction && (
+                      <Badge variant="secondary" className="text-[10px]">
+                        {act.direction}
+                      </Badge>
+                    )}
+                  </div>
+                  {act.description && (
+                    <p className="text-xs text-gray-500 mt-1 line-clamp-2">{act.description}</p>
+                  )}
+                  <p className="text-xs text-gray-400 mt-1">
+                    {date ? format(new Date(date), 'MMM d, yyyy h:mm a') : 'No date'}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })}
+    </div>
+  );
+}

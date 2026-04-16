@@ -28,6 +28,7 @@ import {
   ContactActivitiesTab,
   ContactDealsTabEnhanced,
   ContactCommissionHistoryTab,
+  ContactProspectingHistoryTab,
 } from '@/components/crm/ContactRecordTabs';
 import { ContactTimeline } from '@/components/crm/ContactTimeline';
 import { RelationshipMap } from '@/components/crm/RelationshipMap';
@@ -323,6 +324,11 @@ export default function ContactRecordPage() {
           value: 'models',
           label: 'Models',
           content: <ContactModelsTab dealIds={contact.deals?.map((d: any) => d.id)} />,
+        },
+        {
+          value: 'prospecting',
+          label: 'Prospecting',
+          content: <ContactProspectingHistoryTab contactId={id} />,
         },
         {
           value: 'intel',

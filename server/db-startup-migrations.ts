@@ -205,12 +205,71 @@ const MIGRATIONS: Migration[] = [
     `,
   },
   {
+    name: "outreach_campaigns: add campaign_type column",
+    sql: `ALTER TABLE outreach_campaigns ADD COLUMN IF NOT EXISTS campaign_type text NOT NULL DEFAULT 'outreach'`,
+  },
+  {
+    name: "outreach_campaign_steps: create table",
+    sql: `
+      CREATE TABLE IF NOT EXISTS outreach_campaign_steps (
+        id text PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        campaign_id text NOT NULL REFERENCES outreach_campaigns(id) ON DELETE CASCADE,
+        org_id text NOT NULL REFERENCES organizations(id),
+        step_number integer NOT NULL,
+        type text NOT NULL DEFAULT 'email',
+        delay_days integer NOT NULL DEFAULT 0,
+        template_id text REFERENCES outreach_templates(id),
+        subject text,
+        body text,
+        created_at timestamp DEFAULT NOW(),
+        updated_at timestamp DEFAULT NOW()
+      )
+    `,
+  },
+  {
     name: "deal_commissions: index on deal_id",
     sql: `CREATE INDEX IF NOT EXISTS deal_commissions_deal_idx ON deal_commissions(deal_id)`,
   },
   {
     name: "deal_commissions: index on contact_id",
     sql: `CREATE INDEX IF NOT EXISTS deal_commissions_contact_idx ON deal_commissions(contact_id)`,
+  },
+  {
+    name: "outreach_campaign_steps: create campaign_idx",
+    sql: `CREATE INDEX IF NOT EXISTS outreach_campaign_steps_campaign_idx ON outreach_campaign_steps(campaign_id)`,
+  },
+  {
+    name: "outreach_campaign_enrollments: create table",
+    sql: `
+      CREATE TABLE IF NOT EXISTS outreach_campaign_enrollments (
+        id text PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        campaign_id text NOT NULL REFERENCES outreach_campaigns(id) ON DELETE CASCADE,
+        contact_id text NOT NULL REFERENCES crm_contacts(id),
+        property_id text REFERENCES crm_properties(id),
+        org_id text NOT NULL REFERENCES organizations(id),
+        status text NOT NULL DEFAULT 'active',
+        current_step integer NOT NULL DEFAULT 1,
+        started_at timestamp DEFAULT NOW(),
+        next_step_at timestamp,
+        completed_at timestamp,
+        enrolled_by text REFERENCES users(id),
+        notes text,
+        created_at timestamp DEFAULT NOW(),
+        updated_at timestamp DEFAULT NOW()
+      )
+    `,
+  },
+  {
+    name: "outreach_campaign_enrollments: create campaign_idx",
+    sql: `CREATE INDEX IF NOT EXISTS outreach_campaign_enrollments_campaign_idx ON outreach_campaign_enrollments(campaign_id)`,
+  },
+  {
+    name: "outreach_campaign_enrollments: create contact_idx",
+    sql: `CREATE INDEX IF NOT EXISTS outreach_campaign_enrollments_contact_idx ON outreach_campaign_enrollments(contact_id)`,
+  },
+  {
+    name: "outreach_campaign_enrollments: create active_idx",
+    sql: `CREATE INDEX IF NOT EXISTS outreach_campaign_enrollments_active_idx ON outreach_campaign_enrollments(status, next_step_at)`,
   },
 ];
 

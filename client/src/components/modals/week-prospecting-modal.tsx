@@ -40,7 +40,8 @@ import {
   MapPin,
   X,
   UserPlus,
-  Building2
+  Building2,
+  AlertCircle
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -2195,6 +2196,24 @@ export default function WeekProspectingModal({
               )}
             </div>
             
+            {/* Active Deal Warning */}
+            {boxActivityForm.contactId && (() => {
+              const activeDealsForContact = filteredDeals.filter(d => 
+                d.stage && !d.stage.includes('closed') && !d.stage.includes('lost')
+              );
+              if (activeDealsForContact.length === 0) return null;
+              return (
+                <div className="flex items-start gap-2 p-2 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800">
+                  <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-semibold">Active deal exists: </span>
+                    {activeDealsForContact.slice(0, 2).map(d => d.name || d.title || 'Unnamed Deal').join(', ')}
+                    {activeDealsForContact.length > 2 && ` +${activeDealsForContact.length - 2} more`}
+                  </div>
+                </div>
+              );
+            })()}
+
             <div>
               <Label className="text-sm font-medium mb-2 block">
                 Link to Deal/Property
