@@ -30,6 +30,7 @@ import {
 import { eq, and, desc, sql, lt, gte, lte, count, or } from "drizzle-orm";
 import { logger } from "../lib/logger";
 import { sendTrialDay3Email, sendTrialDay5Email, sendTrialLastDayEmail } from "../services/email-service";
+import { runEmailSchedulerTick } from "../services/email-scheduler";
 
 let jobsStarted = false;
 
@@ -40,6 +41,17 @@ export function startPlatformCronJobs() {
   }
   jobsStarted = true;
   logger.info("Starting platform background jobs...");
+
+  // ─── 0. Scheduled email dispatch — every minute ───────────────────────
+  // Polls email_messages for status='scheduled' rows whose scheduled_at is
+  // due and dispatches them via sendEmail(). See server/services/email-scheduler.ts
+  cron.schedule("* * * * *", async () => {
+    try {
+      await runEmailSchedulerTick();
+    } catch (err) {
+      logger.error({ err }, "[CRON] email scheduler tick failed");
+    }
+  });
 
   // ─── 1. Lease Expiry Alerts — daily at 7:00 AM ────────────────────────
   cron.schedule("0 7 * * *", async () => {

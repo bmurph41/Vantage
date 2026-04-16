@@ -442,16 +442,117 @@ workflowEmailRouter.get('/available-tokens', async (_req: any, res) => {
   res.json({ tokens: AVAILABLE_TOKENS });
 });
 
+// ── Helper: build compose context from a real crm_deal / crm_contact ──
+//
+// Powers {{deal.*}} / {{contact.*}} / {{user.*}} / {{org.*}} substitution in
+// compose-send. Distinct from `buildSampleContext` (which queries
+// sourced_deals for the template preview UI) — this one hits the real CRM
+// tables for the actual deal/contact being emailed.
+async function buildComposeContext(
+  orgId: string,
+  dealId: string | undefined,
+  contactId: string | undefined,
+  user: { id?: string; name?: string; email?: string } | undefined,
+): Promise<Record<string, any>> {
+  const ctx: Record<string, any> = {
+    deal: {},
+    contact: {},
+    org: {},
+    user: { name: user?.name || '', email: user?.email || '' },
+    rule: { name: '' },
+  };
+
+  if (dealId) {
+    const { rows } = await pool.query(
+      `SELECT id, title, stage, value, amount, asset_class, city, state,
+              days_in_current_stage, marina_name, owner_id, contact_id
+         FROM crm_deals WHERE id = $1 AND org_id = $2`,
+      [dealId, orgId],
+    );
+    if (rows.length > 0) {
+      const d = rows[0];
+      const dealValue = d.value || d.amount;
+      ctx.deal = {
+        propertyName: d.title || d.marina_name || '',
+        stage: d.stage || '',
+        value: dealValue ? `$${Number(dealValue).toLocaleString()}` : '',
+        assetClass: d.asset_class || '',
+        daysInStage: String(d.days_in_current_stage || 0),
+        state: d.state || '',
+        city: d.city || '',
+        assignedToName: user?.name || '',
+      };
+      // Backfill contactId from the deal if not explicitly supplied
+      if (!contactId && d.contact_id) contactId = d.contact_id;
+    }
+  }
+
+  if (contactId) {
+    const { rows } = await pool.query(
+      `SELECT first_name, last_name, email, company_name
+         FROM crm_contacts WHERE id = $1 AND org_id = $2`,
+      [contactId, orgId],
+    );
+    if (rows.length > 0) {
+      const c = rows[0];
+      ctx.contact = {
+        firstName: c.first_name || '',
+        lastName: c.last_name || '',
+        email: c.email || '',
+        company: c.company_name || '',
+      };
+    }
+  }
+
+  try {
+    const { rows } = await pool.query(
+      'SELECT name FROM organizations WHERE id = $1 LIMIT 1',
+      [orgId],
+    );
+    ctx.org.name = rows[0]?.name || '';
+  } catch (_) { /* non-fatal */ }
+
+  return ctx;
+}
+
 // ── POST /compose-send ──────────────────────────────────────────────
-// Ad-hoc email compose and send — used from deal/contact pages
+// Ad-hoc email compose and send — used from deal/contact pages.
+//
+// Accepts (all optional unless marked):
+//   to         — recipient email (required unless templateId resolves it)
+//   subject    — subject line (or overridden by templateId)
+//   body       — HTML body (or overridden by templateId)
+//   templateId — prefill/override subject+body from a saved template
+//   sendAt     — ISO timestamp; if in the future, schedules via emailMessages
+//                and returns { scheduled: true } without sending
+//   dealId, contactId — context for {{token}} substitution + activity log
+//   fromName   — sender display name
+//
+// Always interpolates {{deal.*}} / {{contact.*}} / etc. tokens in the final
+// subject and body (whether the body came from templateId or inline).
 workflowEmailRouter.post('/compose-send', async (req: any, res) => {
   try {
     const orgId = req.user?.orgId || req.tenantId || req.orgId;
     if (!orgId) return res.status(401).json({ error: 'No org context' });
 
-    const { to, cc, bcc, subject, body, dealId, contactId, fromName } = req.body;
+    const { to, subject, body, templateId, sendAt, dealId, contactId, fromName } = req.body;
 
-    if (!to || !subject || !body) {
+    // Load template first if provided
+    let finalSubject = subject;
+    let finalBody = body;
+    if (templateId) {
+      const { rows } = await pool.query(
+        'SELECT * FROM workflow_email_templates WHERE id = $1 AND org_id = $2',
+        [templateId, orgId],
+      );
+      if (rows.length === 0) return res.status(404).json({ error: 'Template not found' });
+      const tpl = rows[0];
+      // Inline subject/body override the template when provided
+      if (!subject) finalSubject = tpl.subject;
+      if (!body) finalBody = tpl.body_html;
+    }
+
+    if (!to || !finalSubject || !finalBody) {
       return res.status(400).json({ error: 'to, subject, and body are required' });
     }
 
@@ -461,27 +562,97 @@ workflowEmailRouter.post('/compose-send', async (req: any, res) => {
       return res.status(400).json({ error: 'Invalid email address' });
     }
 
+    // Build substitution context + interpolate tokens
+    const ctx = await buildComposeContext(orgId, dealId, contactId, {
+      id: req.user?.id,
+      name: req.user?.name || req.user?.username,
+      email: req.user?.email,
+    });
+    const renderedSubject = interpolateTokens(finalSubject, ctx);
+    const renderedBody = interpolateTokens(finalBody, ctx);
     const senderName = fromName || req.user?.name || req.user?.username || 'Vantage';
-    const htmlBody = wrapEmailTemplate(body);
-    const textBody = stripHtml(body);
+    const htmlBody = wrapEmailTemplate(renderedBody);
+    const textBody = stripHtml(renderedBody);
 
+    // Scheduled path — persist to email_messages without sending
+    if (sendAt) {
+      const scheduledAt = new Date(sendAt);
+      if (Number.isNaN(scheduledAt.getTime())) {
+        return res.status(400).json({ error: 'Invalid sendAt' });
+      }
+      if (scheduledAt.getTime() > Date.now() + 60_000) {
+        const { rows } = await pool.query(
+          `INSERT INTO email_messages
+             (org_id, deal_id, from_user_id, to_contact_id, to_email, subject,
+              body_html, body_text, status, scheduled_at, template_id)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'scheduled', $9, $10)
+           RETURNING id, scheduled_at`,
+          [
+            orgId,
+            dealId || null,
+            req.user?.id || null,
+            contactId || null,
+            to,
+            renderedSubject,
+            htmlBody,
+            textBody,
+            scheduledAt,
+            templateId || null,
+          ],
+        );
+        return res.json({
+          scheduled: true,
+          messageId: rows[0].id,
+          scheduledAt: rows[0].scheduled_at,
+        });
+      }
+      // sendAt within 60s → just send now
+    }
+
+    // Send path
     const sent = await sendEmail({
       to,
-      subject,
+      subject: renderedSubject,
       html: htmlBody,
       text: textBody,
       from: { email: process.env.SENDGRID_FROM_EMAIL || 'noreply@vantage.com', name: senderName },
     });
 
-    // Log the email
+    // Persist to email_messages as the canonical record
+    await pool.query(
+      `INSERT INTO email_messages
+         (org_id, deal_id, from_user_id, to_contact_id, to_email, subject,
+          body_html, body_text, status, sent_at, template_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+      [
+        orgId,
+        dealId || null,
+        req.user?.id || null,
+        contactId || null,
+        to,
+        renderedSubject,
+        htmlBody,
+        textBody,
+        sent ? 'sent' : 'failed',
+        sent ? new Date() : null,
+        templateId || null,
+      ],
+    );
+
+    // Also keep legacy workflow_email_log for continuity with existing UI
     await pool.query(
       `INSERT INTO workflow_email_log
-         (org_id, recipient_email, recipient_type, subject, body_preview, status, provider, sent_at)
-       VALUES ($1, $2, 'manual', $3, $4, $5, 'compose', $6)`,
+         (org_id, template_id, recipient_email, recipient_type, subject, body_preview, status, provider, sent_at)
+       VALUES ($1, $2, $3, 'manual', $4, $5, $6, 'compose', $7)`,
       [
-        orgId, to, subject, body.substring(0, 500),
-        sent ? 'sent' : 'failed', sent ? new Date() : null,
-      ]
+        orgId,
+        templateId || null,
+        to,
+        renderedSubject,
+        renderedBody.substring(0, 500),
+        sent ? 'sent' : 'failed',
+        sent ? new Date() : null,
+      ],
     );
 
     // Log as CRM activity if tied to a deal or contact
@@ -489,13 +660,60 @@ workflowEmailRouter.post('/compose-send', async (req: any, res) => {
       await pool.query(
         `INSERT INTO crm_activities (type, subject, description, direction, entity_type, entity_id, org_id, user_id, created_at)
          VALUES ('email', $1, $2, 'outbound', $3, $4, $5, $6, NOW())`,
-        [subject, `Sent to ${to}`, dealId ? 'deal' : 'contact', dealId || contactId, orgId, req.user?.id || null]
+        [renderedSubject, `Sent to ${to}`, dealId ? 'deal' : 'contact', dealId || contactId, orgId, req.user?.id || null],
       );
     }
 
-    res.json({ success: sent, to, subject });
+    // Bump template usage counter if applicable
+    if (templateId && sent) {
+      pool.query(
+        'UPDATE workflow_email_templates SET updated_at = NOW() WHERE id = $1',
+        [templateId],
+      ).catch(() => { /* non-fatal */ });
+    }
+
+    res.json({ success: sent, to, subject: renderedSubject });
   } catch (error: any) {
     console.error('Failed to send composed email:', error);
     res.status(500).json({ error: error.message || 'Failed to send email' });
+  }
+});
+
+// ── GET /scheduled ────────────────────────────────────────────────
+// List the caller's scheduled emails (not yet sent).
+workflowEmailRouter.get('/scheduled', async (req: any, res) => {
+  try {
+    const orgId = req.user?.orgId || req.tenantId || req.orgId;
+    if (!orgId) return res.status(401).json({ error: 'No org context' });
+    const { rows } = await pool.query(
+      `SELECT id, deal_id, to_email, subject, scheduled_at, template_id, created_at
+         FROM email_messages
+        WHERE org_id = $1 AND status = 'scheduled'
+        ORDER BY scheduled_at ASC
+        LIMIT 100`,
+      [orgId],
+    );
+    res.json({ scheduled: rows });
+  } catch (error: any) {
+    console.error('Failed to list scheduled emails:', error);
+    res.status(500).json({ error: 'Failed to list scheduled emails' });
+  }
+});
+
+// ── POST /scheduled/:id/cancel ────────────────────────────────────
+workflowEmailRouter.post('/scheduled/:id/cancel', async (req: any, res) => {
+  try {
+    const orgId = req.user?.orgId || req.tenantId || req.orgId;
+    const { rows } = await pool.query(
+      `UPDATE email_messages SET status = 'draft'
+        WHERE id = $1 AND org_id = $2 AND status = 'scheduled'
+        RETURNING id`,
+      [req.params.id, orgId],
+    );
+    if (rows.length === 0) return res.status(404).json({ error: 'Not found or not scheduled' });
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('Failed to cancel scheduled email:', error);
+    res.status(500).json({ error: 'Failed to cancel' });
   }
 });

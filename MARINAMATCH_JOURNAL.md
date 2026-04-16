@@ -2,6 +2,100 @@
 
 ## Current State (2026-04-16)
 
+### ✅ COMPLETE — Email Send Integration (Tier 2) (2026-04-16)
+
+Extended the existing email compose/send pipeline with template merge-field
+substitution, scheduled sends, and a scheduler job — completing the final CRM
+priority from CLAUDE.md.
+
+**Discovery finding:** v0 was more built-out than expected:
+- `ComposeEmailModal` already mounted in deal-detail.tsx, calling
+  `POST /api/workflow-email/compose-send`
+- Full template CRUD already at `/api/workflow-email/templates` with
+  `interpolateTokens()` helper, preview endpoint, send-test endpoint
+- Workflow engine already had a complete `email.send` action type (line 262
+  of workflow-engine.ts) with template context resolution, recipient
+  resolution, and send dispatch
+- `emailMessages.scheduledAt` column already existed in schema
+- `AVAILABLE_TOKENS` list already defined (15 tokens across deal/contact/
+  org/user/rule)
+
+**What was actually missing** (and now built):
+1. `compose-send` didn't accept `templateId` or `sendAt`
+2. No scheduler polling emailMessages for scheduled sends
+3. Compose modal had no template picker, no schedule option, no token
+   insertion
+
+**Backend changes**
+- `server/routes/workflow-email-routes.ts`:
+  - New `buildComposeContext()` helper — queries real `crm_deals` +
+    `crm_contacts` + `organizations` tables to build `{{deal.*}}` /
+    `{{contact.*}}` / `{{user.*}}` / `{{org.*}}` substitution context.
+    Distinct from `buildSampleContext()` which queries `sourced_deals`
+    for the template preview UI.
+  - Extended `POST /compose-send` to accept:
+    - `templateId` — loads template, uses as default subject+body (inline
+      values override)
+    - `sendAt` — if >60s in the future, writes to `email_messages` with
+      `status='scheduled'` and returns `{ scheduled: true }` without
+      sending
+  - All sends (template or ad-hoc) now interpolate tokens via
+    `buildComposeContext`
+  - Canonical record always written to `email_messages` table (in
+    addition to legacy `workflow_email_log` for backward compat)
+  - Template usage counter bumped on successful send
+  - New `GET /scheduled` — lists the caller's pending scheduled emails
+  - New `POST /scheduled/:id/cancel` — reverts a scheduled email to
+    draft status
+- `server/services/email-scheduler.ts` NEW — `runEmailSchedulerTick()`
+  polls `email_messages WHERE status='scheduled' AND scheduled_at <= NOW()`
+  in batches of 50, uses optimistic row-level lock (`status → 'sending'`)
+  to prevent double-dispatch, sends via `sendEmail()`, flips to 'sent' or
+  'failed', logs CRM activity on success
+- `server/jobs/platform-cron.ts` — registered `runEmailSchedulerTick` as
+  a new cron job running every minute
+
+**Frontend changes**
+- `client/src/components/email/compose-email-modal.tsx` REWRITTEN:
+  - **Template picker** — dropdown fetches `/api/workflow-email/templates`,
+    on select calls `/templates/:id/preview` with the current dealId to
+    render subject + body with real deal data (not raw `{{tokens}}`)
+  - **Token insertion helper** — small "Insert token" popover showing all
+    15 available tokens with label + example, clicking inserts
+    `{{deal.propertyName}}` etc. at cursor
+  - **Schedule toggle** — Switch + datetime-local input, defaults to
+    next hour on the hour. When enabled, Send button becomes "Schedule"
+    (Clock icon instead of Send)
+  - **Save as template** — inline name input + save button, POST to
+    `/api/workflow-email/templates` with current form contents
+  - Textarea switched to `font-mono text-sm` to make tokens readable
+  - Activity + scheduled queries invalidated on success
+
+**Open tracking pixel:** skipped for v1 (spam filter cost, privacy, and
+the bot-filtering infra needed are a rabbit hole). Schema field
+`emailMessages.openedAt` stays in place for future webhook integration.
+
+**Validation**
+- `tsc --noEmit` clean on all touched files (4 files)
+- Scheduler registers on startup alongside existing platform cron jobs
+- compose-send endpoint backward-compatible (existing callers that pass
+  `{to, subject, body}` without templateId/sendAt still work identically)
+
+**Known follow-ups**
+- Open/click tracking pixel + webhook receiver for SendGrid/Resend
+- Exponential backoff + retry counter on scheduled-send failures (currently
+  flips to 'failed' on first failure)
+- Rich text editor in the compose modal (currently plaintext textarea with
+  manual HTML)
+- Broker digest pipeline (Tier 3) — scheduled batch of broker verdicts +
+  matched listings per subscriber
+- Inbound email parsing + reply threading schema
+- The existing `buildSampleContext` queries `sourced_deals` not `crm_deals`
+  — template preview UI will show wrong data for CRM deals; fix in a
+  follow-up
+
+---
+
 ### ✅ COMPLETE — Deal Comparison in Workspace — Unification (2026-04-16)
 
 Unified three disconnected deal-comparison surfaces onto a single canonical
