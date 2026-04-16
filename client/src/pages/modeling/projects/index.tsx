@@ -81,9 +81,12 @@ export default function ModelingProjectsPage() {
   const [isTemplateOpen, setIsTemplateOpen] = useState(false);
   const [isNewProjectWizardOpen, setIsNewProjectWizardOpen] = useState(false);
 
-  const { data: projects = [], isLoading } = useQuery<ModelingProject[]>({
+  const { data: projectsResponse, isLoading } = useQuery<{ data: ModelingProject[] } | ModelingProject[]>({
     queryKey: ['/api/modeling/projects'],
   });
+  const projects: ModelingProject[] = Array.isArray(projectsResponse)
+    ? projectsResponse
+    : (projectsResponse as any)?.data ?? [];
 
   type ExitSummary = {
     modelingProjectId: string;
