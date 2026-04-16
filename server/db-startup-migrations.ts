@@ -279,6 +279,53 @@ const MIGRATIONS: Migration[] = [
     name: "modeling_financial_periods: add expense_breakdown",
     sql: `ALTER TABLE modeling_financial_periods ADD COLUMN IF NOT EXISTS expense_breakdown jsonb`,
   },
+  {
+    name: "asset_status enum: create if not exists",
+    sql: `
+      DO $$ BEGIN
+        CREATE TYPE asset_status AS ENUM ('under_management', 'optimization', 'exit');
+      EXCEPTION WHEN duplicate_object THEN NULL;
+      END $$
+    `,
+  },
+  {
+    name: "hold_strategy enum: create if not exists",
+    sql: `
+      DO $$ BEGIN
+        CREATE TYPE hold_strategy AS ENUM ('core', 'value_add', 'opportunistic');
+      EXCEPTION WHEN duplicate_object THEN NULL;
+      END $$
+    `,
+  },
+  {
+    name: "owned_assets: create table",
+    sql: `
+      CREATE TABLE IF NOT EXISTS owned_assets (
+        id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+        org_id varchar NOT NULL REFERENCES organizations(id),
+        property_id varchar NOT NULL REFERENCES crm_properties(id),
+        project_id varchar REFERENCES projects(id),
+        acquisition_date date NOT NULL,
+        acquisition_price integer,
+        status asset_status NOT NULL DEFAULT 'under_management',
+        hold_strategy hold_strategy,
+        exit_target_date date,
+        key_metrics jsonb DEFAULT '{}',
+        notes text,
+        created_by varchar NOT NULL REFERENCES users(id),
+        created_at timestamp NOT NULL DEFAULT NOW(),
+        updated_at timestamp NOT NULL DEFAULT NOW()
+      )
+    `,
+  },
+  {
+    name: "owned_assets: org_status index",
+    sql: `CREATE INDEX IF NOT EXISTS owned_assets_org_status_idx ON owned_assets(org_id, status)`,
+  },
+  {
+    name: "owned_assets: org_property index",
+    sql: `CREATE INDEX IF NOT EXISTS owned_assets_org_property_idx ON owned_assets(org_id, property_id)`,
+  },
 ];
 
 export async function runStartupMigrations(): Promise<void> {

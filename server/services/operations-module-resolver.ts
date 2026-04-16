@@ -30,21 +30,39 @@ export interface ResolvedModulesResult {
  * then resolves which operations modules should be available.
  */
 export async function resolveOpsModulesForOrg(orgId: string): Promise<ResolvedModulesResult> {
-  const results = await db
-    .select({
-      assetId: ownedAssets.id,
-      propertyId: ownedAssets.propertyId,
-      projectId: ownedAssets.projectId,
-      status: ownedAssets.status,
-      propertyTitle: crmProperties.title,
-      propertyType: crmProperties.type,
-    })
-    .from(ownedAssets)
-    .innerJoin(crmProperties, eq(ownedAssets.propertyId, crmProperties.id))
-    .where(and(
-      eq(ownedAssets.orgId, orgId),
-      eq(ownedAssets.status, 'under_management')
-    ));
+  let results: Array<{
+    assetId: string;
+    propertyId: string;
+    projectId: string | null;
+    status: string;
+    propertyTitle: string | null;
+    propertyType: string | null;
+  }>;
+
+  try {
+    results = await db
+      .select({
+        assetId: ownedAssets.id,
+        propertyId: ownedAssets.propertyId,
+        projectId: ownedAssets.projectId,
+        status: ownedAssets.status,
+        propertyTitle: crmProperties.title,
+        propertyType: crmProperties.type,
+      })
+      .from(ownedAssets)
+      .innerJoin(crmProperties, eq(ownedAssets.propertyId, crmProperties.id))
+      .where(and(
+        eq(ownedAssets.orgId, orgId),
+        eq(ownedAssets.status, 'under_management')
+      ));
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes('does not exist') || msg.includes('relation') || msg.includes('column')) {
+      console.warn('[resolveOpsModulesForOrg] Table or column missing, returning empty modules:', msg);
+      return { modules: [], assetClasses: [], assets: [] };
+    }
+    throw err;
+  }
 
   const assetClassSet = new Set<string>();
   const assets: OwnedAssetInfo[] = [];
