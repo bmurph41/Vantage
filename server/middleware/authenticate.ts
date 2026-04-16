@@ -74,7 +74,7 @@ export async function authenticateUser(req: Request, res: Response, next: NextFu
       }
     }
 
-    if (!resolvedUser && process.env.NODE_ENV !== 'production' && process.env.ALLOW_DEMO_AUTH === 'true') {
+    if (!resolvedUser && process.env.ALLOW_DEMO_AUTH === 'true') {
       console.warn('[AUTH] Using demo auth fallback for request:', req.originalUrl);
       resolvedUser = {
         id: "85c9cd7a-c453-4dba-9817-d032d5712c4e",

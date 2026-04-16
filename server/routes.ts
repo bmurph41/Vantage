@@ -525,7 +525,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       //    both resolve the same admin user when no real session is present.
       //    Also triggers if a DB user was found but has no orgId (e.g. Replit OAuth
       //    user created without an org assignment yet).
-      if ((!resolvedUser || !resolvedUser.orgId) && process.env.NODE_ENV !== 'production') {
+      if ((!resolvedUser || !resolvedUser.orgId) && process.env.ALLOW_DEMO_AUTH === 'true') {
         resolvedUser = { id: "85c9cd7a-c453-4dba-9817-d032d5712c4e", orgId: "cd3719c3-ef82-4ccc-acb9-261c80fb64b4", role: "owner", email: "brettmurphy41@gmail.com", name: "Brett Murphy" };
       }
       

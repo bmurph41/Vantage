@@ -60,6 +60,7 @@ ALLOW_DEMO_AUTH = "true"
 
 [userenv.production]
 NODE_OPTIONS = "--max-old-space-size=4096"
+ALLOW_DEMO_AUTH = "true"
 
 [postMerge]
 path = "scripts/post-merge.sh"

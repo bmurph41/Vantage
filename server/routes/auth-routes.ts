@@ -610,15 +610,18 @@ router.get('/me', async (req: Request, res: Response) => {
       }
     }
     
-    // Fall back to admin user if no session
-    return res.json({
-      id: '85c9cd7a-c453-4dba-9817-d032d5712c4e',
-      email: 'brettmurphy41@gmail.com',
-      name: 'Brett Murphy',
-      role: 'owner',
-      orgId: 'cd3719c3-ef82-4ccc-acb9-261c80fb64b4',
-      orgName: 'Marina Admin',
-    });
+    if (process.env.ALLOW_DEMO_AUTH === 'true') {
+      return res.json({
+        id: '85c9cd7a-c453-4dba-9817-d032d5712c4e',
+        email: 'brettmurphy41@gmail.com',
+        name: 'Brett Murphy',
+        role: 'owner',
+        orgId: 'cd3719c3-ef82-4ccc-acb9-261c80fb64b4',
+        orgName: 'Marina Admin',
+      });
+    }
+
+    return res.status(401).json({ error: 'Not authenticated' });
   } catch (error) {
     logger.error({ error }, 'Get current user error');
     res.status(500).json({ error: 'Failed to get user info' });
