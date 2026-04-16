@@ -31,6 +31,7 @@ import { eq, and, desc, sql, lt, gte, lte, count, or } from "drizzle-orm";
 import { logger } from "../lib/logger";
 import { sendTrialDay3Email, sendTrialDay5Email, sendTrialLastDayEmail } from "../services/email-service";
 import { runEmailSchedulerTick } from "../services/email-scheduler";
+import { runQuarterlyLPDelivery } from "../services/quarterly-lp-delivery";
 
 let jobsStarted = false;
 
@@ -50,6 +51,18 @@ export function startPlatformCronJobs() {
       await runEmailSchedulerTick();
     } catch (err) {
       logger.error({ err }, "[CRON] email scheduler tick failed");
+    }
+  });
+
+  // ─── 0b. Quarterly LP statement delivery — 1st of Jan/Apr/Jul/Oct at 6 AM ──
+  // Generates + emails capital account statement PDFs for all active fund LPs.
+  cron.schedule("0 6 1 1,4,7,10 *", async () => {
+    logger.info("[CRON] Running quarterly LP statement delivery");
+    try {
+      const result = await runQuarterlyLPDelivery();
+      logger.info(result, "[CRON] Quarterly LP delivery complete");
+    } catch (err) {
+      logger.error({ err }, "[CRON] Quarterly LP delivery failed");
     }
   });
 

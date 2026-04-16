@@ -2,6 +2,61 @@
 
 ## Current State (2026-04-16)
 
+### ✅ COMPLETE — Phase 4 LP Experience: K-1 PDF + Quarterly Delivery (2026-04-16)
+
+Closed the two remaining Phase 4 gaps from the institutional audit:
+(1) K-1 tax document PDF generation and (2) quarterly automated statement
+delivery.
+
+**Discovery:** Phase 4 was ~85% done. `lp-statement-pdf.ts` was already a
+full StatementPDFBuilder, the LP portal auth + frontend pages were
+scaffolded, `generateInvestorStatement()` was fully implemented,
+`generateK1()` in `lp-portal-service.ts` already produced structured K1Data.
+Only two gaps remained.
+
+**Files**
+- `server/services/k1-statement-pdf.ts` NEW (~210 lines) — `K1PDFBuilder`
+  using pdf-lib. Renders partner info, 7-section income/loss allocations,
+  deductions, credits/AMT, distributions, capital account analysis.
+  Same Navy/Steel/Teal palette + Helvetica fonts + striped tables +
+  confidential footer as lp-statement-pdf.ts. Includes tax disclaimer.
+- `server/routes/modeling-routes.ts` — new
+  `GET /api/funds/:fundId/investors/:investorId/k1/pdf?taxYear=2025`
+  route. Calls `lpStatements.generateK1()` → `generateK1PDF()` → streams
+  binary PDF with attachment header.
+- `server/services/quarterly-lp-delivery.ts` NEW (~150 lines) —
+  `runQuarterlyLPDelivery()`. For each active fund, for each active
+  investor: generates statement PDF via `generateStatementPDF()`, resolves
+  investor email from `lp_portal_users` → `lp_investors` fallback, sends
+  via `sendEmail()` with PDF attachment. Creates
+  `lp_statement_deliveries` tracking table inline (idempotent CREATE IF
+  NOT EXISTS) with `UNIQUE(fund_id, investor_id, quarter_label)` to
+  prevent double-delivery. Returns `{funds, investors, sent, failed}`.
+- `server/jobs/platform-cron.ts` — registered quarterly delivery as
+  `"0 6 1 1,4,7,10 *"` (6 AM on Jan/Apr/Jul/Oct 1st). Also previously
+  registered the email scheduler tick at `"* * * * *"`.
+
+**Phase 4 LP Experience status after this session:**
+- ✅ PDF statement generation — existed, confirmed working
+- ✅ K-1 tax document PDF — NEW, route + renderer
+- ✅ Quarterly automated delivery — NEW, cron + email + PDF attachment
+- ⚠️ LP portal independent auth — scaffolded (auth service + routes +
+  frontend pages exist, but needs integration testing + password reset +
+  TOTP enrollment UI)
+
+**Known follow-ups**
+- LP portal needs integration testing (login flow, session management,
+  password reset, TOTP 2FA enrollment)
+- K-1 PDF is a "summary report" (not the official IRS Form 1065
+  Schedule K-1); formal filing requires a tax-forms renderer
+- `sendEmail()` `attachments` parameter assumes SendGrid attachment
+  format `{content, filename, type, disposition}` — Resend fallback
+  path may need adaptation for attachments
+- Annual K-1 delivery cron (separate from quarterly statements) not yet
+  scheduled — could fire `"0 6 1 3 *"` (March 1st) for prior tax year
+
+---
+
 ### ✅ COMPLETE — Email Send Integration (Tier 2) (2026-04-16)
 
 Extended the existing email compose/send pipeline with template merge-field

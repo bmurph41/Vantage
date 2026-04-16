@@ -5911,6 +5911,31 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     }
   });
 
+  // === K-1 Tax Document PDF ===
+  app.get('/api/funds/:fundId/investors/:investorId/k1/pdf', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { fundId, investorId } = req.params;
+      const { taxYear } = req.query as Record<string, string>;
+      const year = taxYear ? Number(taxYear) : new Date().getFullYear() - 1;
+
+      const { lpStatements } = await import('../services/lp-portal-service');
+      const k1Data = await lpStatements.generateK1(orgId, fundId, investorId, year);
+
+      const { generateK1PDF } = await import('../services/k1-statement-pdf');
+      const pdfBytes = await generateK1PDF(k1Data);
+
+      const filename = `K1_${year}_${k1Data.investorName.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.setHeader('Content-Length', pdfBytes.length);
+      res.end(Buffer.from(pdfBytes));
+    } catch (error: any) {
+      console.error('Failed to generate K-1 PDF:', error);
+      res.status(500).json({ error: error.message || 'Failed to generate K-1 PDF' });
+    }
+  });
+
   // === LP Reporting (project-level, for workspace tab) ===
   app.get('/api/modeling/projects/:projectId/lp-reporting', authenticateUser, async (req: any, res) => {
     try {
