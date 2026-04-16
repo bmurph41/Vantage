@@ -271,6 +271,14 @@ const MIGRATIONS: Migration[] = [
     name: "outreach_campaign_enrollments: create active_idx",
     sql: `CREATE INDEX IF NOT EXISTS outreach_campaign_enrollments_active_idx ON outreach_campaign_enrollments(status, next_step_at)`,
   },
+  {
+    name: "modeling_financial_periods: add revenue_breakdown",
+    sql: `ALTER TABLE modeling_financial_periods ADD COLUMN IF NOT EXISTS revenue_breakdown jsonb`,
+  },
+  {
+    name: "modeling_financial_periods: add expense_breakdown",
+    sql: `ALTER TABLE modeling_financial_periods ADD COLUMN IF NOT EXISTS expense_breakdown jsonb`,
+  },
 ];
 
 export async function runStartupMigrations(): Promise<void> {
