@@ -456,11 +456,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     return event;
   };
-  // Enterprise authentication middleware with session support
+  const AUTH_PUBLIC_PATHS = [
+    '/api/config',
+    '/api/packs/catalog',
+    '/api/legal/',
+    '/api/stripe/webhook',
+    '/api/health',
+  ];
+
   const authenticateUser = async (req: any, res: any, next: any) => {
-    // Skip authentication for non-API routes (let SPA handle auth)
-    // Use originalUrl since req.path is relative to the mount point
     if (!req.originalUrl.startsWith('/api/')){return next();}
+    if (AUTH_PUBLIC_PATHS.some(p => req.originalUrl.startsWith(p))) return next();
     try {
       // resolvedUser will hold the normalized { id, orgId, role, email, name } shape
       let resolvedUser: { id: string; orgId: string; role: string; email: string; name: string } | null = null;

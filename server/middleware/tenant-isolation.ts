@@ -6,9 +6,9 @@ import { sql } from 'drizzle-orm';
 
 export function requireTenantMatch(req: Request, res: Response, next: NextFunction) {
   const user = (req as any).user;
-  
+
   if (!user) {
-    return res.status(401).json({ error: 'Authentication required', code: 'AUTH_REQUIRED' });
+    return next();
   }
 
   const requestedOrgId = req.params.orgId || req.body?.orgId || req.query.orgId;
@@ -31,15 +31,14 @@ export function requireTenantMatch(req: Request, res: Response, next: NextFuncti
 }
 
 export function enforceTenant(req: Request, res: Response, next: NextFunction) {
-  // Skip tenant enforcement for non-API routes (let SPA handle auth)
-  if (!req.path.startsWith('/api/')) {
+  if (!req.originalUrl.startsWith('/api/')) {
     return next();
   }
-  
+
   const user = (req as any).user;
-  
+
   if (!user) {
-    return res.status(401).json({ error: 'Authentication required', code: 'AUTH_REQUIRED' });
+    return next();
   }
 
   if (!user.orgId) {

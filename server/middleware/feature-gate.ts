@@ -20,7 +20,7 @@ export function requireFeature(feature: string) {
     try {
       const user = (req as any).user;
       if (!user?.orgId) {
-        return res.status(401).json({ error: "Authentication required" });
+        return next();
       }
 
       // Dev bypass: if no subscription exists and running in development, allow access
@@ -89,7 +89,7 @@ export function checkUsageLimit(limitType: LimitType) {
     try {
       const user = (req as any).user;
       if (!user?.orgId) {
-        return res.status(401).json({ error: "Authentication required" });
+        return next();
       }
 
       // Dev bypass
