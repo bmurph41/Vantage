@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Upload, Plus, Search, Edit, Trash2, MapPin, Anchor, Building, DollarSign, Home, TrendingUp, FolderPlus, AlertTriangle, CheckCircle, BarChart3 } from "lucide-react";
+import { Upload, Plus, Search, Edit, Trash2, MapPin, Anchor, Building, DollarSign, Home, TrendingUp, FolderPlus, AlertTriangle, CheckCircle, BarChart3, List } from "lucide-react";
 import { FileUpload } from "@/components/file-upload";
 import PropertyFormModal from "@/components/modals/property-form-modal";
 import { CreatePropertyWizardModal } from "@/components/modals/create-property-wizard-modal";
@@ -145,6 +145,7 @@ export default function Properties() {
   const [bulkStatusValue, setBulkStatusValue] = useState<string>('');
   const [showBulkStatusDialog, setShowBulkStatusDialog] = useState(false);
   const [activeViewId, setActiveViewId] = useState<string | null>('default-0');
+  const [viewMode, setViewMode] = useState<'properties' | 'lists'>('properties');
 
   // HubSpot-style: Drawer state
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -454,15 +455,24 @@ export default function Properties() {
         subtitle={`${totalProperties} properties`}
         actions={
           <>
-            <Button variant="outline" size="sm" onClick={() => setShowFileUpload(!showFileUpload)}>
-              <Upload className="h-4 w-4 mr-2" />Import
+            <Button
+              variant={viewMode === 'lists' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setViewMode(viewMode === 'lists' ? 'properties' : 'lists')}
+            >
+              <List className="h-4 w-4 mr-2" />Lists
             </Button>
-            <Button variant="outline" size="sm" onClick={() => setShowPortfolioWizard(true)}>
-              <FolderPlus className="h-4 w-4 mr-2" />Portfolio
-            </Button>
-            <Button className="bg-blue-600 hover:bg-blue-700" size="sm" onClick={handleAdd}>
-              <Plus className="h-4 w-4 mr-2" />Add Property
-            </Button>
+            {viewMode === 'properties' && <>
+              <Button variant="outline" size="sm" onClick={() => setShowFileUpload(!showFileUpload)}>
+                <Upload className="h-4 w-4 mr-2" />Import
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setShowPortfolioWizard(true)}>
+                <FolderPlus className="h-4 w-4 mr-2" />Portfolio
+              </Button>
+              <Button className="bg-blue-600 hover:bg-blue-700" size="sm" onClick={handleAdd}>
+                <Plus className="h-4 w-4 mr-2" />Add Property
+              </Button>
+            </>}
           </>
         }
         filters={
@@ -593,6 +603,11 @@ export default function Properties() {
         )}
 
         <div className="flex-1 overflow-auto">
+          {viewMode === 'lists' ? (
+            <div className="p-4">
+              <CrmListsManager entityType="property" />
+            </div>
+          ) : (
           <CrmDataTable
             data={filteredProperties}
             columns={columns}
@@ -610,6 +625,7 @@ export default function Properties() {
               action: !searchTerm && typeFilter === 'all' && statusFilter === 'all' ? { label: 'Add Property', onClick: handleAdd } : undefined
             }}
           />
+          )}
         </div>
       </div>
 

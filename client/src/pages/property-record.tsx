@@ -25,6 +25,8 @@ import {
   PropertyRateCompsTab,
   PropertyIntelTab,
   PropertyActivitiesTab,
+  PropertyRentRollKpiTab,
+  PropertyDemographicsTab,
 } from '@/components/crm/PropertyRecordTabs';
 import { PropertyStatusPanel } from '@/components/crm/panels/PropertyStatusPanel';
 import { CommentThreadsPanel } from '@/components/crm/panels/comment-threads-panel';
@@ -347,6 +349,16 @@ export default function PropertyRecordPage() {
           count: property.askingPriceHistory.length,
           content: <PriceHistoryTab history={property.askingPriceHistory} />,
         }] : []),
+        {
+          value: 'rent-roll-kpi',
+          label: 'Rent Roll',
+          content: <PropertyRentRollKpiTab propertyId={id} />,
+        },
+        {
+          value: 'demographics',
+          label: 'Demographics',
+          content: <PropertyDemographicsTab propertyId={id} city={property.city} state={property.state} />,
+        },
       ] : []}
 
       // ── RIGHT: Associations Sidebar ──

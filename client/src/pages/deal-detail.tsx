@@ -12,7 +12,7 @@ import {
   Anchor, MapPin, FileText, FolderOpen, FileSpreadsheet, CheckCircle,
   ListChecks, TrendingUp, Files, Activity, ExternalLink, Calculator,
   ChevronRight, Phone, Mail, MessageSquare, BarChart3, AlertCircle,
-  Circle, CheckCircle2, ArrowUpRight, Newspaper, Scale,
+  Circle, CheckCircle2, ArrowUpRight, Newspaper, Scale, Plus, Hash,
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { toast } from "@/hooks/use-toast";
@@ -32,6 +32,7 @@ import { PhaseGatesPanel } from "@/components/crm/panels/phase-gates-panel";
 import { DealPlaybookPanel } from "@/components/crm/panels/deal-playbook-panel";
 import { CommentThreadsPanel } from "@/components/crm/panels/comment-threads-panel";
 import { PipelineForecastingPanel } from "@/components/crm/panels/pipeline-forecasting-panel";
+import { SlaTrackingPanel } from "@/components/crm/panels/sla-tracking-panel";
 
 // ── Helpers ───────────────────────────────────────────────
 function fmtCurrency(v: string | number | null | undefined): string {
@@ -579,6 +580,354 @@ function DealRightSidebar({ deal, associations }: { deal: any; associations: any
   );
 }
 
+// ── Tab: LOI / Transaction Timeline ───────────────────────────────────
+function DealLoiTimelineTab({ deal }: { deal: any }) {
+  const queryClient = useQueryClient();
+  const [editingKey, setEditingKey] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState('');
+
+  const milestones = [
+    { key: 'offerSubmittedAt', label: 'Offer Submitted', icon: FileText, color: 'bg-gray-100 text-gray-600' },
+    { key: 'loiSubmittedAt', label: 'LOI Submitted', icon: FileText, color: 'bg-blue-100 text-blue-700' },
+    { key: 'loiAcceptedAt', label: 'LOI Accepted', icon: CheckCircle2, color: 'bg-emerald-100 text-emerald-700' },
+    { key: 'loiRejectedAt', label: 'LOI Rejected', icon: Circle, color: 'bg-red-100 text-red-700' },
+    { key: 'loiExpiresAt', label: 'LOI Expiry', icon: Clock, color: 'bg-amber-100 text-amber-700' },
+    { key: 'termSheetSignedAt', label: 'Term Sheet Signed', icon: FileText, color: 'bg-purple-100 text-purple-700' },
+    { key: 'psaSignedDate', label: 'PSA Signed', icon: FileText, color: 'bg-indigo-100 text-indigo-700' },
+    { key: 'psaExecutedAt', label: 'PSA Executed', icon: CheckCircle2, color: 'bg-indigo-100 text-indigo-700' },
+    { key: 'ddExpirationDate', label: 'DD Expiration', icon: Clock, color: 'bg-orange-100 text-orange-700' },
+    { key: 'closingScheduledAt', label: 'Closing Scheduled', icon: Calendar, color: 'bg-blue-100 text-blue-700' },
+    { key: 'closingDate', label: 'Closing Date', icon: CheckCircle, color: 'bg-emerald-100 text-emerald-700' },
+  ];
+
+  const updateMilestone = useMutation({
+    mutationFn: async ({ key, value }: { key: string; value: string | null }) => {
+      const res = await apiRequest('PUT', `/api/crm/deals/${deal.id}`, { [key]: value || null });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/crm/deals', deal.id] });
+      queryClient.invalidateQueries({ queryKey: [`/api/crm/deals/${deal.id}`] });
+      setEditingKey(null);
+    },
+    onError: () => toast({ title: 'Failed to update milestone', variant: 'destructive' }),
+  });
+
+  const handleStartEdit = (key: string, current: string | null | undefined) => {
+    setEditingKey(key);
+    if (current) {
+      try {
+        setEditValue(format(new Date(current), 'yyyy-MM-dd'));
+      } catch {
+        setEditValue('');
+      }
+    } else {
+      setEditValue('');
+    }
+  };
+
+  const handleSave = (key: string) => {
+    updateMilestone.mutate({ key, value: editValue || null });
+  };
+
+  const handleClear = (key: string) => {
+    updateMilestone.mutate({ key, value: null });
+    setEditingKey(null);
+  };
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader className="pb-2 pt-3 px-4">
+          <CardTitle className="text-sm flex items-center gap-2">
+            Transaction Timeline
+            <span className="text-[10px] font-normal text-gray-400">Click any date to edit</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="px-4 pb-4">
+          <div className="space-y-2">
+            {milestones.map((m) => {
+              const val = deal[m.key];
+              const Icon = m.icon;
+              const isPast = val && new Date(val) < new Date();
+              const isExpiry = m.key === 'loiExpiresAt' || m.key === 'ddExpirationDate';
+              const isOverdue = val && isPast && isExpiry;
+              const isEditing = editingKey === m.key;
+              return (
+                <div key={m.key} className={cn(
+                  "flex items-center justify-between py-2 border-b last:border-b-0 gap-2",
+                  !val && !isEditing && "opacity-50"
+                )}>
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className={cn("rounded-lg p-1.5 shrink-0", val ? m.color : 'bg-gray-50 text-gray-300')}>
+                      <Icon className="h-3.5 w-3.5" />
+                    </div>
+                    <span className="text-sm text-gray-700 truncate">{m.label}</span>
+                  </div>
+                  {isEditing ? (
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <input
+                        type="date"
+                        className="border rounded px-2 py-0.5 text-xs"
+                        value={editValue}
+                        onChange={e => setEditValue(e.target.value)}
+                        autoFocus
+                      />
+                      <Button size="sm" className="h-6 px-2 text-[10px]"
+                        onClick={() => handleSave(m.key)}
+                        disabled={updateMilestone.isPending}>
+                        Save
+                      </Button>
+                      {val && (
+                        <Button size="sm" variant="ghost" className="h-6 px-1 text-[10px] text-red-500"
+                          onClick={() => handleClear(m.key)}>
+                          Clear
+                        </Button>
+                      )}
+                      <Button size="sm" variant="ghost" className="h-6 px-1 text-[10px]"
+                        onClick={() => setEditingKey(null)}>
+                        ✕
+                      </Button>
+                    </div>
+                  ) : (
+                    <button
+                      className={cn(
+                        "text-sm font-medium shrink-0 rounded px-1.5 py-0.5 hover:bg-gray-100 transition-colors",
+                        isOverdue ? 'text-red-600' : val ? 'text-gray-900' : 'text-gray-300 hover:text-gray-500'
+                      )}
+                      onClick={() => handleStartEdit(m.key, val)}
+                    >
+                      {val ? fmtDate(val) : '+ Set date'}
+                      {isOverdue && <span className="ml-1 text-[10px] text-red-500">OVERDUE</span>}
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
+      {deal.offerPrice && (
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-xs text-gray-500 mb-1">Offer Price</p>
+            <p className="text-lg font-bold text-gray-900">{fmtCurrency(deal.offerPrice)}</p>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+// ── Tab: Commission Tracking ───────────────────────────────────────────
+function DealCommissionsTab({ dealId, deal }: { dealId: string; deal: any }) {
+  const queryClient = useQueryClient();
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({
+    recipientName: '', recipientType: 'internal', role: '',
+    splitPercent: '', commissionAmount: '', status: 'pending', notes: '', contactId: '',
+  });
+
+  const { data: commissions = [], isLoading } = useQuery<any[]>({
+    queryKey: ['deal-commissions', dealId],
+    queryFn: async () => {
+      const res = await apiRequest('GET', `/api/crm/deals/${dealId}/commissions`);
+      return res.json();
+    },
+    enabled: !!dealId,
+  });
+
+  const addMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const nullableFields = ['contactId', 'role', 'splitPercent', 'commissionAmount', 'notes'];
+      const sanitized: Record<string, any> = { ...data };
+      for (const f of nullableFields) {
+        if (sanitized[f] === '') sanitized[f] = undefined;
+      }
+      const res = await apiRequest('POST', `/api/crm/deals/${dealId}/commissions`, sanitized);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error ?? 'Failed to add commission');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['deal-commissions', dealId] });
+      setShowForm(false);
+      setForm({ recipientName: '', recipientType: 'internal', role: '', splitPercent: '', commissionAmount: '', status: 'pending', notes: '', contactId: '' });
+    },
+    onError: (err: any) => toast({ title: err?.message ?? 'Failed to add commission', variant: 'destructive' }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest('DELETE', `/api/crm/deals/${dealId}/commissions/${id}`);
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['deal-commissions', dealId] }),
+  });
+
+  const statusMutation = useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: string }) => {
+      const res = await apiRequest('PATCH', `/api/crm/deals/${dealId}/commissions/${id}`, { status });
+      return res.json();
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['deal-commissions', dealId] }),
+  });
+
+  const dealValue = Number(deal?.amount || deal?.value) || 0;
+  const totalCommissionPool = deal?.commissionAmount
+    ? parseFloat(deal.commissionAmount)
+    : deal?.commissionRate
+      ? dealValue * (parseFloat(deal.commissionRate) / 100)
+      : 0;
+
+  const totalAllocated = commissions.reduce((sum: number, c: any) => sum + (parseFloat(c.commissionAmount || '0') || 0), 0);
+
+  const statusColors: Record<string, string> = {
+    pending: 'bg-amber-100 text-amber-700',
+    approved: 'bg-blue-100 text-blue-700',
+    paid: 'bg-emerald-100 text-emerald-700',
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-3">
+        <div className="rounded-xl bg-gradient-to-br from-emerald-50 to-emerald-100 p-4">
+          <p className="text-xs text-emerald-500 mb-1">Commission Pool</p>
+          <p className="text-xl font-bold text-emerald-700">{fmtCurrency(totalCommissionPool)}</p>
+          {deal?.commissionRate && <p className="text-[10px] text-emerald-400 mt-0.5">{parseFloat(deal.commissionRate).toFixed(1)}% rate</p>}
+        </div>
+        <div className="rounded-xl bg-gradient-to-br from-blue-50 to-blue-100 p-4">
+          <p className="text-xs text-blue-500 mb-1">Allocated</p>
+          <p className="text-xl font-bold text-blue-700">{fmtCurrency(totalAllocated)}</p>
+          {totalCommissionPool > 0 && (
+            <div className="mt-2">
+              <Progress value={Math.min(100, (totalAllocated / totalCommissionPool) * 100)} className="h-1" />
+            </div>
+          )}
+        </div>
+      </div>
+
+      {isLoading ? (
+        <div className="space-y-2">{[...Array(3)].map((_, i) => <Card key={i}><CardContent className="p-4"><div className="h-12 bg-gray-100 rounded animate-pulse" /></CardContent></Card>)}</div>
+      ) : commissions.length === 0 ? (
+        <EmptyState icon={DollarSign} title="No commission splits yet" subtitle="Add recipients and split the commission pool." />
+      ) : (
+        <div className="space-y-2">
+          {commissions.map((c: any) => (
+            <Card key={c.id}>
+              <CardContent className="p-4">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="text-sm font-semibold text-gray-900">{c.recipientName}</p>
+                      {c.role && <Badge variant="outline" className="text-[10px]">{fmtLabel(c.role)}</Badge>}
+                      <Badge className={cn("text-[10px]", statusColors[c.status] || 'bg-gray-100 text-gray-600')}>{c.status}</Badge>
+                    </div>
+                    <div className="flex items-center gap-3 mt-1 text-xs text-gray-400">
+                      {c.splitPercent && <span>{parseFloat(c.splitPercent).toFixed(1)}% split</span>}
+                      {c.commissionAmount && <span className="font-medium text-gray-700">{fmtCurrency(c.commissionAmount)}</span>}
+                      <span className="capitalize">{c.recipientType}</span>
+                    </div>
+                    {c.notes && <p className="text-xs text-gray-500 mt-1">{c.notes}</p>}
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    {c.status !== 'paid' && (
+                      <Button size="sm" variant="ghost" className="h-7 px-2 text-xs text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+                        onClick={() => statusMutation.mutate({ id: c.id, status: c.status === 'pending' ? 'approved' : 'paid' })}>
+                        {c.status === 'pending' ? 'Approve' : 'Mark Paid'}
+                      </Button>
+                    )}
+                    <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-red-400 hover:text-red-600 hover:bg-red-50"
+                      onClick={() => deleteMutation.mutate(c.id)}>
+                      <span className="text-xs">✕</span>
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {showForm ? (
+        <Card>
+          <CardHeader className="pb-2 pt-3 px-4"><CardTitle className="text-sm">Add Commission Split</CardTitle></CardHeader>
+          <CardContent className="px-4 pb-4 space-y-3">
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="text-xs text-gray-500">Recipient Name *</label>
+                <input className="w-full border rounded px-2 py-1.5 text-sm mt-0.5" value={form.recipientName}
+                  onChange={e => setForm(f => ({ ...f, recipientName: e.target.value }))} placeholder="John Smith" />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500">Type</label>
+                <select className="w-full border rounded px-2 py-1.5 text-sm mt-0.5 bg-white" value={form.recipientType}
+                  onChange={e => setForm(f => ({ ...f, recipientType: e.target.value }))}>
+                  <option value="internal">Internal</option>
+                  <option value="external">External</option>
+                  <option value="referral">Referral</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-gray-500">Role</label>
+                <select className="w-full border rounded px-2 py-1.5 text-sm mt-0.5 bg-white" value={form.role}
+                  onChange={e => setForm(f => ({ ...f, role: e.target.value }))}>
+                  <option value="">Select role...</option>
+                  <option value="listing_broker">Listing Broker</option>
+                  <option value="buyers_broker">Buyer's Broker</option>
+                  <option value="referral_agent">Referral Agent</option>
+                  <option value="transaction_coordinator">Transaction Coordinator</option>
+                  <option value="co_broker">Co-Broker</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-gray-500">Split %</label>
+                <input className="w-full border rounded px-2 py-1.5 text-sm mt-0.5" type="number" step="0.5" min="0" max="100"
+                  value={form.splitPercent} onChange={e => setForm(f => ({ ...f, splitPercent: e.target.value }))} placeholder="50" />
+              </div>
+              <div className="col-span-2">
+                <label className="text-xs text-gray-500">Commission Amount ($)</label>
+                <input className="w-full border rounded px-2 py-1.5 text-sm mt-0.5" type="number" step="100"
+                  value={form.commissionAmount} onChange={e => setForm(f => ({ ...f, commissionAmount: e.target.value }))} placeholder="25000" />
+              </div>
+              {deal?.contacts?.length > 0 && (
+                <div className="col-span-2">
+                  <label className="text-xs text-gray-500">Link to Contact (optional)</label>
+                  <select className="w-full border rounded px-2 py-1.5 text-sm mt-0.5 bg-white" value={form.contactId}
+                    onChange={e => setForm(f => ({ ...f, contactId: e.target.value }))}>
+                    <option value="">None</option>
+                    {deal.contacts.map((c: any) => (
+                      <option key={c.id} value={c.id}>
+                        {c.firstName} {c.lastName}{c.company ? ` — ${c.company}` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              <div className="col-span-2">
+                <label className="text-xs text-gray-500">Notes</label>
+                <textarea className="w-full border rounded px-2 py-1.5 text-sm mt-0.5" rows={2} value={form.notes}
+                  onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} />
+              </div>
+            </div>
+            <div className="flex gap-2 pt-1">
+              <Button size="sm" onClick={() => addMutation.mutate(form)} disabled={!form.recipientName || addMutation.isPending}>
+                {addMutation.isPending ? 'Adding...' : 'Add Split'}
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => setShowForm(false)}>Cancel</Button>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <Button size="sm" variant="outline" className="w-full" onClick={() => setShowForm(true)}>
+          <Plus className="h-4 w-4 mr-1.5" />Add Commission Split
+        </Button>
+      )}
+    </div>
+  );
+}
+
 // ── Main Page ─────────────────────────────────────────────────────────
 export default function DealDetail() {
   const params = useParams();
@@ -758,6 +1107,21 @@ export default function DealDetail() {
             label: 'Notes',
             count: notesData?.length || 0,
             content: <DealNotesTab notes={notesData || []} />,
+          },
+          {
+            value: 'loi-timeline',
+            label: 'LOI / Milestones',
+            content: <DealLoiTimelineTab deal={deal} />,
+          },
+          {
+            value: 'commissions',
+            label: 'Commissions',
+            content: <DealCommissionsTab dealId={dealId} deal={deal} />,
+          },
+          {
+            value: 'sla',
+            label: 'SLA',
+            content: <SlaTrackingPanel entityType="deal" entityId={dealId} />,
           },
         ] : []}
 

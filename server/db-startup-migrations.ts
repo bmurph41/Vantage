@@ -172,6 +172,46 @@ const MIGRATIONS: Migration[] = [
       END; $$
     `,
   },
+  // ── LOI / Transaction Milestone columns on crm_deals ──────────────────────
+  { name: "crm_deals: add loi_submitted_at",    sql: `ALTER TABLE crm_deals ADD COLUMN IF NOT EXISTS loi_submitted_at timestamp` },
+  { name: "crm_deals: add loi_accepted_at",     sql: `ALTER TABLE crm_deals ADD COLUMN IF NOT EXISTS loi_accepted_at timestamp` },
+  { name: "crm_deals: add loi_rejected_at",     sql: `ALTER TABLE crm_deals ADD COLUMN IF NOT EXISTS loi_rejected_at timestamp` },
+  { name: "crm_deals: add loi_expires_at",      sql: `ALTER TABLE crm_deals ADD COLUMN IF NOT EXISTS loi_expires_at timestamp` },
+  { name: "crm_deals: add offer_price",         sql: `ALTER TABLE crm_deals ADD COLUMN IF NOT EXISTS offer_price numeric(12,2)` },
+  { name: "crm_deals: add offer_submitted_at",  sql: `ALTER TABLE crm_deals ADD COLUMN IF NOT EXISTS offer_submitted_at timestamp` },
+  { name: "crm_deals: add term_sheet_signed_at",sql: `ALTER TABLE crm_deals ADD COLUMN IF NOT EXISTS term_sheet_signed_at timestamp` },
+  { name: "crm_deals: add psa_executed_at",     sql: `ALTER TABLE crm_deals ADD COLUMN IF NOT EXISTS psa_executed_at timestamp` },
+  { name: "crm_deals: add closing_scheduled_at",sql: `ALTER TABLE crm_deals ADD COLUMN IF NOT EXISTS closing_scheduled_at timestamp` },
+  // ── deal_commissions table ─────────────────────────────────────────────────
+  {
+    name: "deal_commissions: create table",
+    sql: `
+      CREATE TABLE IF NOT EXISTS deal_commissions (
+        id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+        deal_id varchar NOT NULL REFERENCES crm_deals(id) ON DELETE CASCADE,
+        recipient_type text NOT NULL DEFAULT 'internal',
+        recipient_name text NOT NULL,
+        contact_id varchar REFERENCES crm_contacts(id),
+        role text,
+        split_percent numeric(5,2),
+        commission_amount numeric(12,2),
+        status text NOT NULL DEFAULT 'pending',
+        paid_at timestamp,
+        notes text,
+        org_id varchar REFERENCES organizations(id),
+        created_at timestamp NOT NULL DEFAULT NOW(),
+        updated_at timestamp NOT NULL DEFAULT NOW()
+      )
+    `,
+  },
+  {
+    name: "deal_commissions: index on deal_id",
+    sql: `CREATE INDEX IF NOT EXISTS deal_commissions_deal_idx ON deal_commissions(deal_id)`,
+  },
+  {
+    name: "deal_commissions: index on contact_id",
+    sql: `CREATE INDEX IF NOT EXISTS deal_commissions_contact_idx ON deal_commissions(contact_id)`,
+  },
 ];
 
 export async function runStartupMigrations(): Promise<void> {

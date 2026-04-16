@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Search, Edit, Trash2, Mail, Phone, Building, Upload, Users, User, Star, Download, Thermometer, BarChart3 } from "lucide-react";
+import { Plus, Search, Edit, Trash2, Mail, Phone, Building, Upload, Users, User, Star, Download, Thermometer, BarChart3, List } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { CrmListsManager } from "@/components/crm/panels/CrmListsManager";
 import { useToast } from "@/hooks/use-toast";
@@ -70,6 +70,7 @@ export default function Contacts() {
   const [showImportResults, setShowImportResults] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [activeViewId, setActiveViewId] = useState<string | null>('default-0');
+  const [viewMode, setViewMode] = useState<'contacts' | 'lists'>('contacts');
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -416,13 +417,22 @@ export default function Contacts() {
         subtitle={`${filteredContacts.length} contacts`}
         actions={
           <>
-            <CsvExportButton entityType="contacts" />
-            <Button variant="outline" size="sm" onClick={() => setShowFileUpload(!showFileUpload)}>
-              <Upload className="w-4 h-4 mr-1.5" />Import
+            <Button
+              variant={viewMode === 'lists' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setViewMode(viewMode === 'lists' ? 'contacts' : 'lists')}
+            >
+              <List className="w-4 h-4 mr-1.5" />Lists
             </Button>
-            <Button size="sm" onClick={handleAdd}>
-              <Plus className="w-4 h-4 mr-1.5" />Add Contact
-            </Button>
+            {viewMode === 'contacts' && <>
+              <CsvExportButton entityType="contacts" />
+              <Button variant="outline" size="sm" onClick={() => setShowFileUpload(!showFileUpload)}>
+                <Upload className="w-4 h-4 mr-1.5" />Import
+              </Button>
+              <Button size="sm" onClick={handleAdd}>
+                <Plus className="w-4 h-4 mr-1.5" />Add Contact
+              </Button>
+            </>}
           </>
         }
         filters={
@@ -540,21 +550,27 @@ export default function Contacts() {
         )}
 
         <div className="flex-1 overflow-auto">
-          <CrmDataTable
-            data={filteredContacts}
-            columns={columns}
-            isLoading={isLoading}
-            selectedId={drawerContactId}
-            onRowClick={handleRowClick}
-            getRowId={(c) => c.id}
-            selectedIds={selectedIds}
-            onSelectionChange={setSelectedIds}
-            emptyState={{
-              title: searchTerm || statusFilter !== 'all' ? 'No contacts found' : 'No contacts yet',
-              description: searchTerm || statusFilter !== 'all' ? 'Try adjusting your search or filter criteria.' : 'Start by adding your first contact.',
-              action: !searchTerm && statusFilter === 'all' ? { label: 'Add Contact', onClick: handleAdd } : undefined
-            }}
-          />
+          {viewMode === 'lists' ? (
+            <div className="p-4">
+              <CrmListsManager entityType="contact" />
+            </div>
+          ) : (
+            <CrmDataTable
+              data={filteredContacts}
+              columns={columns}
+              isLoading={isLoading}
+              selectedId={drawerContactId}
+              onRowClick={handleRowClick}
+              getRowId={(c) => c.id}
+              selectedIds={selectedIds}
+              onSelectionChange={setSelectedIds}
+              emptyState={{
+                title: searchTerm || statusFilter !== 'all' ? 'No contacts found' : 'No contacts yet',
+                description: searchTerm || statusFilter !== 'all' ? 'Try adjusting your search or filter criteria.' : 'Start by adding your first contact.',
+                action: !searchTerm && statusFilter === 'all' ? { label: 'Add Contact', onClick: handleAdd } : undefined
+              }}
+            />
+          )}
         </div>
       </div>
 

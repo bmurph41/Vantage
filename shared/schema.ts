@@ -4378,6 +4378,16 @@ export const crmDeals = pgTable("crm_deals", {
   // Closed Deal Tracking
   isClosed: boolean("is_closed").default(false),
   closedAt: timestamp("closed_at"),
+  // LOI / Offer / Transaction Milestone Tracking
+  loiSubmittedAt: timestamp("loi_submitted_at"),
+  loiAcceptedAt: timestamp("loi_accepted_at"),
+  loiRejectedAt: timestamp("loi_rejected_at"),
+  loiExpiresAt: timestamp("loi_expires_at"),
+  offerPrice: decimal("offer_price", { precision: 12, scale: 2 }),
+  offerSubmittedAt: timestamp("offer_submitted_at"),
+  termSheetSignedAt: timestamp("term_sheet_signed_at"),
+  psaExecutedAt: timestamp("psa_executed_at"),
+  closingScheduledAt: timestamp("closing_scheduled_at"),
   orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -4410,6 +4420,31 @@ export const crmDealStageHistory = pgTable("crm_deal_stage_history", {
   enteredAtIdx: index("crm_deal_stage_history_entered_at_idx").on(table.enteredAt),
   currentStageIdx: index("crm_deal_stage_history_current_idx").on(table.dealId, table.isCurrentStage),
 }));
+
+// Deal Commissions - Per-deal commission tracking (splits, co-brokerage, referrals)
+export const dealCommissions = pgTable("deal_commissions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  dealId: varchar("deal_id").notNull().references(() => crmDeals.id, { onDelete: "cascade" }),
+  recipientType: text("recipient_type").notNull().default("internal"), // internal, external, referral
+  recipientName: text("recipient_name").notNull(),
+  contactId: varchar("contact_id").references(() => crmContacts.id),
+  role: text("role"), // listing_broker, buyers_broker, referral_agent, transaction_coordinator, co_broker
+  splitPercent: decimal("split_percent", { precision: 5, scale: 2 }), // e.g. 50.00 for 50%
+  commissionAmount: decimal("commission_amount", { precision: 12, scale: 2 }),
+  status: text("status").notNull().default("pending"), // pending, approved, paid
+  paidAt: timestamp("paid_at"),
+  notes: text("notes"),
+  orgId: varchar("org_id").references(() => organizations.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  dealIdx: index("deal_commissions_deal_idx").on(table.dealId),
+  contactIdx: index("deal_commissions_contact_idx").on(table.contactId),
+}));
+
+export const insertDealCommissionSchema = createInsertSchema(dealCommissions).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertDealCommission = z.infer<typeof insertDealCommissionSchema>;
+export type DealCommission = typeof dealCommissions.$inferSelect;
 
 // CRM Timeline Events - Unified event tracking across entities
 export const crmTimelineEventTypeEnum = pgEnum("crm_timeline_event_type", [

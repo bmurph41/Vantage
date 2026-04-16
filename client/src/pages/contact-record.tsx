@@ -27,6 +27,7 @@ import {
   ContactModelsTab,
   ContactActivitiesTab,
   ContactDealsTabEnhanced,
+  ContactCommissionHistoryTab,
 } from '@/components/crm/ContactRecordTabs';
 import { ContactTimeline } from '@/components/crm/ContactTimeline';
 import { RelationshipMap } from '@/components/crm/RelationshipMap';
@@ -343,6 +344,11 @@ export default function ContactRecordPage() {
           value: 'relationships',
           label: 'Relationships',
           content: <RelationshipMap entityId={id} entityType="contact" />,
+        },
+        {
+          value: 'commissions',
+          label: 'Commissions',
+          content: <ContactCommissionHistoryTab contactId={id} />,
         },
       ] : []}
 

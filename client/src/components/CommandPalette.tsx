@@ -129,6 +129,8 @@ export function CommandPalette() {
                           target.isContentEditable;
       
       if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
+        // On CRM pages, ⌘K is handled by SmartSearch in CrmTopBar — skip here
+        if (window.location.pathname.startsWith('/crm')) return;
         e.preventDefault();
         setOpen((open) => !open);
       }

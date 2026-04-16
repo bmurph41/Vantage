@@ -13,7 +13,7 @@ import {
   MapPin, Building2, DollarSign, TrendingUp, Activity, Clock,
   ExternalLink, ChevronRight, Anchor, Phone, Mail, FileText,
   BarChart3, Newspaper, Calendar, Target, ArrowUpRight,
-  CheckCircle2, Circle, AlertCircle, MessageSquare,
+  CheckCircle2, Circle, AlertCircle, MessageSquare, Award,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { apiRequest } from '@/lib/queryClient';
@@ -257,7 +257,7 @@ export function ContactActivitiesTab({ contactId }: { contactId: string }) {
 // ── Enhanced Deals Tab ────────────────────────────────────────────────
 export function ContactDealsTabEnhanced({ deals }: { deals: any[] }) {
   const [, setLocation] = useLocation();
-  if (!deals?.length) return <EmptyState icon={DollarSign} title="No deals yet" subtitle="Deals linked to this contact will appear here" />;
+  if (!deals?.length) return <EmptyState icon={DollarSign} title="No deals yet" subtitle="Deals associated to this contact will appear here" />;
   const totalPipeline = deals.reduce((s: number, d: any) => s + (parseFloat(d.value || '0') || 0), 0);
   const openDeals = deals.filter((d: any) => !d.stage.includes('closed'));
   const chartData = Object.entries(deals.reduce((acc: any, d: any) => { const s = fmtLabel(d.stage); acc[s] = (acc[s] || 0) + (parseFloat(d.value || '0') || 0); return acc; }, {})).map(([name, value]) => ({ name, value }));
@@ -293,6 +293,81 @@ export function ContactDealsTabEnhanced({ deals }: { deals: any[] }) {
                     {deal.probability != null && !isClosed && <Progress value={deal.probability} className="h-1 mt-2" />}
                   </div>
                   <ChevronRight className="h-4 w-4 text-gray-400 shrink-0 ml-3" />
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ── Commission History Tab ─────────────────────────────────────────────
+export function ContactCommissionHistoryTab({ contactId }: { contactId: string }) {
+  const [, setLocation] = useLocation();
+  const { data, isLoading } = useQuery<any[]>({
+    queryKey: ['contact-commissions', contactId],
+    queryFn: async () => {
+      const res = await apiRequest('GET', `/api/crm/contacts/${contactId}/commissions`);
+      return res.json();
+    },
+    enabled: !!contactId,
+  });
+
+  const rows = data || [];
+
+  const statusColors: Record<string, string> = {
+    pending: 'bg-amber-100 text-amber-700',
+    approved: 'bg-blue-100 text-blue-700',
+    paid: 'bg-emerald-100 text-emerald-700',
+  };
+
+  const fmtCurrency2 = (v: string | number | null) => {
+    if (!v) return '—';
+    const n = typeof v === 'string' ? parseFloat(v) : v;
+    if (isNaN(n)) return '—';
+    if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(2)}M`;
+    if (n >= 1_000) return `$${(n / 1_000).toFixed(0)}K`;
+    return `$${n.toFixed(0)}`;
+  };
+
+  if (isLoading) return <div className="space-y-2">{[...Array(3)].map((_, i) => <Card key={i}><CardContent className="p-4"><div className="h-12 bg-gray-100 rounded animate-pulse" /></CardContent></Card>)}</div>;
+  if (!rows.length) return <EmptyState icon={Award} title="No commission history" subtitle="Commissions assigned to this contact on closed deals will appear here." />;
+
+  const totalEarned = rows.filter((r: any) => r.commission?.status === 'paid').reduce((s: number, r: any) => s + (parseFloat(r.commission?.commissionAmount || '0') || 0), 0);
+  const totalPending = rows.filter((r: any) => r.commission?.status === 'pending').reduce((s: number, r: any) => s + (parseFloat(r.commission?.commissionAmount || '0') || 0), 0);
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-3">
+        <div className="rounded-xl bg-emerald-50 p-3 text-center">
+          <p className="text-xs text-emerald-400">Total Paid</p>
+          <p className="text-xl font-bold text-emerald-700">{fmtCurrency2(totalEarned)}</p>
+        </div>
+        <div className="rounded-xl bg-amber-50 p-3 text-center">
+          <p className="text-xs text-amber-400">Pending</p>
+          <p className="text-xl font-bold text-amber-700">{fmtCurrency2(totalPending)}</p>
+        </div>
+      </div>
+      <div className="space-y-2">
+        {rows.map((row: any) => {
+          const c = row.commission;
+          const d = row.deal;
+          return (
+            <Card key={c.id} className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => d?.id && setLocation(`/crm/deals/${d.id}`)}>
+              <CardContent className="p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-gray-900 truncate">{d?.title || 'Unknown Deal'}</p>
+                    <div className="flex items-center gap-2 mt-1 flex-wrap">
+                      {c.role && <Badge variant="outline" className="text-[10px]">{fmtLabel(c.role)}</Badge>}
+                      <Badge className={cn("text-[10px]", statusColors[c.status] || 'bg-gray-100 text-gray-600')}>{c.status}</Badge>
+                      {c.splitPercent && <span className="text-[10px] text-gray-400">{parseFloat(c.splitPercent).toFixed(1)}% split</span>}
+                    </div>
+                    {c.paidAt && <p className="text-[10px] text-gray-400 mt-0.5">Paid: {fmtDate(c.paidAt)}</p>}
+                  </div>
+                  <p className="text-sm font-bold text-gray-900 shrink-0">{fmtCurrency2(c.commissionAmount)}</p>
                 </div>
               </CardContent>
             </Card>

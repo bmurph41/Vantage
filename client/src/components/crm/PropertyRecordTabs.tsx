@@ -385,6 +385,111 @@ export function PropertyIntelTab({ state, city }: { state?: string | null; city?
   );
 }
 
+// ── Rent Roll KPI Tab ─────────────────────────────────────────────────
+export function PropertyRentRollKpiTab({ propertyId }: { propertyId: string }) {
+  const { data, isLoading } = useQuery<any>({
+    queryKey: ['rra-projects-property', propertyId],
+    queryFn: async () => {
+      const res = await apiRequest('GET', `/api/rra/projects?propertyId=${propertyId}&limit=5`);
+      return res.json();
+    },
+    enabled: !!propertyId,
+  });
+
+  const projects: any[] = Array.isArray(data) ? data : data?.projects || data?.data || [];
+
+  if (isLoading) return <div className="space-y-2">{[...Array(3)].map((_, i) => <Card key={i}><CardContent className="p-4"><Skeleton className="h-16 w-full" /></CardContent></Card>)}</div>;
+  if (!projects.length) return <EmptyState icon={BarChart3} title="No Rent Roll Analyses" subtitle="Link a Rent Roll Analysis project to this property to see KPIs." />;
+
+  const latest = projects[0];
+  const kpis: { label: string; value: any; fmt?: (v: any) => string }[] = [
+    { label: 'Total Units', value: latest?.summary?.totalUnits ?? latest?.totalUnits },
+    { label: 'Occupied', value: latest?.summary?.occupiedUnits ?? latest?.occupiedUnits },
+    { label: 'Occupancy Rate', value: latest?.summary?.occupancyRate ?? latest?.occupancyRate, fmt: v => `${parseFloat(v).toFixed(1)}%` },
+    { label: 'Avg Monthly Rent', value: latest?.summary?.avgMonthlyRent ?? latest?.avgMonthlyRent, fmt: v => `$${parseFloat(v).toLocaleString(undefined, { maximumFractionDigits: 0 })}` },
+    { label: 'Gross Potential Rent', value: latest?.summary?.grossPotentialRent ?? latest?.grossPotentialRent, fmt: v => `$${(parseFloat(v) / 1000).toFixed(0)}K/mo` },
+    { label: 'Economic Vacancy', value: latest?.summary?.vacancyLoss ?? latest?.vacancyLoss, fmt: v => `$${(parseFloat(v) / 1000).toFixed(0)}K` },
+  ];
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-3">
+        {kpis.filter(k => k.value != null).map((k) => (
+          <div key={k.label} className="rounded-xl bg-gray-50 p-3">
+            <p className="text-xs text-gray-400 mb-1">{k.label}</p>
+            <p className="text-lg font-bold text-gray-900">{k.fmt ? k.fmt(k.value) : k.value}</p>
+          </div>
+        ))}
+      </div>
+      {projects.length > 1 && (
+        <Card>
+          <CardHeader className="pb-2 pt-3 px-4"><CardTitle className="text-sm">Recent Analyses</CardTitle></CardHeader>
+          <CardContent className="px-4 pb-4 space-y-2">
+            {projects.slice(1).map((p: any) => (
+              <div key={p.id} className="flex items-center justify-between text-sm border-b last:border-0 pb-2 last:pb-0">
+                <span className="text-gray-700 truncate">{p.name || p.title || 'Analysis'}</span>
+                <span className="text-gray-400 text-xs shrink-0 ml-2">{p.createdAt ? new Date(p.createdAt).toLocaleDateString() : ''}</span>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+// ── Demographics Tab ───────────────────────────────────────────────────
+export function PropertyDemographicsTab({ propertyId, city, state }: { propertyId: string; city?: string | null; state?: string | null }) {
+  const { data, isLoading } = useQuery<any>({
+    queryKey: ['property-demographics', propertyId, city, state],
+    queryFn: async () => {
+      const locationStr = [city, state].filter(Boolean).join(', ');
+      if (!locationStr) return null;
+      const res = await apiRequest('POST', '/api/demographics/location', { location: locationStr, propertyId });
+      if (!res.ok) return null;
+      return res.json();
+    },
+    enabled: !!(city || state),
+  });
+
+  const demo = data?.data || data?.demographics || data;
+
+  if (!city && !state) return <EmptyState icon={MapPin} title="No location set" subtitle="Add a city and state to this property to auto-load demographics." />;
+  if (isLoading) return <div className="space-y-2">{[...Array(4)].map((_, i) => <Card key={i}><CardContent className="p-4"><Skeleton className="h-12 w-full" /></CardContent></Card>)}</div>;
+  if (!demo) return <EmptyState icon={MapPin} title="Demographics unavailable" subtitle={`No data available for ${[city, state].filter(Boolean).join(', ')}.`} />;
+
+  const items: { label: string; value: any }[] = [
+    { label: 'Population', value: demo.population?.toLocaleString() },
+    { label: 'Median HH Income', value: demo.medianHouseholdIncome ? `$${demo.medianHouseholdIncome.toLocaleString()}` : null },
+    { label: 'Median Age', value: demo.medianAge },
+    { label: 'Owner Occupied %', value: demo.ownerOccupiedRate ? `${demo.ownerOccupiedRate.toFixed(1)}%` : null },
+    { label: 'Renter Occupied %', value: demo.renterOccupiedRate ? `${demo.renterOccupiedRate.toFixed(1)}%` : null },
+    { label: 'Unemployment %', value: demo.unemploymentRate ? `${demo.unemploymentRate.toFixed(1)}%` : null },
+    { label: 'College Educated %', value: demo.collegeEducatedRate ? `${demo.collegeEducatedRate.toFixed(1)}%` : null },
+  ].filter(i => i.value != null);
+
+  return (
+    <div className="space-y-3">
+      <Card>
+        <CardHeader className="pb-2 pt-3 px-4">
+          <CardTitle className="text-sm">Demographics — {[city, state].filter(Boolean).join(', ')}</CardTitle>
+        </CardHeader>
+        <CardContent className="px-4 pb-4">
+          <div className="grid grid-cols-2 gap-3">
+            {items.map(item => (
+              <div key={item.label} className="rounded-lg bg-gray-50 p-3">
+                <p className="text-xs text-gray-400 mb-1">{item.label}</p>
+                <p className="text-sm font-bold text-gray-900">{item.value}</p>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+      {demo.source && <p className="text-[10px] text-gray-400 text-right">Source: {demo.source}</p>}
+    </div>
+  );
+}
+
 // ── Activities Tab ────────────────────────────────────────────────────
 const activityTypeConfig: Record<string, { icon: any; color: string; bg: string }> = {
   call: { icon: Phone, color: 'text-blue-600', bg: 'bg-blue-50' },

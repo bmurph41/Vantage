@@ -57,6 +57,9 @@ import { PipelineNudges } from "@/components/pipeline/PipelineNudges";
 import DealGanttView from "@/components/crm/deal-gantt-view";
 import { ForecastChart } from "@/components/pipeline/ForecastChart";
 import PipelineTemplateSelector from "@/components/pipeline/PipelineTemplateSelector";
+import { SlaTrackingPanel } from "@/components/crm/panels/sla-tracking-panel";
+import { PipelineForecastingPanel } from "@/components/crm/panels/pipeline-forecasting-panel";
+import { StageTemplateEditor } from "@/components/crm/panels/StageTemplateEditor";
 import {
   ASSET_CLASSES,
   DEAL_PRIORITIES,
@@ -1626,18 +1629,28 @@ export default function Pipeline() {
 
         {/* Templates View */}
         {viewMode === "templates" && (
-          <div className="flex-1 overflow-y-auto p-4" data-testid="templates-view">
+          <div className="flex-1 overflow-y-auto p-4 space-y-6" data-testid="templates-view">
             <PipelineTemplateSelector
               pipelineId={selectedPipelineId}
               onDealCreated={() => setViewMode("kanban")}
             />
+            {stages.length > 0 && (
+              <div className="space-y-4">
+                <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-200 px-1">Stage Task Templates & SLA Settings</h2>
+                {stages.map(stage => (
+                  <StageTemplateEditor key={stage.id} stageId={stage.id} stageName={stage.name} />
+                ))}
+              </div>
+            )}
           </div>
         )}
 
         {/* Forecast View */}
         {viewMode === "forecast" && (
-          <div className="flex-1 overflow-y-auto" data-testid="forecast-view">
+          <div className="flex-1 overflow-y-auto p-4 space-y-4" data-testid="forecast-view">
+            <PipelineForecastingPanel pipelineId={selectedPipelineId} />
             <ForecastChart pipelineId={selectedPipelineId} />
+            <SlaTrackingPanel entityType="pipeline" entityId={selectedPipelineId} />
           </div>
         )}
 

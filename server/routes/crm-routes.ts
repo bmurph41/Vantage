@@ -71,6 +71,9 @@ import {
   marketTargets,
   insertMarketTargetSchema,
   insertModelingProjectSchema,
+  dealCommissions,
+  insertDealCommissionSchema,
+  crmPipelineStages,
 } from "@shared/schema";
 import {
   salesCompCreateSchema,
@@ -175,7 +178,7 @@ export function registerCRMRoutes(
         }
       }
       
-      const deal = await storage.updateCrmDeal(req.params.id, updateData);
+      let deal = await storage.updateCrmDeal(req.params.id, updateData);
       
       // Pipeline Stage Automation - execute after successful deal update
       if (stageChanged) {
@@ -274,6 +277,67 @@ export function registerCRMRoutes(
       evaluateAutomations('deal.field_updated', 'deal', req.params.id, req.user.orgId, {
         updatedFields: Object.keys(req.body),
       }).catch(() => {});
+
+      // ── LOI Milestone Auto-Stage-Advance ──────────────────────────────────
+      // When key milestone dates are newly set (were null, now have a value),
+      // advance the deal to an appropriate stage if one matches.
+      if (!updateData.stageId) {
+        try {
+          const milestoneStageMapping: Array<{ field: string; keywords: string[] }> = [
+            { field: 'loiSubmittedAt',    keywords: ['loi', 'letter of intent', 'offer'] },
+            { field: 'loiAcceptedAt',     keywords: ['negotiation', 'accepted', 'loi accepted'] },
+            { field: 'termSheetSignedAt', keywords: ['term sheet', 'term', 'signed'] },
+            { field: 'psaExecutedAt',     keywords: ['psa', 'under contract', 'contract', 'executed'] },
+            { field: 'closingDate',       keywords: ['closed', 'close', 'won', 'done', 'closing'] },
+          ];
+
+          // Walk from most-significant to least: last match wins
+          let targetStageName: string | null = null;
+          let triggerField: string | null = null;
+          for (const { field, keywords } of milestoneStageMapping) {
+            const wasUnset = !currentDeal[field as keyof typeof currentDeal];
+            const isNowSet = !!(updateData[field]);
+            if (wasUnset && isNowSet) {
+              targetStageName = keywords[0]; // use first keyword for logging
+              triggerField = field;
+            }
+          }
+
+          if (targetStageName && triggerField && deal?.pipelineId) {
+            const pipelineStages = await db.select().from(crmPipelineStages)
+              .where(eq(crmPipelineStages.pipelineId, deal.pipelineId))
+              .orderBy(asc(crmPipelineStages.stageOrder));
+
+            // Find the best matching stage (case-insensitive keyword match)
+            const candidateKeywords = milestoneStageMapping.find(m => m.field === triggerField)?.keywords || [];
+            const matchedStage = pipelineStages.find(s => {
+              const lower = s.name.toLowerCase();
+              return candidateKeywords.some(kw => lower.includes(kw));
+            });
+
+            if (matchedStage && matchedStage.id !== deal.stageId) {
+              const autoAdvanceFields: Record<string, any> = { stageId: matchedStage.id };
+              if (matchedStage.name.toLowerCase() === 'closed') {
+                autoAdvanceFields.isClosed = true;
+                autoAdvanceFields.closedAt = new Date().toISOString();
+              }
+              deal = await storage.updateCrmDeal(req.params.id, autoAdvanceFields);
+              storage.createCrmActivity({
+                type: 'stage_change',
+                subject: `Auto-advanced to ${matchedStage.name}`,
+                description: `Stage auto-advanced due to milestone "${triggerField}" being set`,
+                status: 'completed',
+                entityType: 'deal',
+                entityId: req.params.id,
+                performedBy: req.user.id,
+              }).catch(() => {});
+            }
+          }
+        } catch (milestoneError) {
+          console.error('[Milestone Auto-Advance] Error:', milestoneError);
+          // Non-fatal — don't fail the deal update
+        }
+      }
 
       res.json(deal);
     } catch (error: any) {
@@ -4892,6 +4956,133 @@ export function registerCRMRoutes(
     }
   });
 
+  // ─── Deal Commissions CRUD ────────────────────────────────────────────────
+  // Helper: verify a deal belongs to the caller's org. Returns null if not found/unauthorized.
+  async function verifyDealOwnership(dealId: string, orgId: string) {
+    const [deal] = await db.select({ id: crmDeals.id, orgId: crmDeals.orgId })
+      .from(crmDeals)
+      .where(and(eq(crmDeals.id, dealId), eq(crmDeals.orgId, orgId)));
+    return deal ?? null;
+  }
+
+  app.get("/api/crm/deals/:dealId/commissions", async (req: any, res) => {
+    try {
+      const { dealId } = req.params;
+      const orgId: string = req.user.orgId;
+      const deal = await verifyDealOwnership(dealId, orgId);
+      if (!deal) return res.status(404).json({ error: "Deal not found" });
+      const rows = await db.select().from(dealCommissions)
+        .where(eq(dealCommissions.dealId, dealId))
+        .orderBy(asc(dealCommissions.createdAt));
+      res.json(rows);
+    } catch (error: any) {
+      console.error("Failed to get commissions:", error);
+      res.status(500).json({ error: "Failed to retrieve commissions" });
+    }
+  });
+
+  app.post("/api/crm/deals/:dealId/commissions", async (req: any, res) => {
+    try {
+      const { dealId } = req.params;
+      const orgId: string = req.user.orgId;
+      const deal = await verifyDealOwnership(dealId, orgId);
+      if (!deal) return res.status(404).json({ error: "Deal not found" });
+      // Strip tenancy fields from body — set server-side
+      const { orgId: _o, dealId: _d, ...safeBody } = req.body;
+      // Normalize empty strings to undefined for nullable/optional fields so FK and decimal constraints are safe
+      const nullableFields = ['contactId', 'role', 'splitPercent', 'commissionAmount', 'paidAt', 'notes'];
+      for (const field of nullableFields) {
+        if (safeBody[field] === '') safeBody[field] = undefined;
+      }
+      const parsed = insertDealCommissionSchema.safeParse({ ...safeBody, dealId, orgId });
+      if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+      // Verify contactId belongs to same org to prevent cross-tenant FK linkage
+      if (parsed.data.contactId) {
+        const [contact] = await db.select({ id: crmContacts.id }).from(crmContacts)
+          .where(and(eq(crmContacts.id, parsed.data.contactId), eq(crmContacts.orgId, orgId)));
+        if (!contact) return res.status(400).json({ error: "Contact not found in your organization" });
+      }
+      const [row] = await db.insert(dealCommissions).values(parsed.data).returning();
+      res.status(201).json(row);
+    } catch (error: any) {
+      console.error("Failed to create commission:", error);
+      res.status(500).json({ error: "Failed to create commission" });
+    }
+  });
+
+  app.patch("/api/crm/deals/:dealId/commissions/:id", async (req: any, res) => {
+    try {
+      const { dealId, id } = req.params;
+      const orgId: string = req.user.orgId;
+      const deal = await verifyDealOwnership(dealId, orgId);
+      if (!deal) return res.status(404).json({ error: "Deal not found" });
+      const patchSchema = insertDealCommissionSchema
+        .pick({ recipientName: true, recipientType: true, role: true, splitPercent: true, commissionAmount: true, status: true, notes: true, contactId: true })
+        .partial();
+      const parsed = patchSchema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+      if (Object.keys(parsed.data).length === 0) return res.status(400).json({ error: "No valid fields provided" });
+      // Verify contactId belongs to same org to prevent cross-tenant FK linkage
+      if (parsed.data.contactId) {
+        const [contact] = await db.select({ id: crmContacts.id }).from(crmContacts)
+          .where(and(eq(crmContacts.id, parsed.data.contactId), eq(crmContacts.orgId, orgId)));
+        if (!contact) return res.status(400).json({ error: "Contact not found in your organization" });
+      }
+      const updatePayload: Record<string, any> = { ...parsed.data, updatedAt: new Date() };
+      if (parsed.data.status === 'paid' && !updatePayload.paidAt) {
+        updatePayload.paidAt = new Date();
+      }
+      const [row] = await db.update(dealCommissions)
+        .set(updatePayload)
+        .where(and(eq(dealCommissions.id, id), eq(dealCommissions.dealId, dealId)))
+        .returning();
+      if (!row) return res.status(404).json({ error: "Commission not found" });
+      res.json(row);
+    } catch (error: any) {
+      console.error("Failed to update commission:", error);
+      res.status(500).json({ error: "Failed to update commission" });
+    }
+  });
+
+  app.delete("/api/crm/deals/:dealId/commissions/:id", async (req: any, res) => {
+    try {
+      const { dealId, id } = req.params;
+      const orgId: string = req.user.orgId;
+      const deal = await verifyDealOwnership(dealId, orgId);
+      if (!deal) return res.status(404).json({ error: "Deal not found" });
+      await db.delete(dealCommissions).where(and(eq(dealCommissions.id, id), eq(dealCommissions.dealId, dealId)));
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Failed to delete commission:", error);
+      res.status(500).json({ error: "Failed to delete commission" });
+    }
+  });
+
+  // Commission history by contact (for ContactRecordTabs) — org-scoped via deal join
+  app.get("/api/crm/contacts/:contactId/commissions", async (req: any, res) => {
+    try {
+      const { contactId } = req.params;
+      const orgId: string = req.user.orgId;
+      // Verify contact belongs to caller's org
+      const [contact] = await db.select({ id: crmContacts.id })
+        .from(crmContacts)
+        .where(and(eq(crmContacts.id, contactId), eq(crmContacts.orgId, orgId)));
+      if (!contact) return res.status(404).json({ error: "Contact not found" });
+      const rows = await db.select({
+        commission: dealCommissions,
+        deal: { id: crmDeals.id, title: crmDeals.title, stage: crmDeals.stage },
+      })
+        .from(dealCommissions)
+        .innerJoin(crmDeals, and(eq(dealCommissions.dealId, crmDeals.id), eq(crmDeals.orgId, orgId)))
+        .where(eq(dealCommissions.contactId, contactId))
+        .orderBy(desc(dealCommissions.createdAt));
+      res.json(rows);
+    } catch (error: any) {
+      console.error("Failed to get contact commissions:", error);
+      res.status(500).json({ error: "Failed to retrieve contact commissions" });
+    }
+  });
+
   // Get stage templates for a given stage
   app.get("/api/stages/:stageId/templates", async (req: any, res) => {
     try {
@@ -6669,7 +6860,7 @@ export function registerCRMRoutes(
               .then(rows => new Map(rows.map(r => [r.id, r])))
           : Promise.resolve(new Map()),
         dealIds.size > 0
-          ? db.select({ id: crmDeals.id, title: crmDeals.title, name: crmDeals.name, contactId: crmDeals.contactId, companyId: crmDeals.companyId })
+          ? db.select({ id: crmDeals.id, title: crmDeals.title, contactId: crmDeals.contactId, companyId: crmDeals.companyId })
               .from(crmDeals).where(inArray(crmDeals.id, [...dealIds]))
               .then(rows => new Map(rows.map(r => [r.id, r])))
           : Promise.resolve(new Map()),
@@ -6885,9 +7076,9 @@ export function registerCRMRoutes(
         .select({
           id: crmDeals.id,
           type: sql<string>`'deal'`,
-          title: crmDeals.name,
+          title: crmDeals.title,
           subtitle: sql<string>`CONCAT('$', ${crmDeals.amount})`,
-          description: crmDeals.status,
+          description: crmDeals.stage,
           data: crmDeals,
         })
         .from(crmDeals)
@@ -6895,8 +7086,8 @@ export function registerCRMRoutes(
           and(
             eq(crmDeals.orgId, req.user.orgId),
             or(
-              sql`LOWER(${crmDeals.name}) LIKE ${searchTerm}`,
-              sql`LOWER(${crmDeals.status}) LIKE ${searchTerm}`
+              sql`LOWER(${crmDeals.title}) LIKE ${searchTerm}`,
+              sql`LOWER(${crmDeals.stage}) LIKE ${searchTerm}`
             )
           )
         )

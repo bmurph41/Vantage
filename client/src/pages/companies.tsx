@@ -8,7 +8,7 @@ import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Building, Plus, Edit, Trash2, Upload, Search, Globe, Users, MapPin, TrendingUp, Download, Phone, Settings, Calendar, Briefcase, Home, Loader2, User, ChevronRight, Anchor, DollarSign, Merge, AlertTriangle, BarChart3 } from "lucide-react";
+import { Building, Plus, Edit, Trash2, Upload, Search, Globe, Users, MapPin, TrendingUp, Download, Phone, Settings, Calendar, Briefcase, Home, Loader2, User, ChevronRight, Anchor, DollarSign, Merge, AlertTriangle, BarChart3, List } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import CompanyFormModal from "@/components/modals/company-form-modal";
@@ -112,6 +112,7 @@ export default function Companies() {
   const [showMergeDialog, setShowMergeDialog] = useState(false);
   const [mergeMode, setMergeMode] = useState(false);
   const [activeViewId, setActiveViewId] = useState<string | null>('default-0');
+  const [viewMode, setViewMode] = useState<'companies' | 'lists'>('companies');
 
   // HubSpot-style: Drawer state
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -538,6 +539,14 @@ export default function Companies() {
         actions={
           <>
             <Button
+              variant={viewMode === 'lists' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setViewMode(viewMode === 'lists' ? 'companies' : 'lists')}
+            >
+              <List className="h-4 w-4 mr-2" />Lists
+            </Button>
+            {viewMode === 'companies' && <>
+            <Button
               variant={mergeMode ? "default" : "outline"}
               size="sm"
               onClick={() => {
@@ -559,6 +568,7 @@ export default function Companies() {
             <Button className="bg-blue-600 hover:bg-blue-700" size="sm" onClick={handleAdd}>
               <Plus className="h-4 w-4 mr-2" />Add Company
             </Button>
+            </>}
           </>
         }
         filters={
@@ -664,23 +674,29 @@ export default function Companies() {
         )}
 
         <div className="flex-1 overflow-auto">
-          <CrmDataTable
-            data={filteredCompanies}
-            columns={columns}
-            isLoading={isLoading}
-            selectedId={drawerCompanyId}
-            onRowClick={handleRowClick}
-            getRowId={(c) => c.id}
-            selectedIds={selectedIds}
-            onSelectionChange={setSelectedIds}
-            emptyState={{
-              title: searchTerm || industryFilter !== 'all' || sizeFilter !== 'all' ? 'No companies found' : 'No companies yet',
-              description: searchTerm || industryFilter !== 'all' || sizeFilter !== 'all' 
-                ? 'Try adjusting your search or filter criteria.'
-                : 'Start by adding your first company to build your network.',
-              action: !searchTerm && industryFilter === 'all' && sizeFilter === 'all' ? { label: 'Add Company', onClick: handleAdd } : undefined
-            }}
-          />
+          {viewMode === 'lists' ? (
+            <div className="p-4">
+              <CrmListsManager entityType="company" />
+            </div>
+          ) : (
+            <CrmDataTable
+              data={filteredCompanies}
+              columns={columns}
+              isLoading={isLoading}
+              selectedId={drawerCompanyId}
+              onRowClick={handleRowClick}
+              getRowId={(c) => c.id}
+              selectedIds={selectedIds}
+              onSelectionChange={setSelectedIds}
+              emptyState={{
+                title: searchTerm || industryFilter !== 'all' || sizeFilter !== 'all' ? 'No companies found' : 'No companies yet',
+                description: searchTerm || industryFilter !== 'all' || sizeFilter !== 'all' 
+                  ? 'Try adjusting your search or filter criteria.'
+                  : 'Start by adding your first company to build your network.',
+                action: !searchTerm && industryFilter === 'all' && sizeFilter === 'all' ? { label: 'Add Company', onClick: handleAdd } : undefined
+              }}
+            />
+          )}
         </div>
       </div>
 
