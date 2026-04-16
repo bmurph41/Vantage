@@ -32,6 +32,7 @@ import { logger } from "../lib/logger";
 import { sendTrialDay3Email, sendTrialDay5Email, sendTrialLastDayEmail } from "../services/email-service";
 import { runEmailSchedulerTick } from "../services/email-scheduler";
 import { runQuarterlyLPDelivery } from "../services/quarterly-lp-delivery";
+import { retryFailedPnlJobs } from "../services/pnl/retry-failed-jobs";
 
 let jobsStarted = false;
 
@@ -63,6 +64,17 @@ export function startPlatformCronJobs() {
       logger.info(result, "[CRON] Quarterly LP delivery complete");
     } catch (err) {
       logger.error({ err }, "[CRON] Quarterly LP delivery failed");
+    }
+  });
+
+  // ─── 0c. PNL job retry — every 15 minutes ──────────────────────────────
+  // Re-queues failed parsing jobs (retry_count < 3) so transient failures
+  // don't permanently stall the upload pipeline.
+  cron.schedule("*/15 * * * *", async () => {
+    try {
+      await retryFailedPnlJobs();
+    } catch (err) {
+      logger.error({ err }, "[CRON] PNL job retry failed");
     }
   });
 

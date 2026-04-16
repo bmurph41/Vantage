@@ -1,4 +1,5 @@
 import { db } from '../db';
+import { pool } from '../db';
 import OpenAI from 'openai';
 import { 
   pnlCategories, 
@@ -403,6 +404,36 @@ class DocIntelService {
       .insert(pnlCategories)
       .values({ ...data, orgId })
       .returning();
+
+    // Auto-create a matching canonical line item so the parser's mapping
+    // engine immediately recognizes this category on future document uploads.
+    const canonicalKey = (data.name || "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_|_$/g, "");
+    const sectionMap: Record<string, string> = {
+      revenue: "Revenue",
+      cogs: "COGS",
+      opex: "OpEx",
+      payroll: "Payroll",
+      other_expense: "OpEx",
+      other_income: "Revenue",
+    };
+    const section = sectionMap[data.categoryType as string] || "OpEx";
+    if (canonicalKey) {
+      await pool.query(
+        `INSERT INTO pnl_canonical_line_items
+           (org_id, canonical_key, display_name, section, department, sort_order,
+            is_active, is_system_default, major_group)
+         VALUES ($1, $2, $3, $4, $5, $6, true, false, $4)
+         ON CONFLICT (org_id, canonical_key) DO UPDATE SET
+           display_name = EXCLUDED.display_name,
+           section = EXCLUDED.section,
+           is_active = true`,
+        [orgId, canonicalKey, data.name, section, section, data.sortOrder ?? 0],
+      );
+    }
+
     return category;
   }
 

@@ -845,6 +845,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   );
 
+  // ─── Rent Roll Sync (parsed rent roll → rent_rolls + rent_roll_entries) ──
+  app.post(
+    '/api/modeling/projects/:projectId/rent-roll-sync',
+    authenticateUser,
+    async (req: any, res) => {
+      try {
+        const orgId: string =
+          req.user?.organizationId ?? req.user?.orgId ?? req.user?.organization_id;
+        const { projectId } = req.params;
+        const { uploadId, name, effectiveDate } = req.body;
+
+        if (!orgId) return res.status(401).json({ error: 'Not authenticated' });
+        if (!uploadId) return res.status(400).json({ error: 'uploadId is required' });
+
+        // Resolve the file from doc_intel_uploads
+        const fileRes = await pool.query(
+          `SELECT file_path, original_name FROM doc_intel_uploads WHERE id = $1 AND org_id = $2`,
+          [uploadId, orgId],
+        );
+        if (fileRes.rowCount === 0) return res.status(404).json({ error: 'Upload not found' });
+        const upload = fileRes.rows[0];
+
+        // Parse the rent roll document
+        const { RentRollDocumentParser } = await import('./services/rent-roll-document-parser');
+        const fs = await import('fs');
+        const buffer = fs.readFileSync(upload.file_path);
+        const parser = new RentRollDocumentParser();
+        const parsed = await parser.parseDocument(buffer, upload.original_name);
+
+        if (!parsed.success || parsed.rows.length === 0) {
+          return res.status(422).json({
+            error: 'Could not parse rent roll',
+            warnings: parsed.warnings,
+            errors: parsed.errors,
+          });
+        }
+
+        // Sync to structured tables
+        const { syncParsedRentRoll } = await import('./services/rent-roll-sync-service');
+        const result = await syncParsedRentRoll({
+          orgId,
+          projectId,
+          name: name || upload.original_name || 'Uploaded Rent Roll',
+          effectiveDate: effectiveDate || new Date().toISOString().slice(0, 10),
+          parsed,
+        });
+
+        res.json(result);
+      } catch (error: any) {
+        console.error('[Rent Roll Sync] Error:', error.message);
+        res.status(500).json({ error: error.message });
+      }
+    },
+  );
+
   app.use("/api/rent-roll", authenticateUser, enforceTenant, requireRentRoll(), rraRoutes);
 
   // ============================================================================

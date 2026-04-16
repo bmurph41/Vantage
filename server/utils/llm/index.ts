@@ -5,10 +5,12 @@ import { AnthropicClassifier } from './anthropicProvider';
 
 export * from './types';
 
-const LLM_PROVIDER = process.env.LLM_PROVIDER ?? 'mock';
+const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY ?? '';
 const LLM_API_KEY = process.env.LLM_API_KEY ?? process.env.OPENAI_API_KEY ?? '';
 const LLM_MODEL = process.env.LLM_MODEL ?? '';
-const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY ?? '';
+// Auto-detect provider from available API keys when not explicitly set
+const LLM_PROVIDER = process.env.LLM_PROVIDER
+  ?? (ANTHROPIC_API_KEY ? 'anthropic' : LLM_API_KEY ? 'openai' : 'mock');
 
 function createClassifier(providerName: string): LlmClassifier {
   switch (providerName.toLowerCase()) {

@@ -2,6 +2,66 @@
 
 ## Current State (2026-04-16)
 
+### ✅ COMPLETE — Document Upload & AI Parsing: 4 Critical Fixes (2026-04-16)
+
+Audited the full document upload + AI parsing pipeline and applied 4
+high-priority fixes to unblock accurate financial document processing.
+
+**Audit summary:** The pipeline was ~90% production-ready with a 5-stage
+mapping chain (alias → regex → keyword → canonical → LLM), anomaly
+detection, validation gates, and a clean bridge to modeling actuals. Four
+specific gaps were causing data-quality issues or silent failures.
+
+**Fix #1 — Auto-create canonical item when category created**
+(`server/services/doc-intel-service.ts`)
+- Problem: users creating custom categories in CategoryManager weren't
+  visible to the parser because `pnl_categories` ≠ `pnl_canonical_line_items`
+- Fix: `createCategory()` now upserts a matching `pnl_canonical_line_items`
+  row (canonicalKey derived from name, section mapped from categoryType)
+  with `ON CONFLICT DO UPDATE` so the parser immediately recognizes new
+  user-created categories
+
+**Fix #2 — Wire LLM_PROVIDER to Anthropic auto-detect**
+(`server/utils/llm/index.ts`)
+- Problem: `LLM_PROVIDER` defaulted to `'mock'` — users with
+  `ANTHROPIC_API_KEY` set were still getting mock classification with 50%
+  confidence penalty
+- Fix: auto-detect from available API keys —
+  `ANTHROPIC_API_KEY → 'anthropic'` · `OPENAI_API_KEY → 'openai'` ·
+  else `'mock'`. Explicit `LLM_PROVIDER` env var still overrides.
+
+**Fix #3 — Rent roll parsing → lease table sync**
+- `server/services/rent-roll-sync-service.ts` NEW — bridges parsed rent
+  roll data into `rent_rolls` + `rent_roll_entries` tables. Heuristic
+  header mapping (e.g., "Slip #"/"Unit"/"Space" → unitNumber) with
+  type/status inference from column values.
+- `server/routes.ts` — new `POST /api/modeling/projects/:id/rent-roll-sync`
+  endpoint. Reads file from `doc_intel_uploads`, parses via
+  `RentRollDocumentParser`, syncs to structured tables.
+- Previously: rent rolls were parsed but the data dead-ended (no bridge).
+
+**Fix #4 — Retry logic for failed parsing jobs**
+- `server/services/pnl/retry-failed-jobs.ts` NEW — `retryFailedPnlJobs()`
+  queries `pnl_jobs WHERE status='failed' AND retry_count < 3`, resets to
+  `'queued'`, re-runs `runPnlPipeline()` fire-and-forget. Batch of 5 per
+  tick.
+- `server/jobs/platform-cron.ts` — registered as `"*/15 * * * *"` (every
+  15 minutes). Previously: failed jobs stayed failed permanently.
+
+**Validation**
+- `tsc --noEmit` clean on all touched files (6 files)
+- No schema changes needed — all tables already existed
+
+**Follow-ups (Phase 2 — flagged in audit, not yet built)**
+- OCR fallback for scanned PDFs (Tesseract or Claude Vision)
+- Business-rule validation layer on LLM output (revenue never negative, etc.)
+- Per-category audit trail (who corrected what, when)
+- ML-based confidence scoring (replace linear heuristic)
+- Rent roll sync needs a frontend "Sync to Model" button in the uploads
+  UI (endpoint is ready, UI button not yet wired)
+
+---
+
 ### ✅ COMPLETE — Phase 4 LP Experience: K-1 PDF + Quarterly Delivery (2026-04-16)
 
 Closed the two remaining Phase 4 gaps from the institutional audit:
