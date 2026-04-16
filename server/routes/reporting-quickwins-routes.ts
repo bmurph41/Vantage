@@ -25,7 +25,7 @@ function getUserId(req: Request): string | null {
 }
 
 function getOrgId(req: Request): string | null {
-  return (req as any).orgId || (req as any).user?.orgId || null;
+  return (req as any).user?.orgId || (req as any).tenantId || null;
 }
 
 // ── 8.1-8.3 Board Package / Reports ────────────────────────────────────

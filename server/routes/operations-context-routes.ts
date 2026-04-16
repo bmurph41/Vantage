@@ -136,11 +136,8 @@ const pushToAssetSchema = z.object({
 // ============================================================================
 
 function getOrgId(req: Request): string {
-  const orgId = (req as any).auth?.tenantId || (req as any).orgId;
+  const orgId = (req as any).user?.orgId || (req as any).tenantId;
   if (!orgId) {
-    if (process.env.NODE_ENV === 'development') {
-      return 'cd3719c3-ef82-4ccc-acb9-261c80fb64b4';
-    }
     throw new Error('Missing organization context');
   }
   return orgId;

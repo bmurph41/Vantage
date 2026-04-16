@@ -3,7 +3,7 @@ import { rraService } from "../services/rra-service";
 import { requireRentRoll } from "../middleware/pack-guard";
 import { z } from "zod";
 import multer from "multer";
-import { db } from "../db";
+import { db, pool } from "../db";
 import { documentIntelligenceService } from "../services/document-intelligence-service";
 import { parseOcrPdf } from "../services/ocr-pdf-parser";
 import { rentRollDocumentParser } from "../services/rent-roll-document-parser";
@@ -1748,7 +1748,7 @@ router.get("/leases/:id", async (req: Request, res: Response, next: NextFunction
 /** Persist computed completeness_score to the lease row (fire-and-forget safe). */
 async function updateLeaseCompletenessScore(leaseId: string): Promise<void> {
   // Use only columns guaranteed to exist: lease_amount, lease_commencement, lease_expiration, tenant_id, org_id
-  await db.execute(
+  await pool.query(
     `UPDATE rra_leases SET completeness_score = (
       CASE WHEN lease_amount IS NOT NULL AND lease_amount::numeric > 0 THEN 25 ELSE 0 END +
       CASE WHEN lease_commencement IS NOT NULL THEN 25 ELSE 0 END +
@@ -3532,7 +3532,7 @@ function mapRraToModelingStorageType(rraType: string | null): string {
  */
 async function isAutoSyncEnabled(orgId: string, locationId: string): Promise<boolean> {
   // Check project-level toggle (locationId may be a rent_roll_projects.id)
-  const { rows: projectRows } = await db.execute(
+  const { rows: projectRows } = await pool.query(
     `SELECT auto_sync_enabled FROM rent_roll_projects WHERE id = $1 AND org_id = $2 LIMIT 1`,
     [locationId, orgId]
   );
@@ -3541,7 +3541,7 @@ async function isAutoSyncEnabled(orgId: string, locationId: string): Promise<boo
     return (projectRows[0] as AutoSyncRow).auto_sync_enabled === true;
   }
   // Fall back to per-location config (locationId is a rra_marina_locations.id)
-  const { rows: configRows } = await db.execute(
+  const { rows: configRows } = await pool.query(
     `SELECT 1 FROM modeling_rent_roll_config WHERE org_id = $1 AND linked_rra_location_id = $2 AND auto_sync_enabled = true LIMIT 1`,
     [orgId, locationId]
   );
@@ -3712,7 +3712,7 @@ router.get("/locations/:locationId/sync-status", async (req: Request, res: Respo
     const { locationId } = req.params;
 
     // Check project-level toggle first
-    const { rows: projectRows } = await db.execute(
+    const { rows: projectRows } = await pool.query(
       `SELECT auto_sync_enabled, last_sync_at FROM rent_roll_projects WHERE id = $1 AND org_id = $2 LIMIT 1`,
       [locationId, orgId]
     );
@@ -3726,7 +3726,7 @@ router.get("/locations/:locationId/sync-status", async (req: Request, res: Respo
     }
 
     // Fall back to modeling config
-    const { rows: cfgRows } = await db.execute(
+    const { rows: cfgRows } = await pool.query(
       `SELECT auto_sync_enabled, updated_at FROM modeling_rent_roll_config
        WHERE org_id = $1 AND linked_rra_location_id = $2 LIMIT 1`,
       [orgId, locationId]
@@ -3763,7 +3763,7 @@ router.patch("/locations/:locationId/auto-sync", async (req: Request, res: Respo
 
     // Update rent_roll_projects.auto_sync_enabled as the primary store
     // (isAutoSyncEnabled() checks this table first; keeps /locations and /projects routes in sync)
-    await db.execute(
+    await pool.query(
       `UPDATE rent_roll_projects SET auto_sync_enabled = $1, updated_at = NOW() WHERE id = $2 AND org_id = $3`,
       [autoSyncEnabled, locationId, orgId]
     );
@@ -3884,7 +3884,7 @@ router.get("/cre/lease-rollover", async (req: Request, res: Response, next: Next
  */
 async function isLocationOwnedByOrg(locationId: string, orgId: string | null): Promise<boolean> {
   if (!orgId) return false;
-  const { rows } = await db.execute(
+  const { rows } = await pool.query(
     `(SELECT 1 FROM rra_marina_locations WHERE id = $1 AND org_id = $2 LIMIT 1)
      UNION ALL
      (SELECT 1 FROM rent_roll_projects WHERE id = $1 AND org_id = $2 LIMIT 1)`,
@@ -4032,7 +4032,7 @@ async function resolveRetailProjectId(
   orgId: string
 ): Promise<string | undefined> {
   if (!rawId) return undefined;
-  const { rows } = await db.execute(
+  const { rows } = await pool.query(
     `SELECT modeling_project_id FROM modeling_rent_roll_config
        WHERE linked_rra_location_id = $1 AND org_id = $2 LIMIT 1`,
     [rawId, orgId]
@@ -4237,7 +4237,7 @@ router.post("/locations/:locationId/market-rents/bulk-update", async (req: Reque
 
     // Verify the location belongs to the caller's org — check both entity tables
     // (dashboard passes rra_marina_locations.id; some flows use rent_roll_projects.id)
-    const { rows: ownerRows } = await db.execute(
+    const { rows: ownerRows } = await pool.query(
       `SELECT 1 FROM rra_marina_locations WHERE id = $1 AND org_id = $2
        UNION
        SELECT 1 FROM rent_roll_projects WHERE id = $1 AND org_id = $2
@@ -4251,7 +4251,7 @@ router.post("/locations/:locationId/market-rents/bulk-update", async (req: Reque
       const { unitType, marketRent } = update;
       if (!unitType || marketRent === undefined) continue;
       
-      const result = await db.execute(
+      const result = await pool.query(
         `UPDATE rra_leases SET base_rent_2 = $1, updated_at = NOW() WHERE location_id = $2 AND org_id = $3 AND is_active = true AND COALESCE(unit_type_custom, storage_type::text) = $4`,
         [marketRent, locationId, orgId, unitType]
       );
@@ -4276,13 +4276,13 @@ router.post("/snapshots/compare", async (req: Request, res: Response, next: Next
     // Fetch the snapshot version metadata AND the point-in-time lease data
     // from rra_lease_snapshots (the immutable per-lease snapshot store)
     const [snapA, snapB, leasesARes, leasesBRes] = await Promise.all([
-      db.execute(`SELECT * FROM rra_snapshot_versions WHERE id = $1 AND org_id = $2`, [snapshotAId, orgId]),
-      db.execute(`SELECT * FROM rra_snapshot_versions WHERE id = $1 AND org_id = $2`, [snapshotBId, orgId]),
-      db.execute(
+      pool.query(`SELECT * FROM rra_snapshot_versions WHERE id = $1 AND org_id = $2`, [snapshotAId, orgId]),
+      pool.query(`SELECT * FROM rra_snapshot_versions WHERE id = $1 AND org_id = $2`, [snapshotBId, orgId]),
+      pool.query(
         `SELECT lease_data FROM rra_lease_snapshots WHERE snapshot_version_id = $1 AND org_id = $2`,
         [snapshotAId, orgId]
       ),
-      db.execute(
+      pool.query(
         `SELECT lease_data FROM rra_lease_snapshots WHERE snapshot_version_id = $1 AND org_id = $2`,
         [snapshotBId, orgId]
       ),
@@ -4420,7 +4420,7 @@ router.post("/periods/:periodId/lock", async (req: Request, res: Response, next:
     const orgId = getOrgId(req);
     
     // Update reconciliation record status to closed/locked
-    const { rows } = await db.execute(
+    const { rows } = await pool.query(
       `UPDATE reconciliation_records SET status = 'closed', reconciled_by = $1, reconciled_at = NOW(), notes = COALESCE(notes, '') || ' [Period locked]' WHERE id = $2 AND organization_id = $3 RETURNING *`,
       [userId, periodId, orgId]
     );
@@ -4436,7 +4436,7 @@ router.post("/periods/:periodId/unlock", async (req: Request, res: Response, nex
     const userId = getUserId(req);
     const orgId = getOrgId(req);
     
-    const { rows } = await db.execute(
+    const { rows } = await pool.query(
       `UPDATE reconciliation_records SET status = 'in_progress', reconciled_by = $1, notes = COALESCE(notes, '') || ' [Period unlocked]' WHERE id = $2 AND organization_id = $3 RETURNING *`,
       [userId, periodId, orgId]
     );
@@ -4454,7 +4454,7 @@ router.patch("/projects/:id/auto-sync", async (req: Request, res: Response, next
   try {
     const orgId = getValidatedOrgId(req as AuthenticatedRequest);
     const { autoSyncEnabled } = req.body;
-    const { rows } = await db.execute(
+    const { rows } = await pool.query(
       `UPDATE rent_roll_projects SET auto_sync_enabled = $1, updated_at = NOW() WHERE id = $2 AND org_id = $3 RETURNING *`,
       [autoSyncEnabled === true, req.params.id, orgId]
     );
@@ -4469,14 +4469,14 @@ router.post("/projects/:id/sync-to-proforma", async (req: Request, res: Response
     const orgId = getValidatedOrgId(req as AuthenticatedRequest);
     const projectId = req.params.id;
     // Find linked rra_marina_locations.id via modeling_rent_roll_config
-    const { rows: cfgRows } = await db.execute(
+    const { rows: cfgRows } = await pool.query(
       `SELECT linked_rra_location_id FROM modeling_rent_roll_config WHERE modeling_project_id = $1 AND org_id = $2 LIMIT 1`,
       [projectId, orgId]
     );
     const linkRow = cfgRows[0] as ConfigLinkRow | undefined;
     const locationId = linkRow?.linked_rra_location_id || projectId;
     // Calculate EGI from rra_leases using the rra_marina_locations.id
-    const { rows: leaseRows } = await db.execute(
+    const { rows: leaseRows } = await pool.query(
       `SELECT COALESCE(SUM(lease_amount::numeric), 0) as total_rent, COUNT(*) as lease_count
        FROM rra_leases WHERE location_id = $1 AND org_id = $2 AND is_active = true`,
       [locationId, orgId]
@@ -4485,7 +4485,7 @@ router.post("/projects/:id/sync-to-proforma", async (req: Request, res: Response
     const totalEGI = parseFloat(leaseAgg?.total_rent || "0");
     const leaseCount = parseInt(leaseAgg?.lease_count || "0");
     // Update last_sync_at on the project (project table is keyed by rent_roll_projects.id)
-    await db.execute(
+    await pool.query(
       `UPDATE rent_roll_projects SET last_sync_at = NOW() WHERE id = $1 AND org_id = $2`,
       [projectId, orgId]
     );
@@ -4496,7 +4496,7 @@ router.post("/projects/:id/sync-to-proforma", async (req: Request, res: Response
 router.get("/projects/:id/sync-status", async (req: Request, res: Response, next: NextFunction) => {
   try {
     const orgId = getValidatedOrgId(req as AuthenticatedRequest);
-    const { rows } = await db.execute(
+    const { rows } = await pool.query(
       `SELECT auto_sync_enabled, last_sync_at FROM rent_roll_projects WHERE id = $1 AND org_id = $2`,
       [req.params.id, orgId]
     );
@@ -4516,13 +4516,13 @@ router.post("/locations/:locationId/sync-to-proforma", async (req: Request, res:
     const orgId = getOrgId(req);
     const { locationId } = req.params;
     // Verify ownership
-    const { rows: ownerRows } = await db.execute(
+    const { rows: ownerRows } = await pool.query(
       `SELECT 1 FROM rra_marina_locations WHERE id = $1 AND org_id = $2 LIMIT 1`,
       [locationId, orgId]
     );
     if (ownerRows.length === 0) return res.status(403).json({ error: "Location not found or access denied" });
     // Compute EGI from active leases for this location
-    const { rows: leaseRows } = await db.execute(
+    const { rows: leaseRows } = await pool.query(
       `SELECT COALESCE(SUM(lease_amount::numeric), 0) as total_rent, COUNT(*) as lease_count
        FROM rra_leases WHERE location_id = $1 AND org_id = $2 AND is_active = true`,
       [locationId, orgId]
@@ -4532,7 +4532,7 @@ router.post("/locations/:locationId/sync-to-proforma", async (req: Request, res:
     const leaseCount = parseInt(locLeaseAgg?.lease_count || "0");
     // Find the linked modeling project (if any) and ALWAYS stamp last_sync_at regardless of auto_sync_enabled
     // so manual syncs also update the sync timestamp shown in UI indicators
-    const { rows: cfgRows } = await db.execute(
+    const { rows: cfgRows } = await pool.query(
       `SELECT modeling_project_id FROM modeling_rent_roll_config
        WHERE linked_rra_location_id = $1 AND org_id = $2 LIMIT 1`,
       [locationId, orgId]
@@ -4540,7 +4540,7 @@ router.post("/locations/:locationId/sync-to-proforma", async (req: Request, res:
     if (cfgRows.length > 0) {
       const cfgRow = cfgRows[0] as ConfigModelRow;
       if (cfgRow.modeling_project_id) {
-        await db.execute(
+        await pool.query(
           `UPDATE rent_roll_projects SET last_sync_at = NOW() WHERE id = $1 AND org_id = $2`,
           [cfgRow.modeling_project_id, orgId]
         );
@@ -4556,7 +4556,7 @@ router.get("/locations/:locationId/sync-conflicts", async (req: Request, res: Re
     const { locationId } = req.params;
     // Find the most recent snapshot for each lease in this location by joining rra_leases
     // (rra_lease_snapshots does not have location_id directly; join via lease)
-    const { rows: snapRows } = await db.execute(
+    const { rows: snapRows } = await pool.query(
       `SELECT s.id, s.lease_id, s.created_at as snapshot_date, s.lease_data
        FROM rra_lease_snapshots s
        JOIN rra_leases l ON l.id = s.lease_id
@@ -4565,7 +4565,7 @@ router.get("/locations/:locationId/sync-conflicts", async (req: Request, res: Re
       [orgId, locationId]
     );
     // Get current active leases
-    const { rows: currentLeases } = await db.execute(
+    const { rows: currentLeases } = await pool.query(
       `SELECT l.id, l.tenant_id, l.lease_amount, l.unit_number, l.is_active, l.updated_at,
               t.name as tenant_name
        FROM rra_leases l LEFT JOIN rra_tenants t ON t.id = l.tenant_id
@@ -4616,13 +4616,13 @@ router.post("/locations/:locationId/sync-conflicts/:leaseId/resolve", async (req
       return res.status(400).json({ error: "resolution must be accept_current or revert_to_snapshot" });
     }
     // Verify lease belongs to org/location
-    const { rows: leaseRows } = await db.execute(
+    const { rows: leaseRows } = await pool.query(
       `SELECT id, lease_amount FROM rra_leases WHERE id = $1 AND org_id = $2 AND location_id = $3 LIMIT 1`,
       [leaseId, orgId, locationId]
     );
     if (leaseRows.length === 0) return res.status(404).json({ error: "Lease not found" });
     if (resolution === "revert_to_snapshot" && field === "lease_amount" && value !== undefined) {
-      await db.execute(
+      await pool.query(
         `UPDATE rra_leases SET lease_amount = $1, updated_at = NOW() WHERE id = $2 AND org_id = $3`,
         [value, leaseId, orgId]
       );
@@ -4702,7 +4702,7 @@ router.get("/analytics/cohorts", async (req: Request, res: Response, next: NextF
       SELECT * FROM cohort_stats
     `;
 
-    const { rows: cohortRows } = await db.execute(cohortQuery, params);
+    const { rows: cohortRows } = await pool.query(cohortQuery, params);
 
     const cohorts = (cohortRows as CohortRow[]).map(r => {
       const total = parseInt(r.total_tenants || "0");
@@ -4804,7 +4804,7 @@ router.get("/analytics/ltv-trend", async (req: Request, res: Response, next: Nex
     const locationFilter = effectiveLocationId ? ` AND l.location_id = $${params.length + 1}` : "";
     if (effectiveLocationId) params.push(String(effectiveLocationId));
 
-    const { rows } = await db.execute(`
+    const { rows } = await pool.query(`
       SELECT 
         TO_CHAR(l.lease_commencement, 'Mon YYYY') as period_label,
         TO_CHAR(l.lease_commencement, 'YYYYMM') as period_key,
@@ -4856,7 +4856,7 @@ router.post("/reports/generate", async (req: Request, res: Response, next: NextF
     if (projectId) {
       // Verify ownership: accept both rra_marina_locations.id and rent_roll_projects.id
       // (UI may pass either; report leases are always queried by rra_leases.location_id)
-      const { rows: ownerCheck } = await db.execute(
+      const { rows: ownerCheck } = await pool.query(
         `(SELECT id FROM rra_marina_locations WHERE id = $1 AND org_id = $2 LIMIT 1)
          UNION ALL
          (SELECT id FROM rent_roll_projects WHERE id = $1 AND org_id = $2 LIMIT 1)`,
@@ -4867,7 +4867,7 @@ router.post("/reports/generate", async (req: Request, res: Response, next: NextF
       // Resolve canonical locationId — if a rent_roll_projects.id was supplied,
       // look up the linked rra_marina_locations.id so the lease query works correctly.
       let canonicalLocationId: string = projectId;
-      const { rows: cfgLookup } = await db.execute(
+      const { rows: cfgLookup } = await pool.query(
         `SELECT linked_rra_location_id FROM modeling_rent_roll_config
          WHERE modeling_project_id = $1 AND org_id = $2 LIMIT 1`,
         [projectId, orgId]
@@ -4877,7 +4877,7 @@ router.post("/reports/generate", async (req: Request, res: Response, next: NextF
         if (cfgRow.linked_rra_location_id) canonicalLocationId = cfgRow.linked_rra_location_id;
       }
 
-      const { rows } = await db.execute(
+      const { rows } = await pool.query(
         `SELECT l.id, l.unit_number, l.unit_location, l.unit_type_custom, l.storage_type, l.lease_amount,
                 l.lease_commencement, l.lease_expiration, l.slip_status, l.is_active, t.name as tenant_name
          FROM rra_leases l LEFT JOIN rra_tenants t ON t.id = l.tenant_id
@@ -4892,7 +4892,7 @@ router.post("/reports/generate", async (req: Request, res: Response, next: NextF
     if (reportType === "cash_flow_statement" && projectId) {
       // Resolve canonicalLocationId again (may differ from projectId if a modeling ID was supplied)
       let canonicalLocationIdForCF: string = projectId;
-      const { rows: cfgCFLookup } = await db.execute(
+      const { rows: cfgCFLookup } = await pool.query(
         `SELECT linked_rra_location_id FROM modeling_rent_roll_config
          WHERE modeling_project_id = $1 AND org_id = $2 LIMIT 1`,
         [projectId, orgId]
@@ -4901,7 +4901,7 @@ router.post("/reports/generate", async (req: Request, res: Response, next: NextF
         const cfgRow = cfgCFLookup[0] as ConfigLinkRow;
         if (cfgRow.linked_rra_location_id) canonicalLocationIdForCF = cfgRow.linked_rra_location_id;
       }
-      const { rows } = await db.execute(
+      const { rows } = await pool.query(
         `SELECT id, cashflow_type, amount, year, month, notes
          FROM rra_lease_cash_flows WHERE location_id = $1 AND org_id = $2
          ORDER BY year, month, cashflow_type`,
@@ -5079,17 +5079,17 @@ router.post("/leases/bulk-fix", async (req: Request, res: Response, next: NextFu
       
       try {
         if (fixType === "set_end_date") {
-          await db.execute(
+          await pool.query(
             `UPDATE rra_leases SET lease_expiration = $1, updated_at = NOW() WHERE id = $2 AND org_id = $3`,
             [value || new Date().toISOString().split("T")[0], leaseId, orgId]
           );
         } else if (fixType === "set_rate") {
-          await db.execute(
+          await pool.query(
             `UPDATE rra_leases SET lease_amount = $1, updated_at = NOW() WHERE id = $2 AND org_id = $3`,
             [parseFloat(value), leaseId, orgId]
           );
         } else if (fixType === "set_status") {
-          await db.execute(
+          await pool.query(
             `UPDATE rra_leases SET slip_status = $1, updated_at = NOW() WHERE id = $2 AND org_id = $3`,
             [value || "Active", leaseId, orgId]
           );
@@ -5114,7 +5114,7 @@ router.get("/leases/completeness-scores", async (req: Request, res: Response, ne
     let whereClause = `org_id = $1`;
     if (locationId) { whereClause += ` AND location_id = $2`; params.push(String(locationId)); }
     
-    const { rows } = await db.execute(
+    const { rows } = await pool.query(
       `SELECT id,
         (CASE WHEN lease_amount IS NOT NULL AND lease_amount::numeric > 0 THEN 20 ELSE 0 END +
          CASE WHEN lease_commencement IS NOT NULL THEN 20 ELSE 0 END +
@@ -5137,7 +5137,7 @@ router.get("/leases/completeness-scores", async (req: Request, res: Response, ne
 router.get("/projects", async (req: Request, res: Response, next: NextFunction) => {
   try {
     const orgId = getValidatedOrgId(req as AuthenticatedRequest);
-    const { rows } = await db.execute(
+    const { rows } = await pool.query(
       `SELECT * FROM rent_roll_projects WHERE org_id = $1 ORDER BY created_at DESC`,
       [orgId]
     );
@@ -5165,7 +5165,7 @@ router.post("/projects", async (req: Request, res: Response, next: NextFunction)
     const orgId = getValidatedOrgId(req as AuthenticatedRequest);
     const userId = getValidatedUserId(req as AuthenticatedRequest);
     const d = req.body;
-    const { rows } = await db.execute(
+    const { rows } = await pool.query(
       `INSERT INTO rent_roll_projects (org_id, name, code, description, status, project_type, season_type,
         capacity, is_active, target_noi, include_in_executive, season_start_date, season_end_date,
         winter_start_date, winter_end_date, budgeted_revenue, budgeted_occupancy, budgeted_expenses,
@@ -5215,7 +5215,7 @@ router.patch("/projects/:id", async (req: Request, res: Response, next: NextFunc
     sets.push(`updated_at = NOW()`);
 
     vals.push(req.params.id, orgId);
-    const { rows } = await db.execute(
+    const { rows } = await pool.query(
       `UPDATE rent_roll_projects SET ${sets.join(', ')} WHERE id = $${i} AND org_id = $${i + 1} RETURNING *`,
       vals
     );
@@ -5227,7 +5227,7 @@ router.patch("/projects/:id", async (req: Request, res: Response, next: NextFunc
 router.delete("/projects/:id", async (req: Request, res: Response, next: NextFunction) => {
   try {
     const orgId = getValidatedOrgId(req as AuthenticatedRequest);
-    const { rowCount } = await db.execute(
+    const { rowCount } = await pool.query(
       `DELETE FROM rent_roll_projects WHERE id = $1 AND org_id = $2`,
       [req.params.id, orgId]
     );

@@ -29,7 +29,7 @@ const router = Router();
 
 // ─── Auth helper (matches commercial-lease-routes pattern) ─────────────────
 function getOrgId(req: Request): string {
-  const orgId = (req as any).auth?.tenantId || (req as any).orgId;
+  const orgId = (req as any).user?.orgId || (req as any).tenantId;
   if (!orgId) {
     throw new Error("Unauthorized – org context missing");
   }

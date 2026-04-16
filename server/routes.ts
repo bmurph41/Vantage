@@ -4,7 +4,7 @@ import { logger } from "./lib/logger";
 import { createServer, type Server } from "http";
 import { setupAuth, registerAuthRoutes } from "./replit_integrations/auth";
 import { storage } from "./storage";
-import { db } from "./db";
+import { db, pool } from "./db";
 import { eq, and, or, desc, asc, gte, lte, sql, gt, inArray, notInArray, ilike, isNull } from "drizzle-orm";
 import { resolveRecipient } from "@shared/recipient-utils";
 import { AIRiskAnalyzer } from "./ai-risk-analyzer";
@@ -915,23 +915,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/gl-accounts", authenticateUser, enforceTenant, async (req: any, res: Response) => {
     try {
-      const orgId = req.user?.orgId || req.orgId || "";
-      const { rows } = await db.execute(
+      const orgId = req.user?.orgId || req.tenantId;
+      const { rows } = await pool.query(
         `SELECT id, organization_id as "organizationId", account_code as "accountCode", account_name as "accountName",
                 category, description, is_active as "isActive", created_at as "createdAt"
          FROM gl_accounts WHERE organization_id = $1 ORDER BY account_code`,
         [orgId]
       );
       res.json(rows);
-    } catch (e) { res.status(500).json({ error: "Failed to fetch GL accounts" }); }
+    } catch (e: any) { console.error('[GL Accounts] Error:', e.message); res.status(500).json({ error: "Failed to fetch GL accounts" }); }
   });
 
   app.post("/api/gl-accounts", authenticateUser, enforceTenant, async (req: any, res: Response) => {
     try {
-      const orgId = req.user?.orgId || req.orgId || "";
+      const orgId = req.user?.orgId || req.tenantId;
       const { accountCode, accountName, category = "revenue", description, isActive = true } = req.body;
       if (!accountCode || !accountName) return res.status(400).json({ error: "accountCode and accountName required" });
-      const { rows } = await db.execute(
+      const { rows } = await pool.query(
         `INSERT INTO gl_accounts (organization_id, account_code, account_name, category, description, is_active)
          VALUES ($1, $2, $3, $4, $5, $6)
          RETURNING id, organization_id as "organizationId", account_code as "accountCode", account_name as "accountName",
@@ -944,9 +944,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.put("/api/gl-accounts/:id", authenticateUser, enforceTenant, async (req: any, res: Response) => {
     try {
-      const orgId = req.user?.orgId || req.orgId || "";
+      const orgId = req.user?.orgId || req.tenantId;
       const { accountCode, accountName, category, description, isActive } = req.body;
-      const { rows } = await db.execute(
+      const { rows } = await pool.query(
         `UPDATE gl_accounts SET account_code = COALESCE($1, account_code),
                                 account_name = COALESCE($2, account_name),
                                 category = COALESCE($3, category),
@@ -965,16 +965,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/gl-accounts/:id", authenticateUser, enforceTenant, async (req: any, res: Response) => {
     try {
-      const orgId = req.user?.orgId || req.orgId || "";
-      await db.execute(`DELETE FROM gl_accounts WHERE id = $1 AND organization_id = $2`, [req.params.id, orgId]);
+      const orgId = req.user?.orgId || req.tenantId;
+      await pool.query(`DELETE FROM gl_accounts WHERE id = $1 AND organization_id = $2`, [req.params.id, orgId]);
       res.status(204).send();
     } catch (e) { res.status(500).json({ error: "Failed to delete GL account" }); }
   });
 
   app.get("/api/gl-mappings", authenticateUser, enforceTenant, async (req: any, res: Response) => {
     try {
-      const orgId = req.user?.orgId || req.orgId || "";
-      const { rows } = await db.execute(
+      const orgId = req.user?.orgId || req.tenantId;
+      const { rows } = await pool.query(
         `SELECT gm.id, gm.organization_id as "organizationId", gm.gl_account_id as "glAccountId",
                 gm.charge_type as "chargeType", gm.project_id as "projectId",
                 gm.storage_location_id as "storageLocationId", gm.is_active as "isActive",
@@ -992,16 +992,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/gl-mappings", authenticateUser, enforceTenant, async (req: any, res: Response) => {
     try {
-      const orgId = req.user?.orgId || req.orgId || "";
+      const orgId = req.user?.orgId || req.tenantId;
       const { glAccountId, chargeType, projectId, storageLocationId, isActive = true } = req.body;
       if (!glAccountId || !chargeType) return res.status(400).json({ error: "glAccountId and chargeType required" });
       // Security: verify that the referenced GL account belongs to this org
-      const { rows: ownerCheck } = await db.execute(
+      const { rows: ownerCheck } = await pool.query(
         `SELECT 1 FROM gl_accounts WHERE id = $1 AND organization_id = $2 LIMIT 1`,
         [glAccountId, orgId]
       );
       if (ownerCheck.length === 0) return res.status(403).json({ error: "GL account not found in this organization" });
-      const { rows } = await db.execute(
+      const { rows } = await pool.query(
         `INSERT INTO gl_mappings (organization_id, gl_account_id, charge_type, project_id, storage_location_id, is_active)
          VALUES ($1, $2, $3, $4, $5, $6)
          RETURNING id, organization_id as "organizationId", gl_account_id as "glAccountId",
@@ -1015,17 +1015,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.put("/api/gl-mappings/:id", authenticateUser, enforceTenant, async (req: any, res: Response) => {
     try {
-      const orgId = req.user?.orgId || req.orgId || "";
+      const orgId = req.user?.orgId || req.tenantId;
       const { glAccountId, chargeType, projectId, storageLocationId, isActive } = req.body;
       // Security: verify that the referenced GL account (if changing) belongs to this org
       if (glAccountId) {
-        const { rows: ownerCheck } = await db.execute(
+        const { rows: ownerCheck } = await pool.query(
           `SELECT 1 FROM gl_accounts WHERE id = $1 AND organization_id = $2 LIMIT 1`,
           [glAccountId, orgId]
         );
         if (ownerCheck.length === 0) return res.status(403).json({ error: "GL account not found in this organization" });
       }
-      const { rows } = await db.execute(
+      const { rows } = await pool.query(
         `UPDATE gl_mappings SET gl_account_id = COALESCE($1, gl_account_id),
                                 charge_type = COALESCE($2, charge_type),
                                 project_id = $3,
@@ -1045,15 +1045,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/gl-mappings/:id", authenticateUser, enforceTenant, async (req: any, res: Response) => {
     try {
-      const orgId = req.user?.orgId || req.orgId || "";
-      await db.execute(`DELETE FROM gl_mappings WHERE id = $1 AND organization_id = $2`, [req.params.id, orgId]);
+      const orgId = req.user?.orgId || req.tenantId;
+      await pool.query(`DELETE FROM gl_mappings WHERE id = $1 AND organization_id = $2`, [req.params.id, orgId]);
       res.status(204).send();
     } catch (e) { res.status(500).json({ error: "Failed to delete GL mapping" }); }
   });
 
   app.get("/api/reconciliation-records", authenticateUser, enforceTenant, async (req: any, res: Response) => {
     try {
-      const orgId = req.user?.orgId || req.orgId || "";
+      const orgId = req.user?.orgId || req.tenantId;
       const { projectId } = req.query;
       let q = `SELECT id, organization_id as "organizationId", project_id as "projectId",
                       period_month as "periodMonth", period_year as "periodYear", status,
@@ -1065,7 +1065,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const params: (string | number)[] = [orgId];
       if (projectId) { q += ` AND project_id = $2`; params.push(String(projectId)); }
       q += ` ORDER BY period_year DESC, period_month DESC`;
-      const { rows } = await db.execute(q, params);
+      const { rows } = await pool.query(q, params);
       res.json(rows);
     } catch (e) { res.status(500).json({ error: "Failed to fetch reconciliation records" }); }
   });
@@ -1076,8 +1076,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/report-packages", authenticateUser, enforceTenant, async (req: any, res: Response) => {
     try {
-      const orgId = req.user?.orgId || req.orgId || "";
-      const { rows } = await db.execute(
+      const orgId = req.user?.orgId || req.tenantId;
+      const { rows } = await pool.query(
         `SELECT rp.id, rp.organization_id as "organizationId", rp.name, rp.description,
                 rp.package_type as "packageType", rp.status,
                 rp.project_id as "projectId", ml.name as "projectName",
@@ -1097,8 +1097,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/report-packages/:id", authenticateUser, enforceTenant, async (req: any, res: Response) => {
     try {
-      const orgId = req.user?.orgId || req.orgId || "";
-      const { rows } = await db.execute(
+      const orgId = req.user?.orgId || req.tenantId;
+      const { rows } = await pool.query(
         `SELECT rp.id, rp.organization_id as "organizationId", rp.name, rp.description,
                 rp.package_type as "packageType", rp.status,
                 rp.project_id as "projectId", ml.name as "projectName",
@@ -1118,10 +1118,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/report-packages", authenticateUser, enforceTenant, async (req: any, res: Response) => {
     try {
-      const orgId = req.user?.orgId || req.orgId || "";
+      const orgId = req.user?.orgId || req.tenantId;
       const { name, description, packageType = "quarterly", projectId, periodStartDate, periodEndDate, asOfDate, snapshotId } = req.body;
       if (!name || !periodStartDate || !periodEndDate) return res.status(400).json({ error: "name, periodStartDate, periodEndDate required" });
-      const { rows } = await db.execute(
+      const { rows } = await pool.query(
         `INSERT INTO rra_report_packages (organization_id, name, description, package_type, project_id, period_start_date, period_end_date, as_of_date, snapshot_id)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
          RETURNING id, organization_id as "organizationId", name, description, package_type as "packageType", status,
@@ -1136,17 +1136,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/report-packages/:id", authenticateUser, enforceTenant, async (req: any, res: Response) => {
     try {
-      const orgId = req.user?.orgId || req.orgId || "";
-      await db.execute(`DELETE FROM rra_report_packages WHERE id = $1 AND organization_id = $2`, [req.params.id, orgId]);
+      const orgId = req.user?.orgId || req.tenantId;
+      await pool.query(`DELETE FROM rra_report_packages WHERE id = $1 AND organization_id = $2`, [req.params.id, orgId]);
       res.status(204).send();
     } catch (e) { res.status(500).json({ error: "Failed to delete report package" }); }
   });
 
   app.post("/api/report-packages/:id/generate", authenticateUser, enforceTenant, async (req: any, res: Response) => {
     try {
-      const orgId = req.user?.orgId || req.orgId || "";
+      const orgId = req.user?.orgId || req.tenantId;
       // Fetch the package to get its config
-      const { rows: pkgRows } = await db.execute(
+      const { rows: pkgRows } = await pool.query(
         `SELECT * FROM rra_report_packages WHERE id = $1 AND organization_id = $2`,
         [req.params.id, orgId]
       );
@@ -1155,7 +1155,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const pkg = pkgRows[0] as ReportPackageRow;
 
       // Mark as generating
-      await db.execute(
+      await pool.query(
         `UPDATE rra_report_packages SET status = 'generating', updated_at = NOW() WHERE id = $1`,
         [req.params.id]
       );
@@ -1164,7 +1164,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const leaseParams: (string)[] = [orgId];
       const leaseFilter = pkg.project_id ? ` AND l.location_id = $2` : "";
       if (pkg.project_id) leaseParams.push(pkg.project_id);
-      const { rows: leaseRows } = await db.execute(
+      const { rows: leaseRows } = await pool.query(
         `SELECT l.id, l.tenant_id, l.location_id, l.lease_amount, l.is_active,
                 l.lease_commencement, l.lease_expiration, l.unit_number,
                 t.name as tenant_name
@@ -1176,7 +1176,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
 
       // Update status to 'ready' with generated timestamp (report data returned in response)
-      await db.execute(
+      await pool.query(
         `UPDATE rra_report_packages SET status = 'ready', generated_at = NOW(), updated_at = NOW() WHERE id = $1`,
         [req.params.id]
       );
@@ -1195,8 +1195,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/report-packages/:id/archive", authenticateUser, enforceTenant, async (req: any, res: Response) => {
     try {
-      const orgId = req.user?.orgId || req.orgId || "";
-      const { rows } = await db.execute(
+      const orgId = req.user?.orgId || req.tenantId;
+      const { rows } = await pool.query(
         `UPDATE rra_report_packages SET status = 'archived', updated_at = NOW()
          WHERE id = $1 AND organization_id = $2
          RETURNING id, status`,
@@ -1210,9 +1210,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.put("/api/report-packages/:packageId/sections/:sectionId", authenticateUser, enforceTenant, async (req: any, res: Response) => {
     try {
-      const orgId = req.user?.orgId || req.orgId || "";
+      const orgId = req.user?.orgId || req.tenantId;
       // Verify package belongs to org
-      const { rows: pkgRows } = await db.execute(
+      const { rows: pkgRows } = await pool.query(
         `SELECT id FROM rra_report_packages WHERE id = $1 AND organization_id = $2 LIMIT 1`,
         [req.params.packageId, orgId]
       );
@@ -1225,7 +1225,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Cohort Analysis routes (proxies to rra analytics cohort endpoint)
   app.get("/api/cohort/analysis", authenticateUser, enforceTenant, async (req: any, res: Response) => {
     try {
-      const orgId = req.user?.orgId || req.orgId || "";
+      const orgId = req.user?.orgId || req.tenantId;
       const { projectId, granularity = "quarter" } = req.query;
       const safeGranularity = ["quarter", "year", "month"].includes(String(granularity)) ? String(granularity) : "quarter";
 
@@ -1268,7 +1268,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         )
         SELECT * FROM cohort_stats`;
 
-      const { rows } = await db.execute(cohortQuery, params);
+      const { rows } = await pool.query(cohortQuery, params);
 
       interface SimpleCohortRow { cohort_key: string; cohort_label: string; total_tenants: string; active_tenants: string; total_revenue: string; total_ltv: string; avg_tenure_months: string; }
       const cohorts = (rows as SimpleCohortRow[]).map(r => {
@@ -1338,13 +1338,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/cohort/ltv-trend", authenticateUser, enforceTenant, async (req: any, res: Response) => {
     try {
-      const orgId = req.user?.orgId || req.orgId || "";
+      const orgId = req.user?.orgId || req.tenantId;
       const { projectId } = req.query;
       const params: (string | number)[] = [orgId];
       const locationFilter = projectId ? ` AND l.location_id = $${params.length + 1}` : "";
       if (projectId) params.push(String(projectId));
 
-      const { rows } = await db.execute(`
+      const { rows } = await pool.query(`
         SELECT 
           TO_CHAR(l.lease_commencement, 'Mon YYYY') as period_label,
           TO_CHAR(l.lease_commencement, 'YYYYMM') as period_key,
