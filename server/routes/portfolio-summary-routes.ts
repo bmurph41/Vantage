@@ -17,6 +17,7 @@ const router = Router();
 router.get("/summary", async (req: any, res) => {
   try {
     const orgId = (req.user?.orgId || req.tenantId) as string;
+    if (!orgId) return res.status(401).json({ error: 'Unauthorized' });
 
     // ── Core project aggregates ─────────────────────────────────────────────
     const projectAgg = await db.execute(sql`

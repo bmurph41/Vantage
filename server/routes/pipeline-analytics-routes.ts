@@ -345,6 +345,7 @@ router.get("/health", async (req, res) => {
 router.get("/", async (req, res) => {
   try {
     const orgId = ((req as any).user?.orgId || (req as any).tenantId) as string;
+    if (!orgId) return res.status(401).json({ error: 'Unauthorized' });
 
     const velocityResult = await db.execute(sql`
       SELECT
