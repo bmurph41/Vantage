@@ -620,10 +620,81 @@ router.post("/me/subscriptions/:subscriptionId/messages", async (req: Request, r
       })
       .returning();
 
+    try {
+      await recordInboundMessage(pool, {
+        brokerProfileId: sub.brokerProfileId,
+        threadType: "advisory_message",
+        threadId: subscriptionId,
+        inboundAt: msg.createdAt,
+      });
+    } catch (trackerErr) {
+      console.error("Response tracker inbound error:", trackerErr);
+    }
+
     res.json(msg);
   } catch (err) {
     console.error("Send message error:", err);
     res.status(500).json({ error: "Failed to send message" });
+  }
+});
+
+// Broker replies to an advisory subscriber. Only the broker who owns the
+// profile attached to this subscription may reply. Records first-response
+// latency for passive response-time tracking.
+router.post("/broker/subscriptions/:subscriptionId/messages", async (req: Request, res: Response) => {
+  try {
+    const ctx = getUserContext(req);
+    if (!ctx) return res.status(401).json({ error: "Authentication required" });
+    const { subscriptionId } = req.params;
+    const { body } = req.body as { body: string };
+    if (!body?.trim()) return res.status(400).json({ error: "Message body required" });
+
+    const [sub] = await db
+      .select()
+      .from(brokerSubscriptions)
+      .where(
+        and(
+          eq(brokerSubscriptions.id, subscriptionId),
+          eq(brokerSubscriptions.tier, "advisory"),
+          eq(brokerSubscriptions.status, "active"),
+        ),
+      );
+    if (!sub) return res.status(404).json({ error: "Active advisory subscription not found" });
+
+    const [profile] = await db
+      .select()
+      .from(brokerProfiles)
+      .where(eq(brokerProfiles.id, sub.brokerProfileId));
+    if (!profile || profile.userId !== ctx.userId) {
+      return res.status(403).json({ error: "Only the subscription's broker may reply here" });
+    }
+
+    const [msg] = await db
+      .insert(brokerAdvisoryMessages)
+      .values({
+        subscriptionId,
+        senderUserId: ctx.userId,
+        senderRole: "broker",
+        body: body.trim(),
+      })
+      .returning();
+
+    try {
+      await recordBrokerReply(pool, {
+        brokerProfileId: profile.id,
+        threadType: "advisory_message",
+        threadId: subscriptionId,
+        inboundAt: msg.createdAt,
+        brokerReplyAt: msg.createdAt,
+      });
+    } catch (trackerErr) {
+      console.error("Response tracker reply error:", trackerErr);
+    }
+
+    res.json(msg);
+  } catch (err) {
+    console.error("Broker reply error:", err);
+    res.status(500).json({ error: "Failed to send broker reply" });
   }
 });
 
