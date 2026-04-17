@@ -1,5 +1,71 @@
 # MarinaMatch Platform Journal
 
+## ✅ COMPLETE — Stabilization #4: Stripe billing verification (2026-04-17)
+
+Tested the full Stripe webhook → entitlement-flip flow for all three product
+SKUs (platform packs, broker plans, marketplace+). Found two show-stopper bugs
+before any happy path worked.
+
+### Bugs fixed
+
+1. **Missing unique constraint on `organization_packs(org_id, pack_type)`**
+   — the webhook uses `onConflictDoUpdate({ target: [orgId, packType] })`
+   but no DB constraint matched → every platform-pack checkout failed with
+   `there is no unique or exclusion constraint matching the ON CONFLICT
+   specification`. Added via raw SQL + a matching startup migration at
+   `server/db-startup-migrations.ts` so fresh DBs don't regress.
+
+2. **`billingService.handleWebhook` never called from the primary webhook
+   handler** — `POST /api/stripe/webhook` in `server/index.ts` only handled
+   the `metadata.packType` flow (platform packs). All `sku=broker_plan` and
+   `sku=marketplace_plus` checkouts were returning 200 but doing NOTHING
+   (webhook orphaned). `billingService.handleWebhook` has the comprehensive
+   logic (marketplace+, broker tiers, core-platform `SUBSCRIPTION_TIERS`) but
+   was mounted at an unused `/api/billing/webhook` route. Now delegated from
+   the primary handler via dynamic import. Also fixed the dynamic-import
+   destructuring — `billingService` is a default export, not a named one.
+
+### End-to-end verified (6/6 tier-flip tests pass)
+
+Test script at `/tmp/stripe_webhook_test.sh`. Uses synthetic Stripe events
+(no real Stripe needed — dev bypass when `STRIPE_WEBHOOK_SECRET` unset).
+
+| # | Scenario                                              | DB assertions       |
+|---|-------------------------------------------------------|---------------------|
+| 1 | platform pack `checkout.session.completed`            | org_packs `active`, billing_subs `modeling_tools/active` ✓ |
+| 2 | `invoice.payment_failed`                              | org_packs `expired`, billing_subs `past_due` ✓ |
+| 3 | `invoice.payment_succeeded`                           | both reactivated to `active` ✓ |
+| 4 | `customer.subscription.deleted`                       | org_packs `cancelled`, billing_subs `starter/canceled` ✓ |
+| 5 | broker `checkout.session.completed` (sku=broker_plan) | broker_profiles.broker_tier → `pro` ✓ |
+| 6 | marketplace+ `checkout.session.completed`             | org_marketplace_entitlements.marketplace_plus_tier → `pro` ✓ |
+
+### Gotcha: test data cleanup
+
+broker_profiles cleanup requires dropping + restoring the FK
+`broker_follow_history_broker_profile_id_fkey` because of the append-only
+PG rule on `broker_follow_history` (documented in Phase 1 journal). Cleanup
+logic is at the bottom of `/tmp/stripe_webhook_test.sh`.
+
+### Findings NOT fixed this session
+
+1. **`pack_catalog` is near-empty** — only `master_comps` row exists, both
+   price IDs NULL. `customer.subscription.updated` webhook tries to derive
+   tier from price_id via `pack_catalog` lookup; for 11 of 12 pack types
+   this lookup will never match. Prod needs the catalog populated with real
+   Stripe price IDs for upgrade/downgrade via billing portal to work.
+
+2. **No `STRIPE_PUBLISHABLE_KEY` in this env** — `/api/stripe/status`
+   reports `configured: false`. For real Stripe integration the publishable
+   key must be set too.
+
+### Next session pickup
+
+Stabilization #5 — Broker onboarding flow (invite test broker → set criteria
+→ subscriber sees feedback). This is the last stabilization item before
+revenue readiness (#7-8) and data integrity hardening (#9-11).
+
+---
+
 ## ✅ COMPLETE — Stabilization #3: LP Portal integration testing (2026-04-17)
 
 Tested the LP Portal read path end-to-end. Found a cluster of method-name drift
