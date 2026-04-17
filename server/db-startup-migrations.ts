@@ -34,15 +34,23 @@
  *        `,
  *      },
  *
- * 3. DETECT DRIFT AUTOMATICALLY — run the helper script any time you want to see
+ * 3. NEW INDEX — append an entry like:
+ *      {
+ *        name: "my_table: add index my_index_name",
+ *        sql: `CREATE INDEX IF NOT EXISTS my_index_name ON my_table (col1, col2)`,
+ *      },
+ *
+ *    For a unique index, use CREATE UNIQUE INDEX IF NOT EXISTS instead.
+ *
+ * 4. DETECT DRIFT AUTOMATICALLY — run the helper script any time you want to see
  *    what the schema defines vs. what is already covered here:
  *
  *      npx tsx scripts/generate-startup-migrations.ts
  *
- *    The script prints ready-to-paste migration stubs for every table/column that
- *    is in the Drizzle schema but has no matching entry in this file.
+ *    The script prints ready-to-paste migration stubs for every table, column, and
+ *    named index that is in the Drizzle schema but has no matching entry in this file.
  *
- * 4. CI GUARD — the project includes a drift-check script that exits non-zero when
+ * 5. CI GUARD — the project includes a drift-check script that exits non-zero when
  *    the live database is missing schema columns, making it suitable as a CI step:
  *
  *      npx tsx scripts/check-schema-drift.ts
