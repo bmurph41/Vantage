@@ -143,6 +143,69 @@ This executes `scripts/generate-startup-migrations.ts` and produces migration fi
 
 The `schema-drift` job in `.github/workflows/ci.yml` runs this check automatically on every push to `main` or `feat/**` branches and on every pull request targeting `main`, using the `DATABASE_URL` repository secret. If that secret is not configured (e.g. on forked pull requests), the step skips with a warning rather than failing the build.
 
+---
+
+## Schema Drift — Nightly Production Alert
+
+The workflow `.github/workflows/schema-drift-nightly.yml` runs every night at **02:00 UTC** against the production database. It can also be triggered manually from the GitHub Actions UI via **workflow_dispatch** — useful for immediate post-deploy verification.
+
+### How alerts are delivered
+
+| Channel | How it works |
+|---------|--------------|
+| **GitHub email** | GitHub automatically emails repository watchers / on-call when the workflow run is marked **red** (failed). No extra setup needed. |
+| **Slack** | Add a `SLACK_WEBHOOK_URL` repository secret. The workflow POSTs a formatted message to the channel whenever drift is detected. |
+
+To configure Slack:
+1. Create an Incoming Webhook in your Slack workspace (Apps → Incoming Webhooks).
+2. Add the webhook URL as a repository secret named `SLACK_WEBHOOK_URL` (Settings → Secrets and variables → Actions).
+
+### Required repository secrets
+
+| Secret | Required | Description |
+|--------|----------|-------------|
+| `DATABASE_URL` | **Yes** | PostgreSQL connection string for the production database. The job fails with an error if this is missing. |
+| `SLACK_WEBHOOK_URL` | Optional | Incoming Webhook URL for Slack alerts. If absent, only GitHub's native email notification fires. |
+
+### On-call runbook
+
+When a nightly drift alert fires (red run or Slack message), follow these steps:
+
+1. **Open the failing run** in GitHub Actions and expand the `Run schema drift check against production database` step to see which tables or columns have drifted.
+
+2. **Reproduce locally** against the production database:
+   ```bash
+   DATABASE_URL="<prod-connection-string>" npm run check:schema
+   ```
+
+3. **Identify the cause** — common scenarios:
+   - A migration ran in production but the schema file was never updated (or vice versa).
+   - A manual `ALTER TABLE` was applied directly to the production database.
+   - A migration was rolled back in production but not in the schema file.
+
+4. **Generate migration stubs** for any missing tables or columns:
+   ```bash
+   npm run gen:migrations
+   ```
+   Review the output, adjust as needed, and apply the migration to production.
+
+5. **For orphan or phantom objects** (extra columns/tables in the DB): decide whether to `DROP` them or add a matching Drizzle definition, then commit and deploy.
+
+6. **Verify the fix** by re-running the workflow manually:
+   - GitHub Actions → **Schema Drift – Nightly Production Alert** → **Run workflow**.
+
+7. **Post-incident**: document what drifted, why, and how it was resolved in the incident log or the PR description.
+
+### Running the nightly job manually
+
+```bash
+# From the GitHub UI:
+# Actions → Schema Drift – Nightly Production Alert → Run workflow
+
+# Or via the GitHub CLI:
+gh workflow run schema-drift-nightly.yml --field reason="Post-deploy verification"
+```
+
 ## Usage Example
 
 ```typescript

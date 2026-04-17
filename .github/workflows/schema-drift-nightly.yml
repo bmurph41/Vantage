@@ -1,0 +1,126 @@
+name: Schema Drift – Nightly Production Alert
+
+on:
+  schedule:
+    # Runs every night at 02:00 UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: 'Reason for manual run (e.g., post-deploy verification)'
+        required: false
+        default: 'Manual trigger'
+
+jobs:
+  schema-drift-production:
+    name: Check Schema Drift (Production DB)
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - run: npm ci
+
+      - name: Run schema drift check against production database
+        id: drift_check
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::error::DATABASE_URL secret is not configured — cannot run production drift check."
+            echo "Add DATABASE_URL to repository secrets to enable this check."
+            echo "failure_mode=config" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+
+          echo "Running schema drift check against production database..."
+          set +e
+          npm run check:schema
+          EXIT_CODE=$?
+          set -e
+
+          # check-schema-drift.ts exit codes:
+          #   0 — no drift (success)
+          #   1 — drift detected
+          #   2 — fatal / DB unreachable
+          if [ "$EXIT_CODE" -eq 0 ]; then
+            echo "failure_mode=none" >> "$GITHUB_OUTPUT"
+          elif [ "$EXIT_CODE" -eq 1 ]; then
+            echo "::error::Schema drift detected — the live database does not match the Drizzle schema."
+            echo "failure_mode=drift" >> "$GITHUB_OUTPUT"
+            exit 1
+          else
+            echo "::error::Schema drift check could not connect to the database (exit code $EXIT_CODE)."
+            echo "failure_mode=fatal" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+        continue-on-error: true
+
+      - name: Send Slack alert on failure
+        if: steps.drift_check.outcome == 'failure' && env.SLACK_WEBHOOK_URL != ''
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          TRIGGER="${{ github.event_name == 'workflow_dispatch' && github.event.inputs.reason || 'Scheduled nightly check' }}"
+          FAILURE_MODE="${{ steps.drift_check.outputs.failure_mode }}"
+
+          case "$FAILURE_MODE" in
+            drift)
+              TITLE="*[SCHEMA DRIFT ALERT]* Production database schema has drifted from the Drizzle schema definitions."
+              ;;
+            config)
+              TITLE="*[SCHEMA DRIFT ALERT]* Nightly check could not run — DATABASE_URL secret is missing."
+              ;;
+            *)
+              TITLE="*[SCHEMA DRIFT ALERT]* Nightly check failed — could not connect to the production database."
+              ;;
+          esac
+
+          curl --fail --show-error -s -X POST "$SLACK_WEBHOOK_URL" \
+            -H 'Content-Type: application/json' \
+            -d "{
+              \"text\": \"${TITLE}\",
+              \"attachments\": [
+                {
+                  \"color\": \"danger\",
+                  \"fields\": [
+                    { \"title\": \"Repository\",    \"value\": \"${{ github.repository }}\", \"short\": true },
+                    { \"title\": \"Failure reason\",\"value\": \"${FAILURE_MODE}\",          \"short\": true },
+                    { \"title\": \"Trigger\",       \"value\": \"${TRIGGER}\",               \"short\": true },
+                    { \"title\": \"Run details\",   \"value\": \"${RUN_URL}\",               \"short\": false }
+                  ],
+                  \"footer\": \"Runbook: README.md → Schema Drift — Nightly Production Alert → On-call runbook\"
+                }
+              ]
+            }"
+
+      - name: Fail the job so GitHub sends email notifications and marks the run red
+        if: steps.drift_check.outcome == 'failure'
+        run: |
+          FAILURE_MODE="${{ steps.drift_check.outputs.failure_mode }}"
+          case "$FAILURE_MODE" in
+            drift)
+              echo "::error::Schema drift detected in the production database."
+              echo ""
+              echo "On-call action required — see the drift_check step log above for the full diff."
+              echo "Reproduce: DATABASE_URL='<prod>' npm run check:schema"
+              echo "Fix:       npm run gen:migrations  (then review and apply the stubs)"
+              ;;
+            config)
+              echo "::error::DATABASE_URL secret is not set — the nightly drift check cannot run."
+              echo "Add the DATABASE_URL secret under Settings → Secrets and variables → Actions."
+              ;;
+            *)
+              echo "::error::Schema drift check failed to connect to the production database."
+              echo "Verify that DATABASE_URL is correct and the database is reachable from GitHub Actions."
+              ;;
+          esac
+          echo ""
+          echo "Full runbook: README.md → 'Schema Drift — Nightly Production Alert' → 'On-call runbook'"
+          exit 1
