@@ -1,10 +1,10 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { format, subMonths } from "date-fns";
+import { format, subMonths, parseISO } from "date-fns";
 import {
   Car, Plus, Trash2, DollarSign, Edit,
   TrendingUp, Download, Calendar, Sun, Moon,
-  Percent, Calculator, BarChart3
+  Percent, Calculator, BarChart3, Save, Upload, BookOpen
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -103,6 +103,60 @@ interface ScenarioInputs {
   enableMonthly: boolean;
   enableEvent: boolean;
 }
+
+interface AsmpRow {
+  id: string;
+  projectId: string;
+  orgId: string;
+  periodMonth: string;
+  totalSpaces: number | null;
+  coveredSpaces: number | null;
+  uncoveredSpaces: number | null;
+  hourlyRate: string | null;
+  dailyRate: string | null;
+  monthlyRate: string | null;
+  eventRate: string | null;
+  weekdayOccupancyPct: string | null;
+  weekendOccupancyPct: string | null;
+  monthlyPassCount: number | null;
+  growthPct: string | null;
+  revenue: string | null;
+  notes: string | null;
+}
+
+interface AsmpFormState {
+  periodMonth: string;
+  totalSpaces: string;
+  coveredSpaces: string;
+  uncoveredSpaces: string;
+  hourlyRate: string;
+  dailyRate: string;
+  monthlyRate: string;
+  eventRate: string;
+  weekdayOccupancyPct: string;
+  weekendOccupancyPct: string;
+  monthlyPassCount: string;
+  growthPct: string;
+  revenue: string;
+  notes: string;
+}
+
+const EMPTY_ASMP_FORM: AsmpFormState = {
+  periodMonth: format(new Date(), "yyyy-MM"),
+  totalSpaces: "",
+  coveredSpaces: "",
+  uncoveredSpaces: "",
+  hourlyRate: "",
+  dailyRate: "",
+  monthlyRate: "",
+  eventRate: "",
+  weekdayOccupancyPct: "",
+  weekendOccupancyPct: "",
+  monthlyPassCount: "",
+  growthPct: "",
+  revenue: "",
+  notes: "",
+};
 
 const DEFAULT_SCENARIO: ScenarioInputs = {
   totalSpaces: 50,
@@ -212,6 +266,9 @@ export default function ValuatorParkingLotTab({ projectId, projectName }: Valuat
   const [editingRecord, setEditingRecord] = useState<ParkingRecord | null>(null);
   const [timeframe, setTimeframe] = useState("12m");
   const [scenario, setScenario] = useState<ScenarioInputs>({ ...DEFAULT_SCENARIO });
+  const [showAsmpDialog, setShowAsmpDialog] = useState(false);
+  const [editingAsmp, setEditingAsmp] = useState<AsmpRow | null>(null);
+  const [asmpForm, setAsmpForm] = useState<AsmpFormState>({ ...EMPTY_ASMP_FORM });
 
   const getDateRange = () => {
     const end = new Date();
@@ -304,6 +361,134 @@ export default function ValuatorParkingLotTab({ projectId, projectName }: Valuat
     onError: () => toast({ title: "Failed to delete record", variant: "destructive" }),
   });
 
+  const { data: assumptions = [] } = useQuery<AsmpRow[]>({
+    queryKey: ["/api/operations-context/projects", projectId, "assumptions/parking-lot"],
+    queryFn: async () => {
+      const res = await fetch(`/api/operations-context/projects/${projectId}/assumptions/parking-lot`, {
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to fetch parking lot assumptions");
+      return res.json();
+    },
+  });
+
+  const saveAssumptionsMutation = useMutation({
+    mutationFn: async (rows: object[]) => {
+      const res = await apiRequest("POST", `/api/operations-context/projects/${projectId}/assumptions/parking-lot/bulk`, { rows });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/operations-context/projects", projectId, "assumptions/parking-lot"] });
+      toast({ title: "Assumptions saved" });
+      setShowAsmpDialog(false);
+      setEditingAsmp(null);
+      setAsmpForm({ ...EMPTY_ASMP_FORM });
+    },
+    onError: () => toast({ title: "Failed to save assumptions", variant: "destructive" }),
+  });
+
+  const deleteAssumptionMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("DELETE", `/api/operations-context/projects/${projectId}/assumptions/parking-lot/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/operations-context/projects", projectId, "assumptions/parking-lot"] });
+      toast({ title: "Assumption row deleted" });
+    },
+    onError: () => toast({ title: "Failed to delete assumption", variant: "destructive" }),
+  });
+
+  const handleSaveAsmpRow = () => {
+    const periodMonthDate = asmpForm.periodMonth ? `${asmpForm.periodMonth}-01` : null;
+    if (!periodMonthDate) {
+      toast({ title: "Period month is required", variant: "destructive" });
+      return;
+    }
+    const row: Record<string, unknown> = {
+      periodMonth: periodMonthDate,
+      totalSpaces: asmpForm.totalSpaces ? parseInt(asmpForm.totalSpaces) : null,
+      coveredSpaces: asmpForm.coveredSpaces ? parseInt(asmpForm.coveredSpaces) : null,
+      uncoveredSpaces: asmpForm.uncoveredSpaces ? parseInt(asmpForm.uncoveredSpaces) : null,
+      hourlyRate: asmpForm.hourlyRate || null,
+      dailyRate: asmpForm.dailyRate || null,
+      monthlyRate: asmpForm.monthlyRate || null,
+      eventRate: asmpForm.eventRate || null,
+      weekdayOccupancyPct: asmpForm.weekdayOccupancyPct ? (parseFloat(asmpForm.weekdayOccupancyPct) / 100).toString() : null,
+      weekendOccupancyPct: asmpForm.weekendOccupancyPct ? (parseFloat(asmpForm.weekendOccupancyPct) / 100).toString() : null,
+      monthlyPassCount: asmpForm.monthlyPassCount ? parseInt(asmpForm.monthlyPassCount) : null,
+      growthPct: asmpForm.growthPct ? (parseFloat(asmpForm.growthPct) / 100).toString() : null,
+      revenue: asmpForm.revenue || null,
+      notes: asmpForm.notes || null,
+    };
+    saveAssumptionsMutation.mutate([row]);
+  };
+
+  const loadFromAssumptions = () => {
+    if (assumptions.length === 0) {
+      toast({ title: "No assumptions saved yet", variant: "destructive" });
+      return;
+    }
+    const sorted = [...assumptions].sort((a, b) => a.periodMonth.localeCompare(b.periodMonth));
+    const latest = sorted[sorted.length - 1];
+    setScenario(prev => ({
+      ...prev,
+      totalSpaces: latest.totalSpaces ?? prev.totalSpaces,
+      coveredSpaces: latest.coveredSpaces ?? prev.coveredSpaces,
+      uncoveredSpaces: latest.uncoveredSpaces ?? prev.uncoveredSpaces,
+      hourlyRate: latest.hourlyRate ? parseFloat(latest.hourlyRate) : prev.hourlyRate,
+      dailyRate: latest.dailyRate ? parseFloat(latest.dailyRate) : prev.dailyRate,
+      monthlyRate: latest.monthlyRate ? parseFloat(latest.monthlyRate) : prev.monthlyRate,
+      eventRate: latest.eventRate ? parseFloat(latest.eventRate) : prev.eventRate,
+      weekdayOccupancy: latest.weekdayOccupancyPct ? parseFloat(latest.weekdayOccupancyPct) * 100 : prev.weekdayOccupancy,
+      weekendOccupancy: latest.weekendOccupancyPct ? parseFloat(latest.weekendOccupancyPct) * 100 : prev.weekendOccupancy,
+      monthlyPassSpaces: latest.monthlyPassCount ?? prev.monthlyPassSpaces,
+      annualGrowthRate: latest.growthPct ? parseFloat(latest.growthPct) * 100 : prev.annualGrowthRate,
+    }));
+    toast({ title: "Calculator loaded from latest assumption row" });
+  };
+
+  const saveScenarioAsAssumption = () => {
+    const periodMonthDate = `${format(new Date(), "yyyy-MM")}-01`;
+    const row = {
+      periodMonth: periodMonthDate,
+      totalSpaces: scenario.totalSpaces,
+      coveredSpaces: scenario.coveredSpaces,
+      uncoveredSpaces: scenario.uncoveredSpaces,
+      hourlyRate: scenario.hourlyRate.toString(),
+      dailyRate: scenario.dailyRate.toString(),
+      monthlyRate: scenario.monthlyRate.toString(),
+      eventRate: scenario.eventRate.toString(),
+      weekdayOccupancyPct: (scenario.weekdayOccupancy / 100).toString(),
+      weekendOccupancyPct: (scenario.weekendOccupancy / 100).toString(),
+      monthlyPassCount: scenario.monthlyPassSpaces,
+      growthPct: (scenario.annualGrowthRate / 100).toString(),
+      revenue: revenue.totalAnnual.toFixed(2),
+    };
+    saveAssumptionsMutation.mutate([row]);
+  };
+
+  const importFromActuals = () => {
+    if (records.length === 0) {
+      toast({ title: "No actuals data to import", variant: "destructive" });
+      return;
+    }
+    const byMonth: Record<string, { revenue: number; spaces: number; count: number }> = {};
+    for (const rec of records) {
+      const monthKey = rec.txnDate.substring(0, 7);
+      if (!byMonth[monthKey]) byMonth[monthKey] = { revenue: 0, spaces: 0, count: 0 };
+      byMonth[monthKey].revenue += parseFloat(rec.grossRevenue) || 0;
+      byMonth[monthKey].spaces += rec.spacesUsed || 0;
+      byMonth[monthKey].count += 1;
+    }
+    const rows = Object.entries(byMonth).map(([month, data]) => ({
+      periodMonth: `${month}-01`,
+      revenue: data.revenue.toFixed(2),
+      totalSpaces: scenario.totalSpaces,
+    }));
+    saveAssumptionsMutation.mutate(rows);
+    toast({ title: `Importing ${rows.length} month(s) from actuals…` });
+  };
+
   const revenue = useMemo(() => computeRevenue(scenario), [scenario]);
 
   const updateScenario = (key: keyof ScenarioInputs, value: number | boolean) => {
@@ -390,6 +575,13 @@ export default function ValuatorParkingLotTab({ projectId, projectName }: Valuat
             <Calculator className="h-4 w-4" />
             Revenue Calculator
           </TabsTrigger>
+          <TabsTrigger value="assumptions" className="gap-2">
+            <BookOpen className="h-4 w-4" />
+            Assumptions
+            {assumptions.length > 0 && (
+              <span className="ml-1 bg-primary/20 text-primary text-xs rounded-full px-1.5 py-0.5">{assumptions.length}</span>
+            )}
+          </TabsTrigger>
           <TabsTrigger value="actuals" className="gap-2">
             <BarChart3 className="h-4 w-4" />
             Actuals
@@ -397,6 +589,28 @@ export default function ValuatorParkingLotTab({ projectId, projectName }: Valuat
         </TabsList>
 
         <TabsContent value="calculator" className="space-y-6 mt-4">
+          <div className="flex items-center justify-end gap-2 mb-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={loadFromAssumptions}
+              disabled={assumptions.length === 0}
+              className="gap-2"
+            >
+              <Upload className="h-4 w-4" />
+              Load from Assumptions
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={saveScenarioAsAssumption}
+              disabled={saveAssumptionsMutation.isPending}
+              className="gap-2"
+            >
+              <Save className="h-4 w-4" />
+              {saveAssumptionsMutation.isPending ? "Saving…" : "Save Scenario"}
+            </Button>
+          </div>
           <div className="grid lg:grid-cols-2 gap-6">
             <div className="space-y-4">
               <Card>
@@ -806,6 +1020,132 @@ export default function ValuatorParkingLotTab({ projectId, projectName }: Valuat
           </div>
         </TabsContent>
 
+        <TabsContent value="assumptions" className="space-y-4 mt-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h4 className="text-sm font-semibold">Parking Lot Assumptions</h4>
+              <p className="text-xs text-muted-foreground">Monthly assumption rows used for modeling. Each row is keyed by period month and upserted on save.</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={importFromActuals}
+                disabled={saveAssumptionsMutation.isPending || records.length === 0}
+                className="gap-2"
+              >
+                <Download className="h-4 w-4" />
+                Import from Actuals
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => {
+                  setEditingAsmp(null);
+                  setAsmpForm({ ...EMPTY_ASMP_FORM });
+                  setShowAsmpDialog(true);
+                }}
+                className="gap-2"
+              >
+                <Plus className="h-4 w-4" />
+                Add Row
+              </Button>
+            </div>
+          </div>
+
+          {assumptions.length === 0 ? (
+            <Card>
+              <CardContent className="pt-10 pb-10 text-center text-muted-foreground text-sm">
+                <BookOpen className="h-8 w-8 mx-auto mb-3 opacity-40" />
+                No assumption rows yet. Add a row manually or import from actuals.
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardContent className="p-0">
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Period</TableHead>
+                        <TableHead className="text-right">Spaces</TableHead>
+                        <TableHead className="text-right">Hourly</TableHead>
+                        <TableHead className="text-right">Daily</TableHead>
+                        <TableHead className="text-right">Monthly</TableHead>
+                        <TableHead className="text-right">Event</TableHead>
+                        <TableHead className="text-right">Wkday Occ%</TableHead>
+                        <TableHead className="text-right">Wkend Occ%</TableHead>
+                        <TableHead className="text-right">Pass Count</TableHead>
+                        <TableHead className="text-right">Growth%</TableHead>
+                        <TableHead className="text-right">Revenue</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {assumptions.map((row) => (
+                        <TableRow key={row.id}>
+                          <TableCell className="font-medium whitespace-nowrap">
+                            {row.periodMonth ? format(parseISO(row.periodMonth), "MMM yyyy") : "—"}
+                          </TableCell>
+                          <TableCell className="text-right">{row.totalSpaces ?? "—"}</TableCell>
+                          <TableCell className="text-right">{row.hourlyRate ? `$${parseFloat(row.hourlyRate).toFixed(2)}` : "—"}</TableCell>
+                          <TableCell className="text-right">{row.dailyRate ? `$${parseFloat(row.dailyRate).toFixed(2)}` : "—"}</TableCell>
+                          <TableCell className="text-right">{row.monthlyRate ? `$${parseFloat(row.monthlyRate).toFixed(2)}` : "—"}</TableCell>
+                          <TableCell className="text-right">{row.eventRate ? `$${parseFloat(row.eventRate).toFixed(2)}` : "—"}</TableCell>
+                          <TableCell className="text-right">{row.weekdayOccupancyPct ? `${(parseFloat(row.weekdayOccupancyPct) * 100).toFixed(0)}%` : "—"}</TableCell>
+                          <TableCell className="text-right">{row.weekendOccupancyPct ? `${(parseFloat(row.weekendOccupancyPct) * 100).toFixed(0)}%` : "—"}</TableCell>
+                          <TableCell className="text-right">{row.monthlyPassCount ?? "—"}</TableCell>
+                          <TableCell className="text-right">{row.growthPct ? `${(parseFloat(row.growthPct) * 100).toFixed(1)}%` : "—"}</TableCell>
+                          <TableCell className="text-right">{row.revenue ? formatCurrency(parseFloat(row.revenue)) : "—"}</TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex items-center justify-end gap-1">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7"
+                                onClick={() => {
+                                  setEditingAsmp(row);
+                                  setAsmpForm({
+                                    periodMonth: row.periodMonth ? row.periodMonth.substring(0, 7) : "",
+                                    totalSpaces: row.totalSpaces?.toString() ?? "",
+                                    coveredSpaces: row.coveredSpaces?.toString() ?? "",
+                                    uncoveredSpaces: row.uncoveredSpaces?.toString() ?? "",
+                                    hourlyRate: row.hourlyRate ?? "",
+                                    dailyRate: row.dailyRate ?? "",
+                                    monthlyRate: row.monthlyRate ?? "",
+                                    eventRate: row.eventRate ?? "",
+                                    weekdayOccupancyPct: row.weekdayOccupancyPct ? (parseFloat(row.weekdayOccupancyPct) * 100).toString() : "",
+                                    weekendOccupancyPct: row.weekendOccupancyPct ? (parseFloat(row.weekendOccupancyPct) * 100).toString() : "",
+                                    monthlyPassCount: row.monthlyPassCount?.toString() ?? "",
+                                    growthPct: row.growthPct ? (parseFloat(row.growthPct) * 100).toString() : "",
+                                    revenue: row.revenue ?? "",
+                                    notes: row.notes ?? "",
+                                  });
+                                  setShowAsmpDialog(true);
+                                }}
+                              >
+                                <Edit className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 text-destructive hover:text-destructive"
+                                onClick={() => deleteAssumptionMutation.mutate(row.id)}
+                                disabled={deleteAssumptionMutation.isPending}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
         <TabsContent value="actuals" className="space-y-4 mt-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -957,6 +1297,88 @@ export default function ValuatorParkingLotTab({ projectId, projectName }: Valuat
           )}
         </TabsContent>
       </Tabs>
+
+      <Dialog open={showAsmpDialog} onOpenChange={(open) => {
+        if (!open) { setShowAsmpDialog(false); setEditingAsmp(null); setAsmpForm({ ...EMPTY_ASMP_FORM }); }
+      }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{editingAsmp ? "Edit Assumption Row" : "Add Assumption Row"}</DialogTitle>
+            <DialogDescription>Enter monthly parking lot assumption data. Occupancy fields are percentages (0–100).</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="col-span-2">
+                <Label>Period Month</Label>
+                <Input
+                  type="month"
+                  value={asmpForm.periodMonth}
+                  onChange={(e) => !editingAsmp && setAsmpForm({ ...asmpForm, periodMonth: e.target.value })}
+                  readOnly={!!editingAsmp}
+                  className={`mt-1 ${editingAsmp ? "bg-muted cursor-not-allowed" : ""}`}
+                />
+                {editingAsmp && (
+                  <p className="text-xs text-muted-foreground mt-1">Period month is locked while editing. Delete and re-add to change it.</p>
+                )}
+              </div>
+              <div>
+                <Label className="text-xs">Total Spaces</Label>
+                <Input type="number" value={asmpForm.totalSpaces} onChange={(e) => setAsmpForm({ ...asmpForm, totalSpaces: e.target.value })} className="mt-1" />
+              </div>
+              <div>
+                <Label className="text-xs">Covered Spaces</Label>
+                <Input type="number" value={asmpForm.coveredSpaces} onChange={(e) => setAsmpForm({ ...asmpForm, coveredSpaces: e.target.value })} className="mt-1" />
+              </div>
+              <div>
+                <Label className="text-xs">Hourly Rate ($)</Label>
+                <Input type="number" step="0.01" value={asmpForm.hourlyRate} onChange={(e) => setAsmpForm({ ...asmpForm, hourlyRate: e.target.value })} className="mt-1" />
+              </div>
+              <div>
+                <Label className="text-xs">Daily Rate ($)</Label>
+                <Input type="number" step="0.01" value={asmpForm.dailyRate} onChange={(e) => setAsmpForm({ ...asmpForm, dailyRate: e.target.value })} className="mt-1" />
+              </div>
+              <div>
+                <Label className="text-xs">Monthly Pass Rate ($)</Label>
+                <Input type="number" step="0.01" value={asmpForm.monthlyRate} onChange={(e) => setAsmpForm({ ...asmpForm, monthlyRate: e.target.value })} className="mt-1" />
+              </div>
+              <div>
+                <Label className="text-xs">Event Rate ($)</Label>
+                <Input type="number" step="0.01" value={asmpForm.eventRate} onChange={(e) => setAsmpForm({ ...asmpForm, eventRate: e.target.value })} className="mt-1" />
+              </div>
+              <div>
+                <Label className="text-xs">Weekday Occupancy (%)</Label>
+                <Input type="number" min="0" max="100" value={asmpForm.weekdayOccupancyPct} onChange={(e) => setAsmpForm({ ...asmpForm, weekdayOccupancyPct: e.target.value })} className="mt-1" />
+              </div>
+              <div>
+                <Label className="text-xs">Weekend Occupancy (%)</Label>
+                <Input type="number" min="0" max="100" value={asmpForm.weekendOccupancyPct} onChange={(e) => setAsmpForm({ ...asmpForm, weekendOccupancyPct: e.target.value })} className="mt-1" />
+              </div>
+              <div>
+                <Label className="text-xs">Monthly Pass Count</Label>
+                <Input type="number" value={asmpForm.monthlyPassCount} onChange={(e) => setAsmpForm({ ...asmpForm, monthlyPassCount: e.target.value })} className="mt-1" />
+              </div>
+              <div>
+                <Label className="text-xs">Growth Rate (%)</Label>
+                <Input type="number" step="0.1" value={asmpForm.growthPct} onChange={(e) => setAsmpForm({ ...asmpForm, growthPct: e.target.value })} className="mt-1" />
+              </div>
+              <div>
+                <Label className="text-xs">Revenue ($)</Label>
+                <Input type="number" step="0.01" value={asmpForm.revenue} onChange={(e) => setAsmpForm({ ...asmpForm, revenue: e.target.value })} className="mt-1" />
+              </div>
+              <div className="col-span-2">
+                <Label className="text-xs">Notes</Label>
+                <Input value={asmpForm.notes} onChange={(e) => setAsmpForm({ ...asmpForm, notes: e.target.value })} className="mt-1" />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setShowAsmpDialog(false); setEditingAsmp(null); setAsmpForm({ ...EMPTY_ASMP_FORM }); }}>Cancel</Button>
+            <Button onClick={handleSaveAsmpRow} disabled={saveAssumptionsMutation.isPending}>
+              {saveAssumptionsMutation.isPending ? "Saving…" : "Save"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={showAddDialog || !!editingRecord} onOpenChange={(open) => {
         if (!open) { setShowAddDialog(false); setEditingRecord(null); }
