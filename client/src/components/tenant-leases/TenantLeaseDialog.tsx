@@ -1195,6 +1195,8 @@ export function TenantLeaseDialog({ open, onOpenChange, projectId, projectName, 
                       </div>
                     </CardContent>
                   </Card>
+                </TabsContent>
+
                 {/* ── SALES ─────────────────────────────────────────────────── */}
                 <TabsContent value="sales" className="space-y-4 mt-0">
                   <div>
