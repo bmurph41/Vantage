@@ -235,7 +235,8 @@
       "Bash(scripts/integration/smoke.sh)",
       "Bash(scripts/integration/stripe-webhook.sh)",
       "Bash(kill -9 49139 49140 49151 50961 50978)",
-      "Bash(scripts/integration/broker-onboarding.sh)"
+      "Bash(scripts/integration/broker-onboarding.sh)",
+      "Bash(/usr/bin/time -v env NODE_OPTIONS=--max-old-space-size=6144 npx tsc -p /tmp/shared-tsconfig-test.json)"
     ]
   }
 }
