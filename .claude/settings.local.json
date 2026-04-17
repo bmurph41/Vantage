@@ -231,7 +231,11 @@
       "Bash(cp /tmp/smoke.sh scripts/integration/smoke.sh)",
       "Bash(cp /tmp/stripe_webhook_test.sh scripts/integration/stripe-webhook.sh)",
       "Bash(cp /tmp/broker_onboarding_test.sh scripts/integration/broker-onboarding.sh)",
-      "Bash(chmod +x scripts/integration/*.sh)"
+      "Bash(chmod +x scripts/integration/*.sh)",
+      "Bash(scripts/integration/smoke.sh)",
+      "Bash(scripts/integration/stripe-webhook.sh)",
+      "Bash(kill -9 49139 49140 49151 50961 50978)",
+      "Bash(scripts/integration/broker-onboarding.sh)"
     ]
   }
 }

@@ -89,6 +89,10 @@ interface IntegrationsStatus {
   stripePublishable: boolean;
   stripeWebhookSecret: boolean;
   replitSendgridConnector: boolean;
+  // PII encryption — when false, encrypt() silently passes plaintext through
+  // (see server/services/encryption-service.ts). Must be true in prod or
+  // fund_investors.tax_id lands unencrypted in the DB.
+  piiEncryption: boolean;
 }
 
 function checkIntegrations(): IntegrationsStatus {
@@ -103,6 +107,8 @@ function checkIntegrations(): IntegrationsStatus {
     replitSendgridConnector:
       !!process.env.REPLIT_CONNECTORS_HOSTNAME &&
       !!(process.env.REPL_IDENTITY || process.env.WEB_REPL_RENEWAL),
+    piiEncryption:
+      !!process.env.PII_ENCRYPTION_KEY || !!process.env.QB_ENCRYPTION_KEY,
   };
 }
 
