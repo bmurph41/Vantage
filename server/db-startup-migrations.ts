@@ -2665,6 +2665,144 @@ const MIGRATIONS: Migration[] = [
   { name: "marketing_campaigns: add dry_slips", sql: `ALTER TABLE marketing_campaigns ADD COLUMN IF NOT EXISTS dry_slips integer` },
   { name: "marketing_campaigns: add has_fuel_dock", sql: `ALTER TABLE marketing_campaigns ADD COLUMN IF NOT EXISTS has_fuel_dock boolean DEFAULT false` },
   { name: "marketing_campaigns: add has_repair_yard", sql: `ALTER TABLE marketing_campaigns ADD COLUMN IF NOT EXISTS has_repair_yard boolean DEFAULT false` },
+
+  // ============================================================
+  // INDEXES: asmp_* modeling assumption tables (project+month)
+  // ============================================================
+  { name: "asmp_fuel: index project+month", sql: `CREATE INDEX IF NOT EXISTS asmp_fuel_project_month_idx ON asmp_fuel(project_id, period_month)` },
+  { name: "asmp_fuel: unique project+month", sql: `CREATE UNIQUE INDEX IF NOT EXISTS asmp_fuel_project_month_unique ON asmp_fuel(project_id, period_month)` },
+  { name: "asmp_ship_store: index project+month", sql: `CREATE INDEX IF NOT EXISTS asmp_ship_store_project_month_idx ON asmp_ship_store(project_id, period_month)` },
+  { name: "asmp_ship_store: unique project+month", sql: `CREATE UNIQUE INDEX IF NOT EXISTS asmp_ship_store_project_month_unique ON asmp_ship_store(project_id, period_month)` },
+  { name: "asmp_service: index project+month", sql: `CREATE INDEX IF NOT EXISTS asmp_service_project_month_idx ON asmp_service(project_id, period_month)` },
+  { name: "asmp_service: unique project+month", sql: `CREATE UNIQUE INDEX IF NOT EXISTS asmp_service_project_month_unique ON asmp_service(project_id, period_month)` },
+  { name: "asmp_commercial_tenants: index project+month", sql: `CREATE INDEX IF NOT EXISTS asmp_tenants_project_month_idx ON asmp_commercial_tenants(project_id, period_month)` },
+  { name: "asmp_commercial_tenants: unique project+month", sql: `CREATE UNIQUE INDEX IF NOT EXISTS asmp_tenants_project_month_unique ON asmp_commercial_tenants(project_id, period_month)` },
+  { name: "asmp_boat_rentals: index project+month", sql: `CREATE INDEX IF NOT EXISTS asmp_boat_rentals_project_month_idx ON asmp_boat_rentals(project_id, period_month)` },
+  { name: "asmp_boat_rentals: unique project+month", sql: `CREATE UNIQUE INDEX IF NOT EXISTS asmp_boat_rentals_project_month_unique ON asmp_boat_rentals(project_id, period_month)` },
+  { name: "asmp_boat_club: index project+month", sql: `CREATE INDEX IF NOT EXISTS asmp_boat_club_project_month_idx ON asmp_boat_club(project_id, period_month)` },
+  { name: "asmp_boat_club: unique project+month", sql: `CREATE UNIQUE INDEX IF NOT EXISTS asmp_boat_club_project_month_unique ON asmp_boat_club(project_id, period_month)` },
+  { name: "asmp_boat_sales: index project+month", sql: `CREATE INDEX IF NOT EXISTS asmp_boat_sales_project_month_idx ON asmp_boat_sales(project_id, period_month)` },
+  { name: "asmp_boat_sales: unique project+month", sql: `CREATE UNIQUE INDEX IF NOT EXISTS asmp_boat_sales_project_month_unique ON asmp_boat_sales(project_id, period_month)` },
+  { name: "asmp_bookkeeping: index project+month", sql: `CREATE INDEX IF NOT EXISTS asmp_bookkeeping_project_month_idx ON asmp_bookkeeping(project_id, period_month)` },
+  { name: "asmp_bookkeeping: unique project+month", sql: `CREATE UNIQUE INDEX IF NOT EXISTS asmp_bookkeeping_project_month_unique ON asmp_bookkeeping(project_id, period_month)` },
+  { name: "asmp_parking_lot: index project+month", sql: `CREATE INDEX IF NOT EXISTS asmp_parking_lot_project_month_idx ON asmp_parking_lot(project_id, period_month)` },
+  { name: "asmp_parking_lot: unique project+month", sql: `CREATE UNIQUE INDEX IF NOT EXISTS asmp_parking_lot_project_month_unique ON asmp_parking_lot(project_id, period_month)` },
+
+  // ============================================================
+  // INDEXES: tenant_leases and child tables
+  // ============================================================
+  { name: "tenant_leases: index project_id", sql: `CREATE INDEX IF NOT EXISTS tenant_leases_project_id_idx ON tenant_leases(project_id)` },
+  { name: "tenant_leases: index status", sql: `CREATE INDEX IF NOT EXISTS tenant_leases_status_idx ON tenant_leases(status)` },
+  { name: "tenant_rent_terms: index lease_id", sql: `CREATE INDEX IF NOT EXISTS tenant_rent_terms_lease_id_idx ON tenant_rent_terms(lease_id)` },
+  { name: "tenant_recoveries: index lease_id", sql: `CREATE INDEX IF NOT EXISTS tenant_recoveries_lease_id_idx ON tenant_recoveries(lease_id)` },
+  { name: "tenant_percentage_rent: index lease_id", sql: `CREATE INDEX IF NOT EXISTS tenant_percentage_rent_lease_id_idx ON tenant_percentage_rent(lease_id)` },
+  { name: "tenant_sales: index lease_id", sql: `CREATE INDEX IF NOT EXISTS tenant_sales_lease_id_idx ON tenant_sales(lease_id)` },
+  { name: "tenant_concessions: index lease_id", sql: `CREATE INDEX IF NOT EXISTS tenant_concessions_lease_id_idx ON tenant_concessions(lease_id)` },
+  { name: "tenant_capex_leasing: index lease_id", sql: `CREATE INDEX IF NOT EXISTS tenant_capex_leasing_lease_id_idx ON tenant_capex_leasing(lease_id)` },
+  { name: "tenant_rollover_assumptions: index lease_id", sql: `CREATE INDEX IF NOT EXISTS tenant_rollover_assumptions_lease_id_idx ON tenant_rollover_assumptions(lease_id)` },
+
+  // ============================================================
+  // INDEXES: monthly_loan_schedule
+  // ============================================================
+  { name: "monthly_loan_schedule: index org_id", sql: `CREATE INDEX IF NOT EXISTS monthly_loan_schedule_org_idx ON monthly_loan_schedule(org_id)` },
+  { name: "monthly_loan_schedule: index debt_tranche_id", sql: `CREATE INDEX IF NOT EXISTS monthly_loan_schedule_debt_tranche_idx ON monthly_loan_schedule(debt_tranche_id)` },
+  { name: "monthly_loan_schedule: index capital_stack_id", sql: `CREATE INDEX IF NOT EXISTS monthly_loan_schedule_capital_stack_idx ON monthly_loan_schedule(capital_stack_id)` },
+  { name: "monthly_loan_schedule: index period year+month", sql: `CREATE INDEX IF NOT EXISTS monthly_loan_schedule_period_idx ON monthly_loan_schedule(period_year, period_month)` },
+  { name: "monthly_loan_schedule: composite tranche+date", sql: `CREATE INDEX IF NOT EXISTS monthly_loan_schedule_tranche_date_idx ON monthly_loan_schedule(debt_tranche_id, period_date)` },
+
+  // ============================================================
+  // INDEXES: exit_scenarios
+  // ============================================================
+  { name: "exit_scenarios: index modeling_project_id", sql: `CREATE INDEX IF NOT EXISTS exit_scenarios_modeling_project_idx ON exit_scenarios(modeling_project_id)` },
+  { name: "exit_scenarios: index org_id", sql: `CREATE INDEX IF NOT EXISTS exit_scenarios_org_idx ON exit_scenarios(org_id)` },
+  { name: "exit_scenarios: index status", sql: `CREATE INDEX IF NOT EXISTS exit_scenarios_status_idx ON exit_scenarios(status)` },
+
+  // ============================================================
+  // INDEXES: exit_scenario_results_v2
+  // ============================================================
+  { name: "exit_scenario_results_v2: unique scenario+checksum+version", sql: `CREATE UNIQUE INDEX IF NOT EXISTS exit_results_v2_scenario_checksum_idx ON exit_scenario_results_v2(scenario_id, inputs_checksum, engine_version)` },
+  { name: "exit_scenario_results_v2: index scenario_id", sql: `CREATE INDEX IF NOT EXISTS exit_results_v2_scenario_idx ON exit_scenario_results_v2(scenario_id)` },
+
+  // ============================================================
+  // INDEXES: exit_scenario_events
+  // ============================================================
+  { name: "exit_scenario_events: index scenario_id", sql: `CREATE INDEX IF NOT EXISTS exit_events_scenario_idx ON exit_scenario_events(scenario_id)` },
+  { name: "exit_scenario_events: index event_type", sql: `CREATE INDEX IF NOT EXISTS exit_events_type_idx ON exit_scenario_events(event_type)` },
+  { name: "exit_scenario_events: index created_at", sql: `CREATE INDEX IF NOT EXISTS exit_events_created_idx ON exit_scenario_events(created_at)` },
+
+  // ============================================================
+  // INDEXES: exit_scenario_kpis
+  // ============================================================
+  { name: "exit_scenario_kpis: index asset_class", sql: `CREATE INDEX IF NOT EXISTS exit_kpis_asset_class_idx ON exit_scenario_kpis(asset_class)` },
+  { name: "exit_scenario_kpis: index sale_price", sql: `CREATE INDEX IF NOT EXISTS exit_kpis_sale_price_idx ON exit_scenario_kpis(sale_price)` },
+  { name: "exit_scenario_kpis: index after_tax_cash_now", sql: `CREATE INDEX IF NOT EXISTS exit_kpis_after_tax_idx ON exit_scenario_kpis(after_tax_cash_now)` },
+
+  // ============================================================
+  // INDEXES: opssos_* tables
+  // ============================================================
+  { name: "opssos_conversations: index org_id", sql: `CREATE INDEX IF NOT EXISTS opssos_conversations_org_idx ON opssos_conversations(org_id)` },
+  { name: "opssos_conversations: index org+status", sql: `CREATE INDEX IF NOT EXISTS opssos_conversations_status_idx ON opssos_conversations(org_id, status)` },
+  { name: "opssos_conversations: index org+assigned_user", sql: `CREATE INDEX IF NOT EXISTS opssos_conversations_assigned_idx ON opssos_conversations(org_id, assigned_user_id)` },
+  { name: "opssos_messages: index conversation_id", sql: `CREATE INDEX IF NOT EXISTS opssos_messages_conversation_idx ON opssos_messages(conversation_id)` },
+  { name: "opssos_messages: index org_id", sql: `CREATE INDEX IF NOT EXISTS opssos_messages_org_idx ON opssos_messages(org_id)` },
+  { name: "opssos_automation_rules: index org_id", sql: `CREATE INDEX IF NOT EXISTS opssos_automation_rules_org_idx ON opssos_automation_rules(org_id)` },
+  { name: "opssos_automation_rules: index org+enabled", sql: `CREATE INDEX IF NOT EXISTS opssos_automation_rules_enabled_idx ON opssos_automation_rules(org_id, enabled)` },
+  { name: "opssos_automation_runs: index rule_id", sql: `CREATE INDEX IF NOT EXISTS opssos_automation_runs_rule_idx ON opssos_automation_runs(rule_id)` },
+  { name: "opssos_automation_runs: index org_id", sql: `CREATE INDEX IF NOT EXISTS opssos_automation_runs_org_idx ON opssos_automation_runs(org_id)` },
+  { name: "opssos_tasks: index org_id", sql: `CREATE INDEX IF NOT EXISTS opssos_tasks_org_idx ON opssos_tasks(org_id)` },
+  { name: "opssos_tasks: index org+status", sql: `CREATE INDEX IF NOT EXISTS opssos_tasks_status_idx ON opssos_tasks(org_id, status)` },
+  { name: "opssos_tasks: index org+assigned_user", sql: `CREATE INDEX IF NOT EXISTS opssos_tasks_assigned_idx ON opssos_tasks(org_id, assigned_user_id)` },
+  { name: "opssos_tasks: index deal_id", sql: `CREATE INDEX IF NOT EXISTS opssos_tasks_deal_idx ON opssos_tasks(deal_id)` },
+  { name: "opssos_statements: index org_id", sql: `CREATE INDEX IF NOT EXISTS opssos_statements_org_idx ON opssos_statements(org_id)` },
+  { name: "opssos_statements: index template_id", sql: `CREATE INDEX IF NOT EXISTS opssos_statements_template_idx ON opssos_statements(template_id)` },
+  { name: "opssos_webhooks: index org_id", sql: `CREATE INDEX IF NOT EXISTS opssos_webhooks_org_idx ON opssos_webhooks(org_id)` },
+  { name: "opssos_webhooks: index org+enabled", sql: `CREATE INDEX IF NOT EXISTS opssos_webhooks_enabled_idx ON opssos_webhooks(org_id, enabled)` },
+  { name: "opssos_webhook_deliveries: index webhook_id", sql: `CREATE INDEX IF NOT EXISTS opssos_webhook_deliveries_webhook_idx ON opssos_webhook_deliveries(webhook_id)` },
+  { name: "opssos_webhook_deliveries: index org_id", sql: `CREATE INDEX IF NOT EXISTS opssos_webhook_deliveries_org_idx ON opssos_webhook_deliveries(org_id)` },
+
+  // ============================================================
+  // INDEXES: opssos_* additional tables
+  // ============================================================
+  { name: "opssos_message_templates: index org_id", sql: `CREATE INDEX IF NOT EXISTS opssos_message_templates_org_idx ON opssos_message_templates(org_id)` },
+  { name: "opssos_scheduled_jobs: index org_id", sql: `CREATE INDEX IF NOT EXISTS opssos_scheduled_jobs_org_idx ON opssos_scheduled_jobs(org_id)` },
+  { name: "opssos_scheduled_jobs: index status+run_at", sql: `CREATE INDEX IF NOT EXISTS opssos_scheduled_jobs_status_run_at_idx ON opssos_scheduled_jobs(status, run_at)` },
+  { name: "opssos_checklist_templates: index org_id", sql: `CREATE INDEX IF NOT EXISTS opssos_checklist_templates_org_idx ON opssos_checklist_templates(org_id)` },
+  { name: "opssos_task_checklists: index task_id", sql: `CREATE INDEX IF NOT EXISTS opssos_task_checklists_task_idx ON opssos_task_checklists(task_id)` },
+  { name: "opssos_statement_templates: index org_id", sql: `CREATE INDEX IF NOT EXISTS opssos_statement_templates_org_idx ON opssos_statement_templates(org_id)` },
+  { name: "opssos_statement_exports: index statement_id", sql: `CREATE INDEX IF NOT EXISTS opssos_statement_exports_statement_idx ON opssos_statement_exports(statement_id)` },
+  { name: "opssos_integrations: index org_id", sql: `CREATE INDEX IF NOT EXISTS opssos_integrations_org_idx ON opssos_integrations(org_id)` },
+  { name: "opssos_integrations: index org+provider", sql: `CREATE INDEX IF NOT EXISTS opssos_integrations_provider_idx ON opssos_integrations(org_id, provider)` },
+
+  // ============================================================
+  // INDEXES: exit_scenario_loans
+  // ============================================================
+  { name: "exit_scenario_loans: index exit_scenario_id", sql: `CREATE INDEX IF NOT EXISTS exit_loans_scenario_idx ON exit_scenario_loans(exit_scenario_id)` },
+  { name: "exit_scenario_loans: index org_id", sql: `CREATE INDEX IF NOT EXISTS exit_loans_org_idx ON exit_scenario_loans(org_id)` },
+
+  // ============================================================
+  // INDEXES: exit_scenario_basis_ledger
+  // ============================================================
+  { name: "exit_scenario_basis_ledger: index exit_scenario_id", sql: `CREATE INDEX IF NOT EXISTS exit_basis_ledger_scenario_idx ON exit_scenario_basis_ledger(exit_scenario_id)` },
+  { name: "exit_scenario_basis_ledger: index org_id", sql: `CREATE INDEX IF NOT EXISTS exit_basis_ledger_org_idx ON exit_scenario_basis_ledger(org_id)` },
+
+  // ============================================================
+  // INDEXES: exit_scenario_multi_year_cashflows
+  // ============================================================
+  { name: "exit_scenario_multi_year_cashflows: index exit_scenario_id", sql: `CREATE INDEX IF NOT EXISTS exit_multi_year_cf_scenario_idx ON exit_scenario_multi_year_cashflows(exit_scenario_id)` },
+  { name: "exit_scenario_multi_year_cashflows: index org_id", sql: `CREATE INDEX IF NOT EXISTS exit_multi_year_cf_org_idx ON exit_scenario_multi_year_cashflows(org_id)` },
+  { name: "exit_scenario_multi_year_cashflows: index year", sql: `CREATE INDEX IF NOT EXISTS exit_multi_year_cf_year_idx ON exit_scenario_multi_year_cashflows(year)` },
+
+  // ============================================================
+  // INDEXES: exit_scenario_tax_profiles
+  // ============================================================
+  { name: "exit_scenario_tax_profiles: index exit_scenario_id", sql: `CREATE INDEX IF NOT EXISTS exit_tax_profiles_scenario_idx ON exit_scenario_tax_profiles(exit_scenario_id)` },
+  { name: "exit_scenario_tax_profiles: index org_id", sql: `CREATE INDEX IF NOT EXISTS exit_tax_profiles_org_idx ON exit_scenario_tax_profiles(org_id)` },
+
+  // ============================================================
+  // INDEXES: exit_scenario_comparisons
+  // ============================================================
+  { name: "exit_scenario_comparisons: index modeling_project_id", sql: `CREATE INDEX IF NOT EXISTS exit_comparisons_project_idx ON exit_scenario_comparisons(modeling_project_id)` },
+  { name: "exit_scenario_comparisons: index org_id", sql: `CREATE INDEX IF NOT EXISTS exit_comparisons_org_idx ON exit_scenario_comparisons(org_id)` },
 ];
 
 export async function runStartupMigrations(): Promise<void> {
