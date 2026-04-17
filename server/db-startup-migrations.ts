@@ -11942,6 +11942,26 @@ const MIGRATIONS: Migration[] = [
   { name: "organization_packs: add notes", sql: `ALTER TABLE organization_packs ADD COLUMN IF NOT EXISTS notes text` },
   { name: "organization_packs: add created_at", sql: `ALTER TABLE organization_packs ADD COLUMN IF NOT EXISTS created_at timestamp` },
   { name: "organization_packs: add updated_at", sql: `ALTER TABLE organization_packs ADD COLUMN IF NOT EXISTS updated_at timestamp` },
+  {
+    name: "organization_packs: unique (org_id, pack_type) for ON CONFLICT",
+    sql: `
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint
+          WHERE conname = 'organization_packs_org_pack_key'
+            AND conrelid = 'public.organization_packs'::regclass
+        ) THEN
+          BEGIN
+            ALTER TABLE organization_packs
+              ADD CONSTRAINT organization_packs_org_pack_key UNIQUE (org_id, pack_type);
+          EXCEPTION WHEN unique_violation THEN
+            RAISE NOTICE 'organization_packs has duplicate (org_id, pack_type) rows; skipping unique constraint';
+          END;
+        END IF;
+      END$$;
+    `,
+  },
 
   // organization_user_roles — uncovered columns
   { name: "organization_user_roles: add id", sql: `ALTER TABLE organization_user_roles ADD COLUMN IF NOT EXISTS id varchar` },

@@ -349,6 +349,18 @@ app.post(
           console.log(`[Stripe Webhook] Unhandled event type: ${event.type}`);
       }
 
+      // Delegate to billing-service for SKU-specific flows (marketplace_plus,
+      // broker_plan, core-platform tier subscriptions). The index.ts switch
+      // above only handles packType-metadata checkouts; billingService covers
+      // everything else. Failures here are logged but don't fail the webhook —
+      // Stripe will retry if needed via the 500 path above.
+      try {
+        const { billingService } = await import('./services/billing-service');
+        await billingService.handleWebhook(event);
+      } catch (delegateErr: any) {
+        console.error('[Stripe Webhook] billingService.handleWebhook error:', delegateErr.message);
+      }
+
       res.json({ received: true });
     } catch (error: any) {
       // Return 500 so Stripe retries the webhook delivery; log full error server-side
