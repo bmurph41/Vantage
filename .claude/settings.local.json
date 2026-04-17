@@ -241,7 +241,10 @@
       "Bash(env NODE_OPTIONS=--max-old-space-size=6144 npx tsc -p tsconfig.shared-test.json)",
       "Bash(echo \"REAL_EXIT=$?\")",
       "Bash(xargs -I{} echo {})",
-      "Bash(echo \"EXIT=$?\")"
+      "Bash(echo \"EXIT=$?\")",
+      "Bash(env NODE_OPTIONS=--max-old-space-size=6144 npx tsc -b shared --verbose)",
+      "Bash(rm -f ~/workspace/node_modules/typescript/tsbuildinfo)",
+      "Bash(env NODE_OPTIONS=--max-old-space-size=6144 npx tsc --noEmit --traceResolution)"
     ]
   }
 }

@@ -13,6 +13,7 @@ vite.config.ts.*
 *.tsbuildinfo
 .cache/
 .tmp/
+dist-types/
 
 # Logs
 logs/

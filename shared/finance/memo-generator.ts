@@ -29,7 +29,11 @@ export interface ScenarioResult {
   terminalValue: number;
   netSaleProceeds: number;
   cashFlows: Array<{ date: string | Date; amount: number; [key: string]: unknown }>;
-  overridesApplied: unknown;
+  overridesApplied: {
+    exitCapRateDelta: number;
+    saleCostRateDelta?: number;
+    [key: string]: unknown;
+  };
 }
 
 export interface ExpectedCaseResult {

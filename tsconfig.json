@@ -1,6 +1,9 @@
 {
-  "include": ["client/src/**/*", "shared/**/*", "server/**/*", "modules/dockit/**/*"],
-  "exclude": ["node_modules", "build", "dist", "**/*.test.ts"],
+  "include": ["client/src/**/*", "server/**/*", "modules/dockit/**/*"],
+  "exclude": ["node_modules", "build", "dist", "dist-types", "shared", "**/*.test.ts"],
+  "references": [
+    { "path": "./shared" }
+  ],
   "compilerOptions": {
     "incremental": true,
     "tsBuildInfoFile": "./node_modules/typescript/tsbuildinfo",
