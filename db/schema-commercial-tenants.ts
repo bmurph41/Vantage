@@ -5,7 +5,7 @@
  * Tables store lease data, rent terms, recoveries, percentage rent, and related configurations.
  */
 
-import { pgTable, uuid, text, numeric, integer, boolean, timestamp, date, jsonb, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, uuid, text, numeric, integer, boolean, timestamp, date, jsonb, pgEnum, index } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
 // ============================================
@@ -138,7 +138,10 @@ export const tenantLeases = pgTable("tenant_leases", {
   // Timestamps
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  projectIdIdx: index("tenant_leases_project_id_idx").on(table.projectId),
+  statusIdx: index("tenant_leases_status_idx").on(table.status),
+}));
 
 /**
  * tenant_rent_terms - Initial term + option terms
@@ -171,7 +174,9 @@ export const tenantRentTerms = pgTable("tenant_rent_terms", {
   // Timestamps
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  leaseIdIdx: index("tenant_rent_terms_lease_id_idx").on(table.leaseId),
+}));
 
 /**
  * tenant_recoveries - CAM, taxes, insurance, etc.
@@ -197,7 +202,9 @@ export const tenantRecoveries = pgTable("tenant_recoveries", {
   // Timestamps
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  leaseIdIdx: index("tenant_recoveries_lease_id_idx").on(table.leaseId),
+}));
 
 /**
  * tenant_percentage_rent - Retail % rent configuration
@@ -222,7 +229,9 @@ export const tenantPercentageRent = pgTable("tenant_percentage_rent", {
   // Timestamps
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  leaseIdIdx: index("tenant_percentage_rent_lease_id_idx").on(table.leaseId),
+}));
 
 /**
  * tenant_sales - Monthly sales data for % rent
@@ -237,7 +246,9 @@ export const tenantSales = pgTable("tenant_sales", {
   // Timestamps
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  leaseIdIdx: index("tenant_sales_lease_id_idx").on(table.leaseId),
+}));
 
 /**
  * tenant_concessions - Free rent, discounts, etc.
@@ -255,7 +266,9 @@ export const tenantConcessions = pgTable("tenant_concessions", {
   // Timestamps
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  leaseIdIdx: index("tenant_concessions_lease_id_idx").on(table.leaseId),
+}));
 
 /**
  * tenant_capex_leasing - TI and LC configurations
@@ -277,7 +290,9 @@ export const tenantCapexLeasing = pgTable("tenant_capex_leasing", {
   // Timestamps
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  leaseIdIdx: index("tenant_capex_leasing_lease_id_idx").on(table.leaseId),
+}));
 
 /**
  * tenant_rollover_assumptions - Renewal and vacancy modeling
@@ -301,7 +316,9 @@ export const tenantRolloverAssumptions = pgTable("tenant_rollover_assumptions", 
   // Timestamps
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  leaseIdIdx: index("tenant_rollover_assumptions_lease_id_idx").on(table.leaseId),
+}));
 
 // ============================================
 // RELATIONS
