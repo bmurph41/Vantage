@@ -5,9 +5,10 @@
  * Usage:
  *   npx tsx scripts/generate-startup-migrations.ts
  *
- * The script compares every table and column defined in shared/schema.ts against
- * the entries already present in server/db-startup-migrations.ts and prints
- * ready-to-paste migration stubs for anything that is not yet covered.
+ * The script compares every table and column defined across all schema sources
+ * (shared/schema.ts, db/schema-commercial-tenants.ts) against the entries already
+ * present in server/db-startup-migrations.ts and prints ready-to-paste migration
+ * stubs for anything that is not yet covered.
  *
  * It does NOT write to db-startup-migrations.ts automatically — it prints stubs
  * to stdout so a developer can review and paste them in at the appropriate place.
@@ -27,8 +28,15 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 // ─── 1. Load schema ───────────────────────────────────────────────────────────
 
-// tsx resolves TypeScript imports natively; use a relative path without alias.
+// tsx resolves TypeScript imports natively; use relative paths without aliases.
 const schema = await import("../shared/schema");
+const commercialTenantsSchema = await import("../db/schema-commercial-tenants");
+
+/** All schema sources merged into one flat object. */
+const allSchemas: Record<string, unknown> = {
+  ...schema,
+  ...commercialTenantsSchema,
+};
 
 interface TableDef {
   tableName: string;
@@ -37,9 +45,12 @@ interface TableDef {
 
 function extractSchemaTables(): TableDef[] {
   const tables: TableDef[] = [];
-  for (const value of Object.values(schema)) {
+  const seen = new Set<string>();
+  for (const value of Object.values(allSchemas)) {
     if (is(value as object, PgTable)) {
       const config = getTableConfig(value as PgTable);
+      if (seen.has(config.name)) continue;
+      seen.add(config.name);
       tables.push({
         tableName: config.name,
         columns: config.columns.map((c) => c.name),

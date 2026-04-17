@@ -18,8 +18,15 @@ import { is } from "drizzle-orm";
 import { PgTable, getTableConfig } from "drizzle-orm/pg-core";
 import { pool } from "./db";
 import * as schema from "@shared/schema";
+import * as commercialTenantsSchema from "../db/schema-commercial-tenants";
 
 const PREFIX = "[schema-drift]";
+
+/** All schema sources merged into one flat object for drift inspection. */
+const allSchemas: Record<string, unknown> = {
+  ...schema,
+  ...commercialTenantsSchema,
+};
 
 /** How long (ms) the entire DB round-trip is allowed to take. */
 const QUERY_TIMEOUT_MS = 5000;
@@ -34,10 +41,13 @@ interface DbColumn {
  */
 function extractSchemaTables(): Array<{ tableName: string; columns: string[] }> {
   const tables: Array<{ tableName: string; columns: string[] }> = [];
+  const seen = new Set<string>();
 
-  for (const value of Object.values(schema)) {
+  for (const value of Object.values(allSchemas)) {
     if (is(value as object, PgTable)) {
       const config = getTableConfig(value as PgTable);
+      if (seen.has(config.name)) continue;
+      seen.add(config.name);
       tables.push({
         tableName: config.name,
         columns: config.columns.map((c) => c.name),
