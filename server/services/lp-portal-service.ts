@@ -324,7 +324,7 @@ class LPStatementGenerator {
     return {
       id: row.id, orgId: row.org_id, fundId: row.fund_id, investorId: row.investor_id,
       statementType: row.statement_type, periodLabel: row.period_label,
-      periodStart: row.period_start, periodEnd: row.period_end,
+      periodStart: new Date(row.period_start), periodEnd: new Date(row.period_end),
       data: row.data, pdfUrl: row.pdf_url,
       generatedAt: new Date(row.generated_at),
       deliveredAt: row.delivered_at ? new Date(row.delivered_at) : null,
@@ -465,7 +465,7 @@ class LPStatementGenerator {
     return (result.rows as any[]).map(r => ({
       id: r.id, orgId: r.org_id, fundId: r.fund_id, investorId: r.investor_id,
       statementType: r.statement_type, periodLabel: r.period_label,
-      periodStart: r.period_start, periodEnd: r.period_end,
+      periodStart: new Date(r.period_start), periodEnd: new Date(r.period_end),
       data: r.data, pdfUrl: r.pdf_url,
       generatedAt: new Date(r.generated_at),
       deliveredAt: r.delivered_at ? new Date(r.delivered_at) : null,

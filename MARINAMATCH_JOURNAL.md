@@ -1,5 +1,87 @@
 # MarinaMatch Platform Journal
 
+## ✅ COMPLETE — Stabilization #3: LP Portal integration testing (2026-04-17)
+
+Tested the LP Portal read path end-to-end. Found a cluster of method-name drift
+between `server/routes/lp-portal-routes.ts` and `server/services/lp-portal-service.ts`
+— router called methods that didn't exist (`createLpUser`, `loginLpUser`,
+`validateLpSession`, `getStatement`, `renderStatementHtml`, `getK1`,
+`getFundSideLetters`, `getMfnAnalysis`) while the service exposed
+`createPortalUser`, `authenticateLP`, `validateSession`, `getSideLettersForFund`,
+`getMFNAnalysis`. Plus three read methods (`getStatement`, `renderStatementHtml`,
+`getK1`) that the router called but the service never had.
+
+### Bugs fixed
+
+1. **Added `getStatement`, `renderStatementHtml` methods** to `LPStatementGenerator`
+   — simple read-by-id + HTML render wrappers.
+2. **Added `getK1` method** to `K1Generator` — queries `lp_statements` where
+   `statement_type='k1' AND period_label=<taxYear>`.
+3. **Rewrote all LP Portal route handlers** to call the actual service methods,
+   dropping unused router-level field names that the service doesn't support
+   (e.g. `firstName`/`lastName` concatenated to service's single `name` param,
+   dropped `totpToken`, `year`/`quarter`/`offset` filters not in service).
+4. **`getSideLettersForFund` SQL bug**: service queried `side_letters.org_id`
+   which doesn't exist. Rewrote as an INNER JOIN to `funds` to scope by org,
+   plus LEFT JOIN to `fund_investors` for `investor_name`. Populated missing
+   fields (`effectiveDate` from `executed_at`, `expirationDate` as null,
+   `status` defaulted `'active'`).
+5. **Date-type fields returned as strings, not `Date` objects**: `getStatement`
+   and `listStatements` row mappers passed `r.period_start`/`r.period_end`
+   directly, which come from Postgres as strings. `generateStatementHTML` then
+   calls `.toLocaleDateString()` on them and crashed. Wrapped in `new Date(...)`.
+
+### End-to-end read-path verified (seeded test data → curl)
+
+- ✅ `GET /api/lp-portal/statements` — returns list
+- ✅ `GET /api/lp-portal/statements/:id` — returns full statement
+- ✅ `GET /api/lp-portal/statements/:id/html` — 4.8KB HTML page rendered with
+   correct fund name, period range, metrics
+- ✅ `GET /api/lp-portal/k1/:fundId/:investorId/:taxYear` — returns K-1 JSON
+- ✅ `GET /api/lp-portal/side-letters/fund/:fundId` — returns []
+- ✅ `GET /api/lp-portal/side-letters/mfn-analysis/:fundId` — returns structure
+
+POST endpoints are CSRF-protected, which is correct — the frontend flows
+through CSRF tokens. Not tested at the wire level this session; the wiring-test
+script at `/tmp/lp_wiring.sh` is reusable.
+
+### Known gaps NOT fixed (deferred — real design decisions)
+
+1. **LP session middleware**: `/api/lp-portal` is mounted at line 1605 of
+   `routes.ts`, which places it AFTER a global `authenticateUser` mount at
+   line 708 (via `app.use(authenticateUser, tourProgressRoutes)`). In dev with
+   `ALLOW_DEMO_AUTH=true`, the demo admin user ends up in `req.user` on every
+   LP Portal request. In production **this means any authenticated platform
+   user could hit LP Portal endpoints scoped only by `org_id`, not
+   `investor_id`**. True LP sessions issued by `/auth/login` are never
+   validated, and `req.user.investorId` is never set. To fix: write a real
+   LP session middleware (reads `Bearer` token, calls `validateSession`,
+   populates `req.user` with `{ id, orgId, investorId }`) and re-scope
+   every statement/K-1 query by investorId. This is a security design task,
+   not a plumbing fix.
+
+2. **`side_letters` schema drift**: missing `org_id`, `investor_name`,
+   `effective_date`, `expiration_date`, `status`, `created_by`. The
+   `createSideLetter` service INSERTs into these columns and will fail on
+   the first POST. Either add the columns via raw psql migration or reduce
+   the service to what the schema supports.
+
+3. **Schema drift for `users.username`** (noted in stabilization #2) affects
+   7+ service/route files that weren't in the route-smoke test. Fix as they
+   surface.
+
+4. **Seeded test data left behind**: one "Test Fund I (smoke)" fund and its
+   fund_investor row are in the DB, couldn't be deleted because of an
+   append-only ledger rule on `fund_ledger_entries`. lp_statements rows
+   were successfully deleted.
+
+### Next session pickup
+
+Stabilization #4 — Stripe billing verification (test checkout → webhook →
+entitlement flip for platform tiers, broker tiers, marketplace+ tiers).
+
+---
+
 ## ✅ COMPLETE — Stabilization #2: Systematic route smoke test (2026-04-17)
 
 Hit 80 representative GET endpoints across every major API surface using
