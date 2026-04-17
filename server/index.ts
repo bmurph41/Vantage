@@ -355,7 +355,7 @@ app.post(
       // everything else. Failures here are logged but don't fail the webhook —
       // Stripe will retry if needed via the 500 path above.
       try {
-        const { billingService } = await import('./services/billing-service');
+        const { default: billingService } = await import('./services/billing-service');
         await billingService.handleWebhook(event);
       } catch (delegateErr: any) {
         console.error('[Stripe Webhook] billingService.handleWebhook error:', delegateErr.message);
