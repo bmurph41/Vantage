@@ -1,5 +1,145 @@
 # MarinaMatch Platform Journal
 
+## ✅ COMPLETE — Broker Marketplace Phase 1 (2026-04-17)
+
+Shipped Phase 1 of the Airbnb-style broker marketplace on top of the substantial
+pre-existing foundation (broker registration, profile, directory, follow/unfollow,
+advisory packages, Stripe checkout, broker dashboard were already built). Phase 1
+filled the objective-trust-signal gaps that the existing system didn't expose.
+
+**What was built (this session):**
+
+### Schema (`/tmp/broker_marketplace_phase1_migration.mjs` applied via raw psql)
+- `crm_deals.broker_profile_id` — FK to `broker_profiles(id) ON DELETE SET NULL`,
+  with indexes on the FK and on `(broker_profile_id, closed_at DESC) WHERE is_closed`
+- `broker_profiles` — 8 new columns for denormalized trust stats:
+  `verified_closed_deals_count`, `verified_closed_deals_volume`,
+  `verified_closed_deals_asset_classes`, `verified_closed_deals_last_at`,
+  `median_response_hours`, `response_rate_30d`, `response_samples_30d`,
+  `trust_stats_last_recomputed_at` + a composite index on verified-deal
+  count/volume for directory ranking
+- `broker_registrations` — 5 new columns for license verification state:
+  `license_last_verified_at`, `license_verification_provider`,
+  `license_verification_status`, `license_verification_notes`,
+  `license_verification_payload`
+- `broker_response_samples` NEW TABLE — raw response-time tracking samples
+  (thread_type, thread_id UNIQUE, first_inbound_at, first_broker_reply_at,
+  response_seconds, is_unanswered)
+- `shared/schema.ts` updated with camelCase mappings + new `brokerResponseSamples` table
+
+### Services
+- `server/services/broker-license-verification.ts` NEW
+  - `LicenseVerificationProvider` interface with swappable providers
+  - `ManualReviewProvider` default (returns `manual_review_required` until a real
+    third-party API is wired in Phase 2)
+  - `scanLicenseExpiry()` — flags expired licenses, auto-unpublishes profiles
+  - `classifyExpiry()` — returns `ok | warning | critical | expired | missing`
+- `server/services/broker-deal-stats.ts` NEW
+  - `computeBrokerDealStats()` — count, volume, asset classes, most-recent close
+  - `persistBrokerDealStats()` — writes denorm back to `broker_profiles`
+  - `attributeDealToBroker()` — helper for setting a deal's broker + recomputing
+    both old and new broker's stats
+  - `recomputeAllBrokerDealStats()` — nightly full recompute
+  - `getBrokerVerifiedDeals()` — recent list for profile page UI
+- `server/services/broker-response-tracker.ts` NEW
+  - `recordInboundMessage()` — called when a subscriber messages a broker
+  - `recordBrokerReply()` — called when the broker replies; computes latency
+  - `computeResponseStats()` / `persistResponseStats()` — rolling 30-day avg +
+    median + reply-rate, written to `broker_profiles`
+  - `markStaleUnanswered()` — flags samples >168h without reply
+- `server/services/broker-feature-flags.ts` NEW
+  - `BROKER_FEATURE_FLAGS` constants: `broker_ai_drafts`, `broker_ratings`,
+    `broker_license_verify_api`
+  - `isBrokerFeatureEnabled(orgId, flag)` — env kill-switch first, then
+    `billing_feature_flags` org-level override, default off
+  - Returns `{ enabled, source }` so UI can show why a flag is off
+
+### Routes
+- `server/routes/broker-subscriptions-routes.ts` — extended:
+  - Directory ranking now sorts by `featuredUntil DESC, verifiedClosedDealsCount DESC,
+    verifiedClosedDealsVolume DESC, followerCount DESC, publishedAt DESC`
+  - Public profile endpoint now returns `trustSignals` + `verifiedDeals` arrays +
+    live license status
+  - NEW `POST /broker/subscriptions/:subscriptionId/messages` — broker reply
+    endpoint (owner-only), fires `recordBrokerReply()`
+  - Existing user-send endpoint now fires `recordInboundMessage()`
+  - NEW `GET /feature-flags` — Phase 2/3 flag state for the frontend
+- `server/routes/broker-dashboard-routes.ts` — `/my-profile` endpoint extended:
+  - Returns `licenseStatus` with level + days-until-expiry + state
+  - Returns `recentVerifiedDeals` (top 5) for dashboard preview
+  - Returns `featureFlags` so the dashboard can render Phase 2/3 coming-soon cards
+  - Added trust-signal stats to `stats` object (verifiedClosed count/volume,
+    medianResponseHours, responseRate30d, responseSamples30d)
+- `server/routes/crm-routes.ts` — PUT `/api/crm/deals/:id` now recomputes broker
+  stats async when broker-attribution or close state changes
+
+### Cron
+- `server/jobs/platform-cron.ts` — two new jobs:
+  - `0 15 2 * * *` — nightly broker marketplace recompute (all deal stats + all
+    response stats)
+  - `0 3 * * *` — daily broker license expiry scan (auto-unpublish expired)
+
+### Frontend
+- `client/src/components/broker/TrustSignalBar.tsx` NEW — reusable trust-signal
+  row (full + compact variants) showing verified closes, response time, reply
+  rate, followers, experience, license status with color-coded tone
+- `client/src/pages/broker/BrokerProfile.tsx` — TrustSignalBar above tabs; new
+  "Verified Closed Deals" tab with table of real closes
+- `client/src/pages/broker/BrokerDirectory.tsx` — broker cards now lead with
+  verified-closed count + response time (was followers/listings/experience)
+- `client/src/pages/broker/dashboard/BrokerDashboardOverview.tsx` — license
+  expiry warning banner (warning/critical/expired tones); new trust-signal KPI
+  row; recent verified deals table; Phase 2/3 `PhaseCard`s for AI Drafts +
+  Ratings gated behind feature flags ("Live" / "Coming soon" badge)
+- `client/src/hooks/use-broker-subscriptions.ts` — types for `BrokerTrustSignals`,
+  `BrokerVerifiedDeal`, `BrokerFeatureFlagsMap`; `useBrokerFeatureFlags()` hook
+- `client/src/hooks/use-broker-dashboard.ts` — extended `BrokerMyProfileResponse`
+  with licenseStatus, recentVerifiedDeals, featureFlags
+
+### What is NOT in Phase 1 (by design)
+- Phase 2 (AI drafts + KB) — scaffolded behind `FEATURE_BROKER_AI_DRAFTS`, dark
+  until compliance counsel review
+- Phase 3 (ratings + credibility) — scaffolded behind `FEATURE_BROKER_RATINGS`,
+  dark until ~50 brokers / ~500 subscribers
+- Third-party license-lookup API — only the `ManualReviewProvider` stub exists;
+  concrete provider (e.g. state-specific real-estate license API) deferred
+- Stripe Connect for subscriber-subscription take-rate — Phase 2 dependency
+  (subscriber subs require broker Advisor tier with AI drafts active)
+
+### Known gotchas discovered this session
+- `broker_follow_history` has an append-only PG rule
+  (`broker_follow_history_no_delete DO INSTEAD NOTHING`) that blocks even
+  cascade-deletes. To remove a broker profile, temporarily drop the FK on
+  `broker_follow_history.broker_profile_id`, delete, then restore the FK. Do
+  NOT drop the rule — it's there to prevent follow-cap gaming.
+- Neon serverless pool's query generic type differs from `pg.Pool` — services
+  use a minimal `QueryPool` interface instead of importing from `pg`.
+
+### Validation performed
+- Migration verified: all columns/indexes/tables present via information_schema
+- End-to-end smoke test (created broker → 2 closed deals → 3 response samples →
+  recompute services → public profile endpoint → directory endpoint):
+  - Deal stats: count=2, volume=$18.05M, assetClasses=[hotel, marina] ✓
+  - Response stats: median=1.5h, rate=66.67%, samples=3 ✓
+  - License classification: warning level at 29 days ✓
+  - License scan: correctly flagged 1 warning ✓
+  - `trustSignals` fully populated on profile response ✓
+  - Directory ranks broker with new trust-signal fields ✓
+- Dev server running cleanly
+- All test rows cleaned up, directory empty
+
+### Next-session pickups
+1. Phase 2 build-out (KB editor + RAG draft generator + approval inbox) behind
+   `FEATURE_BROKER_AI_DRAFTS` — needs compliance disclaimer language from counsel
+2. Phase 3 build-out (review prompts + credibility engine) behind
+   `FEATURE_BROKER_RATINGS`
+3. Concrete license-lookup provider integration (register via
+   `registerLicenseVerificationProvider()`) — pick API per asset class/jurisdiction
+4. CRM deal-detail UI: add "Attribute to broker" dropdown so deal closers can
+   credit a broker profile when closing (currently only settable via raw PUT)
+
+---
+
 ## Design Session (2026-04-17) — Broker Marketplace v1
 
 **Not code, not started — design + monetization locked in for a large deferred initiative.**
