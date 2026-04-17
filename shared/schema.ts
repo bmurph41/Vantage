@@ -13279,6 +13279,7 @@ export const modelingProjectConfig = pgTable('modeling_project_config', {
   stabilizedNoiMonth: integer('stabilized_noi_month'),
   irrDisplayPreference: text('irr_display_preference'),
   seasonalityProfileId: varchar('seasonality_profile_id'),
+  useLeaseIncomeForDcf: boolean('use_lease_income_for_dcf'),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 });

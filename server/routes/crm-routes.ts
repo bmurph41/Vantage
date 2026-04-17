@@ -15611,12 +15611,38 @@ export function registerCRMRoutes(
         orgId
       );
 
+      const mpcUpdates: Record<string, any> = { updatedAt: new Date() };
+      let hasMpcUpdate = false;
+
       if (req.body.holdPeriod !== undefined) {
+        mpcUpdates.holdPeriod = Number(req.body.holdPeriod);
+        hasMpcUpdate = true;
+      }
+      if (req.body.useLeaseIncomeForDcf !== undefined) {
+        const rawFlag = req.body.useLeaseIncomeForDcf;
+        if (typeof rawFlag !== 'boolean') {
+          return res.status(400).json({ error: 'useLeaseIncomeForDcf must be a boolean' });
+        }
+        mpcUpdates.useLeaseIncomeForDcf = rawFlag;
+        hasMpcUpdate = true;
+      }
+
+      if (hasMpcUpdate) {
         const existingMPC = await db.select().from(modelingProjectConfig).where(eq(modelingProjectConfig.modelingProjectId, projectId)).limit(1);
         if (existingMPC.length > 0) {
           await db.update(modelingProjectConfig)
-            .set({ holdPeriod: Number(req.body.holdPeriod), updatedAt: new Date() })
+            .set(mpcUpdates)
             .where(eq(modelingProjectConfig.modelingProjectId, projectId));
+        } else {
+          // No config row yet — create one with the requested values so the flag
+          // is actually persisted where the DCF service reads it.
+          const insertPayload: any = {
+            modelingProjectId: projectId,
+            orgId,
+          };
+          if (mpcUpdates.holdPeriod !== undefined) insertPayload.holdPeriod = mpcUpdates.holdPeriod;
+          if (mpcUpdates.useLeaseIncomeForDcf !== undefined) insertPayload.useLeaseIncomeForDcf = mpcUpdates.useLeaseIncomeForDcf;
+          await db.insert(modelingProjectConfig).values(insertPayload);
         }
       }
 

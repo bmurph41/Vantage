@@ -85,6 +85,7 @@ export interface DCFAnalysisResult {
     hasDebt: boolean;
     overridesApplied: boolean;
     leaseIncomeInjected: boolean;       // true if lease EGI was used in computation
+    useLeaseIncomeForDcf: boolean | null; // stored flag: null=auto, true=opt-in, false=opt-out
     revenueGrowthRateUsed: number;      // percent — actual growth rate used in projection
     leaseEscalationRateUsed: number | null; // percent — weighted lease escalation (null if no leases)
   };
@@ -166,8 +167,15 @@ export async function performDCFAnalysis(
   // When tenant leases are present, their Year 1 base rent + recoveries are
   // passed as hints to the direct input engine so it can contextualize the
   // revenue model. Per-year compounding is handled by computeLeaseIncomeByYear.
+  //
+  // The useLeaseIncomeForDcf flag controls this behavior:
+  //   null  = unset (no explicit choice — do NOT inject, user must opt-in)
+  //   true  = user explicitly opted in  → inject lease income
+  //   false = user explicitly opted out → skip injection
+  const leaseFlag = scenarioData.useLeaseIncomeForDcf;
+  const leaseAllowed = leaseFlag === true; // explicit opt-in required
   let leaseIncomeInjected = false;
-  if (leaseIncome.hasLeases && leaseIncome.totalEGIAnnual > 0) {
+  if (leaseIncome.hasLeases && leaseIncome.totalEGIAnnual > 0 && leaseAllowed) {
     assumptions.leaseEGIAnnual = leaseIncome.totalEGIAnnual;
     assumptions.leaseBaseRentAnnual = leaseIncome.totalBaseRentAnnual;
     assumptions.leaseRecoveryAnnual = leaseIncome.totalRecoveryAnnual;
@@ -384,6 +392,7 @@ export async function performDCFAnalysis(
       hasDebt: totalDebtAtClose > 0,
       overridesApplied: !!input.overrides,
       leaseIncomeInjected,
+      useLeaseIncomeForDcf: scenarioData.useLeaseIncomeForDcf,
       // When leases drive growth, record both rates for transparency
       revenueGrowthRateUsed: revenueGrowthRate * 100,           // percent
       leaseEscalationRateUsed: leaseEscalationRate > 0
@@ -935,9 +944,9 @@ async function loadScenarioData(pool: any, modelingProjectId: string) {
   );
   const scenario = sv.rows[0] ?? {};
 
-  // Project config for hold period + acquisition date
+  // Project config for hold period + acquisition date + lease income flag
   const pc = await pool.query(
-    `SELECT hold_period, acquisition_close_date, cash_flow_granularity
+    `SELECT hold_period, acquisition_close_date, cash_flow_granularity, use_lease_income_for_dcf
      FROM modeling_project_config
      WHERE modeling_project_id = $1 LIMIT 1`,
     [modelingProjectId]
@@ -954,6 +963,8 @@ async function loadScenarioData(pool: any, modelingProjectId: string) {
     assumptions: typeof scenario.assumptions === 'string'
       ? JSON.parse(scenario.assumptions)
       : scenario.assumptions ?? {},
+    // null = unset (legacy auto-detect), true = opt-in, false = opt-out
+    useLeaseIncomeForDcf: config.use_lease_income_for_dcf ?? null,
   };
 }
 

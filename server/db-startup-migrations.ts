@@ -17849,6 +17849,8 @@ const MIGRATIONS: Migration[] = [
   { name: "docket_deals: index idx_docket_deals_seller_entity", sql: `CREATE INDEX IF NOT EXISTS idx_docket_deals_seller_entity ON docket_deals(seller_entity_id)` },
   { name: "docket_deals: index idx_docket_deals_closing_date", sql: `CREATE INDEX IF NOT EXISTS idx_docket_deals_closing_date ON docket_deals(closing_date)` },
   { name: "docket_deals: index idx_docket_deals_announced_date", sql: `CREATE INDEX IF NOT EXISTS idx_docket_deals_announced_date ON docket_deals(announced_date)` },
+  { name: "modeling_project_config: add use_lease_income_for_dcf", sql: `ALTER TABLE modeling_project_config ADD COLUMN IF NOT EXISTS use_lease_income_for_dcf boolean` },
+  { name: "modeling_project_config: backfill use_lease_income_for_dcf for projects with active leases", sql: `UPDATE modeling_project_config SET use_lease_income_for_dcf = true WHERE use_lease_income_for_dcf IS NULL AND modeling_project_id IN (SELECT DISTINCT project_id::varchar FROM tenant_leases WHERE status NOT IN ('EXPIRED','ARCHIVED'))` },
 ];
 
 /**

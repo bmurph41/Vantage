@@ -31,8 +31,10 @@ import {
   Activity,
   Layers,
   AlertCircle,
-  Building2
+  Building2,
+  Info
 } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { cn, formatCurrency, formatPercent } from '@/lib/utils';
 import debounce from 'lodash.debounce';
@@ -92,6 +94,7 @@ interface DCFAnalysis {
   };
   meta?: {
     leaseIncomeInjected: boolean;
+    useLeaseIncomeForDcf: boolean | null;
     revenueGrowthRateUsed: number;
     leaseEscalationRateUsed: number | null;
     discountRate: number;
@@ -235,6 +238,27 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
   const { data: leaseIncomeData } = useQuery<any>({
     queryKey: ['/api/modeling/projects', projectId, 'lease-income'],
     enabled: !!projectId,
+  });
+
+  // null = not yet loaded from server; false = disabled; true = enabled
+  const [leaseOverrideEnabled, setLeaseOverrideEnabled] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    const meta = dcfAnalysis?.meta;
+    if (meta) {
+      setLeaseOverrideEnabled(meta.useLeaseIncomeForDcf === true);
+    }
+  }, [dcfAnalysis]);
+
+  const updateLeaseOverrideMutation = useMutation({
+    mutationFn: (enabled: boolean) =>
+      apiRequest('PATCH', `/api/modeling/projects/${projectId}/config`, {
+        useLeaseIncomeForDcf: enabled,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'dcf'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId] });
+    },
   });
 
   const saveExitCapRateToScenario = useMutation({
@@ -1036,6 +1060,53 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
 
         {/* Lease Income Reconciliation Tab */}
         <TabsContent value="lease-income" className="mt-4 space-y-6">
+          {/* Lease Income Override Toggle */}
+          <Card>
+            <CardContent className="pt-5 pb-5">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5 rounded-md bg-emerald-100 dark:bg-emerald-950 p-1.5">
+                    <Building2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold">Use Lease Income in DCF</p>
+                    <p className="text-xs text-muted-foreground mt-0.5 max-w-md">
+                      When enabled, tenant lease schedules (base rent + recoveries + escalations) override
+                      the pro-forma revenue estimate in the DCF model. Disable to use manual pro-forma inputs only.
+                    </p>
+                    {leaseIncomeData?.hasLeases && (
+                      <div className="flex items-center gap-1.5 mt-2">
+                        <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium ${
+                          dcfAnalysis?.meta?.leaseIncomeInjected
+                            ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300'
+                            : 'bg-muted text-muted-foreground'
+                        }`}>
+                          <Info className="h-3 w-3" />
+                          {dcfAnalysis?.meta?.leaseIncomeInjected
+                            ? 'Lease income is active in the current DCF'
+                            : 'Lease income is not used in the current DCF'}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <Switch
+                    checked={leaseOverrideEnabled === true}
+                    onCheckedChange={(checked) => {
+                      setLeaseOverrideEnabled(checked);
+                      updateLeaseOverrideMutation.mutate(checked);
+                    }}
+                    disabled={leaseOverrideEnabled === null || updateLeaseOverrideMutation.isPending}
+                  />
+                  <span className="text-xs text-muted-foreground w-12">
+                    {leaseOverrideEnabled === null ? '—' : leaseOverrideEnabled ? 'Enabled' : 'Disabled'}
+                  </span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           {!leaseIncomeData?.hasLeases ? (
             <Card>
               <CardContent className="flex flex-col items-center justify-center py-16 text-center gap-3">
