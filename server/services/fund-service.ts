@@ -79,6 +79,11 @@ export interface InvestorCapitalAccount {
   carriedInterestPaid: number;
   capitalAccountBalance: number;
   ownershipPct: number;
+  /** Balance computed from the immutable fund_ledger_entries; authoritative. */
+  capitalAccountBalanceDerived: number;
+  /** True when the stored (mutable) balance disagrees with the derived value
+   *  by more than 1 cent. Surfaces reconciliation bugs to LP reporting UIs. */
+  capitalAccountDivergence: boolean;
 }
 
 export interface WaterfallTierResult {
@@ -1092,15 +1097,23 @@ export class FundService {
     fundId: string
   ): Promise<InvestorCapitalAccount[]> {
     const investors = await this.getInvestorsByFund(orgId, fundId);
-    const fund = await this.getFund(orgId, fundId);
-    
+
     const totalCommitment = investors.reduce(
       (sum, inv) => sum + dn(inv.commitmentAmount),
       0
     );
 
+    // Derive balance from the immutable ledger in a single fund-level aggregate,
+    // then attach to each investor. `fundTotal` path returns byInvestor map.
+    const ledger = await this.getLedgerBalance(orgId, fundId);
+    const byInvestor =
+      'byInvestor' in ledger ? ledger.byInvestor : ({} as Record<string, number>);
+
     return investors.map(inv => {
       const commitment = dn(inv.commitmentAmount);
+      const stored = dn(inv.capitalAccountBalance);
+      const derived = byInvestor[inv.id] ?? 0;
+      const divergent = Math.abs(stored - derived) > 0.01;
       return {
         investorId: inv.id,
         investorName: inv.investorName,
@@ -1113,7 +1126,12 @@ export class FundService {
         preferredReturnPaid: dn(inv.preferredReturnPaid),
         carriedInterestEarned: dn(inv.carriedInterestEarned),
         carriedInterestPaid: dn(inv.carriedInterestPaid),
-        capitalAccountBalance: dn(inv.capitalAccountBalance),
+        // `capitalAccountBalance` now returns the derived value — callers
+        // can trust it reconciles with the ledger. `capitalAccountBalanceDerived`
+        // is exposed separately so UI can A/B both values if needed.
+        capitalAccountBalance: derived,
+        capitalAccountBalanceDerived: derived,
+        capitalAccountDivergence: divergent,
         ownershipPct: totalCommitment > 0 ? (commitment / totalCommitment) * 100 : 0,
       };
     });

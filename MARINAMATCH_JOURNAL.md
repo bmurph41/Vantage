@@ -1,5 +1,73 @@
 # MarinaMatch Platform Journal
 
+## ✅ COMPLETE — Data Integrity #9 + #10 + #11 (2026-04-17)
+
+Bundled all three data-integrity hardening items.
+
+### #9 — decimal.js in fund-service.ts
+
+Queue estimate was "72 parseFloat sites"; the refactor had already happened in
+a prior session. Audited the file: only 5 parseFloat calls remained, all in
+ledger aggregation paths (`getLedgerBalance`, `getLedgerEntries`,
+`reconcileLedgerVsStored`). Replaced them with `Decimal.plus(...)` sums and
+the existing `dn()`/`d()` helpers. Now `grep parseFloat server/services/fund-service.ts`
+returns only the doc-comment mention. Other services (salescomps, capital-markets,
+rent-roll) still use parseFloat for non-money analytics — out of scope here.
+
+### #10 — PII encryption at rest for fund_investors
+
+`lp_investors` table was already wired through `encryptPiiFields` +
+`processInvestorPii` by `investor-portal-routes.ts`. But `fund_investors`
+— the institutional GP/LP ledger table — was storing `taxId` **plaintext**.
+Gap was in `fund-service.ts :: createInvestor / updateInvestor` (neither
+called `encrypt()`) and the routes (no `processInvestorPii` on reads).
+
+Fixed:
+- `fund-service.ts` imports `encrypt`/`isEncrypted` and calls them on
+  create/update. `isEncrypted` guard prevents double-encryption on replays.
+- `modeling-routes.ts` `POST/GET/PATCH /api/funds/:fundId/investors(/:id)`
+  now pipe through `processInvestorPii(inv, userRole)` — admin/owner roles
+  see plaintext; everyone else gets masked (`**-***6789`).
+- `fund_investors.tax_id` column was `varchar(50)` — too short for
+  `enc:<iv>:<authTag>:<ciphertext>` format (~120 chars). Widened to `text`
+  via raw SQL and added a startup migration so fresh DBs auto-apply.
+
+Verified end-to-end: seeded a fund_investor with plaintext `taxId="12-3456789"`,
+confirmed DB stores `enc:551ea6ded8...:...:...` ciphertext, admin read returns
+`12-3456789`, viewer read returns `**-***6789`.
+
+### #11 — Derive capital account balance from ledger (LP reporting path)
+
+`fund_investors.capitalAccountBalance` is a mutable cached column; the truth
+lives in `fund_ledger_entries` (append-only, protected by a PG rule). The
+existing `reconcileLedgerVsStored` method proves divergence is a real risk.
+
+Refactored `getInvestorCapitalAccounts` (the feeder for LP reporting) to
+pull the balance from `getLedgerBalance(orgId, fundId).byInvestor` instead
+of reading `inv.capitalAccountBalance`. The response now includes:
+
+- `capitalAccountBalance` — the DERIVED value (now authoritative)
+- `capitalAccountBalanceDerived` — same value, explicitly named
+- `capitalAccountDivergence: boolean` — true when the stored column
+  disagrees with the ledger by > 1 cent, so LP reporting UIs can surface
+  reconciliation warnings
+
+Remaining call sites that still read `capitalAccountBalance` directly: ~14
+(writes + internal storage math inside fund-service). Those are writes
+that update the cached column — kept for now since the column is still
+populated as a denorm. Dropping the column entirely requires rewriting the
+WHERE/ORDER BY clauses in a few queries; that's follow-on work.
+
+### Next session pickup
+
+Stabilization + revenue readiness + data integrity hardening are now complete.
+Remaining queue is Feature Queue items #12-17 (reporting enhancements like
+PME/J-curve/peer benchmarking, multi-currency, broker feedback v2, DD timeline v2,
+document parsing phase 2, broker marketplace phase 2+). All deferred — not
+blocked on stabilization anymore.
+
+---
+
 ## ✅ COMPLETE — Revenue Readiness #7 + #8 (2026-04-17)
 
 Bundled the two revenue-readiness verification items — both surfaced a real

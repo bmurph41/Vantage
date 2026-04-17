@@ -226,7 +226,8 @@
       "Bash(NODE_OPTIONS=\"--max-old-space-size=4096\" npx tsc --noEmit --incremental false)",
       "Bash(echo \"real_exit=$?\")",
       "Read(//sys/fs/cgroup/**)",
-      "Read(//proc/488/**)"
+      "Read(//proc/488/**)",
+      "Bash(ALLOW_DEMO_AUTH=true NODE_ENV=development npm run dev)"
     ]
   }
 }
