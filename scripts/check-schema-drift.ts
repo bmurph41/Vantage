@@ -71,12 +71,14 @@ async function main(): Promise<void> {
     `RESULT: FAIL — ${driftCount} drift issue(s) found (see warnings above).\n` +
       `  • MISSING COLUMN/TABLE warnings indicate schema-defined items absent from the DB.\n` +
       `  • EXTRA COLUMN warnings indicate orphan DB columns not declared in the schema.\n` +
-      `  • EXTRA TABLE warnings indicate entire DB tables with no Drizzle schema definition.`
+      `  • EXTRA TABLE warnings indicate entire DB tables with no Drizzle schema definition.\n` +
+      `  • MISSING INDEX warnings indicate named indexes declared in schema but absent from the DB.`
   );
   console.error(
-    `\nFor missing items, run the following to generate ready-to-paste migration stubs:\n\n` +
+    `\nFor missing columns/tables, run the following to generate ready-to-paste migration stubs:\n\n` +
       `  npx tsx scripts/generate-startup-migrations.ts\n\n` +
       `Then paste the output into server/db-startup-migrations.ts and commit.\n` +
+      `For missing indexes, apply a CREATE INDEX migration matching the declared index name.\n` +
       `For extra/orphan columns, review whether a DROP COLUMN migration is needed.\n` +
       `For extra/phantom tables (EXTRA TABLE), review whether a DROP TABLE migration is needed\n` +
       `or add a matching Drizzle table definition to the schema.\n`

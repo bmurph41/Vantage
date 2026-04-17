@@ -2,13 +2,15 @@
  * Schema drift detection — runs at server startup to surface gaps between
  * the Drizzle schema definition and the live database.
  *
- * Detects three categories of drift:
+ * Detects four categories of drift:
  *  1. Missing-from-DB  — tables/columns defined in Drizzle but absent from the live DB.
  *  2. Extra-in-DB      — columns present in the live DB but not declared in the Drizzle
  *                        schema (orphan columns). These can indicate stale migrations or
  *                        fields that were removed from code without a matching DDL drop.
  *  3. Extra tables     — entire tables that exist in the live DB but have no corresponding
  *                        Drizzle definition at all (phantom/stale tables).
+ *  4. Missing indexes  — named indexes declared in Drizzle schema that are absent from
+ *                        pg_indexes in the live DB.
  *
  * Design constraints:
  *  - Idempotent: safe to call multiple times.
@@ -25,7 +27,7 @@
  */
 
 import { is } from "drizzle-orm";
-import { PgTable, getTableConfig } from "drizzle-orm/pg-core";
+import { PgTable, Index, getTableConfig } from "drizzle-orm/pg-core";
 import { pool } from "./db";
 import * as schema from "@shared/schema";
 import * as secondarySchemas from "../db/schema-index";
@@ -47,10 +49,10 @@ interface DbColumn {
 }
 
 /**
- * Extract all Drizzle-defined tables (and their columns) from the shared schema.
+ * Extract all Drizzle-defined tables (their columns and named indexes) from all schemas.
  */
-function extractSchemaTables(): Array<{ tableName: string; columns: string[] }> {
-  const tables: Array<{ tableName: string; columns: string[] }> = [];
+function extractSchemaTables(): Array<{ tableName: string; columns: string[]; indexes: string[] }> {
+  const tables: Array<{ tableName: string; columns: string[]; indexes: string[] }> = [];
   const seen = new Set<string>();
 
   for (const value of Object.values(allSchemas)) {
@@ -58,9 +60,19 @@ function extractSchemaTables(): Array<{ tableName: string; columns: string[] }> 
       const config = getTableConfig(value as PgTable);
       if (seen.has(config.name)) continue;
       seen.add(config.name);
+
+      // Collect named index definitions from this table's extra config.
+      const indexNames: string[] = [];
+      for (const idx of config.indexes) {
+        if (is(idx, Index) && idx.config.name) {
+          indexNames.push(idx.config.name);
+        }
+      }
+
       tables.push({
         tableName: config.name,
         columns: config.columns.map((c) => c.name),
+        indexes: indexNames,
       });
     }
   }
@@ -69,17 +81,31 @@ function extractSchemaTables(): Array<{ tableName: string; columns: string[] }> 
 }
 
 /**
+ * Fetch all index names from pg_indexes for the public schema.
+ * Returns a Set of index names present in the live database.
+ */
+async function fetchLiveIndexNames(client: Awaited<ReturnType<typeof pool.connect>>): Promise<Set<string>> {
+  const result = await client.query<{ indexname: string }>(
+    `SELECT indexname FROM pg_indexes WHERE schemaname = 'public'`
+  );
+  return new Set(result.rows.map((r) => r.indexname));
+}
+
+/**
  * Acquire a client from the pool, apply a statement-level timeout, fetch:
  *  - All columns for the given schema-defined table names (for missing-from-DB check).
  *  - All columns for every table in the public schema (for extra-in-DB / orphan check).
+ *  - All index names in the public schema (for missing-index check).
  *
- * Returns two structures:
+ * Returns three structures:
  *  - `schemaTableColumns`: Map<tableName, Set<columnName>> for schema-defined tables only.
  *  - `allLiveColumns`:     Map<tableName, Set<columnName>> for every public table in the DB.
+ *  - `liveIndexNames`:     Set<indexName> for every index present in the live DB.
  */
 async function fetchLiveColumnMaps(tableNames: string[]): Promise<{
   schemaTableColumns: Map<string, Set<string>>;
   allLiveColumns: Map<string, Set<string>>;
+  liveIndexNames: Set<string>;
 }> {
   const client = await pool.connect();
   try {
@@ -118,7 +144,10 @@ async function fetchLiveColumnMaps(tableNames: string[]): Promise<{
       allLiveColumns.get(row.table_name)!.add(row.column_name);
     }
 
-    return { schemaTableColumns, allLiveColumns };
+    // Fetch all index names from pg_indexes (for missing-index detection).
+    const liveIndexNames = await fetchLiveIndexNames(client);
+
+    return { schemaTableColumns, allLiveColumns, liveIndexNames };
   } finally {
     client.release();
   }
@@ -144,7 +173,7 @@ export async function runSchemaDriftCheck(): Promise<number> {
     }
 
     const tableNames = schemaTables.map((t) => t.tableName);
-    const { schemaTableColumns, allLiveColumns } = await fetchLiveColumnMaps(tableNames);
+    const { schemaTableColumns, allLiveColumns, liveIndexNames } = await fetchLiveColumnMaps(tableNames);
 
     // Build a fast lookup: schema column set per table.
     const schemaColumnsByTable = new Map<string, Set<string>>();
@@ -223,9 +252,21 @@ export async function runSchemaDriftCheck(): Promise<number> {
       driftCount++;
     }
 
+    // ── Missing indexes: declared in schema but absent from pg_indexes ─────────
+    for (const { tableName, indexes } of schemaTables) {
+      for (const indexName of indexes) {
+        if (!liveIndexNames.has(indexName)) {
+          console.warn(
+            `${PREFIX} MISSING INDEX: "${indexName}" is defined in schema for table "${tableName}" but does not exist in the database`
+          );
+          driftCount++;
+        }
+      }
+    }
+
     if (driftCount === 0) {
       console.log(
-        `${PREFIX} OK — ${schemaTables.length} schema tables match the live database`
+        `${PREFIX} OK — ${schemaTables.length} schema tables and all declared indexes match the live database`
       );
     } else {
       console.warn(
