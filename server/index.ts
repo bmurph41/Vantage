@@ -15,6 +15,7 @@ import { seedIntegrations } from "./integrations";
 import { seedMarinaTaxonomyPack } from "./services/coa-taxonomy-seed";
 import { seedCanonicalAssetClasses } from "./routes/admin/asset-classes-routes";
 import { runStartupMigrations } from "./db-startup-migrations";
+import { runSchemaDriftCheck } from "./schema-drift";
 import { docIntelService } from "./services/doc-intel-service";
 
 import { configureSecurityMiddleware } from "./middleware/security";
@@ -516,8 +517,9 @@ server.listen({
         .then((packId) => log(`[COA] Marina taxonomy pack ready: ${packId}`))
         .catch((error) => log(`[COA] Failed to seed taxonomy: ${error}`));
 
-      // Run DB migrations first (enum→text, add columns), then seed canonical rows
+      // Run DB migrations first (enum→text, add columns), then drift check, then seed
       runStartupMigrations()
+        .then(() => runSchemaDriftCheck())
         .then(() => seedCanonicalAssetClasses())
         .then(() => console.log('[AssetClass] Canonical asset classes ready'))
         .catch((error) => console.error(`[AssetClass] Startup failed:`, error));
