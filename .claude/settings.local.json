@@ -218,7 +218,8 @@
       "Bash(/tmp/stripe_webhook_test.sh)",
       "Bash(ALLOW_DEMO_AUTH=true STRIPE_SECRET_KEY=sk_test_dummy_for_webhook_testing NODE_ENV=development npm run dev)",
       "Bash(chmod +x /tmp/broker_onboarding_test.sh)",
-      "Bash(/tmp/broker_onboarding_test.sh)"
+      "Bash(/tmp/broker_onboarding_test.sh)",
+      "Bash(/usr/bin/time -v npm run check)"
     ]
   }
 }
