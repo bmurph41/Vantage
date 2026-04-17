@@ -1,7 +1,12 @@
 #!/usr/bin/env tsx
 /**
- * CI schema-drift check — exits with a non-zero code when the live database is
- * missing tables or columns that are defined in shared/schema.ts.
+ * CI schema-drift check — exits with a non-zero code when the Drizzle schema
+ * and the live database are out of sync in either direction:
+ *
+ *   • Missing-from-DB  — tables/columns defined in shared/schema.ts that do not
+ *                        exist in the live database (forward drift).
+ *   • Extra-in-DB      — columns present in the live database that are not
+ *                        declared in shared/schema.ts (orphan / reverse drift).
  *
  * Usage:
  *   npm run check:schema
@@ -17,7 +22,7 @@
  *
  * Exit codes:
  *   0 — no drift detected; live DB matches the Drizzle schema
- *   1 — drift detected; prints a summary of missing tables / columns
+ *   1 — drift detected; prints a per-table summary of missing and extra columns
  *   2 — check could not run (DB unavailable, environment issue)
  *
  * Environment variables required (same as the main app):
@@ -61,12 +66,15 @@ async function main(): Promise<void> {
   }
 
   console.error(
-    `RESULT: FAIL — ${driftCount} drift issue(s) found (see warnings above).`
+    `RESULT: FAIL — ${driftCount} drift issue(s) found (see warnings above).\n` +
+      `  • MISSING COLUMN/TABLE warnings indicate schema-defined items absent from the DB.\n` +
+      `  • EXTRA COLUMN warnings indicate orphan DB columns not declared in the schema.`
   );
   console.error(
-    `\nRun the following to generate ready-to-paste migration stubs:\n\n` +
+    `\nFor missing items, run the following to generate ready-to-paste migration stubs:\n\n` +
       `  npx tsx scripts/generate-startup-migrations.ts\n\n` +
-      `Then paste the output into server/db-startup-migrations.ts and commit.\n`
+      `Then paste the output into server/db-startup-migrations.ts and commit.\n` +
+      `For extra/orphan columns, review whether a DROP COLUMN migration is needed.\n`
   );
   console.log(DIVIDER);
   process.exit(1);
