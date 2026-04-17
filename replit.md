@@ -76,6 +76,7 @@ The platform utilizes React 18 with TypeScript and Wouter for routing. The UI is
 
 ### System Design Choices
 - **Database**: PostgreSQL with Neon serverless hosting, Drizzle ORM, schema-first, Drizzle Kit for migrations.
+- **Schema Drift CI Check**: A registered validation step (`schema-drift`) runs `npm run check:schema` (`scripts/check-schema-drift.ts`) to detect when Drizzle schema definitions are out of sync with the live database. Run it manually with `npm run check:schema`. Exit code 0 = in sync; exit code 1 = drift found; exit code 2 = DB unreachable. When it fails: run `npx tsx scripts/generate-startup-migrations.ts` to generate migration stubs, paste the output into `server/db-startup-migrations.ts`, then commit.
 - **Multi-tenancy**: Organization-based data isolation.
 - **VDR Permission System**: Hierarchical, 5-level granular permissions with caching.
 - **File Uploads**: Multer-based, 10MB limit, local storage.
