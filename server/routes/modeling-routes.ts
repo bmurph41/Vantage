@@ -7434,7 +7434,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
             { label: 'Active Deals', value: String(pipelineResult[0]?.count || 0), icon: 'Target', color: 'amber' },
           ],
           actions: [
-            { label: 'View Portfolio', href: '/modeling' },
+            { label: 'View Portfolio', href: '/portfolio' },
             { label: 'Deal Pipeline', href: '/crm/deals' }
           ]
         };
