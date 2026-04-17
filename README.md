@@ -131,6 +131,16 @@ npm run check:schema
 - `1` — drift detected; the output lists the missing tables and columns
 - `2` — the check could not connect to the database
 
+**Recovering from drift:**
+
+If `npm run check:schema` reports drift (exit code `1`), generate migration stubs for the missing tables and columns by running:
+
+```bash
+npm run gen:migrations
+```
+
+This executes `scripts/generate-startup-migrations.ts` and produces migration files that bring the database in line with the current schema. After generating, review the output files and apply them to your database.
+
 The `schema-drift` job in `.github/workflows/ci.yml` runs this check automatically on every push to `main` or `feat/**` branches and on every pull request targeting `main`, using the `DATABASE_URL` repository secret. If that secret is not configured (e.g. on forked pull requests), the step skips with a warning rather than failing the build.
 
 ## Usage Example
