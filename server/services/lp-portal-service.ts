@@ -670,18 +670,25 @@ class SideLetterManager {
   }
 
   async getSideLettersForFund(orgId: string, fundId: string): Promise<SideLetter[]> {
+    // side_letters has no org_id column; scope via the funds join.
     const result = await db.execute(sql`
-      SELECT * FROM side_letters WHERE org_id = ${orgId} AND fund_id = ${fundId}
-      ORDER BY investor_name
+      SELECT sl.id, sl.fund_id, sl.investor_id, sl.provisions, sl.document_url,
+             sl.executed_at, sl.created_at,
+             fi.investor_name
+      FROM side_letters sl
+      INNER JOIN funds f ON f.id = sl.fund_id
+      LEFT JOIN fund_investors fi ON fi.id = sl.investor_id AND fi.org_id = f.org_id
+      WHERE sl.fund_id = ${fundId} AND f.org_id = ${orgId}
+      ORDER BY sl.created_at DESC
     `);
 
     return (result.rows as any[]).map(r => ({
-      id: r.id, orgId: r.org_id, fundId: r.fund_id,
-      investorId: r.investor_id, investorName: r.investor_name,
+      id: r.id, orgId, fundId: r.fund_id,
+      investorId: r.investor_id, investorName: r.investor_name || '',
       provisions: r.provisions || [],
-      effectiveDate: r.effective_date,
-      expirationDate: r.expiration_date || null,
-      status: r.status, documentUrl: r.document_url,
+      effectiveDate: r.executed_at,
+      expirationDate: null,
+      status: 'active', documentUrl: r.document_url,
       createdAt: new Date(r.created_at),
     }));
   }
