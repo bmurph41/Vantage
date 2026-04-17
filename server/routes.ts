@@ -139,6 +139,7 @@ import { ddReviewRouter } from "./routes/dd-review-routes";
 import commercialTenantsRoutes from "./routes/commercial-tenants-routes";
 import commercialLeaseRoutes from "./routes/commercial-lease-routes";
 import unifiedLeaseRoutes from "./routes/unified-lease-routes";
+import tenantLeasesRoutes, { valuatorLeaseRouter } from "./routes/tenant-leases-routes";
 import tourProgressRoutes from "./routes/tour-progress-routes";
 import operationsSyncRoutes from "./routes/operations-sync-routes";
 import ddAutomationRoutes from "./routes/dd-automation-routes";
@@ -702,6 +703,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/commercial-tenants", authenticateUser, commercialTenantsRoutes);
   app.use("/api/commercial-leases", authenticateUser, commercialLeaseRoutes);
   app.use("/api/commercial-leases", authenticateUser, unifiedLeaseRoutes);
+  app.use("/api/tenant-leases", authenticateUser, tenantLeasesRoutes);
+  app.use("/api/valuator", authenticateUser, valuatorLeaseRouter);
   app.use(authenticateUser, tourProgressRoutes);
   app.use(authenticateUser, searchRoutes);
   app.use("/api/crm", authenticateUser, requirePack("crm_pipeline"), bulkEmailRoutes);

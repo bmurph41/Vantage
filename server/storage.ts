@@ -84,6 +84,16 @@ import {
   pendingSalesComps, type PendingSalesComp, type InsertPendingSalesComp
 } from "@shared/schema";
 import { organizationFeatures, type OrganizationFeature } from "@shared/docket-schema";
+import {
+  tenantLeases,
+  tenantRentTerms,
+  tenantRecoveries,
+  tenantPercentageRent,
+  tenantSales,
+  tenantConcessions,
+  tenantCapexLeasing,
+  tenantRolloverAssumptions,
+} from "../db/schema-commercial-tenants";
 import { db } from "./db";
 import { eq, and, desc, asc, sql, inArray, isNull, isNotNull, or, count, ilike } from "drizzle-orm";
 import { VdrStorage } from "./vdr-storage";
@@ -993,6 +1003,55 @@ export interface IStorage {
 
   // Virtual Data Room - Composed VDR storage access
   vdr: import("./vdr-storage").IVdrStorage;
+
+  // Tenant Leases (commercial lease modeling)
+  getTenantLeases(projectId: string, status?: string): Promise<(typeof tenantLeases.$inferSelect)[]>;
+  getTenantLease(leaseId: string): Promise<(typeof tenantLeases.$inferSelect) | null>;
+  createTenantLease(data: Record<string, unknown>): Promise<typeof tenantLeases.$inferSelect>;
+  updateTenantLease(leaseId: string, data: Record<string, unknown>): Promise<typeof tenantLeases.$inferSelect>;
+  deleteTenantLease(leaseId: string): Promise<boolean>;
+
+  // Tenant Rent Terms
+  getTenantRentTerms(leaseId: string): Promise<(typeof tenantRentTerms.$inferSelect)[]>;
+  createTenantRentTerm(data: Record<string, unknown>): Promise<typeof tenantRentTerms.$inferSelect>;
+  updateTenantRentTerm(termId: string, data: Record<string, unknown>): Promise<typeof tenantRentTerms.$inferSelect>;
+  deleteTenantRentTerm(termId: string): Promise<boolean>;
+
+  // Tenant Recoveries
+  getTenantRecoveries(leaseId: string): Promise<(typeof tenantRecoveries.$inferSelect)[]>;
+  createTenantRecovery(data: Record<string, unknown>): Promise<typeof tenantRecoveries.$inferSelect>;
+  updateTenantRecovery(recoveryId: string, data: Record<string, unknown>): Promise<typeof tenantRecoveries.$inferSelect>;
+  deleteTenantRecovery(recoveryId: string): Promise<boolean>;
+
+  // Tenant Percentage Rent
+  getTenantPercentageRent(leaseId: string): Promise<(typeof tenantPercentageRent.$inferSelect) | null>;
+  upsertTenantPercentageRent(leaseId: string, data: Record<string, unknown>): Promise<typeof tenantPercentageRent.$inferSelect>;
+  updateTenantPercentageRent(prId: string, leaseId: string, data: Record<string, unknown>): Promise<typeof tenantPercentageRent.$inferSelect>;
+  deleteTenantPercentageRent(prId: string, leaseId: string): Promise<boolean>;
+
+  // Tenant Sales
+  getTenantSales(leaseId: string): Promise<(typeof tenantSales.$inferSelect)[]>;
+  createTenantSale(data: Record<string, unknown>): Promise<typeof tenantSales.$inferSelect>;
+  updateTenantSale(saleId: string, leaseId: string, data: Record<string, unknown>): Promise<typeof tenantSales.$inferSelect>;
+  deleteTenantSale(saleId: string, leaseId: string): Promise<boolean>;
+
+  // Tenant Concessions
+  getTenantConcessions(leaseId: string): Promise<(typeof tenantConcessions.$inferSelect)[]>;
+  createTenantConcession(data: Record<string, unknown>): Promise<typeof tenantConcessions.$inferSelect>;
+  updateTenantConcession(concessionId: string, leaseId: string, data: Record<string, unknown>): Promise<typeof tenantConcessions.$inferSelect>;
+  deleteTenantConcession(concessionId: string, leaseId: string): Promise<boolean>;
+
+  // Tenant CapEx / Leasing Costs
+  getTenantCapex(leaseId: string): Promise<(typeof tenantCapexLeasing.$inferSelect) | null>;
+  upsertTenantCapex(leaseId: string, data: Record<string, unknown>): Promise<typeof tenantCapexLeasing.$inferSelect>;
+  updateTenantCapex(capexId: string, leaseId: string, data: Record<string, unknown>): Promise<typeof tenantCapexLeasing.$inferSelect>;
+  deleteTenantCapex(capexId: string, leaseId: string): Promise<boolean>;
+
+  // Tenant Rollover Assumptions
+  getTenantRollover(leaseId: string): Promise<(typeof tenantRolloverAssumptions.$inferSelect) | null>;
+  upsertTenantRollover(leaseId: string, data: Record<string, unknown>): Promise<typeof tenantRolloverAssumptions.$inferSelect>;
+  updateTenantRollover(rolloverId: string, leaseId: string, data: Record<string, unknown>): Promise<typeof tenantRolloverAssumptions.$inferSelect>;
+  deleteTenantRollover(rolloverId: string, leaseId: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -8664,6 +8723,224 @@ export class DatabaseStorage implements IStorage {
       .values(data as any)
       .returning();
     return created;
+  }
+
+  // ── Tenant Leases ────────────────────────────────────────────────────────────
+
+  async getTenantLeases(projectId: string, status?: string): Promise<any[]> {
+    const rows = await db.select().from(tenantLeases)
+      .where(eq(tenantLeases.projectId, projectId))
+      .orderBy(desc(tenantLeases.createdAt));
+    if (status) return rows.filter(r => r.status === status);
+    return rows;
+  }
+
+  async getTenantLease(leaseId: string): Promise<any | null> {
+    const [row] = await db.select().from(tenantLeases).where(eq(tenantLeases.id, leaseId));
+    return row || null;
+  }
+
+  async createTenantLease(data: Record<string, unknown>): Promise<any> {
+    const [row] = await db.insert(tenantLeases).values(data as typeof tenantLeases.$inferInsert).returning();
+    return row;
+  }
+
+  async updateTenantLease(leaseId: string, data: Record<string, unknown>): Promise<any> {
+    const [row] = await db.update(tenantLeases)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(tenantLeases.id, leaseId))
+      .returning();
+    return row;
+  }
+
+  async deleteTenantLease(leaseId: string): Promise<boolean> {
+    const result = await db.delete(tenantLeases).where(eq(tenantLeases.id, leaseId)).returning();
+    return result.length > 0;
+  }
+
+  // ── Tenant Rent Terms ────────────────────────────────────────────────────────
+
+  async getTenantRentTerms(leaseId: string): Promise<any[]> {
+    return db.select().from(tenantRentTerms).where(eq(tenantRentTerms.leaseId, leaseId)).orderBy(asc(tenantRentTerms.termStartDate));
+  }
+
+  async createTenantRentTerm(data: Record<string, unknown>): Promise<any> {
+    const [row] = await db.insert(tenantRentTerms).values(data as typeof tenantRentTerms.$inferInsert).returning();
+    return row;
+  }
+
+  async updateTenantRentTerm(termId: string, data: Record<string, unknown>): Promise<any> {
+    const [row] = await db.update(tenantRentTerms).set({ ...data, updatedAt: new Date() }).where(eq(tenantRentTerms.id, termId)).returning();
+    return row;
+  }
+
+  async deleteTenantRentTerm(termId: string): Promise<boolean> {
+    const result = await db.delete(tenantRentTerms).where(eq(tenantRentTerms.id, termId)).returning();
+    return result.length > 0;
+  }
+
+  // ── Tenant Recoveries ────────────────────────────────────────────────────────
+
+  async getTenantRecoveries(leaseId: string): Promise<any[]> {
+    return db.select().from(tenantRecoveries).where(eq(tenantRecoveries.leaseId, leaseId));
+  }
+
+  async createTenantRecovery(data: Record<string, unknown>): Promise<any> {
+    const [row] = await db.insert(tenantRecoveries).values(data as typeof tenantRecoveries.$inferInsert).returning();
+    return row;
+  }
+
+  async updateTenantRecovery(recoveryId: string, data: Record<string, unknown>): Promise<any> {
+    const [row] = await db.update(tenantRecoveries).set({ ...data, updatedAt: new Date() }).where(eq(tenantRecoveries.id, recoveryId)).returning();
+    return row;
+  }
+
+  async deleteTenantRecovery(recoveryId: string): Promise<boolean> {
+    const result = await db.delete(tenantRecoveries).where(eq(tenantRecoveries.id, recoveryId)).returning();
+    return result.length > 0;
+  }
+
+  // ── Tenant Percentage Rent ───────────────────────────────────────────────────
+
+  async getTenantPercentageRent(leaseId: string): Promise<any | null> {
+    const [row] = await db.select().from(tenantPercentageRent).where(eq(tenantPercentageRent.leaseId, leaseId));
+    return row || null;
+  }
+
+  async upsertTenantPercentageRent(leaseId: string, data: Record<string, unknown>): Promise<any> {
+    const [existing] = await db.select().from(tenantPercentageRent).where(eq(tenantPercentageRent.leaseId, leaseId));
+    if (existing) {
+      const [row] = await db.update(tenantPercentageRent).set({ ...data, updatedAt: new Date() }).where(eq(tenantPercentageRent.id, existing.id)).returning();
+      return row;
+    }
+    const [row] = await db.insert(tenantPercentageRent).values({ ...data, leaseId } as typeof tenantPercentageRent.$inferInsert).returning();
+    return row;
+  }
+
+  // ── Tenant Concessions ───────────────────────────────────────────────────────
+
+  async getTenantConcessions(leaseId: string): Promise<any[]> {
+    return db.select().from(tenantConcessions).where(eq(tenantConcessions.leaseId, leaseId)).orderBy(asc(tenantConcessions.startDate));
+  }
+
+  async createTenantConcession(data: Record<string, unknown>): Promise<any> {
+    const [row] = await db.insert(tenantConcessions).values(data as typeof tenantConcessions.$inferInsert).returning();
+    return row;
+  }
+
+  async updateTenantConcession(concessionId: string, leaseId: string, data: Record<string, unknown>): Promise<any> {
+    const [row] = await db.update(tenantConcessions).set({ ...data, updatedAt: new Date() })
+      .where(and(eq(tenantConcessions.id, concessionId), eq(tenantConcessions.leaseId, leaseId)))
+      .returning();
+    return row;
+  }
+
+  async deleteTenantConcession(concessionId: string, leaseId: string): Promise<boolean> {
+    const result = await db.delete(tenantConcessions)
+      .where(and(eq(tenantConcessions.id, concessionId), eq(tenantConcessions.leaseId, leaseId)))
+      .returning();
+    return result.length > 0;
+  }
+
+  // ── Tenant CapEx / Leasing Costs ─────────────────────────────────────────────
+
+  async getTenantCapex(leaseId: string): Promise<any | null> {
+    const [row] = await db.select().from(tenantCapexLeasing).where(eq(tenantCapexLeasing.leaseId, leaseId));
+    return row || null;
+  }
+
+  async upsertTenantCapex(leaseId: string, data: Record<string, unknown>): Promise<any> {
+    const [existing] = await db.select().from(tenantCapexLeasing).where(eq(tenantCapexLeasing.leaseId, leaseId));
+    if (existing) {
+      const [row] = await db.update(tenantCapexLeasing).set({ ...data, updatedAt: new Date() }).where(eq(tenantCapexLeasing.id, existing.id)).returning();
+      return row;
+    }
+    const [row] = await db.insert(tenantCapexLeasing).values({ ...data, leaseId } as typeof tenantCapexLeasing.$inferInsert).returning();
+    return row;
+  }
+
+  // ── Tenant Rollover Assumptions ──────────────────────────────────────────────
+
+  async getTenantRollover(leaseId: string): Promise<any | null> {
+    const [row] = await db.select().from(tenantRolloverAssumptions).where(eq(tenantRolloverAssumptions.leaseId, leaseId));
+    return row || null;
+  }
+
+  async upsertTenantRollover(leaseId: string, data: Record<string, unknown>): Promise<any> {
+    const [existing] = await db.select().from(tenantRolloverAssumptions).where(eq(tenantRolloverAssumptions.leaseId, leaseId));
+    if (existing) {
+      const [row] = await db.update(tenantRolloverAssumptions).set({ ...data, updatedAt: new Date() }).where(eq(tenantRolloverAssumptions.id, existing.id)).returning();
+      return row;
+    }
+    const [row] = await db.insert(tenantRolloverAssumptions).values({ ...data, leaseId } as typeof tenantRolloverAssumptions.$inferInsert).returning();
+    return row;
+  }
+
+  async updateTenantPercentageRent(prId: string, leaseId: string, data: Record<string, unknown>): Promise<any> {
+    const [row] = await db.update(tenantPercentageRent).set({ ...data, updatedAt: new Date() })
+      .where(and(eq(tenantPercentageRent.id, prId), eq(tenantPercentageRent.leaseId, leaseId)))
+      .returning();
+    return row;
+  }
+
+  async deleteTenantPercentageRent(prId: string, leaseId: string): Promise<boolean> {
+    const result = await db.delete(tenantPercentageRent)
+      .where(and(eq(tenantPercentageRent.id, prId), eq(tenantPercentageRent.leaseId, leaseId)))
+      .returning();
+    return result.length > 0;
+  }
+
+  // ── Tenant Sales ─────────────────────────────────────────────────────────────
+
+  async getTenantSales(leaseId: string): Promise<any[]> {
+    return db.select().from(tenantSales).where(eq(tenantSales.leaseId, leaseId)).orderBy(desc(tenantSales.periodEndDate));
+  }
+
+  async createTenantSale(data: Record<string, unknown>): Promise<any> {
+    const [row] = await db.insert(tenantSales).values(data as typeof tenantSales.$inferInsert).returning();
+    return row;
+  }
+
+  async updateTenantSale(saleId: string, leaseId: string, data: Record<string, unknown>): Promise<any> {
+    const [row] = await db.update(tenantSales).set({ ...data, updatedAt: new Date() })
+      .where(and(eq(tenantSales.id, saleId), eq(tenantSales.leaseId, leaseId)))
+      .returning();
+    return row;
+  }
+
+  async deleteTenantSale(saleId: string, leaseId: string): Promise<boolean> {
+    const result = await db.delete(tenantSales)
+      .where(and(eq(tenantSales.id, saleId), eq(tenantSales.leaseId, leaseId)))
+      .returning();
+    return result.length > 0;
+  }
+
+  async updateTenantCapex(capexId: string, leaseId: string, data: Record<string, unknown>): Promise<any> {
+    const [row] = await db.update(tenantCapexLeasing).set({ ...data, updatedAt: new Date() })
+      .where(and(eq(tenantCapexLeasing.id, capexId), eq(tenantCapexLeasing.leaseId, leaseId)))
+      .returning();
+    return row;
+  }
+
+  async deleteTenantCapex(capexId: string, leaseId: string): Promise<boolean> {
+    const result = await db.delete(tenantCapexLeasing)
+      .where(and(eq(tenantCapexLeasing.id, capexId), eq(tenantCapexLeasing.leaseId, leaseId)))
+      .returning();
+    return result.length > 0;
+  }
+
+  async updateTenantRollover(rolloverId: string, leaseId: string, data: Record<string, unknown>): Promise<any> {
+    const [row] = await db.update(tenantRolloverAssumptions).set({ ...data, updatedAt: new Date() })
+      .where(and(eq(tenantRolloverAssumptions.id, rolloverId), eq(tenantRolloverAssumptions.leaseId, leaseId)))
+      .returning();
+    return row;
+  }
+
+  async deleteTenantRollover(rolloverId: string, leaseId: string): Promise<boolean> {
+    const result = await db.delete(tenantRolloverAssumptions)
+      .where(and(eq(tenantRolloverAssumptions.id, rolloverId), eq(tenantRolloverAssumptions.leaseId, leaseId)))
+      .returning();
+    return result.length > 0;
   }
 }
 

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { UnifiedTenantFormDialog } from "@/components/commercial-tenants/UnifiedTenantFormDialog";
+import { TenantLeaseDialog } from "@/components/tenant-leases/TenantLeaseDialog";
 import {
   Building2, Plus, Trash2, Edit, DollarSign, Users,
   TrendingUp, Download, AlertTriangle, ChevronDown,
@@ -56,6 +56,7 @@ type LeaseStatus = "ACTIVE" | "FUTURE" | "EXPIRING" | "EXPIRED" | "ARCHIVED";
 
 interface TenantLease {
   id: string;
+  projectId: string;
   tenantName: string;
   suiteLabel?: string | null;
   sf: number;
@@ -167,9 +168,7 @@ export default function ValuatorCommercialTenantsTab({ projectId, projectName }:
   // Duplicate lease mutation
   const duplicateMutation = useMutation({
     mutationFn: async (leaseId: string) => {
-      return apiRequest(`/api/valuator/${projectId}/leases/${leaseId}/duplicate`, {
-        method: "POST",
-      });
+      return apiRequest("POST", `/api/valuator/${projectId}/leases/${leaseId}/duplicate`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/valuator", projectId, "leases"] });
@@ -183,9 +182,7 @@ export default function ValuatorCommercialTenantsTab({ projectId, projectName }:
   // Archive lease mutation
   const archiveMutation = useMutation({
     mutationFn: async (leaseId: string) => {
-      return apiRequest(`/api/valuator/${projectId}/leases/${leaseId}`, {
-        method: "DELETE",
-      });
+      return apiRequest("DELETE", `/api/valuator/${projectId}/leases/${leaseId}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/valuator", projectId, "leases"] });
@@ -450,13 +447,22 @@ export default function ValuatorCommercialTenantsTab({ projectId, projectName }:
         </CardContent>
       </Card>
 
-      <UnifiedTenantFormDialog
+      <TenantLeaseDialog
         open={showAddDialog}
         onOpenChange={setShowAddDialog}
-        context="valuator"
         projectId={projectId}
         projectName={projectName}
       />
+
+      {editingLease && (
+        <TenantLeaseDialog
+          open={!!editingLease}
+          onOpenChange={(open) => { if (!open) setEditingLease(null); }}
+          projectId={projectId}
+          projectName={projectName}
+          lease={editingLease}
+        />
+      )}
     </div>
   );
 }
