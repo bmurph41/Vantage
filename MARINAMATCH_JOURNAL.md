@@ -1,5 +1,44 @@
 # MarinaMatch Platform Journal
 
+## ✅ COMPLETE — Stabilization #5: Broker onboarding flow (2026-04-17)
+
+Walked the full broker lifecycle end-to-end: register → admin approve →
+set criteria → publish → subscriber follow → feedback evaluation.
+**All 7 stages pass — no product bugs uncovered.** The broker subsystem is
+well-integrated, unlike the drift-heavy LP Portal (#3) and webhook (#4) flows.
+
+### E2E test (7/7 stages green)
+
+Test script at `/tmp/broker_onboarding_test.sh`. Hybrid approach — SQL-seeds
+for CSRF-protected POSTs, HTTP calls for GETs.
+
+| # | Stage                                              | Result |
+|---|----------------------------------------------------|--------|
+| 1 | seed `broker_registrations` (status=pending)       | ✓ |
+| 2 | admin approve → creates `broker_profiles` row      | ✓ |
+| 3 | set criteria JSONB + is_publishable=true           | ✓ |
+| 4 | `GET /directory?q=...` finds the broker            | ✓ total=1 |
+| 5 | follow + seed matching `marina_listings` target    | ✓ |
+| 6 | `GET /broker-feedback/listing/:id` returns verdict | ✓ verdict=pursue, score=100, 4/4 criteria matched |
+| 7 | `GET /broker-dashboard/my-profile` returns profile | ✓ displayName, brokerTier, publishable, stats |
+
+### Notes
+
+- Directory query uses `?q=` (not `?search=`), returns `{items, total, page}`
+  (not `{brokers}`) — minor docs note.
+- `license_status.level: missing` is expected when `license_expires_at` is null.
+  Real onboarding would supply the license document during registration.
+- Broker evaluator correctly ran all 4 rules (asset class, market, cap rate,
+  deal size) against the seeded listing and returned verdict=`pursue`.
+
+### Next session pickup
+
+Stabilization #6 — Fix tsc OOM. `shared/schema.ts` is ~28k lines and crashes
+`tsc --noEmit` at 1GB. Needs splitting into domain modules (or raising node
+heap flag if that's simpler). Pure refactor, no user-visible impact.
+
+---
+
 ## ✅ COMPLETE — Stabilization #4: Stripe billing verification (2026-04-17)
 
 Tested the full Stripe webhook → entitlement-flip flow for all three product
