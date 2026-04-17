@@ -15,7 +15,7 @@
  */
 
 import type { Express, Request, Response } from 'express';
-import { performDCFAnalysis, computeQuickIRR } from '../services/dcf-calculator-service';
+import { performDCFAnalysis, computeQuickIRR, loadLeaseIncomeForProject } from '../services/dcf-calculator-service';
 import { runMonteCarlo } from '../services/dcf-simulation-service';
 import { runDecisionSupport, checkEntitlement } from '../services/dcf-decision-support-service';
 import { getModelConfig } from '../../shared/asset-class-model-config';
@@ -218,6 +218,69 @@ export function registerDCFRoutes(
       } catch (err: any) {
         console.error('Decision support (fast) error:', err);
         res.status(500).json({ error: err.message ?? 'Decision support failed' });
+      }
+    }
+  );
+
+  // ── Lease Income Reconciliation ────────────────────────────────────────
+  // GET /api/modeling/projects/:projectId/lease-income
+  // Returns tenant lease income data for the given project, including base rent,
+  // recoveries, escalation schedules, and per-tenant breakdown.
+  app.get(
+    '/api/modeling/projects/:projectId/lease-income',
+    authenticateUser,
+    async (req: Request, res: Response) => {
+      try {
+        const { projectId } = req.params;
+        const orgId = (req as any).user?.orgId ?? '';
+
+        // Authorization: confirm this project belongs to the requesting org
+        const projectCheck = await pool.query(
+          `SELECT id FROM modeling_projects WHERE id = $1 AND org_id = $2 LIMIT 1`,
+          [projectId, orgId]
+        );
+        if (!projectCheck.rows[0]) {
+          return res.status(403).json({ error: 'Project not found or access denied' });
+        }
+
+        const leaseIncome = await loadLeaseIncomeForProject(pool, projectId);
+
+        // Compute year-by-year projection with escalations for the breakdown
+        const holdPeriod = Number(req.query.holdPeriod) || 5;
+        const yearlyProjection: Array<{
+          year: number;
+          baseRentAnnual: number;
+          recoveryAnnual: number;
+          totalEGI: number;
+        }> = [];
+
+        for (let yr = 1; yr <= holdPeriod; yr++) {
+          let baseRent = 0;
+          let recovery = 0;
+
+          for (const lease of leaseIncome.leaseBreakdown) {
+            const growthFactor = Math.pow(1 + lease.escalationRate, yr - 1);
+            baseRent += lease.baseRentAnnual * growthFactor;
+            // Recovery income grows at a flat 2.5% per year assumption
+            recovery += lease.recoveryAnnual * Math.pow(1.025, yr - 1);
+          }
+
+          yearlyProjection.push({
+            year: yr,
+            baseRentAnnual: Math.round(baseRent),
+            recoveryAnnual: Math.round(recovery),
+            totalEGI: Math.round(baseRent + recovery),
+          });
+        }
+
+        res.json({
+          projectId,
+          ...leaseIncome,
+          yearlyProjection,
+        });
+      } catch (err: any) {
+        console.error('Lease income route error:', err);
+        res.status(500).json({ error: err.message ?? 'Failed to load lease income' });
       }
     }
   );

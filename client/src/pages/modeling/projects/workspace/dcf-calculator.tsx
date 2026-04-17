@@ -30,7 +30,8 @@ import {
   Target,
   Activity,
   Layers,
-  AlertCircle
+  AlertCircle,
+  Building2
 } from 'lucide-react';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { cn, formatCurrency, formatPercent } from '@/lib/utils';
@@ -213,6 +214,11 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
     queryKey: ['/api/modeling/projects', projectId, 'dcf'],
     enabled: !!projectId,
     retry: false,
+  });
+
+  const { data: leaseIncomeData } = useQuery<any>({
+    queryKey: ['/api/modeling/projects', projectId, 'lease-income'],
+    enabled: !!projectId,
   });
 
   const saveExitCapRateToScenario = useMutation({
@@ -667,6 +673,14 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
           <TabsTrigger value="scenarios" data-testid="tab-scenarios">Scenarios</TabsTrigger>
           <TabsTrigger value="sensitivity" data-testid="tab-sensitivity">Sensitivity</TabsTrigger>
           <TabsTrigger value="cashflows" data-testid="tab-cashflows">Cash Flows</TabsTrigger>
+          <TabsTrigger value="lease-income" data-testid="tab-lease-income" className="relative">
+            Lease Income
+            {leaseIncomeData?.hasLeases && (
+              <span className="ml-1.5 inline-flex items-center justify-center w-4 h-4 text-[10px] font-bold rounded-full bg-emerald-500 text-white">
+                {leaseIncomeData.leaseCount}
+              </span>
+            )}
+          </TabsTrigger>
         </TabsList>
 
         {/* Overview Tab */}
@@ -961,6 +975,183 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
               </ScrollArea>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Lease Income Reconciliation Tab */}
+        <TabsContent value="lease-income" className="mt-4 space-y-6">
+          {!leaseIncomeData?.hasLeases ? (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center py-16 text-center gap-3">
+                <Building2 className="h-10 w-10 text-muted-foreground/40" />
+                <p className="text-muted-foreground font-medium">No active tenant leases found for this project</p>
+                <p className="text-sm text-muted-foreground max-w-sm">
+                  Add leases on the Commercial Tenants tab to see actual income flowing into this DCF model.
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <>
+              {/* Summary KPIs */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <Card>
+                  <CardContent className="pt-6">
+                    <p className="text-sm text-muted-foreground">Annual Base Rent</p>
+                    <p className="text-2xl font-bold text-emerald-600">{formatCurrency(leaseIncomeData.totalBaseRentAnnual)}</p>
+                    <p className="text-xs text-muted-foreground mt-1">From {leaseIncomeData.leaseCount} active lease{leaseIncomeData.leaseCount !== 1 ? 's' : ''}</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="pt-6">
+                    <p className="text-sm text-muted-foreground">Annual Recoveries</p>
+                    <p className="text-2xl font-bold text-blue-600">{formatCurrency(leaseIncomeData.totalRecoveryAnnual)}</p>
+                    <p className="text-xs text-muted-foreground mt-1">CAM, taxes, insurance</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="pt-6">
+                    <p className="text-sm text-muted-foreground">Total EGI</p>
+                    <p className="text-2xl font-bold">{formatCurrency(leaseIncomeData.totalEGIAnnual)}</p>
+                    <p className="text-xs text-muted-foreground mt-1">Effective gross income</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="pt-6">
+                    <p className="text-sm text-muted-foreground">Wtd Avg Escalation</p>
+                    <p className="text-2xl font-bold">
+                      {leaseIncomeData.weightedAvgEscalationRate > 0
+                        ? `${(leaseIncomeData.weightedAvgEscalationRate * 100).toFixed(2)}%`
+                        : 'Flat'}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">Annual rent growth</p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Year-by-Year Projection */}
+              {leaseIncomeData.yearlyProjection?.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <TrendingUp className="h-4 w-4 text-emerald-500" />
+                      Lease Income Projection (with Escalations)
+                    </CardTitle>
+                    <CardDescription>Base rent grows by tenant-specific escalation schedules; recoveries grow at 2.5%/yr</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Year</TableHead>
+                          <TableHead className="text-right">Base Rent</TableHead>
+                          <TableHead className="text-right">Recoveries</TableHead>
+                          <TableHead className="text-right">Total EGI</TableHead>
+                          <TableHead className="text-right">YoY Growth</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {leaseIncomeData.yearlyProjection.map((row: any, idx: number) => {
+                          const prev = idx > 0 ? leaseIncomeData.yearlyProjection[idx - 1] : null;
+                          const yoyGrowth = prev && prev.totalEGI > 0
+                            ? ((row.totalEGI - prev.totalEGI) / prev.totalEGI) * 100
+                            : null;
+                          return (
+                            <TableRow key={row.year}>
+                              <TableCell className="font-medium">Year {row.year}</TableCell>
+                              <TableCell className="text-right">{formatCurrency(row.baseRentAnnual)}</TableCell>
+                              <TableCell className="text-right">{formatCurrency(row.recoveryAnnual)}</TableCell>
+                              <TableCell className="text-right font-semibold">{formatCurrency(row.totalEGI)}</TableCell>
+                              <TableCell className="text-right text-sm text-muted-foreground">
+                                {yoyGrowth !== null ? `+${yoyGrowth.toFixed(1)}%` : '—'}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Per-Tenant Breakdown */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Building2 className="h-4 w-4 text-muted-foreground" />
+                    Per-Tenant Income Breakdown
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ScrollArea className="w-full">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Tenant</TableHead>
+                          <TableHead>Lease Type</TableHead>
+                          <TableHead>SF</TableHead>
+                          <TableHead className="text-right">Base Rent/Yr</TableHead>
+                          <TableHead className="text-right">Recoveries/Yr</TableHead>
+                          <TableHead>Escalation</TableHead>
+                          <TableHead>Lease Expiry</TableHead>
+                          <TableHead className="text-right">% of EGI</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {leaseIncomeData.leaseBreakdown?.map((lease: any) => {
+                          const pct = leaseIncomeData.totalEGIAnnual > 0
+                            ? ((lease.baseRentAnnual + lease.recoveryAnnual) / leaseIncomeData.totalEGIAnnual) * 100
+                            : 0;
+                          const escalationLabel =
+                            lease.escalationType === 'PERCENT' ? `${(lease.escalationRate * 100).toFixed(2)}%/yr`
+                            : lease.escalationType === 'CPI' ? 'CPI'
+                            : lease.escalationType === 'CPI_CAP_FLOOR' ? 'CPI (capped)'
+                            : lease.escalationType === 'SCHEDULE' ? 'Scheduled'
+                            : lease.escalationType === 'FIXED_DOLLAR' ? 'Fixed $'
+                            : 'Flat';
+                          return (
+                            <TableRow key={lease.leaseId}>
+                              <TableCell className="font-medium">{lease.tenantName}</TableCell>
+                              <TableCell>
+                                <Badge variant="outline" className="text-xs">{lease.leaseType}</Badge>
+                              </TableCell>
+                              <TableCell className="text-muted-foreground">{Number(lease.sf).toLocaleString()}</TableCell>
+                              <TableCell className="text-right">{formatCurrency(lease.baseRentAnnual)}</TableCell>
+                              <TableCell className="text-right">{formatCurrency(lease.recoveryAnnual)}</TableCell>
+                              <TableCell className="text-sm">{escalationLabel}</TableCell>
+                              <TableCell className="text-sm text-muted-foreground">{lease.leaseEndDate}</TableCell>
+                              <TableCell className="text-right font-medium">{pct.toFixed(1)}%</TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                    <ScrollBar orientation="horizontal" />
+                  </ScrollArea>
+                </CardContent>
+              </Card>
+
+              {/* Reconciliation Note */}
+              <Card className="border-emerald-200 bg-emerald-50 dark:bg-emerald-950/20 dark:border-emerald-900">
+                <CardContent className="pt-4 pb-4">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="h-4 w-4 text-emerald-600 mt-0.5 shrink-0" />
+                    <div className="text-sm">
+                      <p className="font-medium text-emerald-800 dark:text-emerald-300">
+                        Lease income is wired into this DCF model
+                      </p>
+                      <p className="text-emerald-700 dark:text-emerald-400 mt-1">
+                        Year 1 NOI is derived from actual tenant base rent and recoveries.
+                        Forward-year projections apply the weighted average escalation rate
+                        ({leaseIncomeData.weightedAvgEscalationRate > 0
+                          ? `${(leaseIncomeData.weightedAvgEscalationRate * 100).toFixed(2)}%/yr from leases`
+                          : 'scenario growth rate'}) as the income growth driver,
+                        with the scenario revenue growth rate applied as a minimum floor.
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </>
+          )}
         </TabsContent>
       </Tabs>
 

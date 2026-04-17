@@ -19,10 +19,52 @@ import {
   capitalCalls,
 } from "@shared/schema";
 import { eq, and, desc, sql, gte, lte, count } from "drizzle-orm";
+import { loadLeaseIncomeForProject, type LeaseIncomeResult } from "../services/dcf-calculator-service";
+import { pool } from "../db";
 
 export const cashFlowForecastingRouter = Router();
 
 // ── Generate Forecast ────────────────────────────────────────────────────
+
+// ── Lease income cache (per forecast generation run) ─────────────────────
+// Avoids re-querying the DB for each of the 24 months in the loop.
+// Returns the full LeaseIncomeResult per deal for escalation-aware forecasting.
+async function buildLeaseIncomeCache(
+  deals: any[],
+  pool: any
+): Promise<Map<string, LeaseIncomeResult>> {
+  const cache = new Map<string, LeaseIncomeResult>();
+  for (const deal of deals) {
+    if (!deal.modelingProjectId) continue;
+    try {
+      const leaseData = await loadLeaseIncomeForProject(pool, deal.modelingProjectId);
+      if (leaseData.hasLeases && leaseData.totalEGIAnnual > 0) {
+        cache.set(deal.id, leaseData);
+      }
+    } catch {
+      // ignore per-deal errors — fall back to cap rate estimate
+    }
+  }
+  return cache;
+}
+
+/**
+ * Compute monthly EGI from a lease breakdown applying per-lease escalation schedules.
+ * monthsOut is the number of months from forecast start (0 = current month).
+ */
+function computeLeaseEGIForMonth(
+  leaseBreakdown: LeaseIncomeResult['leaseBreakdown'],
+  monthsOut: number
+): number {
+  let total = 0;
+  for (const lease of leaseBreakdown) {
+    const yearsElapsed = monthsOut / 12;
+    const rentGrowthFactor = Math.pow(1 + lease.escalationRate, yearsElapsed);
+    const recoveryGrowthFactor = Math.pow(1.025, yearsElapsed); // 2.5%/yr for recoveries
+    total += (lease.baseRentAnnual * rentGrowthFactor + lease.recoveryAnnual * recoveryGrowthFactor) / 12;
+  }
+  return total;
+}
 
 // POST /generate — generate 24-month cash flow forecast
 cashFlowForecastingRouter.post("/generate", async (req: Request, res: Response) => {
@@ -39,6 +81,9 @@ cashFlowForecastingRouter.post("/generate", async (req: Request, res: Response) 
       .select()
       .from(crmDeals)
       .where(and(eq(crmDeals.orgId, orgId), eq(crmDeals.isClosed, false)));
+
+    // Preload lease income for deals with linked modeling projects
+    const leaseIncomeByDeal = await buildLeaseIncomeCache(deals, pool);
 
     const now = new Date();
     const asOf = now.toISOString().split("T")[0];
@@ -67,10 +112,31 @@ cashFlowForecastingRouter.post("/generate", async (req: Request, res: Response) 
         const dealValue = parseFloat(deal.value || "0");
         if (dealValue <= 0) continue;
 
-        // Estimated monthly NOI (assume 6% cap rate, grow over time)
-        const annualNOI = dealValue * 0.06;
-        const monthlyGrowthFactor = Math.pow(1 + noiGrowthRate, monthsOut / 12);
-        const monthlyNOI = (annualNOI / 12) * monthlyGrowthFactor;
+        // Use actual lease income with per-lease escalation schedules if available;
+        // otherwise fall back to cap rate estimate with global growth rate.
+        const leaseData = leaseIncomeByDeal.get(deal.id);
+        let monthlyNOI: number;
+        // baseMonthlyIncome = Year-0 income basis used for expense derivation only.
+        // Keeping it separate avoids compounding: op-ex should grow from a fixed base,
+        // not from an already-escalated NOI, to prevent double-compounding.
+        let baseMonthlyIncome: number;
+        let incomeSource: "lease_data" | "cap_rate_estimate";
+
+        if (leaseData && leaseData.hasLeases) {
+          // Apply per-lease escalation schedules (base rent) and 2.5% recovery growth
+          monthlyNOI = computeLeaseEGIForMonth(leaseData.leaseBreakdown, monthsOut);
+          // Base for op-ex = Year-0 lease EGI (no growth applied)
+          baseMonthlyIncome = computeLeaseEGIForMonth(leaseData.leaseBreakdown, 0);
+          incomeSource = "lease_data";
+        } else {
+          // Estimated monthly NOI (assume 6% cap rate, grow over time)
+          const annualNOI = dealValue * 0.06;
+          const monthlyGrowthFactor = Math.pow(1 + noiGrowthRate, monthsOut / 12);
+          monthlyNOI = (annualNOI / 12) * monthlyGrowthFactor;
+          // Base for op-ex = constant Year-0 income (no escalation)
+          baseMonthlyIncome = annualNOI / 12;
+          incomeSource = "cap_rate_estimate";
+        }
 
         // Estimated monthly debt service (assume 65% LTV, 6.5% rate, 30yr amort)
         const loanAmount = dealValue * 0.65;
@@ -85,8 +151,9 @@ cashFlowForecastingRouter.post("/generate", async (req: Request, res: Response) 
         // Management fees (1.5% of AUM annually)
         const monthlyMgmtFee = (dealValue * 0.015) / 12;
 
-        // Operating expenses grow with expense growth rate
-        const monthlyOpEx = (annualNOI * 0.42 / 12) * Math.pow(1 + expenseGrowthRate, monthsOut / 12);
+        // Operating expenses grow from a fixed base (avoids double-compounding with
+        // per-lease escalation already applied to monthlyNOI for lease-based deals)
+        const monthlyOpEx = (baseMonthlyIncome * 0.42) * Math.pow(1 + expenseGrowthRate, monthsOut / 12);
 
         const dealNet = monthlyNOI - monthlyDebtService - monthlyCapex - monthlyMgmtFee;
 
@@ -104,6 +171,7 @@ cashFlowForecastingRouter.post("/generate", async (req: Request, res: Response) 
           capex: Math.round(monthlyCapex),
           managementFee: Math.round(monthlyMgmtFee),
           net: Math.round(dealNet),
+          incomeSource,
         });
       }
 
