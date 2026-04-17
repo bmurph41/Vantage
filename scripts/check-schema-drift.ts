@@ -4,13 +4,14 @@
  * missing tables or columns that are defined in shared/schema.ts.
  *
  * Usage:
- *   npx tsx scripts/check-schema-drift.ts
+ *   npm run check:schema
+ *   # or directly: npx tsx scripts/check-schema-drift.ts
  *
  * Add this as a CI step (GitHub Actions, pre-deploy hook, etc.) to prevent
  * merges that introduce schema drift without a matching migration:
  *
  *   - name: Schema drift check
- *     run: npx tsx scripts/check-schema-drift.ts
+ *     run: npm run check:schema
  *     env:
  *       DATABASE_URL: ${{ secrets.DATABASE_URL }}
  *

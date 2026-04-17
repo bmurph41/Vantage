@@ -110,6 +110,29 @@ Records are deduplicated using composite key:
 - `externalId` - ID from the source system
 - `integrationSource` - Connector key (e.g., 'dockmaster', 'storable_marine')
 
+## Schema Drift Check
+
+The project includes a script that compares the Drizzle schema definitions in `shared/schema.ts` against the live database and reports any tables or columns that are missing.
+
+**When to run it:**
+- Before deploying to production, to confirm pending schema changes have been migrated
+- In CI, to catch pull requests that add schema definitions without a matching migration
+- After restoring or cloning a database, to verify the schema is complete
+
+**Run locally:**
+```bash
+npm run check:schema
+```
+
+`DATABASE_URL` must be set in your environment (same connection string used by the app).
+
+**Exit codes:**
+- `0` — schema and database are in sync
+- `1` — drift detected; the output lists the missing tables and columns
+- `2` — the check could not connect to the database
+
+The `schema-drift` job in `.github/workflows/ci.yml` runs this check automatically on every push to `main` or `feat/**` branches and on every pull request targeting `main`, using the `DATABASE_URL` repository secret. If that secret is not configured (e.g. on forked pull requests), the step skips with a warning rather than failing the build.
+
 ## Usage Example
 
 ```typescript
