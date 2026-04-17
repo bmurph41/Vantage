@@ -4335,12 +4335,12 @@ export const leaseTypeOptions = [
 
 export type LeaseType = typeof leaseTypeOptions[number];
 
-export interface Lease {
+export interface MarinaLeaseConfig {
   id?: string;
   type: string; // ground_lease, submerged_land_lease, etc.
   lessor: string; // Who it's with (landlord/lessor name)
   startDate: string | null; // ISO date string
-  endDate: string | null; // ISO date string  
+  endDate: string | null; // ISO date string
   extensionEnabled: boolean;
   extensionNotes?: string; // Details about extension options
 }
@@ -11099,10 +11099,13 @@ export const selectMarinaLeaseSchema = createSelectSchema(marinaLeases);
 export type InsertMarinaLease = z.infer<typeof insertMarinaLeaseSchema>;
 export type MarinaLease = typeof marinaLeases.$inferSelect;
 
-export const insertLeaseLineItemSchema = createInsertSchema(leaseLineItems).omit({ id: true, createdAt: true, updatedAt: true });
-export const selectLeaseLineItemSchema = createSelectSchema(leaseLineItems);
-export type InsertLeaseLineItem = z.infer<typeof insertLeaseLineItemSchema>;
-export type LeaseLineItem = typeof leaseLineItems.$inferSelect;
+// Note: GenericLeaseLineItem is the older lease_line_items table type. The unprefixed
+// `LeaseLineItem` / `InsertLeaseLineItem` names are the RraLease aliases declared
+// further down in this file.
+export const insertGenericLeaseLineItemSchema = createInsertSchema(leaseLineItems).omit({ id: true, createdAt: true, updatedAt: true });
+export const selectGenericLeaseLineItemSchema = createSelectSchema(leaseLineItems);
+export type InsertGenericLeaseLineItem = z.infer<typeof insertGenericLeaseLineItemSchema>;
+export type GenericLeaseLineItem = typeof leaseLineItems.$inferSelect;
 
 export const insertLeaseCashFlowSchema = createInsertSchema(leaseCashFlows).omit({ id: true, createdAt: true });
 export const selectLeaseCashFlowSchema = createSelectSchema(leaseCashFlows);
@@ -21677,8 +21680,8 @@ export const updateDealWorkspaceSchema = insertDealWorkspaceSchema.partial();
 export type DealWorkspace = typeof dealWorkspaces.$inferSelect;
 export type InsertDealWorkspace = z.infer<typeof insertDealWorkspaceSchema>;
 
-// Re-export Listing Ingestion V2 schema
-export * from '../server/listings/ingestion_v2/schema';
+// Listing Ingestion V2 schema lives in server/listings/ingestion_v2/schema.ts —
+// import directly from there to avoid a shared→server layering violation.
 
 // ============================================================================
 // Hardened P&L Pipeline Schema Integration
@@ -24968,8 +24971,8 @@ export const upsertLearningRuleSchema = z.object({
 });
 export type UpsertLearningRuleInput = z.infer<typeof upsertLearningRuleSchema>;
 
-// Commercial Tenants
-export * from "../db/schema-commercial-tenants";
+// Commercial Tenants schema lives in db/schema-commercial-tenants.ts —
+// import directly from there to avoid a shared→db layering violation.
 
 // ============================================
 // PHASE 1: MODELING TIMELINE ENGINE

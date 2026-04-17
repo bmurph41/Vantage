@@ -141,7 +141,6 @@ import AssumptionAudit from './workspace/assumption-audit';
 import FundGnAModel from './workspace/fund-gna-model';
 import GpPartnerEconomics from './workspace/gp-partner-economics';
 import FundCashFlowDetail from './workspace/fund-cashflow-detail';
-import GlobalAssumptionsSidebar from '@/components/modeling/GlobalAssumptionsSidebar';
 import ScenarioBar from '@/components/modeling/ScenarioBar';
 import InvestmentMaterialsTab from './workspace/investment-materials';
 
@@ -835,12 +834,6 @@ export default function ProjectWorkspace() {
       </div>
 
       <div className="flex flex-1 overflow-hidden">
-        {/* Global Assumptions Sidebar */}
-        <GlobalAssumptionsSidebar
-          projectId={projectId!}
-          project={project}
-        />
-
       <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-0 flex-1 min-w-0">
         <div className="ws-nav-strip sticky top-[56px] z-20 -mx-6 px-6 border-b-2 border-border shadow-[0_3px_12px_-2px_rgba(0,0,0,0.10)]" style={{background:'hsl(221,50%,98%)'}}>
           {/* ── Group Rail ── */}

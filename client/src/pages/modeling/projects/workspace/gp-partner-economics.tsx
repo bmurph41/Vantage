@@ -194,6 +194,58 @@ function GpPartnerEconomics({ projectId, onTabChange }: GpPartnerEconomicsProps)
     saveMutation.mutate(partnerConfig);
   }, [partnerConfig, saveMutation]);
 
+  // --- Fund assumptions state (carry, GP commit, sale costs, hold period) ---
+
+  const [fundFields, setFundFields] = useState({
+    carriedInterestPct: '',
+    gpCommitmentPct: '',
+    saleCostsPct: '',
+    holdPeriod: '',
+  });
+  const [fundHydrated, setFundHydrated] = useState(false);
+
+  useEffect(() => {
+    if (fundHydrated || !project) return;
+    const fa = project?.customMetrics?.fundAssumptions as Record<string, unknown> | undefined;
+    setFundFields({
+      carriedInterestPct: fa?.carriedInterestPct != null ? ((fa.carriedInterestPct as number) * 100).toFixed(1) : '',
+      gpCommitmentPct: fa?.gpCommitmentPct != null ? ((fa.gpCommitmentPct as number) * 100).toFixed(1) : '',
+      saleCostsPct: fa?.saleCostsPct != null ? ((fa.saleCostsPct as number) * 100).toFixed(1) : '',
+      holdPeriod: fa?.holdPeriod != null ? String(Math.round(fa.holdPeriod as number)) : '',
+    });
+    setFundHydrated(true);
+  }, [project, fundHydrated]);
+
+  const fundAssumptionsMutation = useMutation({
+    mutationFn: async (fields: typeof fundFields) => {
+      const existing = project?.customMetrics ?? {};
+      const existingFa = (existing.fundAssumptions as Record<string, unknown>) ?? {};
+      const updated: Record<string, number | null> = {};
+      const pct = (v: string) => { const n = parseFloat(v); return isNaN(n) ? null : n / 100; };
+      const int = (v: string) => { const n = parseInt(v); return isNaN(n) ? null : n; };
+      updated.carriedInterestPct = pct(fields.carriedInterestPct);
+      updated.gpCommitmentPct = pct(fields.gpCommitmentPct);
+      updated.saleCostsPct = pct(fields.saleCostsPct);
+      updated.holdPeriod = int(fields.holdPeriod);
+      const patch: Record<string, unknown> = {
+        customMetrics: { ...existing, fundAssumptions: { ...existingFa, ...updated } },
+      };
+      if (updated.holdPeriod != null) patch.holdPeriodYears = updated.holdPeriod;
+      const res = await apiRequest('PATCH', `/api/modeling/projects/${projectId}`, patch);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['/api/returns/model', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'pro-forma'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/tax-waterfall/projects', projectId] });
+      toast({ title: 'Assumptions Saved', description: 'Fund structure assumptions updated.' });
+    },
+    onError: () => {
+      toast({ title: 'Save Failed', description: 'Could not save assumptions.', variant: 'destructive' });
+    },
+  });
+
   const handlePartnerCountChange = useCallback((delta: number) => {
     setPartnerConfig((prev) => {
       const newCount = Math.max(1, Math.min(10, prev.partnerCount + delta));
@@ -553,6 +605,94 @@ function GpPartnerEconomics({ projectId, onTabChange }: GpPartnerEconomicsProps)
 
   return (
     <div className="space-y-6">
+      {/* Fund Structure Assumptions */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-lg flex items-center gap-2">
+            <TrendingUp className="h-5 w-5" />
+            Fund Structure Assumptions
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Carried Interest</Label>
+              <div className="flex items-center gap-1">
+                <Input
+                  type="number"
+                  className="h-8 text-sm text-right"
+                  placeholder="20"
+                  value={fundFields.carriedInterestPct}
+                  onChange={(e) => setFundFields((p) => ({ ...p, carriedInterestPct: e.target.value }))}
+                  min={0}
+                  max={100}
+                  step={0.5}
+                />
+                <span className="text-sm text-muted-foreground">%</span>
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">GP Commit</Label>
+              <div className="flex items-center gap-1">
+                <Input
+                  type="number"
+                  className="h-8 text-sm text-right"
+                  placeholder="10"
+                  value={fundFields.gpCommitmentPct}
+                  onChange={(e) => setFundFields((p) => ({ ...p, gpCommitmentPct: e.target.value }))}
+                  min={0}
+                  max={100}
+                  step={0.5}
+                />
+                <span className="text-sm text-muted-foreground">%</span>
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Sale Costs</Label>
+              <div className="flex items-center gap-1">
+                <Input
+                  type="number"
+                  className="h-8 text-sm text-right"
+                  placeholder="2"
+                  value={fundFields.saleCostsPct}
+                  onChange={(e) => setFundFields((p) => ({ ...p, saleCostsPct: e.target.value }))}
+                  min={0}
+                  max={20}
+                  step={0.25}
+                />
+                <span className="text-sm text-muted-foreground">%</span>
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Hold Period</Label>
+              <div className="flex items-center gap-1">
+                <Input
+                  type="number"
+                  className="h-8 text-sm text-right"
+                  placeholder="7"
+                  value={fundFields.holdPeriod}
+                  onChange={(e) => setFundFields((p) => ({ ...p, holdPeriod: e.target.value }))}
+                  min={1}
+                  max={30}
+                  step={1}
+                />
+                <span className="text-sm text-muted-foreground">yr</span>
+              </div>
+            </div>
+          </div>
+          <div className="mt-3 flex justify-end">
+            <Button
+              size="sm"
+              onClick={() => fundAssumptionsMutation.mutate(fundFields)}
+              disabled={fundAssumptionsMutation.isPending}
+            >
+              <Save className="h-3 w-3 mr-1" />
+              {fundAssumptionsMutation.isPending ? 'Saving…' : 'Save Assumptions'}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Partner Configuration */}
       <Card>
         <CardHeader className="pb-3">

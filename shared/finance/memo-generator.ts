@@ -14,10 +14,34 @@
  * Optional AI-enhanced mode can be layered on top later.
  */
 
-import type { ScenarioResult, ExpectedCaseResult } from '../../server/services/dcf-scenario-layer';
 import type { DistributionStats, RiskMetrics } from './distributions';
 import type { TornadoResult } from './tornado';
 import type { AttributionResult } from './attribution';
+
+// Inlined from server/services/dcf-scenario-layer.ts to keep `shared` self-contained.
+// Keep these in sync with the exports there.
+export interface ScenarioResult {
+  name: string;
+  irr: number;
+  leveredIrr: number;
+  equityMultiple: number;
+  npv: number;
+  terminalValue: number;
+  netSaleProceeds: number;
+  cashFlows: Array<{ date: string | Date; amount: number; [key: string]: unknown }>;
+  overridesApplied: unknown;
+}
+
+export interface ExpectedCaseResult {
+  expectedIRR: number;
+  expectedEM: number;
+  expectedNPV: number;
+  expectedTerminalValue: number;
+  expectedNetSaleProceeds: number;
+  probIRRBelowHurdle: number;
+  probLosingMoney: number;
+  weights: { base: number; upside: number; downside: number };
+}
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 

@@ -48,7 +48,7 @@ export type ComputeGainCharacter = (
   basisLedger: BasisLedgerOutput,
 ) => GainCharacterization;
 
-export type ResolveStrategyInteractions = (
+export type OrchestratorResolveStrategyInteractions = (
   input: ExitScenarioInput
 ) => StrategyInteractionPolicy;
 

@@ -1,9 +1,21 @@
 import { eq, and } from "drizzle-orm";
 import { users, contacts, organizations } from "./schema";
 import type { User, Contact } from "./schema";
-import type { db } from "../server/db";
 
-type Database = typeof db;
+// Structural type for the drizzle pool used by these helpers. Avoids importing
+// from `server/` (a layering violation) — only the .query accessors are needed.
+type Database = {
+  query: {
+    users: {
+      findFirst: (args: any) => Promise<any>;
+      findMany: (args: any) => Promise<any[]>;
+    };
+    contacts: {
+      findFirst: (args: any) => Promise<any>;
+      findMany: (args: any) => Promise<any[]>;
+    };
+  };
+};
 
 /**
  * Recipient resolution utilities for notification system
