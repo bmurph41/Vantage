@@ -85,19 +85,18 @@ export async function syncLeaseRollupToAssumptions(
       console.warn('[CommercialLeaseEngine] Batch upsert failed, falling back to individual:', batchErr);
       for (const v of values) {
         try {
-          const existing = await db.select()
-            .from(asmpCommercialTenants)
-            .where(and(
-              eq(asmpCommercialTenants.projectId, projectId),
-              eq(asmpCommercialTenants.periodMonth, v.periodMonth)
-            ));
-          if (existing.length > 0) {
-            await db.update(asmpCommercialTenants)
-              .set({ totalRevenue: v.totalRevenue, tenantCount: v.tenantCount, occupancyPct: v.occupancyPct, avgRentPerSqft: v.avgRentPerSqft, updatedAt: v.updatedAt })
-              .where(and(eq(asmpCommercialTenants.projectId, projectId), eq(asmpCommercialTenants.periodMonth, v.periodMonth)));
-          } else {
-            await db.insert(asmpCommercialTenants).values(v);
-          }
+          await db.insert(asmpCommercialTenants)
+            .values(v)
+            .onConflictDoUpdate({
+              target: [asmpCommercialTenants.projectId, asmpCommercialTenants.periodMonth],
+              set: {
+                totalRevenue: v.totalRevenue,
+                tenantCount: v.tenantCount,
+                occupancyPct: v.occupancyPct,
+                avgRentPerSqft: v.avgRentPerSqft,
+                updatedAt: v.updatedAt
+              }
+            });
           synced++;
         } catch (e) {
           console.error(`[CommercialLeaseEngine] Failed to sync month ${v.periodMonth}:`, e);

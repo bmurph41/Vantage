@@ -1396,21 +1396,14 @@ router.post('/projects/:projectId/assumptions/fuel/bulk', async (req: Request, r
     
     const results = [];
     for (const row of rows) {
-      const existing = await db.select()
-        .from(asmpFuel)
-        .where(and(eq(asmpFuel.projectId, projectId), eq(asmpFuel.periodMonth, row.periodMonth)));
-      
       let result;
-      if (existing.length > 0) {
-        [result] = await db.update(asmpFuel)
-          .set({ ...row, updatedAt: new Date() })
-          .where(and(eq(asmpFuel.projectId, projectId), eq(asmpFuel.periodMonth, row.periodMonth)))
-          .returning();
-      } else {
-        [result] = await db.insert(asmpFuel)
-          .values({ ...row, projectId, orgId })
-          .returning();
-      }
+      [result] = await db.insert(asmpFuel)
+        .values({ ...row, projectId, orgId })
+        .onConflictDoUpdate({
+          target: [asmpFuel.projectId, asmpFuel.periodMonth],
+          set: { ...row, updatedAt: new Date() }
+        })
+        .returning();
       results.push(result);
     }
     
@@ -1455,21 +1448,14 @@ router.post('/projects/:projectId/assumptions/ship-store/bulk', async (req: Requ
     
     const results = [];
     for (const row of rows) {
-      const existing = await db.select()
-        .from(asmpShipStore)
-        .where(and(eq(asmpShipStore.projectId, projectId), eq(asmpShipStore.periodMonth, row.periodMonth)));
-      
       let result;
-      if (existing.length > 0) {
-        [result] = await db.update(asmpShipStore)
-          .set({ ...row, updatedAt: new Date() })
-          .where(and(eq(asmpShipStore.projectId, projectId), eq(asmpShipStore.periodMonth, row.periodMonth)))
-          .returning();
-      } else {
-        [result] = await db.insert(asmpShipStore)
-          .values({ ...row, projectId, orgId })
-          .returning();
-      }
+      [result] = await db.insert(asmpShipStore)
+        .values({ ...row, projectId, orgId })
+        .onConflictDoUpdate({
+          target: [asmpShipStore.projectId, asmpShipStore.periodMonth],
+          set: { ...row, updatedAt: new Date() }
+        })
+        .returning();
       results.push(result);
     }
     
@@ -1512,20 +1498,14 @@ router.post('/projects/:projectId/assumptions/service/bulk', async (req: Request
     const { rows } = req.body;
     const results = [];
     for (const row of rows) {
-      const existing = await db.select()
-        .from(asmpService)
-        .where(and(eq(asmpService.projectId, projectId), eq(asmpService.periodMonth, row.periodMonth)));
       let result;
-      if (existing.length > 0) {
-        [result] = await db.update(asmpService)
-          .set({ ...row, updatedAt: new Date() })
-          .where(and(eq(asmpService.projectId, projectId), eq(asmpService.periodMonth, row.periodMonth)))
-          .returning();
-      } else {
-        [result] = await db.insert(asmpService)
-          .values({ ...row, projectId, orgId })
-          .returning();
-      }
+      [result] = await db.insert(asmpService)
+        .values({ ...row, projectId, orgId })
+        .onConflictDoUpdate({
+          target: [asmpService.projectId, asmpService.periodMonth],
+          set: { ...row, updatedAt: new Date() }
+        })
+        .returning();
       results.push(result);
     }
     res.json(results);
@@ -1567,20 +1547,14 @@ router.post('/projects/:projectId/assumptions/commercial-tenants/bulk', async (r
     const { rows } = req.body;
     const results = [];
     for (const row of rows) {
-      const existing = await db.select()
-        .from(asmpCommercialTenants)
-        .where(and(eq(asmpCommercialTenants.projectId, projectId), eq(asmpCommercialTenants.periodMonth, row.periodMonth)));
       let result;
-      if (existing.length > 0) {
-        [result] = await db.update(asmpCommercialTenants)
-          .set({ ...row, updatedAt: new Date() })
-          .where(and(eq(asmpCommercialTenants.projectId, projectId), eq(asmpCommercialTenants.periodMonth, row.periodMonth)))
-          .returning();
-      } else {
-        [result] = await db.insert(asmpCommercialTenants)
-          .values({ ...row, projectId, orgId })
-          .returning();
-      }
+      [result] = await db.insert(asmpCommercialTenants)
+        .values({ ...row, projectId, orgId })
+        .onConflictDoUpdate({
+          target: [asmpCommercialTenants.projectId, asmpCommercialTenants.periodMonth],
+          set: { ...row, updatedAt: new Date() }
+        })
+        .returning();
       results.push(result);
     }
     res.json(results);
@@ -1622,20 +1596,14 @@ router.post('/projects/:projectId/assumptions/boat-rentals/bulk', async (req: Re
     const { rows } = req.body;
     const results = [];
     for (const row of rows) {
-      const existing = await db.select()
-        .from(asmpBoatRentals)
-        .where(and(eq(asmpBoatRentals.projectId, projectId), eq(asmpBoatRentals.periodMonth, row.periodMonth)));
       let result;
-      if (existing.length > 0) {
-        [result] = await db.update(asmpBoatRentals)
-          .set({ ...row, updatedAt: new Date() })
-          .where(and(eq(asmpBoatRentals.projectId, projectId), eq(asmpBoatRentals.periodMonth, row.periodMonth)))
-          .returning();
-      } else {
-        [result] = await db.insert(asmpBoatRentals)
-          .values({ ...row, projectId, orgId })
-          .returning();
-      }
+      [result] = await db.insert(asmpBoatRentals)
+        .values({ ...row, projectId, orgId })
+        .onConflictDoUpdate({
+          target: [asmpBoatRentals.projectId, asmpBoatRentals.periodMonth],
+          set: { ...row, updatedAt: new Date() }
+        })
+        .returning();
       results.push(result);
     }
     res.json(results);
@@ -1677,20 +1645,14 @@ router.post('/projects/:projectId/assumptions/boat-club/bulk', async (req: Reque
     const { rows } = req.body;
     const results = [];
     for (const row of rows) {
-      const existing = await db.select()
-        .from(asmpBoatClub)
-        .where(and(eq(asmpBoatClub.projectId, projectId), eq(asmpBoatClub.periodMonth, row.periodMonth)));
       let result;
-      if (existing.length > 0) {
-        [result] = await db.update(asmpBoatClub)
-          .set({ ...row, updatedAt: new Date() })
-          .where(and(eq(asmpBoatClub.projectId, projectId), eq(asmpBoatClub.periodMonth, row.periodMonth)))
-          .returning();
-      } else {
-        [result] = await db.insert(asmpBoatClub)
-          .values({ ...row, projectId, orgId })
-          .returning();
-      }
+      [result] = await db.insert(asmpBoatClub)
+        .values({ ...row, projectId, orgId })
+        .onConflictDoUpdate({
+          target: [asmpBoatClub.projectId, asmpBoatClub.periodMonth],
+          set: { ...row, updatedAt: new Date() }
+        })
+        .returning();
       results.push(result);
     }
     res.json(results);
@@ -1732,20 +1694,14 @@ router.post('/projects/:projectId/assumptions/boat-sales/bulk', async (req: Requ
     const { rows } = req.body;
     const results = [];
     for (const row of rows) {
-      const existing = await db.select()
-        .from(asmpBoatSales)
-        .where(and(eq(asmpBoatSales.projectId, projectId), eq(asmpBoatSales.periodMonth, row.periodMonth)));
       let result;
-      if (existing.length > 0) {
-        [result] = await db.update(asmpBoatSales)
-          .set({ ...row, updatedAt: new Date() })
-          .where(and(eq(asmpBoatSales.projectId, projectId), eq(asmpBoatSales.periodMonth, row.periodMonth)))
-          .returning();
-      } else {
-        [result] = await db.insert(asmpBoatSales)
-          .values({ ...row, projectId, orgId })
-          .returning();
-      }
+      [result] = await db.insert(asmpBoatSales)
+        .values({ ...row, projectId, orgId })
+        .onConflictDoUpdate({
+          target: [asmpBoatSales.projectId, asmpBoatSales.periodMonth],
+          set: { ...row, updatedAt: new Date() }
+        })
+        .returning();
       results.push(result);
     }
     res.json(results);
@@ -1787,20 +1743,14 @@ router.post('/projects/:projectId/assumptions/bookkeeping/bulk', async (req: Req
     const { rows } = req.body;
     const results = [];
     for (const row of rows) {
-      const existing = await db.select()
-        .from(asmpBookkeeping)
-        .where(and(eq(asmpBookkeeping.projectId, projectId), eq(asmpBookkeeping.periodMonth, row.periodMonth)));
       let result;
-      if (existing.length > 0) {
-        [result] = await db.update(asmpBookkeeping)
-          .set({ ...row, updatedAt: new Date() })
-          .where(and(eq(asmpBookkeeping.projectId, projectId), eq(asmpBookkeeping.periodMonth, row.periodMonth)))
-          .returning();
-      } else {
-        [result] = await db.insert(asmpBookkeeping)
-          .values({ ...row, projectId, orgId })
-          .returning();
-      }
+      [result] = await db.insert(asmpBookkeeping)
+        .values({ ...row, projectId, orgId })
+        .onConflictDoUpdate({
+          target: [asmpBookkeeping.projectId, asmpBookkeeping.periodMonth],
+          set: { ...row, updatedAt: new Date() }
+        })
+        .returning();
       results.push(result);
     }
     res.json(results);
@@ -1899,28 +1849,23 @@ router.post('/projects/:projectId/import-actuals', async (req: Request, res: Res
         const periodMonth = row.month;
         monthsAffected.add(periodMonth);
         
-        if (overwrite) {
-          await db.delete(asmpFuel)
-            .where(and(eq(asmpFuel.projectId, projectId), eq(asmpFuel.periodMonth, periodMonth)));
-        }
-        
-        const existing = await db.select().from(asmpFuel)
-          .where(and(eq(asmpFuel.projectId, projectId), eq(asmpFuel.periodMonth, periodMonth)));
-        
-        if (existing.length === 0) {
-          await db.insert(asmpFuel).values({
-            projectId,
-            orgId,
-            periodMonth,
-            gallons: row.gallons,
-            revenue: row.revenue,
-            cogs: row.cogs,
-            grossProfit: String(Number(row.revenue) - Number(row.cogs)),
-            importedAt: new Date(),
-            importSource: 'ACTUALS'
+        const fuelInsert = {
+          projectId,
+          orgId,
+          periodMonth,
+          gallons: row.gallons,
+          revenue: row.revenue,
+          cogs: row.cogs,
+          grossProfit: String(Number(row.revenue) - Number(row.cogs)),
+          importedAt: new Date(),
+          importSource: 'ACTUALS' as const,
+        };
+        await db.insert(asmpFuel).values(fuelInsert)
+          .onConflictDoUpdate({
+            target: [asmpFuel.projectId, asmpFuel.periodMonth],
+            set: { ...fuelInsert, updatedAt: new Date() }
           });
-          rowsWritten++;
-        }
+        rowsWritten++;
       }
     }
     
@@ -1942,28 +1887,23 @@ router.post('/projects/:projectId/import-actuals', async (req: Request, res: Res
         const periodMonth = row.month;
         monthsAffected.add(periodMonth);
         
-        if (overwrite) {
-          await db.delete(asmpShipStore)
-            .where(and(eq(asmpShipStore.projectId, projectId), eq(asmpShipStore.periodMonth, periodMonth)));
-        }
-        
-        const existing = await db.select().from(asmpShipStore)
-          .where(and(eq(asmpShipStore.projectId, projectId), eq(asmpShipStore.periodMonth, periodMonth)));
-        
-        if (existing.length === 0) {
-          await db.insert(asmpShipStore).values({
-            projectId,
-            orgId,
-            periodMonth,
-            revenue: row.revenue,
-            cogs: row.cogs,
-            grossProfit: String(Number(row.revenue) - Number(row.cogs)),
-            txnCount: row.txnCount,
-            importedAt: new Date(),
-            importSource: 'ACTUALS'
+        const storeInsert = {
+          projectId,
+          orgId,
+          periodMonth,
+          revenue: row.revenue,
+          cogs: row.cogs,
+          grossProfit: String(Number(row.revenue) - Number(row.cogs)),
+          txnCount: row.txnCount,
+          importedAt: new Date(),
+          importSource: 'ACTUALS' as const,
+        };
+        await db.insert(asmpShipStore).values(storeInsert)
+          .onConflictDoUpdate({
+            target: [asmpShipStore.projectId, asmpShipStore.periodMonth],
+            set: { ...storeInsert, updatedAt: new Date() }
           });
-          rowsWritten++;
-        }
+        rowsWritten++;
       }
     }
 
