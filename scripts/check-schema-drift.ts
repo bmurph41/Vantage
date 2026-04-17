@@ -9,6 +9,9 @@
  *                        declared in shared/schema.ts (orphan / reverse drift).
  *   • Extra tables     — entire tables that exist in the live database but have
  *                        no corresponding Drizzle definition (phantom/stale tables).
+ *   • Extra indexes    — named indexes present in the live database for a
+ *                        schema-defined table that are no longer declared in the
+ *                        Drizzle schema (orphan / stale indexes).
  *
  * Usage:
  *   npm run check:schema
@@ -72,7 +75,8 @@ async function main(): Promise<void> {
       `  • MISSING COLUMN/TABLE warnings indicate schema-defined items absent from the DB.\n` +
       `  • EXTRA COLUMN warnings indicate orphan DB columns not declared in the schema.\n` +
       `  • EXTRA TABLE warnings indicate entire DB tables with no Drizzle schema definition.\n` +
-      `  • MISSING INDEX warnings indicate named indexes declared in schema but absent from the DB.`
+      `  • MISSING INDEX warnings indicate named indexes declared in schema but absent from the DB.\n` +
+      `  • EXTRA INDEX warnings indicate indexes in the DB for a schema-defined table that are no longer declared in the schema.`
   );
   console.error(
     `\nFor missing columns/tables, run the following to generate ready-to-paste migration stubs:\n\n` +
@@ -81,7 +85,9 @@ async function main(): Promise<void> {
       `For missing indexes, apply a CREATE INDEX migration matching the declared index name.\n` +
       `For extra/orphan columns, review whether a DROP COLUMN migration is needed.\n` +
       `For extra/phantom tables (EXTRA TABLE), review whether a DROP TABLE migration is needed\n` +
-      `or add a matching Drizzle table definition to the schema.\n`
+      `or add a matching Drizzle table definition to the schema.\n` +
+      `For extra/orphan indexes (EXTRA INDEX), review whether a DROP INDEX migration is needed\n` +
+      `or add the index back to the Drizzle schema if it should still exist.\n`
   );
   console.log(DIVIDER);
   process.exit(1);
