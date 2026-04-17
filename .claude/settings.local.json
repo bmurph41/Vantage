@@ -239,7 +239,8 @@
       "Bash(/usr/bin/time -v env NODE_OPTIONS=--max-old-space-size=6144 npx tsc -p /tmp/shared-tsconfig-test.json)",
       "Bash(env NODE_OPTIONS=--max-old-space-size=6144 npx tsc -p /tmp/shared-tsconfig-test.json)",
       "Bash(env NODE_OPTIONS=--max-old-space-size=6144 npx tsc -p tsconfig.shared-test.json)",
-      "Bash(echo \"REAL_EXIT=$?\")"
+      "Bash(echo \"REAL_EXIT=$?\")",
+      "Bash(xargs -I{} echo {})"
     ]
   }
 }
