@@ -16541,17 +16541,76 @@ const MIGRATIONS: Migration[] = [
 
 ];
 
+/**
+ * Regex that matches the two common simple-column stub forms:
+ *   ALTER TABLE <tbl> ADD COLUMN IF NOT EXISTS <col> <type…>
+ * Groups: 1 = table_name, 2 = column_name
+ */
+const ADD_COLUMN_RE =
+  /^\s*ALTER\s+TABLE\s+(\w+)\s+ADD\s+COLUMN\s+IF\s+NOT\s+EXISTS\s+"?(\w+)"?\s/i;
+
 export async function runStartupMigrations(): Promise<void> {
+  const startTime = Date.now();
+  /** Migrations that ran but produced an unexpected DB error (not "already exists"/"cannot be cast"). */
+  let failed = 0;
+  let skipped = 0;
+
+  console.log(`[startup-migrations] Running ${MIGRATIONS.length} idempotent migrations…`);
+
+  // ── Fast-path: bulk-load every existing column from information_schema ──────
+  // This one round-trip lets us skip the vast majority of ADD COLUMN stubs
+  // that are already in place, without executing thousands of no-op ALTER TABLE
+  // statements (each of which costs a full DB round-trip).
+  //
+  // The pre-check is intentionally narrow: ADD_COLUMN_RE only matches simple
+  //   ALTER TABLE <tbl> ADD COLUMN IF NOT EXISTS <col> <type>
+  // statements. Complex migrations (DO $$ blocks, CREATE TABLE, CREATE TYPE,
+  // enum→text conversions, etc.) will NOT match and always execute normally.
+  const existingCols = new Set<string>();
+  try {
+    const { rows } = await pool.query<{ table_name: string; column_name: string }>(
+      `SELECT table_name, column_name
+         FROM information_schema.columns
+        WHERE table_schema = 'public'`
+    );
+    for (const { table_name, column_name } of rows) {
+      existingCols.add(`${table_name}.${column_name}`);
+    }
+  } catch (err) {
+    // If the pre-check fails, fall through and run every migration normally.
+    console.warn(`[startup-migrations] Pre-check query failed (${err}); running all migrations sequentially`);
+  }
+
   for (const { name, sql } of MIGRATIONS) {
+    // ── Skip simple ADD COLUMN stubs whose column already exists ────────────
+    const match = ADD_COLUMN_RE.exec(sql);
+    if (match && existingCols.has(`${match[1]}.${match[2]}`)) {
+      skipped++;
+      continue;
+    }
+
     try {
       await pool.query(sql);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      // Ignore "already exists" or "cannot be cast" (migration already applied)
+      // Ignore "already exists" or "cannot be cast" — these are idempotency
+      // side-effects meaning the migration was already applied.
       if (!msg.includes("already exists") && !msg.includes("cannot be cast")) {
-        console.warn(`[startup-migrations] Warning applying "${name}": ${msg}`);
+        console.warn(`[startup-migrations] Failed to apply "${name}": ${msg}`);
+        failed++;
       }
     }
   }
-  console.log(`[startup-migrations] Applied ${MIGRATIONS.length} idempotent migrations`);
+
+  const executed = MIGRATIONS.length - skipped;
+  const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
+  const summary =
+    `${MIGRATIONS.length} migrations in ${elapsed}s ` +
+    `(${skipped} skipped via pre-check, ${executed} executed, ${failed} failed)`;
+
+  if (failed > 0) {
+    console.warn(`[startup-migrations] Completed ${summary}`);
+  } else {
+    console.log(`[startup-migrations] Completed ${summary}`);
+  }
 }
