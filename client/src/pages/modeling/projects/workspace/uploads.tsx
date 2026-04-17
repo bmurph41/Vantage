@@ -105,6 +105,13 @@ interface PnlImportResult {
   message: string;
 }
 
+interface RentRollSyncResult {
+  rentRollId: string;
+  entriesCreated: number;
+  skippedRows: number;
+  headerMapping: Record<string, string>;
+}
+
 interface PnlJobStatus {
   job: {
     id: string;
@@ -155,6 +162,7 @@ export default function WorkspaceUploads({ projectId, onTabChange }: WorkspaceUp
   const [vdrSectionOpen, setVdrSectionOpen] = useState(true);
   const [importingDocId, setImportingDocId] = useState<string | null>(null);
   const [syncingUploadId, setSyncingUploadId] = useState<string | null>(null);
+  const [syncingRentRollId, setSyncingRentRollId] = useState<string | null>(null);
   const [seasonalModalUpload, setSeasonalModalUpload] = useState<{id:string;name:string;depts:string[]} | null>(null);
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
   const [processingMessageIndex, setProcessingMessageIndex] = useState(0);
@@ -305,6 +313,41 @@ export default function WorkspaceUploads({ projectId, onTabChange }: WorkspaceUp
     },
   });
 
+  // ─── NEW: Rent Roll sync mutation ───────────────────────────────────────────
+  const rentRollSyncMutation = useMutation({
+    mutationFn: async (uploadId: string): Promise<RentRollSyncResult> => {
+      const res = await apiRequest(
+        'POST',
+        `/api/modeling/projects/${projectId}/rent-roll-sync`,
+        { uploadId },
+      );
+      return res.json();
+    },
+    onMutate: (uploadId: string) => {
+      setSyncingRentRollId(uploadId);
+    },
+    onSuccess: (data) => {
+      setSyncingRentRollId(null);
+      toast({
+        title: '✅ Rent Roll Synced',
+        description: `${data.entriesCreated} entries created${
+          data.skippedRows > 0 ? `, ${data.skippedRows} rows skipped` : ''
+        }.`,
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'documents'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'rent-roll'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/rent-rolls'] });
+    },
+    onError: (error: any) => {
+      setSyncingRentRollId(null);
+      toast({
+        title: 'Rent Roll Sync Failed',
+        description: error?.message ?? 'Failed to sync rent roll.',
+        variant: 'destructive',
+      });
+    },
+  });
+
   // ─── Handlers ──────────────────────────────────────────────────────────────
 
   const handleDeleteClick = (upload: UploadWithStats) => {
@@ -332,6 +375,14 @@ export default function WorkspaceUploads({ projectId, onTabChange }: WorkspaceUp
   const handleSyncToModel = (uploadId: string) => {
     pnlImportMutation.mutate(uploadId);
   };
+
+  const handleSyncRentRoll = (uploadId: string) => {
+    rentRollSyncMutation.mutate(uploadId);
+  };
+
+  const isRentRollSyncable = (upload: UploadWithStats) =>
+    upload.docType === 'rent_roll' &&
+    !(upload.rentRollSubType && STORAGE_RENT_ROLL_SUB_TYPES.has(upload.rentRollSubType));
 
   // ─── Status helpers ─────────────────────────────────────────────────────────
 
@@ -530,6 +581,9 @@ export default function WorkspaceUploads({ projectId, onTabChange }: WorkspaceUp
                 const confirmedCount = upload.stats?.confirmed ?? 0;
                 const alreadySynced = (upload.stats?.imported ?? 0) >= confirmedCount && confirmedCount > 0;
                 const canSync = isPnlType && confirmedCount > 0 && (upload.status === 'parsed' || upload.status === 'reviewing' || upload.status === 'completed');
+                const isRentRollType = isRentRollSyncable(upload);
+                const isSyncingRentRoll = syncingRentRollId === upload.id;
+                const canSyncRentRoll = isRentRollType && (upload.status === 'parsed' || upload.status === 'reviewing' || upload.status === 'completed');
 
                 return (
                   <div
@@ -624,6 +678,23 @@ export default function WorkspaceUploads({ projectId, onTabChange }: WorkspaceUp
                           {alreadySynced ? 'Re-sync to Model' : 'Sync to Model'}
                         </Button>
                       )}
+                      {/* ── NEW: Sync Rent Roll button ── */}
+                      {canSyncRentRoll && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="gap-1.5 border-teal-300 text-teal-700 hover:bg-teal-50 dark:border-teal-800 dark:text-teal-400"
+                          onClick={() => handleSyncRentRoll(upload.id)}
+                          disabled={isSyncingRentRoll || rentRollSyncMutation.isPending}
+                          data-testid={`button-sync-rent-roll-${upload.id}`}
+                        >
+                          {isSyncingRentRoll ? (
+                            <><Loader2 className="h-3.5 w-3.5 animate-spin" />Syncing Rent Roll...</>
+                          ) : (
+                            <><Zap className="h-3.5 w-3.5" />Sync Rent Roll</>
+                          )}
+                        </Button>
+                      )}
                       <Button
                         variant="ghost"
                         size="sm"
@@ -659,6 +730,8 @@ export default function WorkspaceUploads({ projectId, onTabChange }: WorkspaceUp
               {completedUploads.map((upload) => {
                 const isPnlType = PNL_DOC_TYPES.has(upload.docType ?? '');
                 const isSyncing = syncingUploadId === upload.id;
+                const isRentRollType = isRentRollSyncable(upload);
+                const isSyncingRentRoll = syncingRentRollId === upload.id;
 
                 return (
                   <div
@@ -695,6 +768,23 @@ export default function WorkspaceUploads({ projectId, onTabChange }: WorkspaceUp
                             <><Loader2 className="h-3.5 w-3.5 animate-spin" />Syncing...</>
                           ) : (
                             <><Zap className="h-3.5 w-3.5" />Re-sync to Model</>
+                          )}
+                        </Button>
+                      )}
+                      {/* ── NEW: Re-sync Rent Roll ── */}
+                      {isRentRollType && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-1.5 border-teal-300 text-teal-700 hover:bg-teal-50 dark:border-teal-800 dark:text-teal-400"
+                          onClick={() => handleSyncRentRoll(upload.id)}
+                          disabled={isSyncingRentRoll || rentRollSyncMutation.isPending}
+                          data-testid={`button-resync-rent-roll-${upload.id}`}
+                        >
+                          {isSyncingRentRoll ? (
+                            <><Loader2 className="h-3.5 w-3.5 animate-spin" />Syncing...</>
+                          ) : (
+                            <><Zap className="h-3.5 w-3.5" />Re-sync Rent Roll</>
                           )}
                         </Button>
                       )}
