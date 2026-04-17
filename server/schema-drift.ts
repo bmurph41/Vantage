@@ -14,20 +14,28 @@
  *  - Idempotent: safe to call multiple times.
  *  - Non-blocking: a DB timeout or unavailability skips the check gracefully.
  *  - Read-only: never modifies the database.
+ *
+ * Schema coverage:
+ *  - Always includes shared/schema.ts (primary schema).
+ *  - Automatically includes every secondary schema via db/schema-index.ts, which is
+ *    a generated barrel re-exporting all db/schema-*.ts files. When a new secondary
+ *    schema file is added, run `npx tsx scripts/sync-schema-index.ts` (or run the
+ *    generate-startup-migrations script, which does this automatically) to keep the
+ *    barrel up to date. No edits to this file are ever required.
  */
 
 import { is } from "drizzle-orm";
 import { PgTable, getTableConfig } from "drizzle-orm/pg-core";
 import { pool } from "./db";
 import * as schema from "@shared/schema";
-import * as commercialTenantsSchema from "../db/schema-commercial-tenants";
+import * as secondarySchemas from "../db/schema-index";
 
 const PREFIX = "[schema-drift]";
 
 /** All schema sources merged into one flat object for drift inspection. */
 const allSchemas: Record<string, unknown> = {
   ...schema,
-  ...commercialTenantsSchema,
+  ...secondarySchemas,
 };
 
 /** How long (ms) the entire DB round-trip is allowed to take. */

@@ -47,6 +47,26 @@ jobs:
       - run: npm ci
       - run: npm audit --audit-level=high || true
 
+  check-schema-index:
+    name: Schema Index Freshness
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+      - run: npm ci
+      - name: Verify db/schema-index.ts is up to date
+        run: |
+          echo "Regenerating db/schema-index.ts from db/schema-*.ts files..."
+          npx tsx scripts/sync-schema-index.ts
+          if ! git diff --exit-code db/schema-index.ts; then
+            echo "::error::db/schema-index.ts is stale. Run 'npx tsx scripts/sync-schema-index.ts' and commit the result."
+            exit 1
+          fi
+          echo "db/schema-index.ts is up to date."
+
   check-migration-stubs:
     name: Migration Stub Coverage
     runs-on: ubuntu-latest
@@ -88,7 +108,7 @@ jobs:
   build:
     name: Build
     runs-on: ubuntu-latest
-    needs: [lint-and-typecheck, test, check-migration-stubs, schema-drift]
+    needs: [lint-and-typecheck, test, check-schema-index, check-migration-stubs, schema-drift]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

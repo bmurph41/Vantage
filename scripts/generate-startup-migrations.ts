@@ -5,10 +5,13 @@
  * Usage:
  *   npx tsx scripts/generate-startup-migrations.ts
  *
- * The script compares every table and column defined across all schema sources
- * (shared/schema.ts, db/schema-commercial-tenants.ts) against the entries already
- * present in server/db-startup-migrations.ts and prints ready-to-paste migration
- * stubs for anything that is not yet covered.
+ * The script:
+ *  1. Scans db/schema-*.ts files and regenerates db/schema-index.ts so that
+ *     the barrel stays current for server-side bundling (no manual edits needed).
+ *  2. Compares every table and column defined across all schema sources
+ *     (shared/schema.ts plus every discovered db/schema-*.ts) against the
+ *     entries already present in server/db-startup-migrations.ts and prints
+ *     ready-to-paste migration stubs for anything not yet covered.
  *
  * It does NOT write to db-startup-migrations.ts automatically — it prints stubs
  * to stdout so a developer can review and paste them in at the appropriate place.
@@ -18,25 +21,96 @@
  *   1 — at least one table or column lacks a migration stub
  */
 
-import { readFileSync } from "fs";
-import { resolve, dirname } from "path";
+import { readFileSync, readdirSync, writeFileSync } from "fs";
+import { resolve, join, dirname, basename } from "path";
 import { fileURLToPath } from "url";
 import { is } from "drizzle-orm";
 import { PgTable, getTableConfig } from "drizzle-orm/pg-core";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+const dbDir = resolve(__dirname, "../db");
 
-// ─── 1. Load schema ───────────────────────────────────────────────────────────
+// ─── 1. Discover db/schema-*.ts files ─────────────────────────────────────────
+
+let dbEntries: string[] = [];
+try {
+  dbEntries = readdirSync(dbDir);
+} catch {
+  // db/ directory doesn't exist — nothing extra to load.
+}
+
+const schemaFiles = dbEntries
+  .filter((f) => f.startsWith("schema-") && f.endsWith(".ts") && f !== "schema-index.ts")
+  .sort();
+
+// ─── 2. Regenerate db/schema-index.ts ─────────────────────────────────────────
+//
+// Keeps the static barrel that server/schema-drift.ts (and the esbuild bundle)
+// rely on in sync with the current set of secondary schema files.
+
+function generateBarrelContent(files: string[]): string {
+  const header = `/**
+ * AUTO-GENERATED — do not edit manually.
+ *
+ * Re-exports every secondary schema defined in db/schema-*.ts so that
+ * server-side modules can import them with a single static import that
+ * esbuild (and tsc) can analyse and bundle at build time.
+ *
+ * To regenerate after adding a new db/schema-*.ts file, run:
+ *   npx tsx scripts/sync-schema-index.ts
+ *
+ * The generate-startup-migrations script also regenerates this file
+ * automatically whenever it is executed.
+ */\n`;
+
+  if (files.length === 0) {
+    return header + "\n// No secondary schema files found.\n";
+  }
+
+  const exports = files
+    .map((f) => `export * from "./${basename(f, ".ts")}";`)
+    .join("\n");
+
+  return header + "\n" + exports + "\n";
+}
+
+const indexPath = join(dbDir, "schema-index.ts");
+const newIndexContent = generateBarrelContent(schemaFiles);
+let existingIndexContent = "";
+try {
+  existingIndexContent = readFileSync(indexPath, "utf8");
+} catch {
+  // File doesn't exist yet.
+}
+
+if (newIndexContent !== existingIndexContent) {
+  writeFileSync(indexPath, newIndexContent, "utf8");
+  console.log(
+    `[generate-migrations] Updated db/schema-index.ts (${schemaFiles.length} secondary schema file(s) covered).`
+  );
+}
+
+// ─── 3. Load all schemas ───────────────────────────────────────────────────────
 
 // tsx resolves TypeScript imports natively; use relative paths without aliases.
 const schema = await import("../shared/schema");
-const commercialTenantsSchema = await import("../db/schema-commercial-tenants");
 
 /** All schema sources merged into one flat object. */
-const allSchemas: Record<string, unknown> = {
-  ...schema,
-  ...commercialTenantsSchema,
-};
+const allSchemas: Record<string, unknown> = { ...schema };
+
+for (const file of schemaFiles) {
+  try {
+    const mod = await import(join(dbDir, file));
+    Object.assign(allSchemas, mod);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(
+      `[generate-migrations] FATAL: Could not load secondary schema "${file}": ${msg}\n` +
+        `  Fix the import error before running this script.`
+    );
+    process.exit(1);
+  }
+}
 
 interface TableDef {
   tableName: string;
@@ -60,7 +134,7 @@ function extractSchemaTables(): TableDef[] {
   return tables;
 }
 
-// ─── 2. Parse what is already covered in db-startup-migrations.ts ─────────────
+// ─── 4. Parse what is already covered in db-startup-migrations.ts ─────────────
 
 const migrationsFilePath = resolve(
   __dirname,
@@ -96,7 +170,7 @@ function parseCoveredItems(): {
   return { coveredColumns, coveredTables };
 }
 
-// ─── 3. Compare and generate stubs ───────────────────────────────────────────
+// ─── 5. Compare and generate stubs ───────────────────────────────────────────
 
 const schemaTables = extractSchemaTables();
 const { coveredColumns, coveredTables } = parseCoveredItems();
@@ -127,7 +201,7 @@ for (const { tableName, columns } of schemaTables) {
   }
 }
 
-// ─── 4. Report ────────────────────────────────────────────────────────────────
+// ─── 6. Report ────────────────────────────────────────────────────────────────
 
 if (missingCount === 0) {
   console.log(
