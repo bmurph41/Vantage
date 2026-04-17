@@ -436,11 +436,58 @@ app.use(ddChecklistRouter);
     // this serves both the API and the client.
     // It is the only port that is not firewalled.
     const port = parseInt(process.env.PORT || '5000', 10);
+
+    // ── Schema drift gate — runs BEFORE the server accepts any traffic ────────
+    // Applies startup migrations first so any pending DDL is resolved, then
+    // checks whether the live DB still drifts from the Drizzle schema.
+    // In production a non-zero drift count is fatal: it blocks startup so a
+    // broken schema can never reach live traffic.  In development it warns but
+    // allows the server to start so local iteration is not disrupted.
+    try {
+      await runStartupMigrations();
+      const driftCount = await runSchemaDriftCheck();
+      if (driftCount > 0) {
+        const isProduction = process.env.NODE_ENV === 'production';
+        if (isProduction) {
+          console.error(
+            `\n[schema-drift] ══════════════════════════════════════════════════════\n` +
+            `[schema-drift] FATAL: ${driftCount} schema drift issue(s) detected.\n` +
+            `[schema-drift] Deployment blocked to protect the live database.\n` +
+            `[schema-drift]\n` +
+            `[schema-drift] To fix:\n` +
+            `[schema-drift]   1. npx tsx scripts/generate-startup-migrations.ts\n` +
+            `[schema-drift]   2. Paste output into server/db-startup-migrations.ts\n` +
+            `[schema-drift]   3. Commit and redeploy.\n` +
+            `[schema-drift] ══════════════════════════════════════════════════════\n`
+          );
+          process.exit(1);
+        } else {
+          console.warn(
+            `[schema-drift] WARNING: ${driftCount} drift issue(s) found.\n` +
+            `[schema-drift]   This would block startup in production.\n` +
+            `[schema-drift]   Run: npx tsx scripts/generate-startup-migrations.ts`
+          );
+        }
+      }
+    } catch (driftErr: any) {
+      const isProduction = process.env.NODE_ENV === 'production';
+      if (isProduction) {
+        console.error(
+          `\n[schema-drift] FATAL: Pre-listen drift gate threw an unexpected error — blocking startup.\n` +
+          `[schema-drift]   ${driftErr.message}\n` +
+          `[schema-drift] Ensure DATABASE_URL is reachable and the migration scripts are valid.`
+        );
+        process.exit(1);
+      } else {
+        console.warn(`[schema-drift] Pre-listen check failed (continuing in dev): ${driftErr.message}`);
+      }
+    }
+
     // Start document export job processor
-import('./services/document-builder/export-job-processor').then(({ exportJobProcessor }) => {
-  exportJobProcessor.startProcessing(5000); // poll every 5s
-  console.log('[DocumentBuilder] Export job processor started');
-}).catch(err => console.warn('[DocumentBuilder] Export processor failed to start:', err.message));
+    import('./services/document-builder/export-job-processor').then(({ exportJobProcessor }) => {
+      exportJobProcessor.startProcessing(5000); // poll every 5s
+      console.log('[DocumentBuilder] Export job processor started');
+    }).catch(err => console.warn('[DocumentBuilder] Export processor failed to start:', err.message));
 
 server.listen({
       port,
@@ -529,10 +576,8 @@ server.listen({
         .then((packId) => log(`[COA] Marina taxonomy pack ready: ${packId}`))
         .catch((error) => log(`[COA] Failed to seed taxonomy: ${error}`));
 
-      // Run DB migrations first (enum→text, add columns), then drift check, then seed
-      runStartupMigrations()
-        .then(() => runSchemaDriftCheck())
-        .then(() => seedCanonicalAssetClasses())
+      // Seed canonical asset classes (migrations + drift check already ran pre-listen)
+      seedCanonicalAssetClasses()
         .then(() => console.log('[AssetClass] Canonical asset classes ready'))
         .catch((error) => console.error(`[AssetClass] Startup failed:`, error));
 
