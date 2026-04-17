@@ -4,6 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import { format } from "date-fns";
 import {
   Dialog,
   DialogContent,
@@ -33,7 +34,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Plus, Trash2, DollarSign, Building2, Percent } from "lucide-react";
+import { Loader2, Plus, Trash2, DollarSign, Building2, Percent, ShoppingCart } from "lucide-react";
 
 // ── Domain types ───────────────────────────────────────────────────────────────
 
@@ -339,6 +340,9 @@ export function TenantLeaseDialog({ open, onOpenChange, projectId, projectName, 
   const { fields: recoveryFields, append: appendRecovery, remove: removeRecovery } = useFieldArray({ control: form.control, name: "recoveries" });
   const { fields: concessionFields, append: appendConcession, remove: removeConcession } = useFieldArray({ control: form.control, name: "concessions" });
 
+  const [newSaleDate, setNewSaleDate] = useState("");
+  const [newSaleAmount, setNewSaleAmount] = useState("");
+
   useEffect(() => {
     if (leaseDetail && open) {
       const capex = leaseDetail.capexLeasing?.[0] ?? null;
@@ -512,6 +516,59 @@ export function TenantLeaseDialog({ open, onOpenChange, projectId, projectName, 
     },
   });
 
+  const { data: salesRecords = [], isLoading: salesLoading } = useQuery<Array<{ id: string; periodEndDate: string; grossSales: string }>>({
+    queryKey: ["/api/tenant-leases", lease?.id, "sales"],
+    enabled: isEditing && open,
+    queryFn: async () => {
+      const res = await fetch(`/api/tenant-leases/${lease!.id}/sales`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch sales data");
+      return res.json();
+    },
+  });
+
+  const addSaleMutation = useMutation({
+    mutationFn: async (data: { periodEndDate: string; grossSales: string }) => {
+      const res = await apiRequest("POST", `/api/tenant-leases/${lease!.id}/sales`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tenant-leases", lease?.id, "sales"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/valuator", projectId, "leases/kpis"] });
+      setNewSaleDate("");
+      setNewSaleAmount("");
+      toast({ title: "Success", description: "Sales entry added" });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error", description: err.message || "Failed to add sales entry", variant: "destructive" });
+    },
+  });
+
+  const deleteSaleMutation = useMutation({
+    mutationFn: async (saleId: string) => {
+      await apiRequest("DELETE", `/api/tenant-leases/${lease!.id}/sales/${saleId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tenant-leases", lease?.id, "sales"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/valuator", projectId, "leases/kpis"] });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error", description: err.message || "Failed to delete sales entry", variant: "destructive" });
+    },
+  });
+
+  const percentRentEnabled = form.watch("percentRentEnabled");
+  const overagePercentStr = form.watch("overagePercent");
+  const breakpointAnnualStr = form.watch("breakpointAmountAnnual");
+
+  function computeOverage(grossSalesStr: string): number {
+    const grossSales = parseFloat(grossSalesStr) || 0;
+    const overagePct = parseFloat(overagePercentStr || "0") || 0;
+    const breakpointAnnual = parseFloat(breakpointAnnualStr || "0") || 0;
+    if (!overagePct || !breakpointAnnual) return 0;
+    const monthlyBreakpoint = breakpointAnnual / 12;
+    return Math.max(0, grossSales - monthlyBreakpoint) * overagePct;
+  }
+
   const onSubmit = form.handleSubmit((values) => mutation.mutate(values));
 
   return (
@@ -530,13 +587,14 @@ export function TenantLeaseDialog({ open, onOpenChange, projectId, projectName, 
         <Form {...form}>
           <form onSubmit={onSubmit} className="flex flex-col flex-1 overflow-hidden">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col flex-1 overflow-hidden">
-              <TabsList className="grid grid-cols-6 w-full">
+              <TabsList className="grid grid-cols-7 w-full">
                 <TabsTrigger value="basic">Basic</TabsTrigger>
                 <TabsTrigger value="rentTerms">Rent Terms</TabsTrigger>
                 <TabsTrigger value="recoveries">Recoveries</TabsTrigger>
                 <TabsTrigger value="concessions">Concessions</TabsTrigger>
                 <TabsTrigger value="capex">CapEx</TabsTrigger>
                 <TabsTrigger value="rollover">Rollover</TabsTrigger>
+                <TabsTrigger value="sales">Sales</TabsTrigger>
               </TabsList>
 
               <div className="overflow-y-auto flex-1 mt-4">
@@ -1137,6 +1195,190 @@ export function TenantLeaseDialog({ open, onOpenChange, projectId, projectName, 
                       </div>
                     </CardContent>
                   </Card>
+                {/* ── SALES ─────────────────────────────────────────────────── */}
+                <TabsContent value="sales" className="space-y-4 mt-0">
+                  <div>
+                    <p className="font-medium flex items-center gap-2">
+                      <ShoppingCart className="h-4 w-4" />
+                      Monthly Sales &amp; Percentage Rent
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      Enter monthly gross sales to calculate overage rent due above the breakpoint
+                    </p>
+                  </div>
+
+                  {!isEditing ? (
+                    <div className="text-center py-8 text-muted-foreground border rounded-md">
+                      <p className="text-sm">Save the lease first to enter monthly sales figures</p>
+                    </div>
+                  ) : (
+                    <>
+                      {!percentRentEnabled && (
+                        <div className="flex items-center gap-2 p-3 rounded-md bg-amber-50 border border-amber-200 text-amber-800 text-sm">
+                          <Percent className="h-4 w-4 shrink-0" />
+                          Percentage rent is not enabled for this lease. Enable it in the Basic tab to see overage calculations.
+                        </div>
+                      )}
+
+                      {percentRentEnabled && (
+                        <Card>
+                          <CardContent className="pt-4 pb-3">
+                            <div className="grid grid-cols-3 gap-4 text-sm">
+                              <div>
+                                <p className="text-muted-foreground text-xs">Annual Breakpoint</p>
+                                <p className="font-mono font-medium">
+                                  {breakpointAnnualStr
+                                    ? `$${parseFloat(breakpointAnnualStr).toLocaleString()}/yr`
+                                    : "—"}
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-muted-foreground text-xs">Monthly Breakpoint</p>
+                                <p className="font-mono font-medium">
+                                  {breakpointAnnualStr
+                                    ? `$${(parseFloat(breakpointAnnualStr) / 12).toLocaleString(undefined, { maximumFractionDigits: 0 })}/mo`
+                                    : "—"}
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-muted-foreground text-xs">Overage Rate</p>
+                                <p className="font-mono font-medium">
+                                  {overagePercentStr
+                                    ? `${(parseFloat(overagePercentStr) * 100).toFixed(2)}%`
+                                    : "—"}
+                                </p>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      )}
+
+                      <Card>
+                        <CardHeader className="pb-2 pt-3 px-4">
+                          <CardTitle className="text-sm font-medium">Add Monthly Sales Entry</CardTitle>
+                        </CardHeader>
+                        <CardContent className="px-4 pb-4">
+                          <div className="flex items-end gap-3">
+                            <div className="flex-1">
+                              <label className="text-xs font-medium text-muted-foreground block mb-1">Period End Date</label>
+                              <Input
+                                type="date"
+                                className="h-8 text-sm"
+                                value={newSaleDate}
+                                onChange={(e) => setNewSaleDate(e.target.value)}
+                              />
+                            </div>
+                            <div className="flex-1">
+                              <label className="text-xs font-medium text-muted-foreground block mb-1">Gross Sales ($)</label>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                placeholder="0.00"
+                                className="h-8 text-sm"
+                                value={newSaleAmount}
+                                onChange={(e) => setNewSaleAmount(e.target.value)}
+                              />
+                            </div>
+                            <Button
+                              type="button"
+                              size="sm"
+                              disabled={!newSaleDate || !newSaleAmount || addSaleMutation.isPending}
+                              onClick={() => {
+                                if (newSaleDate && newSaleAmount) {
+                                  addSaleMutation.mutate({ periodEndDate: newSaleDate, grossSales: newSaleAmount });
+                                }
+                              }}
+                            >
+                              {addSaleMutation.isPending ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Plus className="h-4 w-4" />
+                              )}
+                              Add
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </Card>
+
+                      {salesLoading ? (
+                        <div className="flex items-center justify-center py-6 text-muted-foreground text-sm">
+                          <Loader2 className="h-4 w-4 animate-spin mr-2" /> Loading sales...
+                        </div>
+                      ) : salesRecords.length === 0 ? (
+                        <div className="text-center py-8 text-muted-foreground border rounded-md">
+                          <ShoppingCart className="h-10 w-10 mx-auto mb-3 opacity-40" />
+                          <p className="text-sm">No sales entries yet</p>
+                          <p className="text-xs">Add monthly gross sales above to calculate percentage rent</p>
+                        </div>
+                      ) : (
+                        <Card>
+                          <CardContent className="p-0">
+                            <table className="w-full text-sm">
+                              <thead>
+                                <tr className="border-b bg-muted/40">
+                                  <th className="text-left px-4 py-2 font-medium text-xs text-muted-foreground">Period End</th>
+                                  <th className="text-right px-4 py-2 font-medium text-xs text-muted-foreground">Gross Sales</th>
+                                  <th className="text-right px-4 py-2 font-medium text-xs text-muted-foreground">Overage Rent</th>
+                                  <th className="px-3 py-2"></th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {salesRecords.map((row) => {
+                                  const overage = computeOverage(row.grossSales);
+                                  return (
+                                    <tr key={row.id} className="border-b last:border-0 hover:bg-muted/20">
+                                      <td className="px-4 py-2 font-mono text-xs">
+                                        {format(new Date(row.periodEndDate), "MMM yyyy")}
+                                      </td>
+                                      <td className="px-4 py-2 text-right font-mono">
+                                        ${parseFloat(row.grossSales).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                                      </td>
+                                      <td className="px-4 py-2 text-right font-mono">
+                                        {percentRentEnabled && overagePercentStr && breakpointAnnualStr ? (
+                                          <span className={overage > 0 ? "text-emerald-700 font-medium" : "text-muted-foreground"}>
+                                            ${overage.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                                          </span>
+                                        ) : (
+                                          <span className="text-muted-foreground">—</span>
+                                        )}
+                                      </td>
+                                      <td className="px-3 py-2">
+                                        <Button
+                                          type="button"
+                                          variant="ghost"
+                                          size="icon"
+                                          className="h-6 w-6"
+                                          disabled={deleteSaleMutation.isPending}
+                                          onClick={() => deleteSaleMutation.mutate(row.id)}
+                                        >
+                                          <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                                        </Button>
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                              {percentRentEnabled && overagePercentStr && breakpointAnnualStr && salesRecords.length > 0 && (
+                                <tfoot>
+                                  <tr className="border-t bg-muted/30">
+                                    <td className="px-4 py-2 text-xs font-medium text-muted-foreground" colSpan={2}>
+                                      Total Overage ({salesRecords.length} period{salesRecords.length !== 1 ? "s" : ""})
+                                    </td>
+                                    <td className="px-4 py-2 text-right font-mono font-semibold text-emerald-700">
+                                      ${salesRecords.reduce((sum, r) => sum + computeOverage(r.grossSales), 0)
+                                        .toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                                    </td>
+                                    <td className="px-3 py-2"></td>
+                                  </tr>
+                                </tfoot>
+                              )}
+                            </table>
+                          </CardContent>
+                        </Card>
+                      )}
+                    </>
+                  )}
                 </TabsContent>
               </div>
             </Tabs>

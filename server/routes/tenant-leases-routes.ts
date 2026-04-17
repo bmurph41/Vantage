@@ -319,6 +319,12 @@ async function computeProjectKpis(projectId: string) {
   let expiredCount = 0;
   let weightedRentSum = 0;
   let weightedSfSum = 0;
+  let totalPercentRentMtd = 0;
+  let totalPercentRentYtd = 0;
+
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const startOfYear = new Date(now.getFullYear(), 0, 1);
 
   for (const lease of leaseRows) {
     const sf = parseFloat(lease.sf) || 0;
@@ -328,9 +334,11 @@ async function computeProjectKpis(projectId: string) {
     if (status === "EXPIRING") expiringCount++;
     if (status === "ACTIVE") activeLeaseCount++;
 
-    const [rentTerms, recoveries] = await Promise.all([
+    const [rentTerms, recoveries, percentageRentRows, salesRows] = await Promise.all([
       db.select().from(tenantRentTerms).where(and(eq(tenantRentTerms.leaseId, lease.id), eq(tenantRentTerms.termType, "INITIAL"))).limit(1),
       db.select().from(tenantRecoveries).where(eq(tenantRecoveries.leaseId, lease.id)),
+      db.select().from(tenantPercentageRent).where(eq(tenantPercentageRent.leaseId, lease.id)),
+      db.select().from(tenantSales).where(eq(tenantSales.leaseId, lease.id)),
     ]);
 
     const monthlyRent = computeMonthlyRent(rentTerms[0], sf);
@@ -347,13 +355,28 @@ async function computeProjectKpis(projectId: string) {
       else if (rec.method === "EXPENSE_STOP_PSF") totalRecoveriesMonthly += (psfAmt * sf) / 12;
       else if (rec.amount) totalRecoveriesMonthly += amount / 12;
     }
+
+    const pr = percentageRentRows.find((p) => p.enabled);
+    if (pr && salesRows.length > 0) {
+      const overagePct = parseFloat(pr.overagePercent ?? "0") || 0;
+      const breakpointAnnual = parseFloat(pr.breakpointAmountAnnual ?? "0") || 0;
+      const monthlyBreakpoint = breakpointAnnual / 12;
+
+      for (const sale of salesRows) {
+        const saleDate = new Date(sale.periodEndDate);
+        const grossSales = parseFloat(sale.grossSales) || 0;
+        const overage = Math.max(0, grossSales - monthlyBreakpoint) * overagePct;
+        if (saleDate >= startOfMonth) totalPercentRentMtd += overage;
+        if (saleDate >= startOfYear) totalPercentRentYtd += overage;
+      }
+    }
   }
 
   return {
     totalBaseRentMonthly,
     totalRecoveriesMonthly,
-    totalPercentRentMtd: 0,
-    totalPercentRentYtd: 0,
+    totalPercentRentMtd,
+    totalPercentRentYtd,
     weightedAvgRentPsf: weightedSfSum > 0 ? weightedRentSum / weightedSfSum : 0,
     totalSf,
     activeLeaseCount,
