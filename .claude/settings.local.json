@@ -227,7 +227,11 @@
       "Bash(echo \"real_exit=$?\")",
       "Read(//sys/fs/cgroup/**)",
       "Read(//proc/488/**)",
-      "Bash(ALLOW_DEMO_AUTH=true NODE_ENV=development npm run dev)"
+      "Bash(ALLOW_DEMO_AUTH=true NODE_ENV=development npm run dev)",
+      "Bash(cp /tmp/smoke.sh scripts/integration/smoke.sh)",
+      "Bash(cp /tmp/stripe_webhook_test.sh scripts/integration/stripe-webhook.sh)",
+      "Bash(cp /tmp/broker_onboarding_test.sh scripts/integration/broker-onboarding.sh)",
+      "Bash(chmod +x scripts/integration/*.sh)"
     ]
   }
 }
