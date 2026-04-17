@@ -7,6 +7,8 @@
 
 import { pgTable, uuid, text, numeric, integer, boolean, timestamp, date, jsonb, pgEnum, index } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
+import { createInsertSchema } from "drizzle-zod";
+import { z } from "zod";
 
 // ============================================
 // ENUMS
@@ -382,6 +384,78 @@ export const tenantRolloverAssumptionsRelations = relations(tenantRolloverAssump
     references: [tenantLeases.id],
   }),
 }));
+
+// ============================================
+// INSERT SCHEMAS (drizzle-zod derived)
+// ============================================
+
+export const insertTenantLeaseSchema = createInsertSchema(tenantLeases).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertTenantRentTermSchema = createInsertSchema(tenantRentTerms).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertTenantRecoverySchema = createInsertSchema(tenantRecoveries).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertTenantPercentageRentSchema = createInsertSchema(tenantPercentageRent).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertTenantSaleSchema = createInsertSchema(tenantSales).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertTenantConcessionSchema = createInsertSchema(tenantConcessions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertTenantCapexLeasingSchema = createInsertSchema(tenantCapexLeasing).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertTenantRolloverAssumptionsSchema = createInsertSchema(tenantRolloverAssumptions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+// Inferred insert types
+export type InsertTenantLease = z.infer<typeof insertTenantLeaseSchema>;
+export type InsertTenantRentTerm = z.infer<typeof insertTenantRentTermSchema>;
+export type InsertTenantRecovery = z.infer<typeof insertTenantRecoverySchema>;
+export type InsertTenantPercentageRent = z.infer<typeof insertTenantPercentageRentSchema>;
+export type InsertTenantSale = z.infer<typeof insertTenantSaleSchema>;
+export type InsertTenantConcession = z.infer<typeof insertTenantConcessionSchema>;
+export type InsertTenantCapexLeasing = z.infer<typeof insertTenantCapexLeasingSchema>;
+export type InsertTenantRolloverAssumptions = z.infer<typeof insertTenantRolloverAssumptionsSchema>;
+
+// Select types
+export type TenantLease = typeof tenantLeases.$inferSelect;
+export type TenantRentTerm = typeof tenantRentTerms.$inferSelect;
+export type TenantRecovery = typeof tenantRecoveries.$inferSelect;
+export type TenantPercentageRent = typeof tenantPercentageRent.$inferSelect;
+export type TenantSale = typeof tenantSales.$inferSelect;
+export type TenantConcession = typeof tenantConcessions.$inferSelect;
+export type TenantCapexLeasing = typeof tenantCapexLeasing.$inferSelect;
+export type TenantRolloverAssumptions = typeof tenantRolloverAssumptions.$inferSelect;
 
 // ============================================
 // EXPORT ALL

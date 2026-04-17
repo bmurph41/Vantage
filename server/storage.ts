@@ -93,6 +93,22 @@ import {
   tenantConcessions,
   tenantCapexLeasing,
   tenantRolloverAssumptions,
+  type TenantLease,
+  type TenantRentTerm,
+  type TenantRecovery,
+  type TenantPercentageRent,
+  type TenantSale,
+  type TenantConcession,
+  type TenantCapexLeasing,
+  type TenantRolloverAssumptions,
+  type InsertTenantLease,
+  type InsertTenantRentTerm,
+  type InsertTenantRecovery,
+  type InsertTenantPercentageRent,
+  type InsertTenantSale,
+  type InsertTenantConcession,
+  type InsertTenantCapexLeasing,
+  type InsertTenantRolloverAssumptions,
 } from "../db/schema-commercial-tenants";
 import { db } from "./db";
 import { eq, and, desc, asc, sql, inArray, isNull, isNotNull, or, count, ilike } from "drizzle-orm";
@@ -8727,7 +8743,7 @@ export class DatabaseStorage implements IStorage {
 
   // ── Tenant Leases ────────────────────────────────────────────────────────────
 
-  async getTenantLeases(projectId: string, status?: string): Promise<any[]> {
+  async getTenantLeases(projectId: string, status?: string): Promise<TenantLease[]> {
     const rows = await db.select().from(tenantLeases)
       .where(eq(tenantLeases.projectId, projectId))
       .orderBy(desc(tenantLeases.createdAt));
@@ -8735,17 +8751,17 @@ export class DatabaseStorage implements IStorage {
     return rows;
   }
 
-  async getTenantLease(leaseId: string): Promise<any | null> {
+  async getTenantLease(leaseId: string): Promise<TenantLease | null> {
     const [row] = await db.select().from(tenantLeases).where(eq(tenantLeases.id, leaseId));
     return row || null;
   }
 
-  async createTenantLease(data: Record<string, unknown>): Promise<any> {
-    const [row] = await db.insert(tenantLeases).values(data as typeof tenantLeases.$inferInsert).returning();
+  async createTenantLease(data: InsertTenantLease): Promise<TenantLease> {
+    const [row] = await db.insert(tenantLeases).values(data).returning();
     return row;
   }
 
-  async updateTenantLease(leaseId: string, data: Record<string, unknown>): Promise<any> {
+  async updateTenantLease(leaseId: string, data: Partial<InsertTenantLease>): Promise<TenantLease> {
     const [row] = await db.update(tenantLeases)
       .set({ ...data, updatedAt: new Date() })
       .where(eq(tenantLeases.id, leaseId))
@@ -8760,16 +8776,16 @@ export class DatabaseStorage implements IStorage {
 
   // ── Tenant Rent Terms ────────────────────────────────────────────────────────
 
-  async getTenantRentTerms(leaseId: string): Promise<any[]> {
+  async getTenantRentTerms(leaseId: string): Promise<TenantRentTerm[]> {
     return db.select().from(tenantRentTerms).where(eq(tenantRentTerms.leaseId, leaseId)).orderBy(asc(tenantRentTerms.termStartDate));
   }
 
-  async createTenantRentTerm(data: Record<string, unknown>): Promise<any> {
-    const [row] = await db.insert(tenantRentTerms).values(data as typeof tenantRentTerms.$inferInsert).returning();
+  async createTenantRentTerm(data: InsertTenantRentTerm): Promise<TenantRentTerm> {
+    const [row] = await db.insert(tenantRentTerms).values(data).returning();
     return row;
   }
 
-  async updateTenantRentTerm(termId: string, data: Record<string, unknown>): Promise<any> {
+  async updateTenantRentTerm(termId: string, data: Partial<InsertTenantRentTerm>): Promise<TenantRentTerm> {
     const [row] = await db.update(tenantRentTerms).set({ ...data, updatedAt: new Date() }).where(eq(tenantRentTerms.id, termId)).returning();
     return row;
   }
@@ -8781,16 +8797,16 @@ export class DatabaseStorage implements IStorage {
 
   // ── Tenant Recoveries ────────────────────────────────────────────────────────
 
-  async getTenantRecoveries(leaseId: string): Promise<any[]> {
+  async getTenantRecoveries(leaseId: string): Promise<TenantRecovery[]> {
     return db.select().from(tenantRecoveries).where(eq(tenantRecoveries.leaseId, leaseId));
   }
 
-  async createTenantRecovery(data: Record<string, unknown>): Promise<any> {
-    const [row] = await db.insert(tenantRecoveries).values(data as typeof tenantRecoveries.$inferInsert).returning();
+  async createTenantRecovery(data: InsertTenantRecovery): Promise<TenantRecovery> {
+    const [row] = await db.insert(tenantRecoveries).values(data).returning();
     return row;
   }
 
-  async updateTenantRecovery(recoveryId: string, data: Record<string, unknown>): Promise<any> {
+  async updateTenantRecovery(recoveryId: string, data: Partial<InsertTenantRecovery>): Promise<TenantRecovery> {
     const [row] = await db.update(tenantRecoveries).set({ ...data, updatedAt: new Date() }).where(eq(tenantRecoveries.id, recoveryId)).returning();
     return row;
   }
@@ -8802,33 +8818,33 @@ export class DatabaseStorage implements IStorage {
 
   // ── Tenant Percentage Rent ───────────────────────────────────────────────────
 
-  async getTenantPercentageRent(leaseId: string): Promise<any | null> {
+  async getTenantPercentageRent(leaseId: string): Promise<TenantPercentageRent | null> {
     const [row] = await db.select().from(tenantPercentageRent).where(eq(tenantPercentageRent.leaseId, leaseId));
     return row || null;
   }
 
-  async upsertTenantPercentageRent(leaseId: string, data: Record<string, unknown>): Promise<any> {
+  async upsertTenantPercentageRent(leaseId: string, data: Partial<InsertTenantPercentageRent>): Promise<TenantPercentageRent> {
     const [existing] = await db.select().from(tenantPercentageRent).where(eq(tenantPercentageRent.leaseId, leaseId));
     if (existing) {
       const [row] = await db.update(tenantPercentageRent).set({ ...data, updatedAt: new Date() }).where(eq(tenantPercentageRent.id, existing.id)).returning();
       return row;
     }
-    const [row] = await db.insert(tenantPercentageRent).values({ ...data, leaseId } as typeof tenantPercentageRent.$inferInsert).returning();
+    const [row] = await db.insert(tenantPercentageRent).values({ ...data, leaseId } as InsertTenantPercentageRent).returning();
     return row;
   }
 
   // ── Tenant Concessions ───────────────────────────────────────────────────────
 
-  async getTenantConcessions(leaseId: string): Promise<any[]> {
+  async getTenantConcessions(leaseId: string): Promise<TenantConcession[]> {
     return db.select().from(tenantConcessions).where(eq(tenantConcessions.leaseId, leaseId)).orderBy(asc(tenantConcessions.startDate));
   }
 
-  async createTenantConcession(data: Record<string, unknown>): Promise<any> {
-    const [row] = await db.insert(tenantConcessions).values(data as typeof tenantConcessions.$inferInsert).returning();
+  async createTenantConcession(data: InsertTenantConcession): Promise<TenantConcession> {
+    const [row] = await db.insert(tenantConcessions).values(data).returning();
     return row;
   }
 
-  async updateTenantConcession(concessionId: string, leaseId: string, data: Record<string, unknown>): Promise<any> {
+  async updateTenantConcession(concessionId: string, leaseId: string, data: Partial<InsertTenantConcession>): Promise<TenantConcession> {
     const [row] = await db.update(tenantConcessions).set({ ...data, updatedAt: new Date() })
       .where(and(eq(tenantConcessions.id, concessionId), eq(tenantConcessions.leaseId, leaseId)))
       .returning();
@@ -8844,39 +8860,39 @@ export class DatabaseStorage implements IStorage {
 
   // ── Tenant CapEx / Leasing Costs ─────────────────────────────────────────────
 
-  async getTenantCapex(leaseId: string): Promise<any | null> {
+  async getTenantCapex(leaseId: string): Promise<TenantCapexLeasing | null> {
     const [row] = await db.select().from(tenantCapexLeasing).where(eq(tenantCapexLeasing.leaseId, leaseId));
     return row || null;
   }
 
-  async upsertTenantCapex(leaseId: string, data: Record<string, unknown>): Promise<any> {
+  async upsertTenantCapex(leaseId: string, data: Partial<InsertTenantCapexLeasing>): Promise<TenantCapexLeasing> {
     const [existing] = await db.select().from(tenantCapexLeasing).where(eq(tenantCapexLeasing.leaseId, leaseId));
     if (existing) {
       const [row] = await db.update(tenantCapexLeasing).set({ ...data, updatedAt: new Date() }).where(eq(tenantCapexLeasing.id, existing.id)).returning();
       return row;
     }
-    const [row] = await db.insert(tenantCapexLeasing).values({ ...data, leaseId } as typeof tenantCapexLeasing.$inferInsert).returning();
+    const [row] = await db.insert(tenantCapexLeasing).values({ ...data, leaseId } as InsertTenantCapexLeasing).returning();
     return row;
   }
 
   // ── Tenant Rollover Assumptions ──────────────────────────────────────────────
 
-  async getTenantRollover(leaseId: string): Promise<any | null> {
+  async getTenantRollover(leaseId: string): Promise<TenantRolloverAssumptions | null> {
     const [row] = await db.select().from(tenantRolloverAssumptions).where(eq(tenantRolloverAssumptions.leaseId, leaseId));
     return row || null;
   }
 
-  async upsertTenantRollover(leaseId: string, data: Record<string, unknown>): Promise<any> {
+  async upsertTenantRollover(leaseId: string, data: Partial<InsertTenantRolloverAssumptions>): Promise<TenantRolloverAssumptions> {
     const [existing] = await db.select().from(tenantRolloverAssumptions).where(eq(tenantRolloverAssumptions.leaseId, leaseId));
     if (existing) {
       const [row] = await db.update(tenantRolloverAssumptions).set({ ...data, updatedAt: new Date() }).where(eq(tenantRolloverAssumptions.id, existing.id)).returning();
       return row;
     }
-    const [row] = await db.insert(tenantRolloverAssumptions).values({ ...data, leaseId } as typeof tenantRolloverAssumptions.$inferInsert).returning();
+    const [row] = await db.insert(tenantRolloverAssumptions).values({ ...data, leaseId } as InsertTenantRolloverAssumptions).returning();
     return row;
   }
 
-  async updateTenantPercentageRent(prId: string, leaseId: string, data: Record<string, unknown>): Promise<any> {
+  async updateTenantPercentageRent(prId: string, leaseId: string, data: Partial<InsertTenantPercentageRent>): Promise<TenantPercentageRent> {
     const [row] = await db.update(tenantPercentageRent).set({ ...data, updatedAt: new Date() })
       .where(and(eq(tenantPercentageRent.id, prId), eq(tenantPercentageRent.leaseId, leaseId)))
       .returning();
@@ -8892,16 +8908,16 @@ export class DatabaseStorage implements IStorage {
 
   // ── Tenant Sales ─────────────────────────────────────────────────────────────
 
-  async getTenantSales(leaseId: string): Promise<any[]> {
+  async getTenantSales(leaseId: string): Promise<TenantSale[]> {
     return db.select().from(tenantSales).where(eq(tenantSales.leaseId, leaseId)).orderBy(desc(tenantSales.periodEndDate));
   }
 
-  async createTenantSale(data: Record<string, unknown>): Promise<any> {
-    const [row] = await db.insert(tenantSales).values(data as typeof tenantSales.$inferInsert).returning();
+  async createTenantSale(data: InsertTenantSale): Promise<TenantSale> {
+    const [row] = await db.insert(tenantSales).values(data).returning();
     return row;
   }
 
-  async updateTenantSale(saleId: string, leaseId: string, data: Record<string, unknown>): Promise<any> {
+  async updateTenantSale(saleId: string, leaseId: string, data: Partial<InsertTenantSale>): Promise<TenantSale> {
     const [row] = await db.update(tenantSales).set({ ...data, updatedAt: new Date() })
       .where(and(eq(tenantSales.id, saleId), eq(tenantSales.leaseId, leaseId)))
       .returning();
@@ -8915,7 +8931,7 @@ export class DatabaseStorage implements IStorage {
     return result.length > 0;
   }
 
-  async updateTenantCapex(capexId: string, leaseId: string, data: Record<string, unknown>): Promise<any> {
+  async updateTenantCapex(capexId: string, leaseId: string, data: Partial<InsertTenantCapexLeasing>): Promise<TenantCapexLeasing> {
     const [row] = await db.update(tenantCapexLeasing).set({ ...data, updatedAt: new Date() })
       .where(and(eq(tenantCapexLeasing.id, capexId), eq(tenantCapexLeasing.leaseId, leaseId)))
       .returning();
@@ -8929,7 +8945,7 @@ export class DatabaseStorage implements IStorage {
     return result.length > 0;
   }
 
-  async updateTenantRollover(rolloverId: string, leaseId: string, data: Record<string, unknown>): Promise<any> {
+  async updateTenantRollover(rolloverId: string, leaseId: string, data: Partial<InsertTenantRolloverAssumptions>): Promise<TenantRolloverAssumptions> {
     const [row] = await db.update(tenantRolloverAssumptions).set({ ...data, updatedAt: new Date() })
       .where(and(eq(tenantRolloverAssumptions.id, rolloverId), eq(tenantRolloverAssumptions.leaseId, leaseId)))
       .returning();

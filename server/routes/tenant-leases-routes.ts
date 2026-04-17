@@ -9,6 +9,22 @@ import {
   tenantConcessions,
   tenantCapexLeasing,
   tenantRolloverAssumptions,
+  insertTenantLeaseSchema,
+  insertTenantRentTermSchema,
+  insertTenantRecoverySchema,
+  insertTenantPercentageRentSchema,
+  insertTenantSaleSchema,
+  insertTenantConcessionSchema,
+  insertTenantCapexLeasingSchema,
+  insertTenantRolloverAssumptionsSchema,
+  type TenantLease,
+  type TenantRentTerm,
+  type TenantRecovery,
+  type TenantPercentageRent,
+  type TenantSale,
+  type TenantConcession,
+  type TenantCapexLeasing,
+  type TenantRolloverAssumptions,
 } from "../../db/schema-commercial-tenants";
 import { modelingProjects } from "@shared/schema";
 import { eq, and, desc, asc } from "drizzle-orm";
@@ -91,14 +107,14 @@ function computeMonthlyRent(term: typeof tenantRentTerms.$inferSelect | undefine
   return val;
 }
 
-type LeaseRow = typeof tenantLeases.$inferSelect;
-type RentTermRow = typeof tenantRentTerms.$inferSelect;
-type RecoveryRow = typeof tenantRecoveries.$inferSelect;
-type PercentageRentRow = typeof tenantPercentageRent.$inferSelect;
-type SaleRow = typeof tenantSales.$inferSelect;
-type ConcessionRow = typeof tenantConcessions.$inferSelect;
-type CapexRow = typeof tenantCapexLeasing.$inferSelect;
-type RolloverRow = typeof tenantRolloverAssumptions.$inferSelect;
+type LeaseRow = TenantLease;
+type RentTermRow = TenantRentTerm;
+type RecoveryRow = TenantRecovery;
+type PercentageRentRow = TenantPercentageRent;
+type SaleRow = TenantSale;
+type ConcessionRow = TenantConcession;
+type CapexRow = TenantCapexLeasing;
+type RolloverRow = TenantRolloverAssumptions;
 
 function formatLeaseForList(
   lease: LeaseRow,
@@ -189,26 +205,7 @@ async function duplicateLease(leaseId: string, orgId: string): Promise<typeof te
   return newLease;
 }
 
-// ── Validation Schemas ────────────────────────────────────────────────────────
-
-const leaseTypeValues = ["NNN", "MOD_GROSS", "FULL_GROSS", "ABSOLUTE_NNN", "OTHER"] as const;
-const leaseStatusValues = ["ACTIVE", "FUTURE", "EXPIRING", "EXPIRED", "ARCHIVED"] as const;
-const securityDepositTypeValues = ["CASH", "LOC", "NONE"] as const;
-const termTypeValues = ["INITIAL", "OPTION"] as const;
-const rentInputUnitValues = ["PSF_YEAR", "PER_MONTH", "PER_YEAR"] as const;
-const escalationTypeValues = ["NONE", "PERCENT", "FIXED_DOLLAR", "DOLLAR_PSF_YEAR", "CPI", "CPI_CAP_FLOOR", "SCHEDULE"] as const;
-const recoveryTypeValues = ["CAM", "TAXES", "INSURANCE", "UTILITIES", "TRASH", "SECURITY", "OTHER"] as const;
-const recoveryMethodValues = ["PRO_RATA", "BASE_YEAR_STOP", "EXPENSE_STOP_PSF", "FIXED_MONTHLY", "FIXED_ANNUAL"] as const;
-const concessionTypeValues = ["FREE_RENT", "DISCOUNT_PERCENT", "DISCOUNT_FIXED", "OTHER"] as const;
-const tiPaymentTimingValues = ["UPFRONT", "REIMBURSEMENT", "DRAW_SCHEDULE"] as const;
-const lcPaymentTimingValues = ["AT_SIGNING", "SPREAD"] as const;
-const breakpointTypeValues = ["NATURAL", "ARTIFICIAL"] as const;
-const settlementFrequencyValues = ["MONTHLY", "QUARTERLY", "ANNUAL"] as const;
-
-const numericString = z.preprocess(
-  (val) => (val === "" || val == null ? null : val),
-  z.string().regex(/^-?\d+(\.\d+)?$/, "Must be a number").nullable()
-).optional();
+// ── Validation Schemas (derived from Drizzle schema via drizzle-zod) ──────────
 
 function normalizeForDb<T extends Record<string, unknown>>(obj: T): T {
   return Object.fromEntries(
@@ -216,96 +213,15 @@ function normalizeForDb<T extends Record<string, unknown>>(obj: T): T {
   ) as T;
 }
 
-const insertLeaseSchema = z.object({
-  projectId: z.string().uuid(),
-  tenantName: z.string().min(1, "Tenant name is required"),
-  suiteLabel: z.string().nullable().optional(),
-  sf: z.string().regex(/^\d+(\.\d+)?$/, "Invalid SF"),
-  unitCount: z.number().int().nullable().optional(),
-  leaseType: z.enum(leaseTypeValues).default("NNN"),
-  leaseStartDate: z.string().min(1, "Start date required"),
-  rentCommencementDate: z.string().nullable().optional(),
-  leaseEndDate: z.string().min(1, "End date required"),
-  securityDepositAmount: numericString,
-  securityDepositType: z.enum(securityDepositTypeValues).default("NONE"),
-  notes: z.string().nullable().optional(),
-  status: z.enum(leaseStatusValues).default("ACTIVE"),
-});
-
-const insertRentTermSchema = z.object({
-  leaseId: z.string().uuid(),
-  termType: z.enum(termTypeValues).default("INITIAL"),
-  optionIndex: z.number().int().nullable().optional(),
-  termStartDate: z.string().min(1, "Start date required"),
-  termEndDate: z.string().min(1, "End date required"),
-  baseRentInputUnit: z.enum(rentInputUnitValues).default("PSF_YEAR"),
-  baseRentInputValue: z.string().regex(/^\d+(\.\d+)?$/, "Invalid rent value"),
-  escalationType: z.enum(escalationTypeValues).default("NONE"),
-  escalationValue: numericString,
-  escalationFrequencyMonths: z.number().int().nullable().optional(),
-  escalationCapPercent: numericString,
-  escalationFloorPercent: numericString,
-  escalationCpiSeries: z.string().nullable().optional(),
-  scheduleJson: z.any().nullable().optional(),
-});
-
-const insertRecoverySchema = z.object({
-  leaseId: z.string().uuid(),
-  recoveryType: z.enum(recoveryTypeValues),
-  method: z.enum(recoveryMethodValues),
-  amount: numericString,
-  psfAmount: numericString,
-  adminFeePercent: numericString,
-  grossUpToOccupancy: numericString,
-  nonrecoverablePercent: numericString,
-  expenseGrowthRatePercent: numericString,
-});
-
-const insertPercentageRentSchema = z.object({
-  leaseId: z.string().uuid(),
-  enabled: z.boolean().default(false),
-  breakpointType: z.enum(breakpointTypeValues).nullable().optional(),
-  breakpointAmountAnnual: numericString,
-  overagePercent: numericString,
-  settlementFrequency: z.enum(settlementFrequencyValues).nullable().optional(),
-  exclusionsJson: z.any().nullable().optional(),
-});
-
-const insertSaleSchema = z.object({
-  leaseId: z.string().uuid(),
-  periodEndDate: z.string().min(1, "Period end date required"),
-  grossSales: z.string().regex(/^\d+(\.\d+)?$/, "Invalid gross sales"),
-});
-
-const insertConcessionSchema = z.object({
-  leaseId: z.string().uuid(),
-  concessionType: z.enum(concessionTypeValues),
-  startDate: z.string().min(1, "Start date required"),
-  endDate: z.string().min(1, "End date required"),
-  value: z.string().regex(/^\d+(\.\d+)?$/, "Invalid value"),
-  notes: z.string().nullable().optional(),
-});
-
-const insertCapexSchema = z.object({
-  leaseId: z.string().uuid(),
-  tiAllowancePsf: numericString,
-  tiTotal: numericString,
-  tiPaymentTiming: z.enum(tiPaymentTimingValues).nullable().optional(),
-  lcPercentInitial: numericString,
-  lcPercentRenewal: numericString,
-  lcPaymentTiming: z.enum(lcPaymentTimingValues).nullable().optional(),
-});
-
-const insertRolloverSchema = z.object({
-  leaseId: z.string().uuid(),
-  assumeRenewal: z.boolean().default(false),
-  renewalProbability: numericString,
-  downtimeMonths: z.number().int().nullable().optional(),
-  marketRentPsfYear: numericString,
-  marketRentGrowthPercent: numericString,
-  renewalTiPsf: numericString,
-  renewalLcPercent: numericString,
-});
+// Aliases for insert schemas (already imported from db/schema-commercial-tenants)
+const insertLeaseSchema = insertTenantLeaseSchema;
+const insertRentTermSchema = insertTenantRentTermSchema;
+const insertRecoverySchema = insertTenantRecoverySchema;
+const insertPercentageRentSchema = insertTenantPercentageRentSchema;
+const insertSaleSchema = insertTenantSaleSchema;
+const insertConcessionSchema = insertTenantConcessionSchema;
+const insertCapexSchema = insertTenantCapexLeasingSchema;
+const insertRolloverSchema = insertTenantRolloverAssumptionsSchema;
 
 // ── KPI computation helper ─────────────────────────────────────────────────────
 
