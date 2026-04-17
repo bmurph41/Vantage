@@ -7,7 +7,7 @@ import {
   opsCommercialLeases, opsBookkeepingGl, valuatorProjectContext, opsImportEvents,
   opsParkingLot,
   asmpFuel, asmpShipStore, asmpService, asmpCommercialTenants, asmpBoatRentals,
-  asmpBoatClub, asmpBoatSales, asmpBookkeeping, modelingProjects,
+  asmpBoatClub, asmpBoatSales, asmpBookkeeping, asmpParkingLot, modelingProjects,
   ownedAssets, crmProperties, modelingActuals, modelingFinancialPeriods,
   assetPerformanceSnapshots, returnsLedger,
   budgets, budgetVersions, budgetLines, budgetAmounts
@@ -1777,6 +1777,75 @@ router.delete('/projects/:projectId/assumptions/bookkeeping/:id', async (req: Re
   } catch (error) {
     console.error('Error deleting bookkeeping entry:', error);
     res.status(500).json({ error: 'Failed to delete bookkeeping entry' });
+  }
+});
+
+// ============================================================================
+// ASSUMPTIONS CRUD - Parking Lot
+// ============================================================================
+
+router.get('/projects/:projectId/assumptions/parking-lot', async (req: Request, res: Response) => {
+  try {
+    const orgId = getOrgId(req);
+    const { projectId } = req.params;
+    if (!await requireProjectInOrg(projectId, orgId)) {
+      return res.status(404).json({ error: 'Project not found' });
+    }
+    const assumptions = await db.select()
+      .from(asmpParkingLot)
+      .where(eq(asmpParkingLot.projectId, projectId))
+      .orderBy(asmpParkingLot.periodMonth);
+    res.json(assumptions);
+  } catch (error) {
+    console.error('Error fetching parking lot assumptions:', error);
+    res.status(500).json({ error: 'Failed to fetch parking lot assumptions' });
+  }
+});
+
+router.post('/projects/:projectId/assumptions/parking-lot/bulk', async (req: Request, res: Response) => {
+  try {
+    const orgId = getOrgId(req);
+    const { projectId } = req.params;
+    if (!await requireProjectInOrg(projectId, orgId)) {
+      return res.status(404).json({ error: 'Project not found' });
+    }
+    const { rows } = req.body;
+    const results = [];
+    for (const row of rows) {
+      let result;
+      [result] = await db.insert(asmpParkingLot)
+        .values({ ...row, projectId, orgId })
+        .onConflictDoUpdate({
+          target: [asmpParkingLot.projectId, asmpParkingLot.periodMonth],
+          set: { ...row, updatedAt: new Date() }
+        })
+        .returning();
+      results.push(result);
+    }
+    res.json(results);
+  } catch (error) {
+    console.error('Error bulk updating parking lot assumptions:', error);
+    res.status(500).json({ error: 'Failed to bulk update parking lot assumptions' });
+  }
+});
+
+router.delete('/projects/:projectId/assumptions/parking-lot/:id', async (req: Request, res: Response) => {
+  try {
+    const orgId = getOrgId(req);
+    const { projectId, id } = req.params;
+    if (!await requireProjectInOrg(projectId, orgId)) {
+      return res.status(404).json({ error: 'Project not found' });
+    }
+    const [deleted] = await db.delete(asmpParkingLot)
+      .where(and(eq(asmpParkingLot.id, id), eq(asmpParkingLot.projectId, projectId)))
+      .returning();
+    if (!deleted) {
+      return res.status(404).json({ error: 'Entry not found' });
+    }
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting parking lot assumption:', error);
+    res.status(500).json({ error: 'Failed to delete parking lot assumption' });
   }
 });
 
