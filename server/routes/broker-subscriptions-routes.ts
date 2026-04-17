@@ -35,6 +35,13 @@ import {
   recordInboundMessage,
   recordBrokerReply,
 } from "../services/broker-response-tracker";
+import { getBrokerVerifiedDeals } from "../services/broker-deal-stats";
+import {
+  getLicenseStatusForBroker,
+} from "../services/broker-license-verification";
+import {
+  getAllBrokerFeatureFlags,
+} from "../services/broker-feature-flags";
 
 const router = Router();
 
@@ -76,7 +83,9 @@ router.get("/directory", async (req: Request, res: Response) => {
       .from(brokerProfiles)
       .where(and(...conditions))
       .orderBy(
-        desc(brokerProfiles.brokerTier),
+        desc(brokerProfiles.featuredUntil),
+        desc(brokerProfiles.verifiedClosedDealsCount),
+        desc(brokerProfiles.verifiedClosedDealsVolume),
         desc(brokerProfiles.followerCount),
         desc(brokerProfiles.publishedAt),
       )
@@ -164,11 +173,45 @@ router.get("/profiles/:profileId", async (req: Request, res: Response) => {
       };
     });
 
+    const verifiedDeals = await getBrokerVerifiedDeals(pool, profileId, 10);
+    const licenseStatus = await getLicenseStatusForBroker(pool, profile.registrationId);
+
+    const trustSignals = {
+      verifiedClosedDealsCount: profile.verifiedClosedDealsCount ?? 0,
+      verifiedClosedDealsVolume: profile.verifiedClosedDealsVolume
+        ? Number(profile.verifiedClosedDealsVolume)
+        : 0,
+      verifiedClosedDealsAssetClasses: profile.verifiedClosedDealsAssetClasses ?? [],
+      verifiedClosedDealsLastAt: profile.verifiedClosedDealsLastAt,
+      averageResponseHours: profile.averageResponseHours
+        ? Number(profile.averageResponseHours)
+        : null,
+      medianResponseHours: profile.medianResponseHours
+        ? Number(profile.medianResponseHours)
+        : null,
+      responseRate30d: profile.responseRate30d ? Number(profile.responseRate30d) : null,
+      responseSamples30d: profile.responseSamples30d ?? 0,
+      followerCount: profile.followerCount ?? 0,
+      advisorySubscriberCount: profile.advisorySubscriberCount ?? 0,
+      yearsExperience: profile.yearsExperience,
+      licenseState: profile.licenseState,
+      licenseStatus: licenseStatus
+        ? {
+            level: licenseStatus.level,
+            expiresAt: licenseStatus.licenseExpiresAt,
+            daysUntilExpiry: licenseStatus.daysUntilExpiry,
+          }
+        : { level: "missing" as const, expiresAt: null, daysUntilExpiry: null },
+      isFeatured: Boolean(profile.featuredUntil && new Date(profile.featuredUntil) > new Date()),
+    };
+
     res.json({
       profile,
       packages,
       listings,
       content,
+      trustSignals,
+      verifiedDeals,
       viewerContext: {
         isFollowing: existingSubscription?.tier === "follow" || isAdvisorySubscriber,
         isAdvisorySubscriber,
@@ -178,6 +221,20 @@ router.get("/profiles/:profileId", async (req: Request, res: Response) => {
   } catch (err) {
     console.error("Broker profile fetch error:", err);
     res.status(500).json({ error: "Failed to fetch broker profile" });
+  }
+});
+
+// ────────────────────────────────────────────────────────────────────────────
+// Broker feature flags (scaffolding for Phase 2/3)
+// ────────────────────────────────────────────────────────────────────────────
+router.get("/feature-flags", async (req: Request, res: Response) => {
+  try {
+    const ctx = getUserContext(req);
+    const flags = await getAllBrokerFeatureFlags(ctx?.orgId ?? null);
+    res.json({ flags });
+  } catch (err) {
+    console.error("Broker feature flags error:", err);
+    res.status(500).json({ error: "Failed to fetch feature flags" });
   }
 });
 

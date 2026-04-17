@@ -28,6 +28,8 @@ import {
   type MarinaListing,
 } from "@/hooks/use-broker-subscriptions";
 import { UpgradePrompt } from "@/components/broker/UpgradePrompt";
+import { TrustSignalBar } from "@/components/broker/TrustSignalBar";
+import type { BrokerVerifiedDeal } from "@/hooks/use-broker-subscriptions";
 
 function initialsFrom(name: string): string {
   return name.split(" ").filter(Boolean).slice(0, 2).map((p) => p[0]?.toUpperCase()).join("");
@@ -55,6 +57,43 @@ function deliverablesFrom(d: any): string[] {
   if (Array.isArray(d)) return d.map(String);
   if (typeof d === "object" && Array.isArray(d.items)) return d.items.map(String);
   return [];
+}
+
+function VerifiedDealsTable({ deals }: { deals: BrokerVerifiedDeal[] }) {
+  return (
+    <Card>
+      <CardContent className="p-0">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-slate-50 text-slate-600 text-xs uppercase tracking-wide">
+              <tr>
+                <th className="text-left px-4 py-2">Closed</th>
+                <th className="text-left px-4 py-2">Asset class</th>
+                <th className="text-left px-4 py-2">Location</th>
+                <th className="text-right px-4 py-2">Volume</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {deals.map((d) => (
+                <tr key={d.id} data-testid={`verified-deal-row-${d.id}`}>
+                  <td className="px-4 py-2 text-slate-700">
+                    {new Date(d.closedAt).toLocaleDateString()}
+                  </td>
+                  <td className="px-4 py-2 text-slate-700">{d.assetClass || "—"}</td>
+                  <td className="px-4 py-2 text-slate-500">
+                    {[d.city, d.state].filter(Boolean).join(", ") || "—"}
+                  </td>
+                  <td className="px-4 py-2 text-right font-semibold text-slate-900">
+                    {formatMoney(d.volume)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </CardContent>
+    </Card>
+  );
 }
 
 function ListingCard({ listing }: { listing: MarinaListing }) {
@@ -198,7 +237,7 @@ export default function BrokerProfile() {
     );
   }
 
-  const { profile, packages, listings, content, viewerContext } = data;
+  const { profile, packages, listings, content, viewerContext, trustSignals, verifiedDeals } = data;
   const specialties = specialtiesFrom(profile.specialties);
   const canMessage =
     entitlement.data?.allowBrokerMessaging && viewerContext.isAdvisorySubscriber;
@@ -332,30 +371,10 @@ export default function BrokerProfile() {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6 pt-4 border-t text-sm">
-            <div>
-              <div className="text-slate-500">Followers</div>
-              <div className="font-semibold text-slate-900">{profile.followerCount ?? 0}</div>
-            </div>
-            <div>
-              <div className="text-slate-500">Listings Published</div>
-              <div className="font-semibold text-slate-900">
-                {profile.totalListingsPublished ?? 0}
-              </div>
-            </div>
-            <div>
-              <div className="text-slate-500">Years Experience</div>
-              <div className="font-semibold text-slate-900">{profile.yearsExperience ?? 0}</div>
-            </div>
-            <div>
-              <div className="text-slate-500">Avg Response</div>
-              <div className="font-semibold text-slate-900">
-                {profile.avgResponseHours != null ? `${profile.avgResponseHours}h` : "—"}
-              </div>
-            </div>
-          </div>
         </CardContent>
       </Card>
+
+      {trustSignals && <TrustSignalBar signals={trustSignals} />}
 
       {capError && (
         <UpgradePrompt
@@ -369,10 +388,26 @@ export default function BrokerProfile() {
       <Tabs defaultValue="listings">
         <TabsList>
           <TabsTrigger value="listings">Listings</TabsTrigger>
+          <TabsTrigger value="verified-deals" data-testid="tab-verified-deals">
+            Verified Closed Deals
+          </TabsTrigger>
           <TabsTrigger value="about">About</TabsTrigger>
           <TabsTrigger value="advisory">Advisory Package</TabsTrigger>
           <TabsTrigger value="insights">Recent Insights</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="verified-deals" className="pt-4">
+          {!verifiedDeals || verifiedDeals.length === 0 ? (
+            <Card>
+              <CardContent className="p-8 text-center text-slate-500">
+                No verified closed deals yet. Deals are marked verified once the
+                closing date is recorded and the broker is attributed in MarinaMatch.
+              </CardContent>
+            </Card>
+          ) : (
+            <VerifiedDealsTable deals={verifiedDeals} />
+          )}
+        </TabsContent>
 
         <TabsContent value="listings" className="pt-4">
           {listings.length === 0 ? (

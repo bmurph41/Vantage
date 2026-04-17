@@ -55,6 +55,11 @@ export interface BrokerMyProfileResponse {
     listingsCount: number;
     followerCount: number;
     advisorySubscriberCount: number;
+    verifiedClosedDealsCount?: number;
+    verifiedClosedDealsVolume?: number;
+    medianResponseHours?: number | null;
+    responseRate30d?: number | null;
+    responseSamples30d?: number;
   };
   tierDefinition: {
     tier: string;
@@ -62,6 +67,22 @@ export interface BrokerMyProfileResponse {
     maxAdvisoryPackages: number;
     maxPublishedListings: number;
   } | null;
+  licenseStatus?: {
+    level: "ok" | "warning" | "critical" | "expired" | "missing";
+    expiresAt: string | null;
+    daysUntilExpiry: number | null;
+    state: string | null;
+  } | null;
+  recentVerifiedDeals?: Array<{
+    id: string;
+    title: string;
+    assetClass: string | null;
+    closedAt: string;
+    volume: number | null;
+    city: string | null;
+    state: string | null;
+  }>;
+  featureFlags?: Record<string, { flag: string; enabled: boolean; source: string }>;
 }
 
 export interface AdvisoryPackage {

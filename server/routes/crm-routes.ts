@@ -339,6 +339,27 @@ export function registerCRMRoutes(
         }
       }
 
+      const affectedBrokerStats = new Set<string>();
+      if (currentDeal.brokerProfileId) affectedBrokerStats.add(currentDeal.brokerProfileId);
+      if (deal?.brokerProfileId) affectedBrokerStats.add(deal.brokerProfileId);
+      const statFieldsTouched =
+        "brokerProfileId" in updateData ||
+        "isClosed" in updateData ||
+        "closedAt" in updateData ||
+        "value" in updateData ||
+        "amount" in updateData ||
+        "offerPrice" in updateData ||
+        "assetClass" in updateData;
+      if (statFieldsTouched && affectedBrokerStats.size > 0) {
+        const { recomputeAndPersistBrokerDealStats } = await import("../services/broker-deal-stats");
+        const { pool } = await import("../db");
+        for (const bid of affectedBrokerStats) {
+          recomputeAndPersistBrokerDealStats(pool, bid).catch((e) =>
+            console.error("[BrokerStats] Recompute failed for", bid, e),
+          );
+        }
+      }
+
       res.json(deal);
     } catch (error: any) {
       console.error("Failed to update deal:", error);

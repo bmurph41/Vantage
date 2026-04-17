@@ -108,18 +108,26 @@ function BrokerCard({
           </div>
         )}
 
-        <div className="grid grid-cols-3 gap-2 text-xs text-slate-600 border-t pt-3">
+        <div className="grid grid-cols-3 gap-2 text-xs text-slate-600 border-t pt-3" data-testid={`broker-card-stats-${profile.id}`}>
+          <div>
+            <div className="font-semibold text-slate-900">
+              {profile.verifiedClosedDealsCount ?? 0}
+            </div>
+            <div>Verified closed</div>
+          </div>
+          <div>
+            <div className="font-semibold text-slate-900">
+              {profile.medianResponseHours != null
+                ? `~${Number(profile.medianResponseHours) < 1 ? `${Math.round(Number(profile.medianResponseHours) * 60)}m` : `${Number(profile.medianResponseHours).toFixed(1)}h`}`
+                : profile.averageResponseHours != null
+                ? `~${Number(profile.averageResponseHours).toFixed(1)}h`
+                : "—"}
+            </div>
+            <div>Response time</div>
+          </div>
           <div>
             <div className="font-semibold text-slate-900">{profile.followerCount ?? 0}</div>
             <div>Followers</div>
-          </div>
-          <div>
-            <div className="font-semibold text-slate-900">{profile.totalListingsPublished ?? 0}</div>
-            <div>Listings</div>
-          </div>
-          <div>
-            <div className="font-semibold text-slate-900">{profile.yearsExperience ?? 0}y</div>
-            <div>Experience</div>
           </div>
         </div>
 

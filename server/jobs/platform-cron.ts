@@ -33,6 +33,10 @@ import { sendTrialDay3Email, sendTrialDay5Email, sendTrialLastDayEmail } from ".
 import { runEmailSchedulerTick } from "../services/email-scheduler";
 import { runQuarterlyLPDelivery } from "../services/quarterly-lp-delivery";
 import { retryFailedPnlJobs } from "../services/pnl/retry-failed-jobs";
+import { pool as sharedPool } from "../db";
+import { recomputeAllBrokerDealStats } from "../services/broker-deal-stats";
+import { recomputeAllBrokerResponseStats } from "../services/broker-response-tracker";
+import { scanLicenseExpiry } from "../services/broker-license-verification";
 
 let jobsStarted = false;
 
@@ -644,6 +648,35 @@ export function startPlatformCronJobs() {
     }
   });
 
+  // ─── 10. Broker Marketplace — nightly recompute at 2:15 AM ────────────
+  // Recomputes verified deal stats + response-time stats for all broker
+  // profiles. Fresh data for directory ranking and public trust signals.
+  cron.schedule("15 2 * * *", async () => {
+    logger.info("[CRON] Running broker marketplace nightly recompute");
+    try {
+      const deals = await recomputeAllBrokerDealStats(sharedPool as any);
+      const responses = await recomputeAllBrokerResponseStats(sharedPool as any);
+      logger.info(
+        { deals, responses },
+        "[CRON] Broker marketplace recompute complete",
+      );
+    } catch (error) {
+      logger.error({ error }, "[CRON] Broker marketplace recompute failed");
+    }
+  });
+
+  // ─── 11. Broker License Expiry Scan — daily at 3:00 AM ────────────────
+  // Flags expired licenses, auto-unpublishes profiles with expired licenses.
+  cron.schedule("0 3 * * *", async () => {
+    logger.info("[CRON] Running broker license expiry scan");
+    try {
+      const result = await scanLicenseExpiry(sharedPool as any);
+      logger.info(result, "[CRON] Broker license scan complete");
+    } catch (error) {
+      logger.error({ error }, "[CRON] Broker license scan failed");
+    }
+  });
+
   logger.info("All platform background jobs scheduled successfully");
 }
 
@@ -663,6 +696,8 @@ export function getPlatformJobStatus(): {
       { name: "stale_deal_detection", schedule: "0 6 * * 1", description: "Stale deal detection (Monday 6 AM)" },
       { name: "exchange_rate_refresh", schedule: "0 6 * * *", description: "Exchange rate refresh (daily 6 AM)" },
       { name: "trial_reminders", schedule: "30 8 * * *", description: "Trial reminder emails (daily 8:30 AM)" },
+      { name: "broker_marketplace_recompute", schedule: "15 2 * * *", description: "Broker trust-signal recompute (nightly 2:15 AM)" },
+      { name: "broker_license_scan", schedule: "0 3 * * *", description: "Broker license expiry scan (daily 3 AM)" },
     ],
   };
 }

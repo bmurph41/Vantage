@@ -23,8 +23,54 @@ export interface BrokerProfile {
   followerCount?: number | null;
   totalListingsPublished?: number | null;
   avgResponseHours?: number | null;
+  averageResponseHours?: number | string | null;
+  medianResponseHours?: number | string | null;
+  responseRate30d?: number | string | null;
+  responseSamples30d?: number | null;
+  verifiedClosedDealsCount?: number | null;
+  verifiedClosedDealsVolume?: number | string | null;
+  verifiedClosedDealsAssetClasses?: string[] | null;
+  verifiedClosedDealsLastAt?: string | null;
   isPublishable?: boolean;
 }
+
+export interface BrokerTrustSignals {
+  verifiedClosedDealsCount: number;
+  verifiedClosedDealsVolume: number;
+  verifiedClosedDealsAssetClasses: string[];
+  verifiedClosedDealsLastAt: string | null;
+  averageResponseHours: number | null;
+  medianResponseHours: number | null;
+  responseRate30d: number | null;
+  responseSamples30d: number;
+  followerCount: number;
+  advisorySubscriberCount: number;
+  yearsExperience: number | null;
+  licenseState: string | null;
+  licenseStatus: {
+    level: "ok" | "warning" | "critical" | "expired" | "missing";
+    expiresAt: string | null;
+    daysUntilExpiry: number | null;
+  };
+  isFeatured: boolean;
+}
+
+export interface BrokerVerifiedDeal {
+  id: string;
+  title: string;
+  assetClass: string | null;
+  closedAt: string;
+  volume: number | null;
+  city: string | null;
+  state: string | null;
+}
+
+export interface BrokerFeatureFlagState {
+  flag: string;
+  enabled: boolean;
+  source: "env_force_off" | "env_force_on" | "org_override" | "default_off";
+}
+export type BrokerFeatureFlagsMap = Record<string, BrokerFeatureFlagState>;
 
 export interface DirectoryFilters {
   q?: string;
@@ -124,6 +170,8 @@ export interface ProfileDetailResponse {
   packages: BrokerAdvisoryPackage[];
   listings: MarinaListing[];
   content: BrokerAdvisoryContent[];
+  trustSignals?: BrokerTrustSignals;
+  verifiedDeals?: BrokerVerifiedDeal[];
   viewerContext: {
     isFollowing: boolean;
     isAdvisorySubscriber: boolean;
@@ -161,7 +209,16 @@ export const brokerKeys = {
   feedContent: () => ["broker-subscriptions", "me", "feed", "content"] as const,
   messages: (subId: string) =>
     ["broker-subscriptions", "me", "subscription", subId, "messages"] as const,
+  featureFlags: () => ["broker-subscriptions", "feature-flags"] as const,
 };
+
+export function useBrokerFeatureFlags() {
+  return useQuery<{ flags: BrokerFeatureFlagsMap }>({
+    queryKey: brokerKeys.featureFlags(),
+    queryFn: () => getJson(`${BASE}/feature-flags`),
+    staleTime: 60_000,
+  });
+}
 
 async function getJson<T>(url: string): Promise<T> {
   const res = await fetch(url, { credentials: "include" });

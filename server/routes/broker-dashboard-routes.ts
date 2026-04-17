@@ -26,6 +26,10 @@ import {
   backfillClaimsForProfile,
   releaseUnpublishedProfileClaims,
 } from "../services/broker-claim-service";
+import { pool } from "../db";
+import { getLicenseStatusForBroker } from "../services/broker-license-verification";
+import { getBrokerVerifiedDeals } from "../services/broker-deal-stats";
+import { getAllBrokerFeatureFlags } from "../services/broker-feature-flags";
 
 const router = Router();
 
@@ -106,6 +110,9 @@ router.get("/my-profile", async (req: Request, res: Response) => {
       .where(eq(marinaListings.brokerProfileId, profile.id));
 
     const tierDef = profile.brokerTier ? getBrokerTierDefinition(profile.brokerTier) : null;
+    const licenseStatus = await getLicenseStatusForBroker(pool, profile.registrationId);
+    const verifiedDeals = await getBrokerVerifiedDeals(pool, profile.id, 5);
+    const featureFlags = await getAllBrokerFeatureFlags(ctx.orgId);
 
     res.json({
       profile,
@@ -115,8 +122,27 @@ router.get("/my-profile", async (req: Request, res: Response) => {
         listingsCount: Number(listingsCount || 0),
         followerCount: profile.followerCount,
         advisorySubscriberCount: profile.advisorySubscriberCount,
+        verifiedClosedDealsCount: profile.verifiedClosedDealsCount ?? 0,
+        verifiedClosedDealsVolume: profile.verifiedClosedDealsVolume
+          ? Number(profile.verifiedClosedDealsVolume)
+          : 0,
+        medianResponseHours: profile.medianResponseHours
+          ? Number(profile.medianResponseHours)
+          : null,
+        responseRate30d: profile.responseRate30d ? Number(profile.responseRate30d) : null,
+        responseSamples30d: profile.responseSamples30d ?? 0,
       },
       tierDefinition: tierDef,
+      licenseStatus: licenseStatus
+        ? {
+            level: licenseStatus.level,
+            expiresAt: licenseStatus.licenseExpiresAt,
+            daysUntilExpiry: licenseStatus.daysUntilExpiry,
+            state: licenseStatus.licenseState,
+          }
+        : null,
+      recentVerifiedDeals: verifiedDeals,
+      featureFlags,
     });
   } catch (err) {
     handleError(err, res);
