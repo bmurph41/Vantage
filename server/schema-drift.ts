@@ -2,11 +2,13 @@
  * Schema drift detection — runs at server startup to surface gaps between
  * the Drizzle schema definition and the live database.
  *
- * Detects two categories of drift:
+ * Detects three categories of drift:
  *  1. Missing-from-DB  — tables/columns defined in Drizzle but absent from the live DB.
  *  2. Extra-in-DB      — columns present in the live DB but not declared in the Drizzle
  *                        schema (orphan columns). These can indicate stale migrations or
  *                        fields that were removed from code without a matching DDL drop.
+ *  3. Extra tables     — entire tables that exist in the live DB but have no corresponding
+ *                        Drizzle definition at all (phantom/stale tables).
  *
  * Design constraints:
  *  - Idempotent: safe to call multiple times.
@@ -196,7 +198,7 @@ export async function runSchemaDriftCheck(): Promise<number> {
       }
     }
 
-    // ── Orphan tables: in live DB but entirely absent from the schema ─────────
+    // ── Extra tables: in live DB but entirely absent from the schema ──────────
     // (These tables were missed by the schema-table loop above because they never
     //  appeared in schemaTables at all.)
     for (const [dbTable, dbCols] of allLiveColumns) {
@@ -204,16 +206,13 @@ export async function runSchemaDriftCheck(): Promise<number> {
         // Already handled in the schema-table loop above.
         continue;
       }
-      // Every column of a fully-orphan table is an extra-in-DB issue.
-      for (const dbCol of dbCols) {
-        console.warn(
-          `${PREFIX} EXTRA COLUMN: "${dbTable}"."${dbCol}" exists in the database but is not declared in the schema`
-        );
-        driftCount++;
-      }
+      // Log one EXTRA TABLE warning per phantom table and count it as a single
+      // drift issue (the number of columns is informational only).
       console.warn(
-        `${PREFIX}   → "${dbTable}" summary: 0 missing-from-db, ${dbCols.size} extra-in-db (table has no schema definition)`
+        `${PREFIX} EXTRA TABLE: "${dbTable}" exists in the database but has no Drizzle schema definition` +
+          ` (${dbCols.size} column(s): ${[...dbCols].join(", ")})`
       );
+      driftCount++;
     }
 
     if (driftCount === 0) {

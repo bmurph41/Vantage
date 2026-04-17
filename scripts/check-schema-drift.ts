@@ -1,12 +1,14 @@
 #!/usr/bin/env tsx
 /**
  * CI schema-drift check — exits with a non-zero code when the Drizzle schema
- * and the live database are out of sync in either direction:
+ * and the live database are out of sync in any direction:
  *
  *   • Missing-from-DB  — tables/columns defined in shared/schema.ts that do not
  *                        exist in the live database (forward drift).
  *   • Extra-in-DB      — columns present in the live database that are not
  *                        declared in shared/schema.ts (orphan / reverse drift).
+ *   • Extra tables     — entire tables that exist in the live database but have
+ *                        no corresponding Drizzle definition (phantom/stale tables).
  *
  * Usage:
  *   npm run check:schema
@@ -68,13 +70,16 @@ async function main(): Promise<void> {
   console.error(
     `RESULT: FAIL — ${driftCount} drift issue(s) found (see warnings above).\n` +
       `  • MISSING COLUMN/TABLE warnings indicate schema-defined items absent from the DB.\n` +
-      `  • EXTRA COLUMN warnings indicate orphan DB columns not declared in the schema.`
+      `  • EXTRA COLUMN warnings indicate orphan DB columns not declared in the schema.\n` +
+      `  • EXTRA TABLE warnings indicate entire DB tables with no Drizzle schema definition.`
   );
   console.error(
     `\nFor missing items, run the following to generate ready-to-paste migration stubs:\n\n` +
       `  npx tsx scripts/generate-startup-migrations.ts\n\n` +
       `Then paste the output into server/db-startup-migrations.ts and commit.\n` +
-      `For extra/orphan columns, review whether a DROP COLUMN migration is needed.\n`
+      `For extra/orphan columns, review whether a DROP COLUMN migration is needed.\n` +
+      `For extra/phantom tables (EXTRA TABLE), review whether a DROP TABLE migration is needed\n` +
+      `or add a matching Drizzle table definition to the schema.\n`
   );
   console.log(DIVIDER);
   process.exit(1);
