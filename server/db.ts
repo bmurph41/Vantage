@@ -29,4 +29,15 @@ pool.on('error', (err) => {
   console.error('[DB] Pool error (non-fatal):', err.message);
 });
 
+// Set a statement-level timeout on every new connection so that runaway or
+// stalled queries (e.g. during Neon WebSocket reconnects) fail fast instead
+// of hanging the HTTP request indefinitely.
+pool.on('connect', async (client) => {
+  try {
+    await client.query('SET statement_timeout = 15000'); // abort after 15 s
+  } catch {
+    // non-fatal — best effort
+  }
+});
+
 export const db = drizzle({ client: pool, schema });

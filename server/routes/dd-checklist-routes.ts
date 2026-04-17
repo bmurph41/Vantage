@@ -991,6 +991,35 @@ router.get('/api/dd-checklist-templates', async (req: any, res: Response) => {
   }
 });
 
+// Alias: /api/dd/templates → same data as /api/dd-checklist-templates
+// Required by DealIntegrationPanel which queries this shorter path.
+router.get('/api/dd/templates', async (req: any, res: Response) => {
+  try {
+    const db = await getDb();
+    const schema = await getSchema();
+    const orgId = req.user?.orgId;
+
+    const templates = await db.select({
+      id: schema.ddChecklistTemplates.id,
+      description: schema.ddChecklistTemplates.description,
+      data: schema.ddChecklistTemplates.data,
+      name: schema.ddChecklistTemplates.name,
+      version: schema.ddChecklistTemplates.version,
+      assetClass: schema.ddChecklistTemplates.assetClass,
+      isBuiltin: schema.ddChecklistTemplates.isBuiltin,
+      createdAt: schema.ddChecklistTemplates.createdAt,
+    }).from(schema.ddChecklistTemplates)
+      .where(
+        or(eq(schema.ddChecklistTemplates.isBuiltin, true), eq(schema.ddChecklistTemplates.orgId, orgId))
+      )
+      .orderBy(asc(schema.ddChecklistTemplates.name));
+
+    res.json(templates);
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to fetch templates' });
+  }
+});
+
 // POST /api/dd-checklist-templates/seed - Seed built-in templates
 router.post('/api/dd-checklist-templates/seed', async (req: any, res: Response) => {
   try {

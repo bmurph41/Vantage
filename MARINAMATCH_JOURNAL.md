@@ -1,5 +1,65 @@
 # MarinaMatch Platform Journal
 
+## Design Session (2026-04-17) — Broker Marketplace v1
+
+**Not code, not started — design + monetization locked in for a large deferred initiative.**
+
+Brett raised the idea of repositioning brokers/advisors on MarinaMatch the way
+Airbnb positions hosts: subscriber/follower model, ratings, response-time
+metrics, closed-deal volume, and per-broker AI knowledge bases that draft
+replies/guidance (either auto-send or broker-approved), with the platform
+learning each broker's system over time and weighting by credibility.
+
+**Decisions (full design in memory — `project_broker_marketplace.md`):**
+
+1. **Phased rollout — three phases, do not skip or reorder:**
+   - Phase 1: Objective trust foundation (verified profiles, license, closed
+     deals linked to real records, passive response-time tracking,
+     subscriber/follower model). No reviews, no AI yet.
+   - Phase 2: KB + AI drafts — broker approval gate mandatory, clear
+     disclaimers on any AI-touched message, prompt-context learning only (no
+     fine-tuning). Compliance counsel review REQUIRED before shipping.
+   - Phase 3: Ratings + credibility weighting. Gated on ~50 active brokers /
+     ~500 subscribers before public reviews — otherwise ratings are noise.
+
+2. **Subscriber auth — shared identity, role-scoped surfaces.** One account
+   system, role flags (GP / LP / broker / subscriber), different landing
+   pages/nav per role. Airbnb host/guest pattern. Don't fragment identity.
+   The LP portal should follow the same pattern.
+
+3. **Verification — both manual + third-party, third-party first.** License
+   lookup API as automated gate (handles 90%+), manual review only for edge
+   cases. Manual-default becomes the scaling bottleneck.
+
+4. **Monetization:**
+   - **Anchor:** Tiered broker subscriptions (Listings / Advisor / Premium
+     Advisor / Enterprise). Predictable revenue.
+   - **Secondary:** 10–15% platform take on broker-set subscriber
+     subscription prices, via Stripe Connect (automatic split, low ops).
+     Benchmarks: Substack 10%, Patreon 8–12%, Airbnb ~15%.
+   - **Skip success fees on closed deals** — regulatory complexity
+     (broker-dealer / real estate broker licensing at platform level,
+     RESPA in some asset classes), incentive misalignment (brokers route
+     off-platform), hard to enforce.
+   - **Caveat:** Subscriber-sub volume in CRE will be low (50–500 subs
+     at $20–$200/mo per broker, not 50k). Take-rate is a nice secondary
+     stream, not the main event.
+   - **Lever:** Per-draft / per-1k-token overage on AI usage above tier
+     cap, to prevent a single power-user broker from eating LLM budget.
+
+**Open questions flagged for Phase 1 kickoff:**
+- Which third-party license-lookup API per asset class / jurisdiction
+- Disclaimer language for AI-drafted messages (draft with counsel)
+- Whether subscription prices have platform floors/ceilings or broker-set
+- When a subscriber graduates to a lead in CRM and how broker attribution
+  is credited
+
+**Queue status:** Added as item #17 in `project_remaining_queue.md`.
+Deferred until stabilization sprint (items 1-6) and revenue-readiness
+(items 7-8) complete. Do not interleave.
+
+---
+
 ## Current State (2026-04-16)
 
 ### ✅ COMPLETE — Document Upload & AI Parsing: 4 Critical Fixes (2026-04-16)

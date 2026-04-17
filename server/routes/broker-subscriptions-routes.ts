@@ -30,6 +30,11 @@ import {
   markUnfollowedInHistory,
   recordFollowInHistory,
 } from "../services/broker-entitlements";
+import { pool } from "../db";
+import {
+  recordInboundMessage,
+  recordBrokerReply,
+} from "../services/broker-response-tracker";
 
 const router = Router();
 

@@ -4375,6 +4375,8 @@ export const crmDeals = pgTable("crm_deals", {
   // DD Project Integration
   ddProjectId: varchar("dd_project_id").references(() => projects.id), // Links to DD project if converted
   modelingProjectId: varchar("modeling_project_id"), // Links to financial modeling project (populated on model creation)
+  // Broker Marketplace — attributes a closed deal to a broker_profile for verified trust signals
+  brokerProfileId: varchar("broker_profile_id"),
   // Closed Deal Tracking
   isClosed: boolean("is_closed").default(false),
   closedAt: timestamp("closed_at"),
@@ -19515,6 +19517,11 @@ export const brokerRegistrations = pgTable("broker_registrations", {
   licenseState: varchar("license_state", { length: 2 }),
   licenseExpiresAt: date("license_expires_at"),
   licenseDocumentUrl: text("license_document_url"),
+  licenseLastVerifiedAt: timestamp("license_last_verified_at"),
+  licenseVerificationProvider: varchar("license_verification_provider", { length: 32 }),
+  licenseVerificationStatus: varchar("license_verification_status", { length: 32 }).notNull().default("unverified"),
+  licenseVerificationNotes: text("license_verification_notes"),
+  licenseVerificationPayload: jsonb("license_verification_payload"),
   yearsExperience: integer("years_experience"),
   specialties: jsonb("specialties"),
   bio: text("bio"),
@@ -19530,6 +19537,7 @@ export const brokerRegistrations = pgTable("broker_registrations", {
 }, (table) => ({
   userIdx: index("broker_registrations_user_idx").on(table.userId),
   statusIdx: index("broker_registrations_status_idx").on(table.status),
+  licenseStatusIdx: index("broker_registrations_license_status_idx").on(table.licenseVerificationStatus, table.licenseExpiresAt),
 }));
 
 export const brokerProfiles = pgTable("broker_profiles", {
@@ -19563,6 +19571,14 @@ export const brokerProfiles = pgTable("broker_profiles", {
   totalListingsPublished: integer("total_listings_published").notNull().default(0),
   avgListingQuality: numeric("avg_listing_quality", { precision: 5, scale: 2 }),
   averageResponseHours: numeric("average_response_hours", { precision: 6, scale: 2 }),
+  medianResponseHours: numeric("median_response_hours", { precision: 6, scale: 2 }),
+  responseRate30d: numeric("response_rate_30d", { precision: 5, scale: 2 }),
+  responseSamples30d: integer("response_samples_30d").notNull().default(0),
+  verifiedClosedDealsCount: integer("verified_closed_deals_count").notNull().default(0),
+  verifiedClosedDealsVolume: numeric("verified_closed_deals_volume", { precision: 18, scale: 2 }).notNull().default("0"),
+  verifiedClosedDealsAssetClasses: jsonb("verified_closed_deals_asset_classes"),
+  verifiedClosedDealsLastAt: timestamp("verified_closed_deals_last_at"),
+  trustStatsLastRecomputedAt: timestamp("trust_stats_last_recomputed_at"),
   featuredUntil: timestamp("featured_until"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -19570,6 +19586,7 @@ export const brokerProfiles = pgTable("broker_profiles", {
   userIdx: index("broker_profiles_user_idx").on(table.userId),
   orgIdx: index("broker_profiles_org_idx").on(table.orgId),
   tierIdx: index("broker_profiles_tier_idx").on(table.brokerTier),
+  verifiedDealsIdx: index("broker_profiles_verified_deals_idx").on(table.verifiedClosedDealsCount, table.verifiedClosedDealsVolume),
 }));
 
 export const brokerAdvisoryPackages = pgTable("broker_advisory_packages", {
@@ -19722,10 +19739,27 @@ export const brokerAdvisoryMessages = pgTable("broker_advisory_messages", {
   subIdx: index("broker_advisory_messages_sub_idx").on(table.subscriptionId, table.createdAt),
 }));
 
+export const brokerResponseSamples = pgTable("broker_response_samples", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()::text`),
+  brokerProfileId: varchar("broker_profile_id").notNull().references(() => brokerProfiles.id, { onDelete: "cascade" }),
+  threadType: varchar("thread_type", { length: 32 }).notNull(),
+  threadId: varchar("thread_id").notNull(),
+  firstInboundAt: timestamp("first_inbound_at").notNull(),
+  firstBrokerReplyAt: timestamp("first_broker_reply_at"),
+  responseSeconds: integer("response_seconds"),
+  isUnanswered: boolean("is_unanswered").notNull().default(false),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  brokerIdx: index("broker_response_samples_broker_idx").on(table.brokerProfileId, table.firstInboundAt),
+  uniqThread: uniqueIndex("broker_response_samples_thread_unique").on(table.threadType, table.threadId),
+}));
+
 export type BrokerRegistration = typeof brokerRegistrations.$inferSelect;
 export type InsertBrokerRegistration = typeof brokerRegistrations.$inferInsert;
 export type BrokerProfile = typeof brokerProfiles.$inferSelect;
 export type InsertBrokerProfile = typeof brokerProfiles.$inferInsert;
+export type BrokerResponseSample = typeof brokerResponseSamples.$inferSelect;
+export type InsertBrokerResponseSample = typeof brokerResponseSamples.$inferInsert;
 export type BrokerAdvisoryPackage = typeof brokerAdvisoryPackages.$inferSelect;
 export type InsertBrokerAdvisoryPackage = typeof brokerAdvisoryPackages.$inferInsert;
 export type BrokerSubscription = typeof brokerSubscriptions.$inferSelect;

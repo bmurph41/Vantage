@@ -54,6 +54,20 @@ export const getQueryFn: <T>(options: {
     }
 
     await throwIfResNotOk(res);
+
+    // Guard against SPA catch-all returning HTML instead of JSON.
+    // This happens when an API route is unregistered and Express falls through
+    // to serveStatic, which returns index.html with a 200 status.  Calling
+    // res.json() on HTML produces the confusing "Unexpected token '<'" error;
+    // replace it with a clearer message that also names the missing URL.
+    const contentType = res.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) {
+      throw new Error(
+        `API endpoint returned unexpected content (${res.status} ${res.statusText}). ` +
+        `The route "${(queryKey as string[]).join('/')}" may not be registered on the server.`
+      );
+    }
+
     return await res.json();
   };
 
