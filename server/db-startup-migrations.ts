@@ -4,6 +4,50 @@
  *
  * Each migration is safe to run multiple times (IF NOT EXISTS / USING cast).
  * This module runs once at server startup before any data seeds.
+ *
+ * ─── HOW TO ADD MIGRATIONS WHEN EXTENDING THE SCHEMA ──────────────────────────
+ *
+ * Whenever you add a new table or column to shared/schema.ts (or any secondary
+ * schema file such as db/schema-commercial-tenants.ts), you MUST also add a
+ * corresponding entry to the MIGRATIONS array below. Failure to do so will cause
+ * schema drift that shows up as warnings at startup and can lead to runtime 500s.
+ *
+ * 1. NEW COLUMN — append an entry like:
+ *      {
+ *        name: "my_table: add my_column",
+ *        sql: `ALTER TABLE my_table ADD COLUMN IF NOT EXISTS my_column text`,
+ *      },
+ *
+ *    Use the appropriate PostgreSQL type (text, integer, boolean, numeric, timestamp,
+ *    jsonb, varchar(N), …).  Add a DEFAULT when the column is NOT NULL so existing
+ *    rows satisfy the constraint.
+ *
+ * 2. NEW TABLE — append an entry like:
+ *      {
+ *        name: "my_table: create table",
+ *        sql: `
+ *          CREATE TABLE IF NOT EXISTS my_table (
+ *            id serial PRIMARY KEY,
+ *            name text NOT NULL,
+ *            created_at timestamp DEFAULT now()
+ *          )
+ *        `,
+ *      },
+ *
+ * 3. DETECT DRIFT AUTOMATICALLY — run the helper script any time you want to see
+ *    what the schema defines vs. what is already covered here:
+ *
+ *      npx tsx scripts/generate-startup-migrations.ts
+ *
+ *    The script prints ready-to-paste migration stubs for every table/column that
+ *    is in the Drizzle schema but has no matching entry in this file.
+ *
+ * 4. CI GUARD — the project includes a drift-check script that exits non-zero when
+ *    the live database is missing schema columns, making it suitable as a CI step:
+ *
+ *      npx tsx scripts/check-schema-drift.ts
+ *
+ * ──────────────────────────────────────────────────────────────────────────────
  */
 
 import { pool } from "./db";
