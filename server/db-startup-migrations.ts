@@ -11943,6 +11943,23 @@ const MIGRATIONS: Migration[] = [
   { name: "organization_packs: add created_at", sql: `ALTER TABLE organization_packs ADD COLUMN IF NOT EXISTS created_at timestamp` },
   { name: "organization_packs: add updated_at", sql: `ALTER TABLE organization_packs ADD COLUMN IF NOT EXISTS updated_at timestamp` },
   {
+    name: "fund_investors: widen tax_id to text (fits encrypted PII ciphertext)",
+    sql: `
+      DO $$
+      BEGIN
+        IF EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_schema = 'public'
+            AND table_name = 'fund_investors'
+            AND column_name = 'tax_id'
+            AND data_type = 'character varying'
+        ) THEN
+          ALTER TABLE fund_investors ALTER COLUMN tax_id TYPE text;
+        END IF;
+      END$$;
+    `,
+  },
+  {
     name: "organization_packs: unique (org_id, pack_type) for ON CONFLICT",
     sql: `
       DO $$
