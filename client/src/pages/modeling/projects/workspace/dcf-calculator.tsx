@@ -90,6 +90,22 @@ interface DCFAnalysis {
     standardDeviation: number;
     confidenceInterval: { low: number; high: number };
   };
+  meta?: {
+    leaseIncomeInjected: boolean;
+    revenueGrowthRateUsed: number;
+    leaseEscalationRateUsed: number | null;
+    discountRate: number;
+    hasDebt: boolean;
+    overridesApplied: boolean;
+    generatedAt: string;
+  };
+  leaseIncome?: {
+    hasLeases: boolean;
+    totalEGIAnnual: number;
+    totalBaseRentAnnual: number;
+    totalRecoveryAnnual: number;
+    weightedAvgEscalationRate: number;
+  };
 }
 
 interface DCFCalculatorPageProps {
@@ -584,6 +600,47 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
       </div>
       </div>
 
+      {/* ── Lease vs Pro-Forma Reconciliation Banner ── */}
+      {(() => {
+        const leaseIncomeInjected = dcfAnalysis?.meta?.leaseIncomeInjected === true;
+        if (!leaseIncomeInjected) return null;
+        const leaseEGI = dcfAnalysis?.leaseIncome?.totalEGIAnnual ?? leaseIncomeData?.totalEGIAnnual;
+        if (!leaseEGI) return null;
+        // Use the original pro-forma value as baseline; fall back to current model input
+        const proFormaNOI = proFormaData?.metrics?.year1Noi || proFormaData?.noi?.[0] || liveInputs.year1NOI;
+        if (!proFormaNOI) return null;
+        const delta = leaseEGI - proFormaNOI;
+        const variancePct = Math.abs(delta / proFormaNOI) * 100;
+        if (variancePct <= 10) return null;
+        const isHigher = delta > 0;
+        return (
+          <div
+            className="flex items-start gap-3 p-4 rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-800"
+            data-testid="lease-variance-banner"
+          >
+            <AlertCircle className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
+            <div className="flex-1 min-w-0 text-sm">
+              <p className="font-semibold text-amber-800 dark:text-amber-300">
+                Lease income deviates significantly from pro-forma estimate
+              </p>
+              <p className="text-amber-700 dark:text-amber-400 mt-1">
+                Actual lease EGI is <strong>{formatCompactCurrency(leaseEGI)}</strong> —{' '}
+                {isHigher ? 'above' : 'below'} your pro-forma Year&nbsp;1 NOI of{' '}
+                <strong>{formatCompactCurrency(proFormaNOI)}</strong> by{' '}
+                <strong>{variancePct.toFixed(1)}%</strong> ({isHigher ? '+' : ''}{formatCompactCurrency(delta)}).{' '}
+                The DCF is using lease-derived income as the Year&nbsp;1 basis.
+              </p>
+            </div>
+            <Badge
+              variant="outline"
+              className="shrink-0 text-amber-700 dark:text-amber-300 border-amber-400 dark:border-amber-700"
+            >
+              {variancePct.toFixed(1)}% variance
+            </Badge>
+          </div>
+        );
+      })()}
+
       {/* ── Institutional KPI strip ── */}
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 divide-x divide-border border rounded-lg overflow-hidden">
         {[
@@ -1026,6 +1083,43 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
                   </CardContent>
                 </Card>
               </div>
+
+              {/* Delta vs. Pro-Forma comparison row */}
+              {(() => {
+                const leaseEGI = dcfAnalysis?.leaseIncome?.totalEGIAnnual ?? leaseIncomeData.totalEGIAnnual;
+                const proFormaNOI = proFormaData?.metrics?.year1Noi || proFormaData?.noi?.[0] || liveInputs.year1NOI;
+                if (!leaseEGI || !proFormaNOI) return null;
+                const delta = leaseEGI - proFormaNOI;
+                const variancePct = proFormaNOI > 0 ? (delta / proFormaNOI) * 100 : 0;
+                const isHigher = delta > 0;
+                const isSignificant = Math.abs(variancePct) > 10;
+                return (
+                  <div
+                    className={`flex flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3 rounded-lg border text-sm ${
+                      isSignificant
+                        ? 'border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-800'
+                        : 'border-border bg-muted/40'
+                    }`}
+                    data-testid="lease-delta-row"
+                  >
+                    <span className="font-medium text-muted-foreground">Delta vs. Pro-Forma:</span>
+                    <span className="font-semibold">
+                      Pro-forma NOI: <span className="tabular-nums">{formatCompactCurrency(proFormaNOI)}</span>
+                    </span>
+                    <span className="font-semibold">
+                      Lease EGI: <span className="tabular-nums">{formatCompactCurrency(leaseEGI)}</span>
+                    </span>
+                    <span className={`font-bold tabular-nums ${isHigher ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+                      {isHigher ? '+' : ''}{formatCompactCurrency(delta)} ({variancePct.toFixed(1)}%)
+                    </span>
+                    {isSignificant && (
+                      <Badge variant="outline" className="text-amber-700 dark:text-amber-300 border-amber-400 dark:border-amber-700">
+                        &gt;10% — review inputs
+                      </Badge>
+                    )}
+                  </div>
+                );
+              })()}
 
               {/* Year-by-Year Projection */}
               {leaseIncomeData.yearlyProjection?.length > 0 && (
