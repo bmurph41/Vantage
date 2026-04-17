@@ -222,7 +222,9 @@
       "Bash(/usr/bin/time -v npm run check)",
       "Bash(/bin/time -v npm run check)",
       "Bash(echo \"exit=$?\")",
-      "Bash(NODE_OPTIONS=\"--max-old-space-size=1024\" npx tsc --noEmit --incremental false)"
+      "Bash(NODE_OPTIONS=\"--max-old-space-size=1024\" npx tsc --noEmit --incremental false)",
+      "Bash(NODE_OPTIONS=\"--max-old-space-size=4096\" npx tsc --noEmit --incremental false)",
+      "Bash(echo \"real_exit=$?\")"
     ]
   }
 }
