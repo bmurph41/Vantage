@@ -15,7 +15,7 @@
  */
 
 import type { Express, Request, Response } from 'express';
-import { performDCFAnalysis, computeQuickIRR, loadLeaseIncomeForProject } from '../services/dcf-calculator-service';
+import { performDCFAnalysis, computeQuickIRR, loadLeaseIncomeForProject, computeLeaseIncomeByYear } from '../services/dcf-calculator-service';
 import { runMonteCarlo } from '../services/dcf-simulation-service';
 import { runDecisionSupport, checkEntitlement } from '../services/dcf-decision-support-service';
 import { getModelConfig } from '../../shared/asset-class-model-config';
@@ -245,33 +245,26 @@ export function registerDCFRoutes(
 
         const leaseIncome = await loadLeaseIncomeForProject(pool, projectId);
 
-        // Compute year-by-year projection with escalations for the breakdown
+        // Compute year-by-year projection with per-tenant escalations, free-rent
+        // concessions, and lease expiry applied individually per lease
         const holdPeriod = Number(req.query.holdPeriod) || 5;
-        const yearlyProjection: Array<{
-          year: number;
-          baseRentAnnual: number;
-          recoveryAnnual: number;
-          totalEGI: number;
-        }> = [];
 
-        for (let yr = 1; yr <= holdPeriod; yr++) {
-          let baseRent = 0;
-          let recovery = 0;
+        // Load acquisition date from project config for accurate timing
+        const pcRow = await pool.query(
+          `SELECT mpc.acquisition_close_date
+           FROM modeling_projects mp
+           JOIN modeling_project_config mpc ON mpc.modeling_project_id = mp.id
+           WHERE mp.id = $1 LIMIT 1`,
+          [projectId]
+        );
+        const acquisitionDate = pcRow.rows[0]?.acquisition_close_date
+          ?? new Date().toISOString().split('T')[0];
 
-          for (const lease of leaseIncome.leaseBreakdown) {
-            const growthFactor = Math.pow(1 + lease.escalationRate, yr - 1);
-            baseRent += lease.baseRentAnnual * growthFactor;
-            // Recovery income grows at a flat 2.5% per year assumption
-            recovery += lease.recoveryAnnual * Math.pow(1.025, yr - 1);
-          }
-
-          yearlyProjection.push({
-            year: yr,
-            baseRentAnnual: Math.round(baseRent),
-            recoveryAnnual: Math.round(recovery),
-            totalEGI: Math.round(baseRent + recovery),
-          });
-        }
+        const yearlyProjection = computeLeaseIncomeByYear(
+          leaseIncome.leaseBreakdown,
+          holdPeriod,
+          acquisitionDate
+        );
 
         res.json({
           projectId,

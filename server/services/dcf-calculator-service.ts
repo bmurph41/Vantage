@@ -76,7 +76,8 @@ export interface DCFAnalysisResult {
   exit: DCFExitDetail;
   cashFlows: DatedCashFlow[];        // full dated flows for parity testing
   sensitivity: SensitivityMatrix;
-  leaseIncome: LeaseIncomeResult;    // tenant lease income data
+  leaseIncome: LeaseIncomeResult;            // tenant lease income data (year 1 summary)
+  yearlyLeaseIncome: LeaseYearIncome[];      // per-year lease EGI with per-tenant escalation detail
   meta: {
     source: 'proForma';
     generatedAt: string;
@@ -161,9 +162,10 @@ export async function performDCFAnalysis(
     }
   }
 
-  // ── Inject lease EGI into assumptions if leases exist ──────────────────
-  // When tenant leases are present, their base rent + recoveries override the
-  // modeled EGI so the DCF reflects actual lease income.
+  // ── Inject lease EGI into assumptions if leases exist (Year 1 basis only) ─
+  // When tenant leases are present, their Year 1 base rent + recoveries are
+  // passed as hints to the direct input engine so it can contextualize the
+  // revenue model. Per-year compounding is handled by computeLeaseIncomeByYear.
   let leaseIncomeInjected = false;
   if (leaseIncome.hasLeases && leaseIncome.totalEGIAnnual > 0) {
     assumptions.leaseEGIAnnual = leaseIncome.totalEGIAnnual;
@@ -179,45 +181,20 @@ export async function performDCFAnalysis(
     projectData.unitMix
   );
 
-  // ── Override year1 EGI with lease income when available ─────────────────
-  // After computing the baseline year1 from the engine, blend in lease income
-  // as the effective gross income when leases are present. The engine's NOI
-  // margin is preserved; we replace the revenue basis.
-  if (leaseIncomeInjected && year1) {
-    const leaseEGI = leaseIncome.totalEGIAnnual;
-    const engineNOI = year1.noi ?? 0;
-    const engineEGI = year1.effectiveGrossIncome ?? year1.grossRevenue ?? year1.totalRevenue ?? 0;
-    // Compute engine's implied NOI margin and apply to lease EGI
-    if (engineEGI > 0) {
-      const noiMargin = engineNOI / engineEGI;
-      year1._leaseNOI = leaseEGI * noiMargin;
-      year1._leaseEGI = leaseEGI;
-    } else {
-      // No engine EGI available — use lease EGI directly as NOI basis
-      year1._leaseNOI = leaseEGI;
-      year1._leaseEGI = leaseEGI;
-    }
-    // Use the lease-derived NOI as the canonical year1 NOI for projections
-    year1.noi = year1._leaseNOI;
-    year1.ncf = year1.noi - (year1.capex ?? 0);
-  }
-
   // ── Step 3: Build projection config from scenario/capital stack ─────────
   const holdPeriod = input.overrides?.holdPeriodYears
     ?? scenarioData.holdPeriod
     ?? capitalStackData?.holdPeriodYears
     ?? 5;
 
-  // When leases are present, use the weighted avg escalation rate as the income
-  // growth rate for the multi-year projection, but apply the scenario rate as a
-  // floor so aggressive lease escalations don't undercut conservative scenarios.
   const scenarioGrowthRate = (scenarioData.revenueGrowthRate ?? 3) / 100
     + (input.overrides?.revenueGrowthRateDelta ?? 0) / 100;
   const leaseEscalationRate = leaseIncome.hasLeases && leaseIncome.weightedAvgEscalationRate > 0
     ? leaseIncome.weightedAvgEscalationRate
     : 0;
+  // Revenue growth rate is still needed for sensitivity matrix and fallback
   const revenueGrowthRate = leaseIncomeInjected && leaseEscalationRate > 0
-    ? Math.max(scenarioGrowthRate, leaseEscalationRate)  // use lease escalation; floor at scenario rate
+    ? Math.max(scenarioGrowthRate, leaseEscalationRate)
     : scenarioGrowthRate;
 
   const expenseGrowthRate = (scenarioData.expenseGrowthRate ?? 2.5) / 100;
@@ -233,6 +210,33 @@ export async function performDCFAnalysis(
     ?? projectData.purchasePrice
     ?? 0;
 
+  // ── Step 3b: Compute per-year NOI overrides from lease escalation schedules ─
+  // When leases are present, derive year-by-year NOI for each hold year by
+  // applying each tenant's individual escalation rate, free-rent concessions,
+  // and lease expiry. This replaces the single weighted-average growth approach.
+  let noiOverrides: number[] | undefined;
+  let yearlyLeaseIncome: ReturnType<typeof computeLeaseIncomeByYear> = [];
+
+  if (leaseIncomeInjected && year1) {
+    const acquisitionDate = scenarioData.acquisitionCloseDate
+      ?? new Date().toISOString().split('T')[0];
+
+    // Compute per-year lease EGI with per-tenant escalation schedules
+    yearlyLeaseIncome = computeLeaseIncomeByYear(
+      leaseIncome.leaseBreakdown,
+      holdPeriod,
+      acquisitionDate
+    );
+
+    // Derive NOI from EGI using the engine's implied NOI margin
+    const engineEGI = year1.effectiveGrossIncome ?? year1.grossRevenue ?? year1.totalRevenue ?? 0;
+    const engineNOI = year1.noi ?? 0;
+    const noiMargin = engineEGI > 0 ? engineNOI / engineEGI : 1;
+
+    // Build the overrides array (index 0 = Year 1, index N-1 = Year N)
+    noiOverrides = yearlyLeaseIncome.map(yli => Math.round(yli.egiAnnual * noiMargin));
+  }
+
   // ── Step 4: Generate Multi-Year Projection (CANONICAL SOURCE) ───────────
   const projection = computeMultiYearProjection(year1, {
     holdPeriod,
@@ -240,6 +244,7 @@ export async function performDCFAnalysis(
     expenseGrowthRate,
     exitCapRate,
     sellingCostPct,
+    noiOverrides,
   });
 
   // ── Step 5: Compute debt schedule ───────────────────────────────────────
@@ -347,6 +352,7 @@ export async function performDCFAnalysis(
       debtBalanceAtExit,
       acquisitionDate,
       purchasePrice,
+      noiOverrides,
     }
   );
 
@@ -370,6 +376,7 @@ export async function performDCFAnalysis(
     cashFlows: canonical.flows,
     sensitivity,
     leaseIncome,
+    yearlyLeaseIncome,
     meta: {
       source: 'proForma',
       generatedAt: new Date().toISOString(),
@@ -449,6 +456,9 @@ function buildSensitivityMatrix(
     debtBalanceAtExit: number;
     acquisitionDate: string;
     purchasePrice: number;
+    /** Per-year NOI overrides from lease escalation schedules — threaded through so
+     *  sensitivity IRR values remain consistent with the main DCF projection. */
+    noiOverrides?: number[];
   }
 ): SensitivityMatrix {
   // Growth rate columns: base ± 1%, ± 2% (5 columns)
@@ -470,6 +480,8 @@ function buildSensitivityMatrix(
         expenseGrowthRate: params.expenseGrowthRate,
         exitCapRate: exitCap,
         sellingCostPct: params.sellingCostPct,
+        // Pass lease NOI overrides so sensitivity correctly reflects contractual income
+        noiOverrides: params.noiOverrides,
       });
 
       const flows = buildQuickFlows(
@@ -522,6 +534,24 @@ function buildQuickFlows(
 
 // ─── Lease Income Loader ─────────────────────────────────────────────────────
 
+export interface LeaseBreakdownEntry {
+  leaseId: string;
+  tenantName: string;
+  sf: number;
+  leaseType: string;
+  baseRentAnnual: number;
+  recoveryAnnual: number;
+  escalationType: string;
+  escalationRate: number;              // annual pct (decimal)
+  leaseEndDate: string;
+  /** ISO date string when the lease starts (used to anchor free-rent timing relative to acquisition) */
+  leaseStartDate: string | null;
+  /** ISO date string when the lease commences rent (after any free-rent period) */
+  rentCommencementDate: string | null;
+  /** Number of free-rent months at start of lease (derived from lease_start_date vs rent_commencement_date) */
+  freeRentMonths: number;
+}
+
 export interface LeaseIncomeResult {
   hasLeases: boolean;
   leaseCount: number;
@@ -529,17 +559,183 @@ export interface LeaseIncomeResult {
   totalRecoveryAnnual: number;
   totalEGIAnnual: number;                // base rent + recoveries
   weightedAvgEscalationRate: number;     // weighted avg annual escalation pct (decimal)
-  leaseBreakdown: Array<{
+  leaseBreakdown: LeaseBreakdownEntry[];
+}
+
+// ─── Per-Year Lease Income ────────────────────────────────────────────────────
+
+export interface LeaseYearIncome {
+  /** 1-based year number */
+  year: number;
+  /** Aggregate base rent for this year across all active leases, after escalation */
+  baseRentAnnual: number;
+  /** Aggregate recovery income for this year across all active leases */
+  recoveryAnnual: number;
+  /** Total EGI = baseRentAnnual + recoveryAnnual */
+  egiAnnual: number;
+  /** Per-lease detail for transparency */
+  leaseDetail: Array<{
     leaseId: string;
     tenantName: string;
-    sf: number;
-    leaseType: string;
-    baseRentAnnual: number;
-    recoveryAnnual: number;
-    escalationType: string;
-    escalationRate: number;              // annual pct (decimal)
-    leaseEndDate: string;
+    baseRent: number;
+    recovery: number;
+    isExpired: boolean;
+    freeRentReduction: number;
   }>;
+}
+
+/**
+ * Compute per-lease EGI for each hold year, applying individual escalation
+ * rates, free-rent concessions, and lease expiry.
+ *
+ * @param leaseBreakdown  Output from loadLeaseIncomeForProject().leaseBreakdown
+ * @param holdPeriod      Number of projection years (1-based)
+ * @param acquisitionDate ISO date string for year 1 start (defaults to today)
+ */
+export function computeLeaseIncomeByYear(
+  leaseBreakdown: LeaseBreakdownEntry[],
+  holdPeriod: number,
+  acquisitionDate?: string
+): LeaseYearIncome[] {
+  const refDate = acquisitionDate ? new Date(acquisitionDate) : new Date();
+  const MS_PER_DAY = 1000 * 60 * 60 * 24;
+  const DAYS_PER_YEAR = 365.25;
+
+  const results: LeaseYearIncome[] = [];
+
+  for (let yr = 1; yr <= holdPeriod; yr++) {
+    // Year `yr` occupies [refDate + (yr-1) years, refDate + yr years)
+    const yearStart = new Date(refDate);
+    yearStart.setFullYear(yearStart.getFullYear() + (yr - 1));
+    const yearEnd = new Date(refDate);
+    yearEnd.setFullYear(yearEnd.getFullYear() + yr);
+
+    let totalBaseRent = 0;
+    let totalRecovery = 0;
+    const leaseDetail: LeaseYearIncome['leaseDetail'] = [];
+
+    for (const lease of leaseBreakdown) {
+      const leaseStartDate = lease.leaseStartDate ? new Date(lease.leaseStartDate) : null;
+      const leaseEndDate = lease.leaseEndDate ? new Date(lease.leaseEndDate) : null;
+
+      // Rent commencement date determines when free-rent ends and when escalation begins.
+      // If not set, fall back to lease start date.
+      const commencementDate = lease.rentCommencementDate
+        ? new Date(lease.rentCommencementDate)
+        : leaseStartDate;
+
+      // Quick rejection: lease entirely outside this projection year
+      const isExpired = leaseEndDate !== null && leaseEndDate <= yearStart;
+      const notYetStarted = leaseStartDate !== null && leaseStartDate >= yearEnd;
+      if (isExpired || notYetStarted) {
+        leaseDetail.push({
+          leaseId: lease.leaseId,
+          tenantName: lease.tenantName,
+          baseRent: 0,
+          recovery: 0,
+          isExpired,
+          freeRentReduction: 0,
+        });
+        continue;
+      }
+
+      // ── Month-by-month computation ──────────────────────────────────────────
+      // Process each of the 12 calendar months within this projection year.
+      // For each month we determine:
+      //   1. Is the lease active? (between leaseStart and leaseEnd)
+      //   2. Is rent due? (on or after commencementDate — i.e., free-rent has ended)
+      //   3. What escalation factor applies? (based on completed lease anniversaries
+      //      since commencementDate, not since acquisition date)
+      //
+      // This unified timeline ensures free-rent, active window, and escalation are
+      // never double-applied or double-counted.
+
+      let netBaseRent = 0;
+      let grossBaseRentIfNoFreeRent = 0; // for computing freeRentReduction as a delta
+
+      for (let m = 0; m < 12; m++) {
+        // Month boundaries within this projection year (calendar month offset from yearStart)
+        const monthStart = new Date(yearStart);
+        monthStart.setMonth(yearStart.getMonth() + m);
+        const monthEnd = new Date(yearStart);
+        monthEnd.setMonth(yearStart.getMonth() + m + 1);
+
+        // Lease not yet started this month
+        if (leaseStartDate && leaseStartDate >= monthEnd) continue;
+        // Lease already expired this month
+        if (leaseEndDate && leaseEndDate <= monthStart) continue;
+
+        // Effective active window within this month (handles partial first/last months)
+        const effectiveStart = leaseStartDate && leaseStartDate > monthStart
+          ? leaseStartDate : monthStart;
+        const effectiveEnd = leaseEndDate && leaseEndDate < monthEnd
+          ? leaseEndDate : monthEnd;
+        const monthMs = monthEnd.getTime() - monthStart.getTime();
+        const activeFraction = monthMs > 0
+          ? Math.max(0, (effectiveEnd.getTime() - effectiveStart.getTime()) / monthMs)
+          : 1.0;
+        if (activeFraction <= 0) continue;
+
+        // Escalation: number of completed lease years since commencement at the start
+        // of this month. Anchored to commencementDate so pre-acquisition escalations
+        // are already baked into the base rent.
+        let escalatedMonthlyRent = lease.baseRentAnnual / 12;
+        if (commencementDate && lease.escalationRate > 0) {
+          const msFromCommencementToMonthStart = monthStart.getTime() - commencementDate.getTime();
+          const leaseYearsElapsed = Math.max(
+            0,
+            Math.floor(msFromCommencementToMonthStart / (MS_PER_DAY * DAYS_PER_YEAR))
+          );
+          escalatedMonthlyRent = (lease.baseRentAnnual / 12) *
+            Math.pow(1 + lease.escalationRate, leaseYearsElapsed);
+        }
+
+        // What the month would earn without any free-rent (for computing freeRentReduction)
+        grossBaseRentIfNoFreeRent += escalatedMonthlyRent * activeFraction;
+
+        // Free-rent: month is rent-free if rent has not yet commenced
+        const isFreePeriod = commencementDate !== null && monthStart < commencementDate;
+        if (isFreePeriod) continue; // no rent this month
+
+        netBaseRent += escalatedMonthlyRent * activeFraction;
+      }
+
+      const freeRentReduction = Math.max(0, grossBaseRentIfNoFreeRent - netBaseRent);
+
+      // Recovery income: annual × active fraction of the full year, growing at 2.5%/year
+      // (consistent with the prior /lease-income route). No free-rent applies to recoveries.
+      const yearMs = yearEnd.getTime() - yearStart.getTime();
+      const fullYearActiveFraction = yearMs > 0 ? Math.max(0, Math.min(1,
+        (Math.min(leaseEndDate?.getTime() ?? yearEnd.getTime(), yearEnd.getTime()) -
+         Math.max(leaseStartDate?.getTime() ?? yearStart.getTime(), yearStart.getTime()))
+        / yearMs
+      )) : 1.0;
+      const escalatedRecovery = lease.recoveryAnnual *
+        Math.pow(1.025, yr - 1) * fullYearActiveFraction;
+
+      totalBaseRent += netBaseRent;
+      totalRecovery += escalatedRecovery;
+
+      leaseDetail.push({
+        leaseId: lease.leaseId,
+        tenantName: lease.tenantName,
+        baseRent: Math.round(netBaseRent),
+        recovery: Math.round(escalatedRecovery),
+        isExpired: false,
+        freeRentReduction: Math.round(freeRentReduction),
+      });
+    }
+
+    results.push({
+      year: yr,
+      baseRentAnnual: Math.round(totalBaseRent),
+      recoveryAnnual: Math.round(totalRecovery),
+      egiAnnual: Math.round(totalBaseRent + totalRecovery),
+      leaseDetail,
+    });
+  }
+
+  return results;
 }
 
 /**
@@ -562,7 +758,8 @@ export async function loadLeaseIncomeForProject(pool: any, projectId: string): P
   // they haven't yet generated income; they can be added to later-year projections separately.
   const today = new Date().toISOString().split('T')[0];
   const leasesResult = await pool.query(
-    `SELECT id, tenant_name, sf, lease_type, lease_end_date, lease_start_date, status
+    `SELECT id, tenant_name, sf, lease_type, lease_end_date, lease_start_date,
+            rent_commencement_date, status
      FROM tenant_leases
      WHERE project_id = $1
        AND status NOT IN ('EXPIRED', 'ARCHIVED')
@@ -656,6 +853,16 @@ export async function loadLeaseIncomeForProject(pool: any, projectId: string): P
     totalRecovery += recoveryAnnual;
     weightedEscRentProduct += escalationRate * baseRentAnnual;
 
+    // Compute free-rent months from the gap between lease_start_date and rent_commencement_date.
+    // When rent_commencement_date is after lease_start_date, the tenant has a free-rent period.
+    let freeRentMonths = 0;
+    if (lease.rent_commencement_date && lease.lease_start_date) {
+      const startMs = new Date(lease.lease_start_date).getTime();
+      const commenceMs = new Date(lease.rent_commencement_date).getTime();
+      const diffDays = Math.max(0, (commenceMs - startMs) / (1000 * 60 * 60 * 24));
+      freeRentMonths = Math.round(diffDays / 30.44); // approximate months
+    }
+
     breakdown.push({
       leaseId: lease.id,
       tenantName: lease.tenant_name,
@@ -666,6 +873,9 @@ export async function loadLeaseIncomeForProject(pool: any, projectId: string): P
       escalationType,
       escalationRate,
       leaseEndDate: lease.lease_end_date,
+      leaseStartDate: lease.lease_start_date ?? null,
+      rentCommencementDate: lease.rent_commencement_date ?? null,
+      freeRentMonths,
     });
   }
 

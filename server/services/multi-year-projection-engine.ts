@@ -88,6 +88,16 @@ export interface ProjectionConfig {
    * Applied when computing net sale proceeds.
    */
   sellingCostPct?: number;
+
+  /**
+   * Per-year NOI overrides derived from tenant lease escalation schedules.
+   * Index 0 = Year 1, index 1 = Year 2, etc.
+   * When present for a given year, the engine uses this value as the canonical NOI
+   * instead of computing NOI from revenue-minus-expenses growth.
+   * Revenue and expense lines still grow normally for display; only NOI and NCF
+   * are overridden. Use computeLeaseIncomeByYear() to generate these values.
+   */
+  noiOverrides?: number[];
 }
 
 // ─────────────────────────────────────────────
@@ -144,6 +154,11 @@ export interface ProjectionYear {
   noiChange?: number;
   /** Year-over-year NOI change as percent (null for Year 1) */
   noiChangePct?: number;
+  /**
+   * When set, this NOI was provided by a per-year lease escalation override
+   * rather than computed from revenue-minus-expenses growth.
+   */
+  noiOverrideFromLeases?: number;
 }
 
 export interface ExitMetrics {
@@ -220,9 +235,13 @@ function resolveGrowthRate(
 }
 
 /**
- * Scale a monthly breakdown proportionally when annual total changes.
+ * Scale a monthly breakdown proportionally when annual totals change.
  * Preserves seasonal distribution — each month's share of the annual total
  * is kept constant, only the absolute amounts change.
+ *
+ * When newNOI differs from (newAnnualRevenue - newAnnualExpenses) — for example
+ * when a per-lease NOI override is in effect — monthly NOI is scaled separately
+ * so the monthly totals sum to the authoritative annual NOI.
  */
 function scaleMonthlyBreakdown(
   year1Breakdown: MonthlyBreakdown[],
@@ -232,19 +251,29 @@ function scaleMonthlyBreakdown(
 ): ProjectionMonthlyBreakdown[] {
   const year1TotalRevenue = year1Breakdown.reduce((s, m) => s + m.revenue, 0);
   const year1TotalExpenses = year1Breakdown.reduce((s, m) => s + m.expenses, 0);
+  const year1TotalNOI = year1Breakdown.reduce(
+    (s, m) => s + (m.noi ?? (m.revenue - m.expenses)),
+    0
+  );
 
   const revenueScalar = year1TotalRevenue > 0 ? newAnnualRevenue / year1TotalRevenue : 1;
   const expenseScalar = year1TotalExpenses > 0 ? newAnnualExpenses / year1TotalExpenses : 1;
+  // Scale monthly NOI to the authoritative annual NOI (which may be a lease override)
+  const noiScalar = year1TotalNOI !== 0 ? newNOI / year1TotalNOI : 1;
 
   return year1Breakdown.map((m, idx) => {
     const scaledRevenue = round2(m.revenue * revenueScalar);
     const scaledExpenses = round2(m.expenses * expenseScalar);
+    const monthNOI = m.noi ?? (m.revenue - m.expenses);
+    const scaledNOI = year1TotalNOI !== 0
+      ? round2(monthNOI * noiScalar)
+      : round2(scaledRevenue - scaledExpenses);
     return {
       month: idx + 1,
       monthName: MONTH_NAMES[idx],
       revenue: scaledRevenue,
       expenses: scaledExpenses,
-      noi: round2(scaledRevenue - scaledExpenses),
+      noi: scaledNOI,
       daysInMonth: m.daysInMonth,
       isSeasonal: m.isSeasonal,
     };
@@ -253,11 +282,14 @@ function scaleMonthlyBreakdown(
 
 /**
  * Build Year 1 projection directly from engine output — no growth applied.
+ * When noiOverride is provided (from per-lease escalation schedules), it
+ * replaces the engine-computed NOI while revenue/expense lines are preserved.
  */
 function buildYear1(
   financials: DirectInputFinancials,
   capex: number,
-  capexEntry: CapExScheduleEntry | undefined
+  capexEntry: CapExScheduleEntry | undefined,
+  noiOverride?: number
 ): ProjectionYear {
   const revenueLines: ProjectionLineItem[] = financials.revenueLines.map(l => ({
     key: l.key,
@@ -288,7 +320,8 @@ function buildYear1(
     })
   );
 
-  const ncf = round2(financials.noi - capex);
+  const canonicalNOI = noiOverride !== undefined ? round2(noiOverride) : round2(financials.noi);
+  const ncf = round2(canonicalNOI - capex);
 
   return {
     year: 1,
@@ -296,7 +329,7 @@ function buildYear1(
     effectiveGrossIncome: round2(financials.totalRevenue),
     totalRevenue: round2(financials.totalRevenue),
     totalExpenses: round2(financials.totalExpenses),
-    noi: round2(financials.noi),
+    noi: canonicalNOI,
     capex: round2(capex),
     ncf,
     revenueLines,
@@ -307,11 +340,16 @@ function buildYear1(
     capexScheduleEntry: capexEntry,
     noiChange: undefined,
     noiChangePct: undefined,
+    noiOverrideFromLeases: noiOverride !== undefined ? round2(noiOverride) : undefined,
   };
 }
 
 /**
  * Build a single projected year by compounding growth on each line item.
+ * When config.noiOverrides[yearNum-1] is set, that value is used as the
+ * canonical NOI (from per-tenant lease escalation schedules) rather than
+ * revenue-minus-expenses. Revenue/expense lines still grow for display
+ * and the monthly breakdown is scaled to reflect the override NOI.
  */
 function buildProjectedYear(
   yearNum: number,
@@ -363,7 +401,14 @@ function buildProjectedYear(
   });
 
   const newTotalExpenses = round2(newExpenseLines.reduce((s, l) => s + l.amount, 0));
-  const newNOI = round2(newTotalRevenue - newTotalExpenses);
+  const computedNOI = round2(newTotalRevenue - newTotalExpenses);
+
+  // ── Per-year lease NOI override ────────────────────────────────────────────
+  // When per-tenant escalation schedules produce a NOI override for this year,
+  // use it as the canonical NOI instead of the revenue-minus-expenses result.
+  // The monthly breakdown is scaled accordingly.
+  const leaseNOIOverride = config.noiOverrides?.[yearNum - 1];
+  const newNOI = leaseNOIOverride !== undefined ? round2(leaseNOIOverride) : computedNOI;
 
   // ── CapEx ──────────────────────────────────────────────────────────────────
   let capex: number;
@@ -377,6 +422,7 @@ function buildProjectedYear(
   const ncf = round2(newNOI - capex);
 
   // ── Monthly breakdown — scale proportionally from Year 1 seasonal pattern ─
+  // Use the canonical (potentially overridden) NOI for the monthly breakdown
   const monthlyBreakdown = scaleMonthlyBreakdown(
     year1Financials.monthlyBreakdown,
     newTotalRevenue,
@@ -405,6 +451,7 @@ function buildProjectedYear(
     capexScheduleEntry: capexEntry,
     noiChange,
     noiChangePct: noiChangePct ?? undefined,
+    noiOverrideFromLeases: leaseNOIOverride !== undefined ? round2(leaseNOIOverride) : undefined,
   };
 }
 
@@ -452,7 +499,9 @@ export function computeMultiYearProjection(
     ? year1CapExEntry.amount
     : year1Financials.totalRevenue * (config.defaultCapExPct ?? DEFAULT_CAPEX_PCT);
 
-  const year1 = buildYear1(year1Financials, year1CapEx, year1CapExEntry);
+  // Apply Year 1 NOI override from per-lease escalation schedules (index 0)
+  const year1NOIOverride = config.noiOverrides?.[0];
+  const year1 = buildYear1(year1Financials, year1CapEx, year1CapExEntry, year1NOIOverride);
 
   const years: ProjectionYear[] = [year1];
 
