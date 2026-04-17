@@ -10516,6 +10516,47 @@ export function registerCRMRoutes(
   });
 
   // ============================================================================
+  // PROPERTIES - Core CRUD
+  // ============================================================================
+
+  // GET /api/crm/properties — list all properties for the org
+  // Supports ?type=marina&status=available&pipelineStage=owned&search=foo
+  app.get('/api/crm/properties', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { type, status, pipelineStage, search } = req.query as Record<string, string | undefined>;
+
+      const { crmProperties } = await import('@shared/schema');
+      const { eq, and, or, ilike } = await import('drizzle-orm');
+
+      const conditions: any[] = [eq(crmProperties.orgId, orgId)];
+      if (type) conditions.push(eq(crmProperties.type, type));
+      if (status) conditions.push(eq(crmProperties.status, status));
+      if (pipelineStage) conditions.push(eq(crmProperties.pipelineStage, pipelineStage));
+      if (search) {
+        conditions.push(
+          or(
+            ilike(crmProperties.title, `%${search}%`),
+            ilike(crmProperties.address, `%${search}%`),
+            ilike(crmProperties.city, `%${search}%`),
+          )
+        );
+      }
+
+      const properties = await db
+        .select()
+        .from(crmProperties)
+        .where(and(...conditions))
+        .orderBy(crmProperties.createdAt);
+
+      res.json(properties);
+    } catch (error: any) {
+      console.error('Error fetching CRM properties:', error);
+      res.status(500).json({ error: 'Failed to fetch properties' });
+    }
+  });
+
+  // ============================================================================
   // PROPERTY STATUS MANAGEMENT - Selling/on-market toggles & pipeline stages
   // ============================================================================
 
@@ -10622,6 +10663,29 @@ export function registerCRMRoutes(
     } catch (error: any) {
       console.error("Error fetching on-market properties:", error);
       res.status(500).json({ error: "Failed to fetch on-market properties" });
+    }
+  });
+
+  // GET /api/crm/properties/:propertyId — single property (must come AFTER /by-stage and /on-market)
+  app.get('/api/crm/properties/:propertyId', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { propertyId } = req.params;
+
+      const { crmProperties } = await import('@shared/schema');
+      const { eq, and } = await import('drizzle-orm');
+
+      const [property] = await db
+        .select()
+        .from(crmProperties)
+        .where(and(eq(crmProperties.id, propertyId), eq(crmProperties.orgId, orgId)))
+        .limit(1);
+
+      if (!property) return res.status(404).json({ error: 'Property not found' });
+      res.json(property);
+    } catch (error: any) {
+      console.error('Error fetching CRM property:', error);
+      res.status(500).json({ error: 'Failed to fetch property' });
     }
   });
 
