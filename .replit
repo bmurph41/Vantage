@@ -8,7 +8,7 @@ packages = ["alsa-lib", "at-spi2-atk", "atk", "cairo", "cups", "dbus", "expat", 
 
 [deployment]
 deploymentTarget = "autoscale"
-build = ["npm", "run", "build"]
+build = ["sh", "-c", "npm run check:schema && npm run build"]
 run = ["npm", "run", "start"]
 
 [[ports]]
