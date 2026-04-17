@@ -94,6 +94,17 @@ interface ApiCapex {
   lcPaymentTiming?: string | null;
 }
 
+interface ApiRollover {
+  id?: string;
+  assumeRenewal: boolean;
+  renewalProbability?: string | null;
+  downtimeMonths?: number | null;
+  marketRentPsfYear?: string | null;
+  marketRentGrowthPercent?: string | null;
+  renewalTiPsf?: string | null;
+  renewalLcPercent?: string | null;
+}
+
 interface ApiPercentageRent {
   enabled: boolean;
   overagePercent?: string | null;
@@ -118,6 +129,7 @@ interface LeaseDetail {
   concessions: ApiConcession[];
   capexLeasing: ApiCapex[];
   percentageRent: ApiPercentageRent[];
+  rollover?: ApiRollover[];
 }
 
 // ── Enums ──────────────────────────────────────────────────────────────────────
@@ -247,6 +259,12 @@ const leaseFormSchema = z.object({
   percentRentEnabled: z.boolean().default(false),
   overagePercent: z.string().optional(),
   breakpointAmountAnnual: z.string().optional(),
+  assumeRenewal: z.boolean().default(false),
+  renewalProbability: z.string().optional(),
+  downtimeMonths: z.string().optional(),
+  marketRentPsfYear: z.string().optional(),
+  renewalTiPsf: z.string().optional(),
+  renewalLcPercent: z.string().optional(),
 });
 
 type LeaseFormValues = z.infer<typeof leaseFormSchema>;
@@ -257,15 +275,20 @@ interface TenantLeaseDialogProps {
   projectId: string;
   projectName: string;
   lease?: LeaseListItem;
+  initialTab?: string;
 }
 
 // ── Component ──────────────────────────────────────────────────────────────────
 
-export function TenantLeaseDialog({ open, onOpenChange, projectId, projectName, lease }: TenantLeaseDialogProps) {
+export function TenantLeaseDialog({ open, onOpenChange, projectId, projectName, lease, initialTab }: TenantLeaseDialogProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const isEditing = !!lease;
-  const [activeTab, setActiveTab] = useState("basic");
+  const [activeTab, setActiveTab] = useState(initialTab ?? "basic");
+
+  useEffect(() => {
+    if (open) setActiveTab(initialTab ?? "basic");
+  }, [open, initialTab]);
 
   const { data: leaseDetail } = useQuery<LeaseDetail>({
     queryKey: ["/api/tenant-leases", lease?.id],
@@ -303,6 +326,12 @@ export function TenantLeaseDialog({ open, onOpenChange, projectId, projectName, 
       percentRentEnabled: false,
       overagePercent: "",
       breakpointAmountAnnual: "",
+      assumeRenewal: false,
+      renewalProbability: "",
+      downtimeMonths: "",
+      marketRentPsfYear: "",
+      renewalTiPsf: "",
+      renewalLcPercent: "",
     },
   });
 
@@ -314,6 +343,7 @@ export function TenantLeaseDialog({ open, onOpenChange, projectId, projectName, 
     if (leaseDetail && open) {
       const capex = leaseDetail.capexLeasing?.[0] ?? null;
       const pr = leaseDetail.percentageRent?.[0] ?? null;
+      const ro = leaseDetail.rollover?.[0] ?? null;
       form.reset({
         tenantName: leaseDetail.tenantName ?? "",
         suiteLabel: leaseDetail.suiteLabel ?? "",
@@ -363,6 +393,12 @@ export function TenantLeaseDialog({ open, onOpenChange, projectId, projectName, 
         percentRentEnabled: pr?.enabled ?? false,
         overagePercent: pr?.overagePercent ? String(pr.overagePercent) : "",
         breakpointAmountAnnual: pr?.breakpointAmountAnnual ? String(pr.breakpointAmountAnnual) : "",
+        assumeRenewal: ro?.assumeRenewal ?? false,
+        renewalProbability: ro?.renewalProbability ? String(ro.renewalProbability) : "",
+        downtimeMonths: ro?.downtimeMonths != null ? String(ro.downtimeMonths) : "",
+        marketRentPsfYear: ro?.marketRentPsfYear ? String(ro.marketRentPsfYear) : "",
+        renewalTiPsf: ro?.renewalTiPsf ? String(ro.renewalTiPsf) : "",
+        renewalLcPercent: ro?.renewalLcPercent ? String(ro.renewalLcPercent) : "",
       });
     } else if (!isEditing && !open) {
       form.reset();
@@ -376,6 +412,8 @@ export function TenantLeaseDialog({ open, onOpenChange, projectId, projectName, 
         tiAllowancePsf, tiTotal, tiPaymentTiming,
         lcPercentInitial, lcPercentRenewal, lcPaymentTiming,
         percentRentEnabled, overagePercent, breakpointAmountAnnual,
+        assumeRenewal, renewalProbability, downtimeMonths,
+        marketRentPsfYear, renewalTiPsf, renewalLcPercent,
         ...leaseData
       } = values;
 
@@ -450,6 +488,16 @@ export function TenantLeaseDialog({ open, onOpenChange, projectId, projectName, 
         breakpointAmountAnnual: breakpointAmountAnnual || null,
       });
 
+      await apiRequest("POST", `/api/tenant-leases/${leaseId}/rollover`, {
+        leaseId,
+        assumeRenewal,
+        renewalProbability: renewalProbability || null,
+        downtimeMonths: downtimeMonths ? parseInt(downtimeMonths, 10) : null,
+        marketRentPsfYear: marketRentPsfYear || null,
+        renewalTiPsf: renewalTiPsf || null,
+        renewalLcPercent: renewalLcPercent || null,
+      });
+
       return { leaseId };
     },
     onSuccess: () => {
@@ -482,12 +530,13 @@ export function TenantLeaseDialog({ open, onOpenChange, projectId, projectName, 
         <Form {...form}>
           <form onSubmit={onSubmit} className="flex flex-col flex-1 overflow-hidden">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col flex-1 overflow-hidden">
-              <TabsList className="grid grid-cols-5 w-full">
+              <TabsList className="grid grid-cols-6 w-full">
                 <TabsTrigger value="basic">Basic</TabsTrigger>
                 <TabsTrigger value="rentTerms">Rent Terms</TabsTrigger>
                 <TabsTrigger value="recoveries">Recoveries</TabsTrigger>
                 <TabsTrigger value="concessions">Concessions</TabsTrigger>
                 <TabsTrigger value="capex">CapEx</TabsTrigger>
+                <TabsTrigger value="rollover">Rollover</TabsTrigger>
               </TabsList>
 
               <div className="overflow-y-auto flex-1 mt-4">
@@ -998,6 +1047,91 @@ export function TenantLeaseDialog({ open, onOpenChange, projectId, projectName, 
                                 <SelectItem value="SPREAD">Spread</SelectItem>
                               </SelectContent>
                             </Select>
+                          </FormItem>
+                        )} />
+                      </div>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+
+                {/* ── ROLLOVER ASSUMPTIONS ──────────────────────────────────── */}
+                <TabsContent value="rollover" className="space-y-4 mt-0">
+                  <div>
+                    <p className="font-medium">Rollover Assumptions</p>
+                    <p className="text-sm text-muted-foreground">
+                      Define re-leasing risk parameters used in underwriting scenarios after lease expiration
+                    </p>
+                  </div>
+
+                  <Card>
+                    <CardHeader className="pb-2 pt-3 px-4">
+                      <CardTitle className="text-sm font-medium flex items-center justify-between">
+                        <span>Renewal Scenario</span>
+                        <FormField control={form.control} name="assumeRenewal" render={({ field }) => (
+                          <FormItem className="flex items-center gap-2 space-y-0">
+                            <FormLabel className="text-xs font-normal">Assume Renewal</FormLabel>
+                            <FormControl>
+                              <Switch checked={field.value} onCheckedChange={field.onChange} />
+                            </FormControl>
+                          </FormItem>
+                        )} />
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="px-4 pb-4 space-y-3">
+                      <div className="grid grid-cols-2 gap-3">
+                        <FormField control={form.control} name="renewalProbability" render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-xs">Renewal Probability (0–1)</FormLabel>
+                            <FormControl>
+                              <Input type="number" step="0.01" min="0" max="1" placeholder="0.70" className="h-8 text-sm" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )} />
+                        <FormField control={form.control} name="downtimeMonths" render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-xs">Downtime Months</FormLabel>
+                            <FormControl>
+                              <Input type="number" min="0" step="1" placeholder="6" className="h-8 text-sm" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )} />
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader className="pb-2 pt-3 px-4">
+                      <CardTitle className="text-sm font-medium">Market Rent & Leasing Costs</CardTitle>
+                    </CardHeader>
+                    <CardContent className="px-4 pb-4 space-y-3">
+                      <div className="grid grid-cols-3 gap-3">
+                        <FormField control={form.control} name="marketRentPsfYear" render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-xs">Market Rent ($/SF/yr)</FormLabel>
+                            <FormControl>
+                              <Input type="number" step="0.01" placeholder="28.00" className="h-8 text-sm" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )} />
+                        <FormField control={form.control} name="renewalTiPsf" render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-xs">Renewal TI ($/SF)</FormLabel>
+                            <FormControl>
+                              <Input type="number" step="0.01" placeholder="20.00" className="h-8 text-sm" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )} />
+                        <FormField control={form.control} name="renewalLcPercent" render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-xs">Renewal LC % (e.g. 0.03)</FormLabel>
+                            <FormControl>
+                              <Input type="number" step="0.001" min="0" placeholder="0.03" className="h-8 text-sm" {...field} />
+                            </FormControl>
+                            <FormMessage />
                           </FormItem>
                         )} />
                       </div>

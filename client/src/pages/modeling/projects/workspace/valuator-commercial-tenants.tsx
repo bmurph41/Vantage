@@ -3,10 +3,10 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { TenantLeaseDialog } from "@/components/tenant-leases/TenantLeaseDialog";
 import {
-  Building2, Plus, Trash2, Edit, DollarSign, Users,
-  TrendingUp, Download, AlertTriangle, ChevronDown,
+  Building2, Plus, Edit, DollarSign,
+  TrendingUp, Download, AlertTriangle,
   Calendar, Percent, MoreHorizontal, Copy, Archive,
-  X, Check
+  X
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -124,6 +124,148 @@ const getHealthBadgeColor = (status: string) => {
 
 
 // ============================================
+// LEASE EXPIRATION TIMELINE
+// ============================================
+
+const STATUS_BG: Record<string, string> = {
+  ACTIVE: "bg-emerald-500",
+  FUTURE: "bg-blue-500",
+  EXPIRING: "bg-amber-400",
+  EXPIRED: "bg-red-500",
+  ARCHIVED: "bg-gray-400",
+};
+
+function LeaseExpirationTimeline({
+  leases,
+  onEditLease,
+}: {
+  leases: TenantLease[];
+  onEditLease: (lease: TenantLease) => void;
+}) {
+  if (leases.length === 0) return null;
+
+  const today = new Date();
+
+  const allStarts = leases.map((l) => new Date(l.leaseStartDate).getTime());
+  const allEnds = leases.map((l) => new Date(l.leaseEndDate).getTime());
+  const minDate = new Date(Math.min(...allStarts));
+  const maxDate = new Date(Math.max(...allEnds));
+
+  const rangeMs = maxDate.getTime() - minDate.getTime();
+  if (rangeMs <= 0) return null;
+
+  const toPercent = (d: Date) =>
+    Math.max(0, Math.min(100, ((d.getTime() - minDate.getTime()) / rangeMs) * 100));
+
+  const todayRaw = ((today.getTime() - minDate.getTime()) / rangeMs) * 100;
+  const showToday = todayRaw >= 0 && todayRaw <= 100;
+  const todayPct = Math.max(0, Math.min(100, todayRaw));
+
+  const xLabels: { label: string; pct: number }[] = [];
+  const startYear = minDate.getFullYear();
+  const endYear = maxDate.getFullYear();
+  for (let y = startYear; y <= endYear; y++) {
+    const d = new Date(y, 0, 1);
+    const pct = toPercent(d);
+    if (pct >= 0 && pct <= 100) {
+      xLabels.push({ label: String(y), pct });
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm font-semibold flex items-center gap-2">
+          <Calendar className="h-4 w-4" />
+          Lease Expiration Timeline
+        </CardTitle>
+        <CardDescription className="text-xs">
+          Click a bar to edit the lease · Vertical line = today
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="pt-1 pb-4">
+        <div className="relative select-none" style={{ overflowX: "auto" }}>
+          <div className="min-w-[480px]">
+            {/* Year labels */}
+            <div className="relative h-5 mb-1">
+              {xLabels.map(({ label, pct }) => (
+                <span
+                  key={label}
+                  className="absolute text-[10px] text-muted-foreground -translate-x-1/2"
+                  style={{ left: `${pct}%` }}
+                >
+                  {label}
+                </span>
+              ))}
+            </div>
+
+            {/* Bars */}
+            <div className="space-y-1.5">
+              {leases.map((lease) => {
+                const startPct = toPercent(new Date(lease.leaseStartDate));
+                const endPct = toPercent(new Date(lease.leaseEndDate));
+                const widthPct = Math.max(0.5, endPct - startPct);
+                const color = STATUS_BG[lease.status] ?? "bg-gray-400";
+                return (
+                  <div key={lease.id} className="relative flex items-center gap-2 group">
+                    <div className="w-28 shrink-0 text-right">
+                      <span className="text-xs text-muted-foreground truncate block leading-none">
+                        {lease.tenantName}
+                      </span>
+                      {lease.suiteLabel && (
+                        <span className="text-[10px] text-muted-foreground/60">{lease.suiteLabel}</span>
+                      )}
+                    </div>
+                    <div className="flex-1 relative h-6">
+                      {/* Background track */}
+                      <div className="absolute inset-0 rounded bg-muted/40" />
+                      {/* Today line */}
+                      {showToday && (
+                        <div
+                          className="absolute top-0 bottom-0 w-px bg-foreground/30 z-10"
+                          style={{ left: `${todayPct}%` }}
+                        />
+                      )}
+                      {/* Lease bar */}
+                      <button
+                        type="button"
+                        onClick={() => onEditLease(lease)}
+                        title={`${lease.tenantName}: ${format(new Date(lease.leaseStartDate), "MMM yyyy")} – ${format(new Date(lease.leaseEndDate), "MMM yyyy")}`}
+                        className={`absolute top-0.5 bottom-0.5 rounded cursor-pointer transition-opacity opacity-85 hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring ${color}`}
+                        style={{ left: `${startPct}%`, width: `${widthPct}%` }}
+                      >
+                        <span className="sr-only">{lease.tenantName}</span>
+                      </button>
+                    </div>
+                    <div className="w-20 shrink-0 text-xs text-muted-foreground">
+                      {format(new Date(lease.leaseEndDate), "MMM yyyy")}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Legend */}
+            <div className="flex items-center gap-4 mt-4 flex-wrap">
+              {Object.entries(STATUS_BG).map(([status, cls]) => (
+                <div key={status} className="flex items-center gap-1">
+                  <div className={`h-2.5 w-5 rounded-sm ${cls}`} />
+                  <span className="text-[10px] text-muted-foreground capitalize">{status.toLowerCase()}</span>
+                </div>
+              ))}
+              <div className="flex items-center gap-1">
+                <div className="h-2.5 w-px bg-foreground/40 mx-1" />
+                <span className="text-[10px] text-muted-foreground">Today</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ============================================
 // MAIN COMPONENT
 // ============================================
 
@@ -131,6 +273,7 @@ export default function ValuatorCommercialTenantsTab({ projectId, projectName }:
   const queryClient = useQueryClient();
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [editingLease, setEditingLease] = useState<TenantLease | null>(null);
+  const [editingLeaseTab, setEditingLeaseTab] = useState<string>("basic");
   const [statusFilter, setStatusFilter] = useState<LeaseStatus | "all">("all");
   const [bannerDismissed, setBannerDismissed] = useState(false);
 
@@ -310,6 +453,14 @@ export default function ValuatorCommercialTenantsTab({ projectId, projectName }:
         </p>
       </div>
 
+      {/* Lease Expiration Timeline */}
+      {!leasesLoading && leases.length > 0 && (
+        <LeaseExpirationTimeline
+          leases={leases}
+          onEditLease={(lease) => { setEditingLeaseTab("basic"); setEditingLease(lease); }}
+        />
+      )}
+
       {/* Leases Table */}
       <Card>
         <CardHeader>
@@ -419,9 +570,13 @@ export default function ValuatorCommercialTenantsTab({ projectId, projectName }:
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => setEditingLease(lease)}>
+                          <DropdownMenuItem onClick={() => { setEditingLeaseTab("basic"); setEditingLease(lease); }}>
                             <Edit className="h-4 w-4 mr-2" />
                             View / Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => { setEditingLeaseTab("rollover"); setEditingLease(lease); }}>
+                            <Calendar className="h-4 w-4 mr-2" />
+                            Rollover Assumptions
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => duplicateMutation.mutate(lease.id)}>
                             <Copy className="h-4 w-4 mr-2" />
@@ -457,10 +612,11 @@ export default function ValuatorCommercialTenantsTab({ projectId, projectName }:
       {editingLease && (
         <TenantLeaseDialog
           open={!!editingLease}
-          onOpenChange={(open) => { if (!open) setEditingLease(null); }}
+          onOpenChange={(open) => { if (!open) { setEditingLease(null); setEditingLeaseTab("basic"); } }}
           projectId={projectId}
           projectName={projectName}
           lease={editingLease}
+          initialTab={editingLeaseTab}
         />
       )}
     </div>
