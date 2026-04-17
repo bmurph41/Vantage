@@ -1,6 +1,7 @@
 import type { BasisCalculationResult } from './basis-ledger';
-
-export type FilingStatus = 'single' | 'married' | 'head_of_household';
+import type { FilingStatus } from './tax-calculations';
+// FilingStatus is canonical in ./tax-calculations; do not re-export from this module
+// (would collide with tax-calculations under shared/exit/index.ts wildcard re-exports).
 
 export interface TaxYearConfig {
   year: number;

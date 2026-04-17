@@ -70,7 +70,7 @@ export interface EarnoutWarning {
 }
 
 import { STATE_CAPITAL_GAINS_RATES, getTaxYearConfig } from './tax-engine';
-import type { FilingStatus } from './tax-engine';
+import type { FilingStatus } from './tax-calculations';
 
 export function calculateEarnout(input: EarnoutEngineInput): EarnoutEngineResult {
   const warnings: EarnoutWarning[] = [];

@@ -34,6 +34,91 @@ import * as secondarySchemas from "../db/schema-index";
 
 const PREFIX = "[schema-drift]";
 
+/**
+ * Tables that are intentionally managed outside Drizzle (created by application
+ * code via CREATE TABLE IF NOT EXISTS, or belonging to a sub-system with its own
+ * schema file that is not yet wired into db/schema-index) and therefore should
+ * NOT trigger an EXTRA TABLE warning during drift checks.
+ *
+ * Categories:
+ *  • AI knowledge base — created by server/services/knowledge-base-service.ts
+ *  • Org settings / extraction config — created by google-places-routes / document-extraction
+ *  • liv2_* listing scraper — defined in server/listings/ingestion_v2/schema.ts
+ */
+const EXTRA_TABLE_ALLOWLIST = new Set<string>([
+  // AI knowledge base (dynamically created by knowledge-base-service.ts)
+  "ai_knowledge_documents",
+  "ai_knowledge_chunks",
+  "ai_global_knowledge",
+  // Org-level settings (dynamically created by google-places-routes.ts)
+  "organization_settings",
+  // Document extraction config (dynamically created by document-extraction.ts)
+  "extraction_org_config",
+  // Listing Intelligence v2 scraper (schema in server/listings/ingestion_v2/schema.ts)
+  "liv2_sources",
+  "liv2_scrape_runs",
+  "liv2_raw_pages",
+  "liv2_listing_candidates",
+  "liv2_listing_payloads",
+  "liv2_listing_assets",
+  "liv2_quarantine",
+  "liv2_field_provenance",
+  "liv2_listings_current",
+  // Feature tables created dynamically by server code (CREATE TABLE IF NOT EXISTS)
+  // — security / RBAC sub-system
+  "security_roles",
+  "security_sessions",
+  "security_integrations",
+  "security_audit_logs",
+  "security_documents",
+  "security_permissions",
+  "security_user_roles",
+  "security_role_permissions",
+  // — workflow automation sub-system
+  "workflow_rules",
+  "workflow_executions",
+  "workflow_pipelines",
+  "workflow_pipeline_executions",
+  "workflow_approval_requests",
+  "workflow_webhooks",
+  "workflow_webhook_deliveries",
+  "workflow_email_templates",
+  "workflow_email_log",
+  "workflow_notifications",
+  "workflow_scheduled_triggers",
+  "workflow_tasks",
+  // — document / e-signature sub-system
+  "document_templates",
+  "document_renders",
+  "document_versions",
+  "esignature_requests",
+  // — AI / analytics sub-system
+  "ai_deal_scores",
+  "ai_anomalies",
+  "ai_conversation_sessions",
+  "ai_conversation_messages",
+  // — CRM extras
+  "crm_custom_field_definitions",
+  "crm_forecast_snapshots",
+  "deal_comparisons",
+  "company_hierarchies",
+  "contact_relationship_scores",
+  // — email / GDPR
+  "email_unsubscribes",
+  "email_tracking_events",
+  "gdpr_consent_records",
+  // — user / auth extras
+  "user_settings",
+  "personal_access_tokens",
+  "docket_users",
+  // — misc platform tables
+  "encrypted_fields",
+  "ip_allowlists",
+  "data_retention_policies",
+  "settings_audit_log",
+  "report_schedules",
+]);
+
 /** All schema sources merged into one flat object for drift inspection. */
 const allSchemas: Record<string, unknown> = {
   ...schema,
@@ -241,6 +326,10 @@ export async function runSchemaDriftCheck(): Promise<number> {
     for (const [dbTable, dbCols] of allLiveColumns) {
       if (schemaColumnsByTable.has(dbTable)) {
         // Already handled in the schema-table loop above.
+        continue;
+      }
+      if (EXTRA_TABLE_ALLOWLIST.has(dbTable)) {
+        // Intentionally managed outside Drizzle — skip without warning.
         continue;
       }
       // Log one EXTRA TABLE warning per phantom table and count it as a single

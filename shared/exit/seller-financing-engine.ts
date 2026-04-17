@@ -1,5 +1,5 @@
 import { STATE_CAPITAL_GAINS_RATES, getTaxYearConfig } from './tax-engine';
-import type { FilingStatus } from './tax-engine';
+import type { FilingStatus } from './tax-calculations';
 import { calculateIRR as canonicalBisectionIRR } from './irr-calculator';
 import type { CashFlow } from './irr-calculator';
 

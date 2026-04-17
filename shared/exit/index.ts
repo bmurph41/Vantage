@@ -14,6 +14,9 @@ export * from './seller-financing-engine';
 export * from './earnout-engine';
 export * from './waterfall-engine-v2';
 export * from './exit-scenario-engine';
-export * from './types';
+// Note: ./types/* exports many names that intentionally collide with the impl
+// files above (canonical type-system v1.0.0). Consumers that want those types
+// should import directly from '@shared/exit/types' or its sub-barrels — re-
+// exporting `./types` here would create TS2308 ambiguities.
 export { runExitScenarioV2, ENGINE_VERSION } from './orchestrator-v2';
 export * from './adapters';
