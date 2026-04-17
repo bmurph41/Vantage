@@ -1,5 +1,32 @@
 # MarinaMatch Platform Journal
 
+## ✅ COMPLETE — Stabilization #1: Rent Roll Sync button (2026-04-17)
+
+First item of the stabilization sprint in `project_remaining_queue.md`. The backend
+route `POST /api/modeling/projects/:projectId/rent-roll-sync` (in `server/routes.ts`
+at line 858) was already wired — the UI side was the remaining gap.
+
+**Changes — `client/src/pages/modeling/projects/workspace/uploads.tsx`:**
+- Added `RentRollSyncResult` interface matching `server/services/rent-roll-sync-service.ts`
+- Added `syncingRentRollId` state (separate from P&L's `syncingUploadId` so the two
+  sync flows don't collide visually)
+- Added `rentRollSyncMutation` using React Query — synchronous call (no job polling,
+  unlike P&L pipeline), success toast shows `entriesCreated` + `skippedRows`, invalidates
+  `documents`, `rent-roll`, and `rent-rolls` queries
+- Added `handleSyncRentRoll` and `isRentRollSyncable(upload)` helpers
+- Button renders on pending uploads (when `status` is `parsed`/`reviewing`/`completed`)
+  and on completed uploads (re-sync). Filters out storage-specific rent rolls
+  (`STORAGE_RENT_ROLL_SUB_TYPES` — wet_slips, dry_stack, etc.) which have their own flow.
+- Teal color scheme to distinguish from green P&L Sync to Model button
+- `data-testid` attrs: `button-sync-rent-roll-{id}` and `button-resync-rent-roll-{id}`
+
+**Note:** Pure frontend change — Vite HMR picks it up, no `pkill -f 'tsx server'` needed.
+
+**Next session pickup:** Stabilization #2 — Systematic route smoke test. Hit every
+major API surface via curl, log 4xx/5xx, fix broken routes.
+
+---
+
 ## ✅ COMPLETE — Broker Marketplace Phase 1 (2026-04-17)
 
 Shipped Phase 1 of the Airbnb-style broker marketplace on top of the substantial
