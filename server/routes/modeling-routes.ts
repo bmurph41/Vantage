@@ -4869,10 +4869,12 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
   app.get('/api/funds/:fundId/investors', authenticateUser, async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
+      const userRole = req.user.role;
       const { fundId } = req.params;
       const { fundService } = await import('../services/fund-service');
+      const { processInvestorPii } = await import('../services/encryption-service');
       const investors = await fundService.getInvestorsByFund(orgId, fundId);
-      res.json(investors);
+      res.json(investors.map((inv) => processInvestorPii(inv, userRole)));
     } catch (error: any) {
       console.error('Failed to fetch fund investors:', error);
       res.status(500).json({ error: 'Failed to fetch fund investors' });
@@ -4882,13 +4884,15 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
   app.get('/api/funds/:fundId/investors/:investorId', authenticateUser, async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
+      const userRole = req.user.role;
       const { investorId } = req.params;
       const { fundService } = await import('../services/fund-service');
+      const { processInvestorPii } = await import('../services/encryption-service');
       const investor = await fundService.getInvestor(orgId, investorId);
       if (!investor) {
         return res.status(404).json({ error: 'Investor not found' });
       }
-      res.json(investor);
+      res.json(processInvestorPii(investor, userRole));
     } catch (error: any) {
       console.error('Failed to fetch investor:', error);
       res.status(500).json({ error: 'Failed to fetch investor' });
@@ -4899,13 +4903,15 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     try {
       const validated = createInvestorSchema.parse(req.body);
       const orgId = req.user.orgId;
+      const userRole = req.user.role;
       const { fundId } = req.params;
       const { fundService } = await import('../services/fund-service');
+      const { processInvestorPii } = await import('../services/encryption-service');
       const investor = await fundService.createInvestor(orgId, {
         ...validated,
         fundId,
       });
-      res.status(201).json(investor);
+      res.status(201).json(processInvestorPii(investor, userRole));
     } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: 'Validation failed', details: error.errors });
@@ -4919,13 +4925,15 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     try {
       const validated = createInvestorSchema.partial().parse(req.body);
       const orgId = req.user.orgId;
+      const userRole = req.user.role;
       const { investorId } = req.params;
       const { fundService } = await import('../services/fund-service');
+      const { processInvestorPii } = await import('../services/encryption-service');
       const investor = await fundService.updateInvestor(orgId, investorId, validated);
       if (!investor) {
         return res.status(404).json({ error: 'Investor not found' });
       }
-      res.json(investor);
+      res.json(processInvestorPii(investor, userRole));
     } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: 'Validation failed', details: error.errors });

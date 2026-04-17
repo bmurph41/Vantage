@@ -33,6 +33,7 @@ import {
   type InsertFundWaterfallCalculation,
 } from '@shared/schema';
 import { eq, and, desc, asc, sql, gte, lte, inArray, sum } from 'drizzle-orm';
+import { encrypt, isEncrypted } from './encryption-service';
 
 /** Transaction-aware DB handle — either the root `db` or a `tx` from db.transaction() */
 type DbOrTx = typeof db;
@@ -267,6 +268,11 @@ export class FundService {
     const [result] = await db.insert(fundInvestors).values({
       ...validated,
       orgId,
+      // Encrypt PII before write. isEncrypted guards re-encryption of values
+      // that came in already-encrypted (e.g., migrations, replays).
+      taxId: validated.taxId && !isEncrypted(validated.taxId)
+        ? encrypt(validated.taxId)
+        : validated.taxId,
       commitmentAmount: String(validated.commitmentAmount),
       commitmentPct: validated.commitmentPct ? String(validated.commitmentPct) : null,
       calledCapital: validated.calledCapital ? String(validated.calledCapital) : '0',
@@ -316,6 +322,12 @@ export class FundService {
     data: Partial<InsertFundInvestor>
   ): Promise<FundInvestor | null> {
     const updateData: Record<string, any> = { ...data, updatedAt: new Date() };
+
+    // Encrypt taxId on update if a plaintext value was supplied. Keep existing
+    // encrypted values unchanged (callers may round-trip the stored blob).
+    if (typeof data.taxId === 'string' && data.taxId && !isEncrypted(data.taxId)) {
+      updateData.taxId = encrypt(data.taxId);
+    }
 
     const numericFields = [
       'commitmentAmount', 'commitmentPct', 'calledCapital', 'unfundedCommitment',
@@ -2183,14 +2195,14 @@ export class FundService {
       );
 
       const breakdown: Record<string, number> = {};
-      let balance = 0;
+      let balance = new Decimal(0);
       for (const row of result.rows) {
-        const val = parseFloat(row.total);
-        breakdown[row.entry_type] = val;
-        balance += val;
+        const val = d(row.total);
+        breakdown[row.entry_type] = val.toNumber();
+        balance = balance.plus(val);
       }
 
-      return { investorId, balance, breakdown };
+      return { investorId, balance: balance.toNumber(), breakdown };
     }
 
     // Fund-level: totals by type and by investor
@@ -2203,11 +2215,11 @@ export class FundService {
     );
 
     const byType: Record<string, number> = {};
-    let fundTotal = 0;
+    let fundTotal = new Decimal(0);
     for (const row of byTypeResult.rows) {
-      const val = parseFloat(row.total);
-      byType[row.entry_type] = val;
-      fundTotal += val;
+      const val = d(row.total);
+      byType[row.entry_type] = val.toNumber();
+      fundTotal = fundTotal.plus(val);
     }
 
     const byInvestorResult = await pool.query(
@@ -2220,10 +2232,10 @@ export class FundService {
 
     const byInvestor: Record<string, number> = {};
     for (const row of byInvestorResult.rows) {
-      byInvestor[row.investor_id] = parseFloat(row.total);
+      byInvestor[row.investor_id] = dn(row.total);
     }
 
-    return { fundTotal, byType, byInvestor };
+    return { fundTotal: fundTotal.toNumber(), byType, byInvestor };
   }
 
   /**
@@ -2282,7 +2294,7 @@ export class FundService {
       fundId: row.fund_id,
       investorId: row.investor_id,
       entryType: row.entry_type,
-      amount: parseFloat(row.amount),
+      amount: dn(row.amount),
       description: row.description,
       referenceId: row.reference_id,
       effectiveDate: row.effective_date,
@@ -2324,7 +2336,7 @@ export class FundService {
 
     const ledgerMap: Record<string, number> = {};
     for (const row of ledgerResult.rows) {
-      ledgerMap[row.investor_id] = parseFloat(row.ledger_balance);
+      ledgerMap[row.investor_id] = dn(row.ledger_balance);
     }
 
     const discrepancies: {

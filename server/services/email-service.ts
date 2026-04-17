@@ -10,7 +10,12 @@ const APP_URL = process.env.APP_URL || 'https://vantage.com';
  * Unified email sender that tries providers in order:
  * 1. SendGrid (if SENDGRID_API_KEY or Replit connector available)
  * 2. Resend (if RESEND_API_KEY available)
- * 3. Console log fallback (dev mode — always succeeds)
+ * 3. Console log fallback — dev-only success, production-failure.
+ *
+ * Return value is ONLY `true` when an actual provider accepted the message.
+ * In production with no provider configured, returns `false` so callers can
+ * surface the failure (prior behavior silently returned true, making outages
+ * invisible — passwords never reset, invites never delivered, etc).
  */
 export async function sendEmail(options: {
   to: string;
@@ -21,26 +26,33 @@ export async function sendEmail(options: {
 }): Promise<boolean> {
   const from = options.from || { email: DEFAULT_FROM_EMAIL, name: DEFAULT_FROM_NAME };
 
-  // Try SendGrid first
-  try {
-    const { client, fromEmail } = await getSendGridClient();
-    await client.send({
-      to: options.to,
-      from: { email: fromEmail, name: from.name },
-      subject: options.subject,
-      text: options.text,
-      html: options.html,
-    });
-    logger.info({ to: options.to, subject: options.subject, provider: 'sendgrid' }, 'Email sent via SendGrid');
-    return true;
-  } catch (sgError: any) {
-    logger.warn({ error: sgError.message, to: options.to }, 'SendGrid failed, trying Resend fallback');
+  // Try SendGrid first — skip quickly if clearly not configured to avoid a
+  // noisy warn-log on every email when Resend is the intended provider.
+  const sendgridCouldWork =
+    !!process.env.SENDGRID_API_KEY ||
+    (!!process.env.REPLIT_CONNECTORS_HOSTNAME &&
+      !!(process.env.REPL_IDENTITY || process.env.WEB_REPL_RENEWAL));
+  if (sendgridCouldWork) {
+    try {
+      const { client, fromEmail } = await getSendGridClient();
+      await client.send({
+        to: options.to,
+        from: { email: fromEmail, name: from.name },
+        subject: options.subject,
+        text: options.text,
+        html: options.html,
+      });
+      logger.info({ to: options.to, subject: options.subject, provider: 'sendgrid' }, 'Email sent via SendGrid');
+      return true;
+    } catch (sgError: any) {
+      logger.warn({ error: sgError.message, to: options.to }, 'SendGrid failed, trying Resend fallback');
+    }
   }
 
   // Try Resend
-  try {
-    const resendKey = process.env.RESEND_API_KEY;
-    if (resendKey) {
+  const resendKey = process.env.RESEND_API_KEY;
+  if (resendKey) {
+    try {
       const res = await fetch('https://api.resend.com/emails', {
         method: 'POST',
         headers: {
@@ -60,25 +72,35 @@ export async function sendEmail(options: {
         return true;
       }
       const err = await res.text();
-      logger.warn({ error: err, to: options.to }, 'Resend API returned error');
+      logger.warn({ error: err, to: options.to, status: res.status }, 'Resend API returned error');
+    } catch (resendError: any) {
+      logger.warn({ error: resendError.message, to: options.to }, 'Resend failed');
     }
-  } catch (resendError: any) {
-    logger.warn({ error: resendError.message, to: options.to }, 'Resend failed');
   }
 
-  // Console fallback (dev mode)
-  logger.info({
+  // No provider succeeded. In production, this is a real failure — surface it
+  // so callers can alert the user (e.g. "we couldn't send the reset email"
+  // rather than silently no-op). In dev, log to console and return true so
+  // local development doesn't require a real provider.
+  const isProduction = process.env.NODE_ENV === 'production';
+  logger.warn({
     to: options.to,
     subject: options.subject,
-    provider: 'console',
-    note: 'Email logged to console — set SENDGRID_API_KEY or RESEND_API_KEY for delivery',
-  }, `[EMAIL] To: ${options.to} | Subject: ${options.subject}`);
-  console.log(`\n========== EMAIL (console fallback) ==========`);
-  console.log(`To: ${options.to}`);
-  console.log(`Subject: ${options.subject}`);
-  console.log(`Body: ${options.text.substring(0, 300)}...`);
-  console.log(`===============================================\n`);
-  return true; // Don't fail in dev — just log
+    provider: 'none',
+    isProduction,
+    sendgridConfigured: sendgridCouldWork,
+    resendConfigured: !!resendKey,
+  }, 'No email provider delivered the message');
+
+  if (!isProduction) {
+    console.log(`\n========== EMAIL (console fallback) ==========`);
+    console.log(`To: ${options.to}`);
+    console.log(`Subject: ${options.subject}`);
+    console.log(`Body: ${options.text.substring(0, 300)}...`);
+    console.log(`===============================================\n`);
+    return true;
+  }
+  return false;
 }
 
 export async function getSendGridClient() {

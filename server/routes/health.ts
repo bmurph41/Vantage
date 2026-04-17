@@ -80,6 +80,32 @@ async function checkRedis(): Promise<HealthCheck> {
   }
 }
 
+interface IntegrationsStatus {
+  anthropic: boolean;
+  openai: boolean;
+  sendgrid: boolean;
+  resend: boolean;
+  stripeSecret: boolean;
+  stripePublishable: boolean;
+  stripeWebhookSecret: boolean;
+  replitSendgridConnector: boolean;
+}
+
+function checkIntegrations(): IntegrationsStatus {
+  return {
+    anthropic: !!process.env.ANTHROPIC_API_KEY,
+    openai: !!process.env.OPENAI_API_KEY,
+    sendgrid: !!process.env.SENDGRID_API_KEY,
+    resend: !!process.env.RESEND_API_KEY,
+    stripeSecret: !!process.env.STRIPE_SECRET_KEY,
+    stripePublishable: !!process.env.STRIPE_PUBLISHABLE_KEY,
+    stripeWebhookSecret: !!process.env.STRIPE_WEBHOOK_SECRET,
+    replitSendgridConnector:
+      !!process.env.REPLIT_CONNECTORS_HOSTNAME &&
+      !!(process.env.REPL_IDENTITY || process.env.WEB_REPL_RENEWAL),
+  };
+}
+
 function checkMemory(): HealthCheck {
   const usage = process.memoryUsage();
   const heapUsedMB = Math.round(usage.heapUsed / 1024 / 1024);
@@ -129,6 +155,7 @@ router.get('/health/ready', async (req: Request, res: Response) => {
     Promise.resolve(checkMemory()),
   ]);
 
+  const integrations = checkIntegrations();
   const checks: Record<string, HealthCheck> = { database, redis, memory };
 
   // Determine overall status
@@ -143,12 +170,13 @@ router.get('/health/ready', async (req: Request, res: Response) => {
 
   const statusCode = overallStatus === 'unhealthy' ? 503 : 200;
 
-  const response: HealthResponse = {
+  const response: HealthResponse & { integrations: IntegrationsStatus } = {
     status: overallStatus,
     version: process.env.npm_package_version || '1.0.0',
     uptime: Math.round(process.uptime()),
     timestamp: new Date().toISOString(),
     checks,
+    integrations,
   };
 
   if (overallStatus !== 'healthy') {
@@ -156,6 +184,19 @@ router.get('/health/ready', async (req: Request, res: Response) => {
   }
 
   res.status(statusCode).json(response);
+});
+
+/**
+ * Integration key status — which third-party API keys are configured in the
+ * running process. Lets ops verify prod secrets without leaking values.
+ * Returns 200 {sendgrid: true, anthropic: true, ...} — booleans only.
+ */
+router.get('/health/integrations', (_req: Request, res: Response) => {
+  res.status(200).json({
+    timestamp: new Date().toISOString(),
+    nodeEnv: process.env.NODE_ENV || 'development',
+    integrations: checkIntegrations(),
+  });
 });
 
 /**

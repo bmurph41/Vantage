@@ -1,5 +1,74 @@
 # MarinaMatch Platform Journal
 
+## ✅ COMPLETE — Revenue Readiness #7 + #8 (2026-04-17)
+
+Bundled the two revenue-readiness verification items — both surfaced a real
+silent-failure risk in production, now fixed.
+
+### #7 — ANTHROPIC_API_KEY visibility
+
+Added **`GET /health/integrations`** endpoint (in `server/routes/health.ts`)
+that returns a boolean-only status of each third-party API key:
+
+```
+{ "anthropic": true, "openai": true, "sendgrid": true, "resend": true,
+  "stripeSecret": true, "stripePublishable": false,
+  "stripeWebhookSecret": false, "replitSendgridConnector": true }
+```
+
+Also included the same `integrations` block in `/health/ready` so existing
+k8s/uptime probes pick it up for free. Returns only booleans — never leaks
+actual key values.
+
+### #8 — Email delivery silent-success fix
+
+**Real bug in `server/services/email-service.ts`**: the console fallback at
+the bottom of `sendEmail()` returned `true` unconditionally. In production
+with no provider configured, this meant:
+
+- Password reset emails silently never sent
+- Magic links silently never sent
+- Invite emails silently never sent
+- `/workflow-email/send-test` logged "sent" status when no email left the server
+
+Now `sendEmail()` returns `false` in production when no provider accepted
+the message. Dev mode still logs to console and returns `true` for developer
+productivity. Also skips SendGrid attempt entirely when neither the env var
+nor Replit connector is present (silences noisy "SendGrid failed, trying
+Resend fallback" warn-logs on every email for Resend-only deployments).
+
+Verified behavior with both NODE_ENV values:
+
+| Scenario                                    | Returns |
+|---------------------------------------------|---------|
+| SendGrid env set + API accepts              | true    |
+| Resend env set + API accepts (no SendGrid)  | true    |
+| No provider configured + `NODE_ENV=prod`    | **false** (was true) |
+| No provider configured + `NODE_ENV=dev`     | true (with console log) |
+
+### Usage for ops
+
+Before a prod deploy, hit `GET /health/integrations` and confirm each flag
+matches the intended feature set:
+
+- `anthropic` must be `true` if any AI feature is enabled (broker evaluator
+  narratives, document builder AI content, meeting transcription, deal
+  sourcing LLM classifier, ai-underwriting, etc.)
+- `sendgrid` OR `resend` OR `replitSendgridConnector` must be `true` for
+  transactional email (password resets, invites, magic links, trial
+  reminders, LP statements delivery)
+- `stripeSecret` + `stripeWebhookSecret` must both be `true` for billing
+  (already enforced by webhook handler in prod; webhook returns 503 if
+  secret is missing in prod)
+
+### Next session pickup
+
+Data integrity hardening (#9-11): decimal.js refactor in `fund-service.ts`
+(72 parseFloat sites), PII field encryption at rest (SSN, Tax ID),
+immutable-ledger-derived capital account balances.
+
+---
+
 ## ⚠ PARTIAL — Stabilization #6: tsc OOM (2026-04-17)
 
 Attempted to fix type-checking by raising the node heap limit. Partial success:
