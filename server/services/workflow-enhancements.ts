@@ -217,12 +217,19 @@ class WorkflowEnhancements {
 
   async listWebhooks(orgId: string) {
     const result = await db.execute(sql`
-      SELECT id, url, event_types, description, is_active, created_at
+      SELECT id, name, url, event_types, is_active, created_at
       FROM workflow_webhooks
       WHERE org_id = ${orgId}
       ORDER BY created_at DESC
     `);
-    return (result as any).rows || [];
+    return ((result as any).rows || []).map((r: any) => ({
+      id: r.id,
+      name: r.name,
+      url: r.url,
+      eventTypes: r.event_types,
+      isActive: r.is_active,
+      createdAt: r.created_at,
+    }));
   }
 
   async getWebhookDeliveryLog(orgId: string, webhookId: string): Promise<WebhookDelivery[]> {
@@ -471,20 +478,18 @@ class WorkflowEnhancements {
 
   async listScheduledTriggers(orgId: string) {
     const result = await db.execute(sql`
-      SELECT t.id, t.name, t.cron_expression, t.workflow_rule_id, t.entity_type,
-             t.entity_id, t.timezone, t.next_run_at, t.last_run_at, t.is_active, t.created_at
-      FROM workflow_scheduled_triggers t
-      WHERE t.org_id = ${orgId}
-      ORDER BY t.created_at DESC
+      SELECT id, name, cron_expression, workflow_rule_id, action_config,
+             next_run_at, last_run_at, is_active, created_at
+      FROM workflow_scheduled_triggers
+      WHERE org_id = ${orgId}
+      ORDER BY created_at DESC
     `);
     return ((result as any).rows || []).map((r: any) => ({
       id: r.id,
       name: r.name,
       cronExpression: r.cron_expression,
       workflowRuleId: r.workflow_rule_id,
-      entityType: r.entity_type,
-      entityId: r.entity_id,
-      timezone: r.timezone,
+      actionConfig: r.action_config,
       nextRunAt: r.next_run_at,
       lastRunAt: r.last_run_at,
       isActive: r.is_active,
@@ -618,6 +623,25 @@ class WorkflowEnhancements {
 
     logger.info({ pipelineId: id, orgId, stepCount: data.steps.length }, '[WorkflowEnhancements] Pipeline created');
     return { id, name: data.name, stepCount: data.steps.length };
+  }
+
+  async listWorkflowPipelines(orgId: string) {
+    const result = await db.execute(sql`
+      SELECT id, name, description, steps, is_active, created_at
+      FROM workflow_pipelines
+      WHERE org_id = ${orgId}
+      ORDER BY created_at DESC
+    `);
+    return ((result as any).rows || []).map((r: any) => ({
+      id: r.id,
+      name: r.name,
+      description: r.description,
+      steps: typeof r.steps === 'string' ? JSON.parse(r.steps) : r.steps,
+      stepCount: Array.isArray(r.steps) ? r.steps.length :
+                 (typeof r.steps === 'string' ? (JSON.parse(r.steps)?.length ?? 0) : 0),
+      isActive: r.is_active,
+      createdAt: r.created_at,
+    }));
   }
 
   async executePipeline(

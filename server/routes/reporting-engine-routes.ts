@@ -66,12 +66,7 @@ reportingEngineRouter.get('/custom-reports', async (req: Request, res: Response)
   try {
     const orgId = getOrgId(req);
     if (!orgId) return res.status(401).json({ error: 'Authentication required' });
-    const reports = await reportingEngine.listCustomReports(orgId, {
-      category: req.query.category as string,
-      createdBy: req.query.createdBy as string,
-      limit: parseInt(req.query.limit as string) || 50,
-      offset: parseInt(req.query.offset as string) || 0,
-    });
+    const reports = await reportingEngine.listSavedReports(orgId);
     res.json(reports);
   } catch (e: any) { res.status(500).json({ error: e.message }); }
 });

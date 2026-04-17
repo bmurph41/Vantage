@@ -204,7 +204,15 @@
       "Bash(ps -p 15452 -o pid,cmd)",
       "Bash(python3 -c \"import sys, json; d=json.load\\(sys.stdin\\); print\\('Total brokers in dir:', d['total']\\); print\\('Broker names:', [i['displayName'] for i in d['items']]\\)\")",
       "Bash(python3 -c \"import sys, json; d=json.load\\(sys.stdin\\); print\\('Total brokers in dir:', d['total']\\)\")",
-      "Bash(python3 -c \"import sys,json;d=json.load\\(sys.stdin\\);print\\(f'Directory: {d[\\\\\"total\\\\\"]} broker\\(s\\)'\\)\")"
+      "Bash(python3 -c \"import sys,json;d=json.load\\(sys.stdin\\);print\\(f'Directory: {d[\\\\\"total\\\\\"]} broker\\(s\\)'\\)\")",
+      "Bash(chmod +x /tmp/smoke.sh)",
+      "Bash(/tmp/smoke.sh)",
+      "Bash(awk '/export const users = pgTable/,/^}\\\\\\);/' shared/schema.ts)",
+      "Bash(nohup npm *)",
+      "Bash(echo \"pid=$!\")",
+      "Bash(kill 238 214)",
+      "Bash(chmod +x /tmp/lp_wiring.sh)",
+      "Bash(/tmp/lp_wiring.sh)"
     ]
   }
 }

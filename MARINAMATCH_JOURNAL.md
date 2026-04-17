@@ -1,5 +1,66 @@
 # MarinaMatch Platform Journal
 
+## ✅ COMPLETE — Stabilization #2: Systematic route smoke test (2026-04-17)
+
+Hit 80 representative GET endpoints across every major API surface using
+`ALLOW_DEMO_AUTH=true` and the test org/project IDs. Smoke script saved at
+`/tmp/smoke.sh` for reuse; results at `/tmp/smoke_results.tsv`.
+
+**Before:** 68 2xx / 5 4xx / 7 5xx
+**After:** 73 2xx / 7 4xx / 0 5xx (6 real bugs fixed, 1 5xx was `/health/ready`
+intentionally reporting `unhealthy` due to Redis + 96% heap — not a route bug)
+
+### Bugs fixed
+
+1. **`server/services/workflow-enhancements.ts` — `listWebhooks`**: SQL selected
+   `description` column that doesn't exist in `workflow_webhooks`. Rewrote to
+   select actual columns (`name, url, event_types, is_active`) and map to camelCase.
+
+2. **`server/services/workflow-enhancements.ts` — `listScheduledTriggers`**: SQL
+   used table alias `t.` (Drizzle doesn't emit that alias) and referenced three
+   nonexistent columns (`entity_type`, `entity_id`, `timezone`). Rewrote to use
+   actual columns (`action_config` replaces `payload`).
+
+3. **`server/services/workflow-enhancements.ts` — added `listWorkflowPipelines`**:
+   method was called by `GET /api/workflow-v2/pipelines` but didn't exist.
+   Returns id/name/description/steps/stepCount/isActive from `workflow_pipelines`.
+
+4. **`server/routes/reporting-engine-routes.ts` — `/custom-reports` GET**: was
+   calling `reportingEngine.listCustomReports(orgId, options)` — no such method.
+   The service has `listSavedReports(orgId)`. Fixed the call.
+
+5. **`server/services/lease-ops-storage.ts` — `getOperationsStats`**: raw `sql`
+   template used aliases `t.` and `cl.` that Drizzle doesn't create, yielding
+   `missing FROM-clause entry for table "t"`. Replaced with `${leaseTerms.col}`
+   and `${commercialLeases.col}` column references.
+
+6. **`server/services/comment-threads-service.ts` — `getProjectThreads`**:
+   selected `users.username` which doesn't exist (real column is `users.name`).
+   Replaced all 3 occurrences with `users.name`.
+
+### Known findings NOT fixed this session (out-of-scope for smoke-test)
+
+- **`users.username` referenced in 7+ other files** that weren't in the smoke
+  test: `multi-approver-service.ts`, `approval-notification-service.ts`,
+  `opssos/task-routes.ts` (also refs `firstName`/`lastName` — neither exist),
+  `phase-gates-routes.ts`, `red-flag-routes.ts`, `operations-routes.ts` (3x).
+  These endpoints would 500 under the same conditions.
+- **`workflow_pipelines` DB schema missing `entry_step_id`** column that
+  `createWorkflowPipeline` and `executePipeline` both reference. POST + execute
+  paths would 500 the first time someone invokes them.
+- **`getCustomReport(:id)` endpoint** calls a method that doesn't exist on
+  `reportingEngine`.
+- **`POST /api/workflow-v2/webhooks`** route passes `events` but the service
+  expects `eventTypes`. Route-handler field name mismatch.
+
+These are all documented here; fix opportunistically as they surface.
+
+### Next session pickup
+Stabilization #3 — LP Portal integration testing (login → statement view →
+K-1 download end-to-end).
+
+---
+
 ## ✅ COMPLETE — Stabilization #1: Rent Roll Sync button (2026-04-17)
 
 First item of the stabilization sprint in `project_remaining_queue.md`. The backend

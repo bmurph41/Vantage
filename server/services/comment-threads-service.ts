@@ -275,7 +275,7 @@ export class CommentThreadsService {
   ): Promise<ThreadWithComments | null> {
     const [thread] = await db.select({
       thread: modelingCommentThreads,
-      creatorName: users.username
+      creatorName: users.name
     })
       .from(modelingCommentThreads)
       .leftJoin(users, eq(modelingCommentThreads.createdBy, users.id))
@@ -289,7 +289,7 @@ export class CommentThreadsService {
 
     const comments = await db.select({
       comment: modelingComments,
-      creatorName: users.username
+      creatorName: users.name
     })
       .from(modelingComments)
       .leftJoin(users, eq(modelingComments.createdBy, users.id))
@@ -333,7 +333,7 @@ export class CommentThreadsService {
   ): Promise<ThreadWithComments[]> {
     let query = db.select({
       thread: modelingCommentThreads,
-      creatorName: users.username
+      creatorName: users.name
     })
       .from(modelingCommentThreads)
       .leftJoin(users, eq(modelingCommentThreads.createdBy, users.id))

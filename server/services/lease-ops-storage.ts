@@ -161,10 +161,10 @@ export async function getOperationsStats(
   const [rentStats] = await db
     .select({
       totalMonthly: sql<number>`coalesce(sum(
-        CASE 
-          WHEN t.base_rent_mode = 'PER_SF_YEAR' THEN (t.base_rent_value::numeric * cl.sf::numeric) / 12
-          WHEN t.base_rent_mode = 'PER_MONTH' THEN t.base_rent_value::numeric
-          WHEN t.base_rent_mode = 'PER_YEAR' THEN t.base_rent_value::numeric / 12
+        CASE
+          WHEN ${leaseTerms.baseRentMode} = 'PER_SF_YEAR' THEN (${leaseTerms.baseRentValue}::numeric * ${commercialLeases.sf}::numeric) / 12
+          WHEN ${leaseTerms.baseRentMode} = 'PER_MONTH' THEN ${leaseTerms.baseRentValue}::numeric
+          WHEN ${leaseTerms.baseRentMode} = 'PER_YEAR' THEN ${leaseTerms.baseRentValue}::numeric / 12
           ELSE 0
         END
       ), 0)::numeric`,

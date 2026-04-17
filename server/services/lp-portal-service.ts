@@ -315,6 +315,29 @@ class LPStatementGenerator {
     };
   }
 
+  async getStatement(orgId: string, id: string): Promise<LPStatement | null> {
+    const result = await db.execute(sql`
+      SELECT * FROM lp_statements WHERE id = ${id} AND org_id = ${orgId} LIMIT 1
+    `);
+    const row = (result.rows as any[])?.[0];
+    if (!row) return null;
+    return {
+      id: row.id, orgId: row.org_id, fundId: row.fund_id, investorId: row.investor_id,
+      statementType: row.statement_type, periodLabel: row.period_label,
+      periodStart: row.period_start, periodEnd: row.period_end,
+      data: row.data, pdfUrl: row.pdf_url,
+      generatedAt: new Date(row.generated_at),
+      deliveredAt: row.delivered_at ? new Date(row.delivered_at) : null,
+      deliveryMethod: row.delivery_method,
+    };
+  }
+
+  async renderStatementHtml(orgId: string, id: string): Promise<string> {
+    const statement = await this.getStatement(orgId, id);
+    if (!statement) throw new Error('Statement not found');
+    return this.generateStatementHTML(statement);
+  }
+
   async generateStatementHTML(statement: LPStatement): Promise<string> {
     const d = statement.data;
     return `<!DOCTYPE html>
@@ -532,6 +555,18 @@ class K1Generator {
     `);
 
     return k1;
+  }
+
+  async getK1(orgId: string, fundId: string, investorId: string, taxYear: number): Promise<K1Data | null> {
+    const result = await db.execute(sql`
+      SELECT data FROM lp_statements
+      WHERE org_id = ${orgId} AND fund_id = ${fundId} AND investor_id = ${investorId}
+        AND statement_type = 'k1' AND period_label = ${String(taxYear)}
+      ORDER BY generated_at DESC
+      LIMIT 1
+    `);
+    const row = (result.rows as any[])?.[0];
+    return row?.data ? (row.data as K1Data) : null;
   }
 
   async generateK1HTML(k1: K1Data): Promise<string> {

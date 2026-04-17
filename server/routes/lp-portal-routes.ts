@@ -24,14 +24,14 @@ lpPortalRouter.post('/auth/create-user', async (req: Request, res: Response) => 
   try {
     const orgId = getOrgId(req);
     if (!orgId) return res.status(401).json({ error: 'Authentication required' });
-    const user = await lpPortalAuth.createLpUser(orgId, {
+    const name = req.body.name
+      || [req.body.firstName, req.body.lastName].filter(Boolean).join(' ').trim()
+      || req.body.email;
+    const user = await lpPortalAuth.createPortalUser(orgId, {
       email: req.body.email,
       investorId: req.body.investorId,
-      firstName: req.body.firstName,
-      lastName: req.body.lastName,
-      fundIds: req.body.fundIds,
-      accessLevel: req.body.accessLevel || 'standard',
-    }, getUserId(req));
+      name,
+    });
     res.json(user);
   } catch (e: any) { res.status(400).json({ error: e.message }); }
 });
@@ -39,18 +39,15 @@ lpPortalRouter.post('/auth/create-user', async (req: Request, res: Response) => 
 lpPortalRouter.post('/auth/activate', async (req: Request, res: Response) => {
   try {
     const { activationToken, password } = req.body;
-    const result = await lpPortalAuth.activateLpUser(activationToken, password);
+    const result = await lpPortalAuth.activatePortalUser(activationToken, password);
     res.json(result);
   } catch (e: any) { res.status(400).json({ error: e.message }); }
 });
 
 lpPortalRouter.post('/auth/login', async (req: Request, res: Response) => {
   try {
-    const { email, password, totpToken } = req.body;
-    const session = await lpPortalAuth.loginLpUser(email, password, totpToken, {
-      ip: req.ip || '',
-      userAgent: req.headers['user-agent'] || '',
-    });
+    const { email, password } = req.body;
+    const session = await lpPortalAuth.authenticateLP(email, password);
     res.json(session);
   } catch (e: any) { res.status(401).json({ error: e.message }); }
 });
@@ -58,7 +55,7 @@ lpPortalRouter.post('/auth/login', async (req: Request, res: Response) => {
 lpPortalRouter.post('/auth/logout', async (req: Request, res: Response) => {
   try {
     const token = req.headers.authorization?.replace('Bearer ', '') || '';
-    await lpPortalAuth.logoutLpUser(token);
+    await lpPortalAuth.logoutLP(token);
     res.json({ success: true });
   } catch (e: any) { res.status(400).json({ error: e.message }); }
 });
@@ -66,7 +63,7 @@ lpPortalRouter.post('/auth/logout', async (req: Request, res: Response) => {
 lpPortalRouter.get('/auth/validate', async (req: Request, res: Response) => {
   try {
     const token = req.headers.authorization?.replace('Bearer ', '') || '';
-    const session = await lpPortalAuth.validateLpSession(token);
+    const session = await lpPortalAuth.validateSession(token);
     res.json(session);
   } catch (e: any) { res.status(401).json({ error: e.message }); }
 });
@@ -77,16 +74,11 @@ lpPortalRouter.post('/statements/generate', async (req: Request, res: Response) 
   try {
     const orgId = getOrgId(req);
     if (!orgId) return res.status(401).json({ error: 'Authentication required' });
-    const statement = await lpStatements.generateStatement(orgId, {
-      fundId: req.body.fundId,
-      investorId: req.body.investorId,
-      periodStart: req.body.periodStart,
-      periodEnd: req.body.periodEnd,
-      includeCapitalAccount: req.body.includeCapitalAccount !== false,
-      includePerformance: req.body.includePerformance !== false,
-      includePortfolioSummary: req.body.includePortfolioSummary !== false,
-      format: req.body.format || 'json',
-    }, getUserId(req));
+    const { fundId, investorId, periodEnd } = req.body;
+    if (!fundId || !investorId || !periodEnd) {
+      return res.status(400).json({ error: 'fundId, investorId, and periodEnd are required' });
+    }
+    const statement = await lpStatements.generateQuarterlyStatement(orgId, fundId, investorId, periodEnd);
     res.json(statement);
   } catch (e: any) { res.status(400).json({ error: e.message }); }
 });
@@ -98,10 +90,8 @@ lpPortalRouter.get('/statements', async (req: Request, res: Response) => {
     const statements = await lpStatements.listStatements(orgId, {
       fundId: req.query.fundId as string,
       investorId: req.query.investorId as string,
-      year: parseInt(req.query.year as string) || undefined,
-      quarter: parseInt(req.query.quarter as string) || undefined,
+      statementType: req.query.statementType as string,
       limit: parseInt(req.query.limit as string) || 50,
-      offset: parseInt(req.query.offset as string) || 0,
     });
     res.json(statements);
   } catch (e: any) { res.status(500).json({ error: e.message }); }
@@ -112,18 +102,16 @@ lpPortalRouter.get('/statements/:id', async (req: Request, res: Response) => {
     const orgId = getOrgId(req);
     if (!orgId) return res.status(401).json({ error: 'Authentication required' });
     const statement = await lpStatements.getStatement(orgId, req.params.id);
+    if (!statement) return res.status(404).json({ error: 'Statement not found' });
     res.json(statement);
-  } catch (e: any) { res.status(404).json({ error: e.message }); }
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
 });
 
 lpPortalRouter.get('/statements/:id/html', async (req: Request, res: Response) => {
   try {
     const orgId = getOrgId(req);
     if (!orgId) return res.status(401).json({ error: 'Authentication required' });
-    const html = await lpStatements.renderStatementHtml(orgId, req.params.id, {
-      theme: req.query.theme as string || 'institutional',
-      showWatermark: req.query.showWatermark !== 'false',
-    });
+    const html = await lpStatements.renderStatementHtml(orgId, req.params.id);
     res.set('Content-Type', 'text/html');
     res.send(html);
   } catch (e: any) { res.status(404).json({ error: e.message }); }
@@ -135,20 +123,11 @@ lpPortalRouter.post('/k1/generate', async (req: Request, res: Response) => {
   try {
     const orgId = getOrgId(req);
     if (!orgId) return res.status(401).json({ error: 'Authentication required' });
-    const k1 = await k1Generator.generateK1(orgId, {
-      fundId: req.body.fundId,
-      investorId: req.body.investorId,
-      taxYear: req.body.taxYear,
-      ordinaryIncome: req.body.ordinaryIncome,
-      capitalGainsShortTerm: req.body.capitalGainsShortTerm,
-      capitalGainsLongTerm: req.body.capitalGainsLongTerm,
-      section1231Gains: req.body.section1231Gains,
-      depreciation: req.body.depreciation,
-      interestExpense: req.body.interestExpense,
-      stateAllocations: req.body.stateAllocations,
-      foreignTaxCredit: req.body.foreignTaxCredit,
-      ubit: req.body.ubit,
-    }, getUserId(req));
+    const { fundId, investorId, taxYear } = req.body;
+    if (!fundId || !investorId || !taxYear) {
+      return res.status(400).json({ error: 'fundId, investorId, and taxYear are required' });
+    }
+    const k1 = await k1Generator.generateK1(orgId, fundId, investorId, parseInt(String(taxYear), 10));
     res.json(k1);
   } catch (e: any) { res.status(400).json({ error: e.message }); }
 });
@@ -157,9 +136,10 @@ lpPortalRouter.get('/k1/:fundId/:investorId/:taxYear', async (req: Request, res:
   try {
     const orgId = getOrgId(req);
     if (!orgId) return res.status(401).json({ error: 'Authentication required' });
-    const k1 = await k1Generator.getK1(orgId, req.params.fundId, req.params.investorId, parseInt(req.params.taxYear));
+    const k1 = await k1Generator.getK1(orgId, req.params.fundId, req.params.investorId, parseInt(req.params.taxYear, 10));
+    if (!k1) return res.status(404).json({ error: 'K-1 not found' });
     res.json(k1);
-  } catch (e: any) { res.status(404).json({ error: e.message }); }
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
 });
 
 // ─── Side Letters ───────────────────────────────────────────────────────────
@@ -168,16 +148,12 @@ lpPortalRouter.post('/side-letters', async (req: Request, res: Response) => {
   try {
     const orgId = getOrgId(req);
     if (!orgId) return res.status(401).json({ error: 'Authentication required' });
+    const { fundId, investorId, investorName, provisions, effectiveDate, expirationDate, documentUrl } = req.body;
+    if (!fundId || !investorId || !investorName || !provisions || !effectiveDate) {
+      return res.status(400).json({ error: 'fundId, investorId, investorName, provisions, and effectiveDate are required' });
+    }
     const letter = await sideLetters.createSideLetter(orgId, {
-      fundId: req.body.fundId,
-      investorId: req.body.investorId,
-      provisions: req.body.provisions,
-      feeDiscount: req.body.feeDiscount,
-      coInvestmentRights: req.body.coInvestmentRights,
-      reportingRequirements: req.body.reportingRequirements,
-      mfnClause: req.body.mfnClause !== false,
-      effectiveDate: req.body.effectiveDate,
-      expirationDate: req.body.expirationDate,
+      fundId, investorId, investorName, provisions, effectiveDate, expirationDate, documentUrl,
     }, getUserId(req));
     res.json(letter);
   } catch (e: any) { res.status(400).json({ error: e.message }); }
@@ -187,10 +163,14 @@ lpPortalRouter.get('/side-letters/fund/:fundId', async (req: Request, res: Respo
   try {
     const orgId = getOrgId(req);
     if (!orgId) return res.status(401).json({ error: 'Authentication required' });
-    const letters = await sideLetters.getFundSideLetters(orgId, req.params.fundId, {
-      investorId: req.query.investorId as string,
-      includeExpired: req.query.includeExpired === 'true',
-    });
+    let letters = await sideLetters.getSideLettersForFund(orgId, req.params.fundId);
+    if (req.query.investorId) {
+      letters = letters.filter(l => l.investorId === req.query.investorId);
+    }
+    if (req.query.includeExpired !== 'true') {
+      const now = Date.now();
+      letters = letters.filter(l => !l.expirationDate || new Date(l.expirationDate as any).getTime() > now);
+    }
     res.json(letters);
   } catch (e: any) { res.status(500).json({ error: e.message }); }
 });
@@ -199,7 +179,7 @@ lpPortalRouter.get('/side-letters/mfn-analysis/:fundId', async (req: Request, re
   try {
     const orgId = getOrgId(req);
     if (!orgId) return res.status(401).json({ error: 'Authentication required' });
-    const analysis = await sideLetters.getMfnAnalysis(orgId, req.params.fundId);
+    const analysis = await sideLetters.getMFNAnalysis(orgId, req.params.fundId);
     res.json(analysis);
   } catch (e: any) { res.status(500).json({ error: e.message }); }
 });
