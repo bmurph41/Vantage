@@ -17927,6 +17927,10 @@ const MIGRATIONS: Migration[] = [
   { name: "drop: workflow_tasks",                 sql: `DROP TABLE IF EXISTS workflow_tasks CASCADE` },
   { name: "drop: workflow_executions",            sql: `DROP TABLE IF EXISTS workflow_executions CASCADE` },
   { name: "drop: workflow_rules",                 sql: `DROP TABLE IF EXISTS workflow_rules CASCADE` },
+  // ─── Auto-generated CREATE TABLE stubs for missing tables ───────────────
+
+
+  // ─── Final drift fixes ────────────────────────────────────────────────────
 ];
 
 /**

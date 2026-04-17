@@ -21,3 +21,4 @@ export * from "./schema-lp-portal";
 // table definitions). These must be path-aliased relative to this file.
 export * from "../shared/commercial-lease-schema";
 export * from "../shared/document-builder/schema";
+export * from "../server/listings/ingestion_v2/schema";

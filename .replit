@@ -50,12 +50,12 @@ outputType = "webview"
 name = "schema-drift"
 author = "agent"
 
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "npm run check:schema"
-
 [workflows.workflow.metadata]
 isValidation = true
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npx tsx scripts/check-schema-drift.ts"
 
 [agent]
 integrations = ["javascript_database:1.0.0", "javascript_mem_db:1.0.0", "javascript_sendgrid:1.0.0", "google-calendar:1.0.0", "javascript_openai:1.0.0", "sendgrid:1.0.0", "stripe:2.0.0", "javascript_log_in_with_replit:2.0.0", "javascript_openai_ai_integrations:2.0.0", "resend:1.0.0"]

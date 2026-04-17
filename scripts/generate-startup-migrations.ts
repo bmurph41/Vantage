@@ -40,7 +40,7 @@ try {
 }
 
 const schemaFiles = dbEntries
-  .filter((f) => f.startsWith("schema-") && f.endsWith(".ts") && f !== "schema-index.ts")
+  .filter((f) => f.startsWith("schema-") && f.endsWith(".ts") && !f.endsWith(".d.ts") && f !== "schema-index.ts")
   .sort();
 
 // ─── 2. Regenerate db/schema-index.ts ─────────────────────────────────────────
