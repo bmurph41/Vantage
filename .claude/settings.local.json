@@ -224,7 +224,9 @@
       "Bash(echo \"exit=$?\")",
       "Bash(NODE_OPTIONS=\"--max-old-space-size=1024\" npx tsc --noEmit --incremental false)",
       "Bash(NODE_OPTIONS=\"--max-old-space-size=4096\" npx tsc --noEmit --incremental false)",
-      "Bash(echo \"real_exit=$?\")"
+      "Bash(echo \"real_exit=$?\")",
+      "Read(//sys/fs/cgroup/**)",
+      "Read(//proc/488/**)"
     ]
   }
 }
