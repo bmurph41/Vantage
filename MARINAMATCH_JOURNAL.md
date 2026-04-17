@@ -1,5 +1,73 @@
 # MarinaMatch Platform Journal
 
+## ⚠ PARTIAL — Stabilization #6: tsc OOM (2026-04-17)
+
+Attempted to fix type-checking by raising the node heap limit. Partial success:
+found + fixed a real JSX bug that was masking the OOM, added a typecheck script,
+but the full type-check still OOMs under the sandbox memory cap. Real fix needs
+project references or splitting `shared/schema.ts`.
+
+### What we learned
+
+- Sandbox cgroup memory cap is **8 GB** (`/sys/fs/cgroup/memory.max`).
+- `npm run check` (default heap ~1.5 GB) OOMs at ~1 GB heap.
+- At `--max-old-space-size=4096` (4 GB) tsc used to terminate early reporting
+  ONE error; with 6 GB it OOMs; at 8+ GB the OS SIGKILLs the process (cgroup
+  OOM killer, because V8 overhead + code pages exceed the heap budget).
+- Root cause: `shared/schema.ts` is 29 574 lines with **769 pgTable exports**.
+  Each Drizzle table's inferred type cascades through the whole import graph —
+  every consumer file recomputes the inference. Memory scales roughly with
+  files × transitive schema types.
+
+### Bugs fixed along the way
+
+1. **`TenantLeaseDialog.tsx` line 1198 — missing `</TabsContent>`** between
+   the `capex` and `sales` tabs. `rollover` TabsContent opened at 1116 but
+   never closed. This parse error was masking ALL other type errors since
+   tsc was failing on the broken JSX before doing full inference. Fixing it
+   uncovered the real OOM baseline. Runtime-visible: the rollover tab would
+   have been broken (all subsequent tabs nested inside it).
+
+### What's left
+
+The real fix is architectural, not mechanical — raising heap alone doesn't
+fit in the cgroup cap. Three real options, each a session+ of work:
+
+1. **Project references** (cleanest) — move `shared/schema.ts` into its own
+   sub-project with `composite: true` + a pre-compiled `.d.ts`. The main
+   `tsconfig.json` would reference it, and the schema would be type-checked
+   once into a declaration file that everything else consumes cheaply.
+
+2. **Split `shared/schema.ts` into 15–20 domain modules** — e.g.
+   `shared/schema/crm.ts`, `shared/schema/modeling.ts`, `shared/schema/broker.ts`.
+   Breaks the inference graph so each consuming file only loads the domains it
+   actually imports. Touches hundreds of import sites but is a mechanical find/
+   replace once the split is done.
+
+3. **Emit static `.d.ts` for schema.ts only** via a custom build step that
+   invokes `tsc --declaration` on just `shared/schema.ts`, then uses `paths`
+   in the main tsconfig to redirect `@shared/schema` to the `.d.ts`. Fragile,
+   worth considering only if 1+2 are blocked.
+
+Recommended order: start with #1 (project references) — it's surgical and
+doesn't require touching imports anywhere else. If that doesn't fit in the
+cgroup either, fall back to #2.
+
+### Script added
+
+`npm run typecheck` — runs `tsc --noEmit --incremental false` at 6 GB heap.
+Best-effort: reports file-level errors before it OOMs on the big-picture
+inference pass. Not a replacement for `npm run check` in CI (which will need
+the real fix above).
+
+### Next session pickup
+
+Stabilization sprint is **complete (5/6 items cleanly green, #6 partial)**.
+Revenue readiness is next: #7 verify `ANTHROPIC_API_KEY` in prod, #8 test
+email delivery (SendGrid/Resend). These are short verification tasks.
+
+---
+
 ## ✅ COMPLETE — Stabilization #5: Broker onboarding flow (2026-04-17)
 
 Walked the full broker lifecycle end-to-end: register → admin approve →
