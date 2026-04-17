@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, integer, index, serial, boolean, jsonb, pgEnum, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, date, integer, index, serial, boolean, jsonb, pgEnum, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -93,6 +93,7 @@ export const articles = pgTable("docket_articles", {
   removalReason: text("removal_reason"),
   removedAt: timestamp("removed_at"),
   removedBy: varchar("removed_by").references(() => users.id),
+  assetClassId: integer("asset_class_id"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => ({
@@ -146,6 +147,8 @@ export const articleRemovalPatterns = pgTable("docket_article_removal_patterns",
   articleTags: text("article_tags").array(),
   articleContent: text("article_content"),
   removedAt: timestamp("removed_at").defaultNow(),
+  assetClassId: integer("asset_class_id"),
+  orgId: varchar("org_id"),
 }, (table) => ({
   byArticle: index("idx_docket_removal_patterns_article").on(table.articleId),
   byRemovedBy: index("idx_docket_removal_patterns_user").on(table.removedBy),
@@ -248,6 +251,28 @@ export const deals = pgTable("docket_deals", {
   confidence: integer("confidence").default(80),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+  deletedAt: timestamp("deleted_at"),
+  orgId: varchar("org_id"),
+  origin: varchar("origin"),
+  createdBy: varchar("created_by"),
+  marinaName: text("marina_name"),
+  dealDate: date("deal_date"),
+  externalId: varchar("external_id"),
+  updatedBy: varchar("updated_by"),
+  sourceReference: varchar("source_reference"),
+  assetDescription: text("asset_description"),
+  dealSize: text("deal_size"),
+  buyerCompanyId: varchar("buyer_company_id"),
+  sellerCompanyId: varchar("seller_company_id"),
+  propertyId: varchar("property_id"),
+  city: text("city"),
+  state: text("state"),
+  region: text("region"),
+  wetSlips: integer("wet_slips"),
+  dryRacks: integer("dry_racks"),
+  notes: text("notes"),
+  articleUrls: text("article_urls").array(),
+  custom: jsonb("custom"),
 }, (table) => ({
   byArticle: index("idx_docket_deals_article").on(table.articleId),
   byType: index("idx_docket_deals_type").on(table.transactionType),
@@ -275,6 +300,7 @@ export const rssSources = pgTable("docket_rss_sources", {
   lastFailureAt: timestamp("last_failure_at"),
   lastSuccessAt: timestamp("last_success_at"),
   createdAt: timestamp("created_at").defaultNow(),
+  assetClassId: integer("asset_class_id"),
 });
 
 export const systemStats = pgTable("docket_system_stats", {
@@ -694,6 +720,7 @@ export const articleFeedback = pgTable("docket_article_feedback", {
   duplicateOfArticleId: integer("duplicate_of_article_id").references(() => articles.id),
   processedByAi: boolean("processed_by_ai").default(false),
   processedAt: timestamp("processed_at"),
+  assetClassId: integer("asset_class_id"),
   createdAt: timestamp("created_at").defaultNow(),
 }, (table) => ({
   byArticle: index("idx_docket_feedback_article").on(table.articleId),
@@ -833,6 +860,7 @@ export const aiKeywordWeights = pgTable("docket_ai_keyword_weights", {
   confidenceScore: integer("confidence_score").notNull().default(50), // 0-100 confidence
   isActive: boolean("is_active").notNull().default(true),
   isUserDefined: boolean("is_user_defined").notNull().default(false),
+  assetClassId: integer("asset_class_id"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => ({
@@ -855,6 +883,7 @@ export const aiSourceAdjustments = pgTable("docket_ai_source_adjustments", {
   irrelevantArticles: integer("irrelevant_articles").notNull().default(0),
   accuracyRate: integer("accuracy_rate").notNull().default(50), // 0-100 percentage
   isActive: boolean("is_active").notNull().default(true),
+  assetClassId: integer("asset_class_id"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => ({
@@ -878,6 +907,7 @@ export const aiLearningRules = pgTable("docket_ai_learning_rules", {
   isActive: boolean("is_active").notNull().default(true),
   learnedFromFeedbackId: integer("learned_from_feedback_id").references(() => articleFeedback.id),
   learnedFromArticleId: integer("learned_from_article_id").references(() => articles.id),
+  assetClassId: integer("asset_class_id"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => ({
@@ -922,6 +952,7 @@ export const aiTrainingAnalytics = pgTable("docket_ai_training_analytics", {
   lastTrainingAt: timestamp("last_training_at"),
   articlesScored: integer("articles_scored").notNull().default(0),
   articlesFiltered: integer("articles_filtered").notNull().default(0),
+  assetClassId: integer("asset_class_id"),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => ({
   byOrg: index("idx_docket_training_analytics_org").on(table.orgId),

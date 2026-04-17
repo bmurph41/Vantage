@@ -13,3 +13,4 @@
  */
 
 export * from "./schema-commercial-tenants";
+export * from "./schema-orphan-tables";
