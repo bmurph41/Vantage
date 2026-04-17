@@ -234,6 +234,9 @@ export const omDocumentSections = pgTable('om_document_sections', {
   // Page references
   pageIds: jsonb('page_ids').$type<string[]>().default([]),
   
+  // Rendered output cache
+  renderedContent: text('rendered_content'),
+
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 }, (table) => ({
@@ -379,6 +382,10 @@ export const omDocumentVersions = pgTable('om_document_versions', {
   status: documentStatusEnum('status').notNull().default('draft'),
   createdBy: varchar('created_by'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
+  omId: varchar('om_id'),
+  snapshotJson: jsonb('snapshot_json'),
+  thumbnailUrl: text('thumbnail_url'),
+  changeSummary: text('change_summary'),
 }, (table) => ({
   documentIdx: index('om_doc_versions_document_idx').on(table.documentId),
   versionIdx: index('om_doc_versions_version_idx').on(table.documentId, table.versionNumber),

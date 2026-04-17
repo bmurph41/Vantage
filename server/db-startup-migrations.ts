@@ -14690,6 +14690,8 @@ const MIGRATIONS: Migration[] = [
   { name: "security_audit_log: add user_agent", sql: `ALTER TABLE security_audit_log ADD COLUMN IF NOT EXISTS user_agent text` },
   { name: "security_audit_log: add success", sql: `ALTER TABLE security_audit_log ADD COLUMN IF NOT EXISTS success boolean` },
   { name: "security_audit_log: add created_at", sql: `ALTER TABLE security_audit_log ADD COLUMN IF NOT EXISTS created_at timestamp` },
+  { name: "security_audit_log: index security_audit_org_id_idx", sql: `CREATE INDEX IF NOT EXISTS security_audit_org_id_idx ON security_audit_log(org_id)` },
+  { name: "security_audit_log: index security_audit_created_at_idx", sql: `CREATE INDEX IF NOT EXISTS security_audit_created_at_idx ON security_audit_log(created_at)` },
 
   // service_labor_entries — uncovered columns
   { name: "service_labor_entries: add id", sql: `ALTER TABLE service_labor_entries ADD COLUMN IF NOT EXISTS id varchar` },
@@ -17851,6 +17853,80 @@ const MIGRATIONS: Migration[] = [
   { name: "docket_deals: index idx_docket_deals_announced_date", sql: `CREATE INDEX IF NOT EXISTS idx_docket_deals_announced_date ON docket_deals(announced_date)` },
   { name: "modeling_project_config: add use_lease_income_for_dcf", sql: `ALTER TABLE modeling_project_config ADD COLUMN IF NOT EXISTS use_lease_income_for_dcf boolean` },
   { name: "modeling_project_config: backfill use_lease_income_for_dcf for projects with active leases", sql: `UPDATE modeling_project_config SET use_lease_income_for_dcf = true WHERE use_lease_income_for_dcf IS NULL AND modeling_project_id IN (SELECT DISTINCT project_id::varchar FROM tenant_leases WHERE status NOT IN ('EXPIRED','ARCHIVED'))` },
+
+  // ── DROP unused orphan tables ──────────────────────────────────────────────
+  // These tables had no active application code, no CREATE TABLE migrations, and
+  // no references in server routes or services. Dropped as part of schema cleanup
+  // (task #101). IF NOT EXISTS / CASCADE make each migration safe to re-run.
+
+  // AI & Knowledge — no routes or services reference these Drizzle tables
+  { name: "drop: ai_knowledge_chunks",         sql: `DROP TABLE IF EXISTS ai_knowledge_chunks CASCADE` },
+  { name: "drop: ai_knowledge_documents",      sql: `DROP TABLE IF EXISTS ai_knowledge_documents CASCADE` },
+  { name: "drop: ai_global_knowledge",         sql: `DROP TABLE IF EXISTS ai_global_knowledge CASCADE` },
+  { name: "drop: ai_deal_scores",              sql: `DROP TABLE IF EXISTS ai_deal_scores CASCADE` },
+  { name: "drop: ai_conversation_messages",    sql: `DROP TABLE IF EXISTS ai_conversation_messages CASCADE` },
+  { name: "drop: ai_conversation_sessions",    sql: `DROP TABLE IF EXISTS ai_conversation_sessions CASCADE` },
+  { name: "drop: ai_anomalies",                sql: `DROP TABLE IF EXISTS ai_anomalies CASCADE` },
+
+  // CRM Extensions — no active routes or storage layer references
+  { name: "drop: deal_comparisons",              sql: `DROP TABLE IF EXISTS deal_comparisons CASCADE` },
+  { name: "drop: crm_forecast_snapshots",        sql: `DROP TABLE IF EXISTS crm_forecast_snapshots CASCADE` },
+  { name: "drop: crm_custom_field_definitions",  sql: `DROP TABLE IF EXISTS crm_custom_field_definitions CASCADE` },
+  { name: "drop: contact_relationship_scores",   sql: `DROP TABLE IF EXISTS contact_relationship_scores CASCADE` },
+  { name: "drop: company_hierarchies",           sql: `DROP TABLE IF EXISTS company_hierarchies CASCADE` },
+
+  // Document Management — superseded by document-builder schema
+  { name: "drop: report_schedules",    sql: `DROP TABLE IF EXISTS report_schedules CASCADE` },
+  { name: "drop: esignature_requests", sql: `DROP TABLE IF EXISTS esignature_requests CASCADE` },
+  { name: "drop: document_versions",  sql: `DROP TABLE IF EXISTS document_versions CASCADE` },
+  { name: "drop: document_templates", sql: `DROP TABLE IF EXISTS document_templates CASCADE` },
+  { name: "drop: document_renders",   sql: `DROP TABLE IF EXISTS document_renders CASCADE` },
+
+  // Security — no active RBAC or session logic uses these tables
+  { name: "drop: security_user_roles",       sql: `DROP TABLE IF EXISTS security_user_roles CASCADE` },
+  { name: "drop: security_role_permissions", sql: `DROP TABLE IF EXISTS security_role_permissions CASCADE` },
+  { name: "drop: security_sessions",         sql: `DROP TABLE IF EXISTS security_sessions CASCADE` },
+  { name: "drop: security_roles",            sql: `DROP TABLE IF EXISTS security_roles CASCADE` },
+  { name: "drop: security_permissions",      sql: `DROP TABLE IF EXISTS security_permissions CASCADE` },
+  { name: "drop: security_integrations",     sql: `DROP TABLE IF EXISTS security_integrations CASCADE` },
+  { name: "drop: security_documents",        sql: `DROP TABLE IF EXISTS security_documents CASCADE` },
+  { name: "drop: security_audit_logs",       sql: `DROP TABLE IF EXISTS security_audit_logs CASCADE` },
+
+  // Compliance & Privacy — no data retention or GDPR logic active
+  { name: "drop: ip_allowlists",           sql: `DROP TABLE IF EXISTS ip_allowlists CASCADE` },
+  { name: "drop: gdpr_consent_records",    sql: `DROP TABLE IF EXISTS gdpr_consent_records CASCADE` },
+  { name: "drop: encrypted_fields",        sql: `DROP TABLE IF EXISTS encrypted_fields CASCADE` },
+  { name: "drop: data_retention_policies", sql: `DROP TABLE IF EXISTS data_retention_policies CASCADE` },
+
+  // Settings & Preferences — per-user / per-org settings not wired to application
+  { name: "drop: user_settings",        sql: `DROP TABLE IF EXISTS user_settings CASCADE` },
+  { name: "drop: settings_audit_log",   sql: `DROP TABLE IF EXISTS settings_audit_log CASCADE` },
+  { name: "drop: personal_access_tokens", sql: `DROP TABLE IF EXISTS personal_access_tokens CASCADE` },
+  { name: "drop: organization_settings", sql: `DROP TABLE IF EXISTS organization_settings CASCADE` },
+
+  // Communication tracking — email tracking not wired to any active routes
+  { name: "drop: email_unsubscribes",    sql: `DROP TABLE IF EXISTS email_unsubscribes CASCADE` },
+  { name: "drop: email_tracking_events", sql: `DROP TABLE IF EXISTS email_tracking_events CASCADE` },
+
+  // Docket Users — legacy Docket platform user table, superseded by main users table
+  { name: "drop: docket_users", sql: `DROP TABLE IF EXISTS docket_users CASCADE` },
+
+  // Extraction config — no active extraction pipeline references this table
+  { name: "drop: extraction_org_config", sql: `DROP TABLE IF EXISTS extraction_org_config CASCADE` },
+
+  // Workflow Engine — legacy workflow automation tables not wired to any active routes
+  { name: "drop: workflow_scheduled_triggers",    sql: `DROP TABLE IF EXISTS workflow_scheduled_triggers CASCADE` },
+  { name: "drop: workflow_approval_requests",     sql: `DROP TABLE IF EXISTS workflow_approval_requests CASCADE` },
+  { name: "drop: workflow_pipeline_executions",   sql: `DROP TABLE IF EXISTS workflow_pipeline_executions CASCADE` },
+  { name: "drop: workflow_pipelines",             sql: `DROP TABLE IF EXISTS workflow_pipelines CASCADE` },
+  { name: "drop: workflow_webhook_deliveries",    sql: `DROP TABLE IF EXISTS workflow_webhook_deliveries CASCADE` },
+  { name: "drop: workflow_webhooks",              sql: `DROP TABLE IF EXISTS workflow_webhooks CASCADE` },
+  { name: "drop: workflow_email_log",             sql: `DROP TABLE IF EXISTS workflow_email_log CASCADE` },
+  { name: "drop: workflow_email_templates",       sql: `DROP TABLE IF EXISTS workflow_email_templates CASCADE` },
+  { name: "drop: workflow_notifications",         sql: `DROP TABLE IF EXISTS workflow_notifications CASCADE` },
+  { name: "drop: workflow_tasks",                 sql: `DROP TABLE IF EXISTS workflow_tasks CASCADE` },
+  { name: "drop: workflow_executions",            sql: `DROP TABLE IF EXISTS workflow_executions CASCADE` },
+  { name: "drop: workflow_rules",                 sql: `DROP TABLE IF EXISTS workflow_rules CASCADE` },
 ];
 
 /**
