@@ -1,17 +1,25 @@
-// PropertyRecordTabs.tsx — Sales Comps, Rate Comps, Market Intel, Activities tabs
+// PropertyRecordTabs.tsx — Sales Comps, Rate Comps, Market Intel, Activities, Leases tabs
 
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useLocation } from 'wouter';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Progress } from '@/components/ui/progress';
 import {
+  Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription,
+} from '@/components/ui/sheet';
+import {
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+} from '@/components/ui/table';
+import {
   MapPin, DollarSign, TrendingUp, Activity, Clock, ExternalLink,
   ChevronRight, Phone, Mail, Calendar, FileText, BarChart3,
   Newspaper, CheckCircle2, Circle, AlertCircle, MessageSquare,
-  Anchor, Building2, ArrowUpRight, Scale, Home,
+  Anchor, Building2, ArrowUpRight, Scale, Home, Building, Users,
+  RefreshCw, Tag, Layers,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { apiRequest } from '@/lib/queryClient';
@@ -500,6 +508,434 @@ const activityTypeConfig: Record<string, { icon: any; color: string; bg: string 
   task: { icon: FileText, color: 'text-purple-600', bg: 'bg-purple-50' },
   site_visit: { icon: MapPin, color: 'text-rose-600', bg: 'bg-rose-50' },
 };
+
+// ── Commercial Leases Tab ─────────────────────────────────────────────────────
+
+function fmtRentPsf(firstTermRent: { baseRentValue: string; baseRentMode: string } | null): string {
+  if (!firstTermRent?.baseRentValue) return '—';
+  const val = parseFloat(firstTermRent.baseRentValue);
+  if (isNaN(val) || val === 0) return '—';
+  const mode = firstTermRent.baseRentMode || 'PER_SF_YEAR';
+  if (mode === 'PER_SF_YEAR') return `$${val.toFixed(2)} PSF/yr`;
+  if (mode === 'PER_MONTH') return `$${val.toFixed(2)}/mo`;
+  return `$${val.toFixed(2)}/yr`;
+}
+
+function fmtSf(v: string | number | null): string {
+  if (!v) return '—';
+  const n = typeof v === 'string' ? parseFloat(v) : v;
+  if (isNaN(n)) return '—';
+  return n.toLocaleString('en-US', { maximumFractionDigits: 0 }) + ' SF';
+}
+
+const leaseTypeColors: Record<string, string> = {
+  retail: 'bg-pink-50 text-pink-700 border-pink-200',
+  office: 'bg-cyan-50 text-cyan-700 border-cyan-200',
+  industrial: 'bg-gray-50 text-gray-700 border-gray-200',
+  other: 'bg-purple-50 text-purple-700 border-purple-200',
+};
+
+function LeaseDetailSheet({ leaseId, open, onClose }: { leaseId: string; open: boolean; onClose: () => void }) {
+  const { data: detail, isLoading } = useQuery<any>({
+    queryKey: ['lease-detail', leaseId],
+    queryFn: async () => {
+      const res = await apiRequest('GET', `/api/commercial-leases/leases/${leaseId}`);
+      return res.json();
+    },
+    enabled: open && !!leaseId,
+  });
+
+  return (
+    <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
+      <SheetContent side="right" className="w-full sm:max-w-2xl overflow-y-auto">
+        {isLoading ? (
+          <div className="space-y-4 mt-6">
+            <Skeleton className="h-8 w-64" />
+            <Skeleton className="h-4 w-48" />
+            <Skeleton className="h-40 w-full" />
+            <Skeleton className="h-40 w-full" />
+          </div>
+        ) : detail ? (
+          <>
+            <SheetHeader className="pb-4">
+              <SheetTitle className="text-lg font-semibold">{detail.tenantName}</SheetTitle>
+              <SheetDescription className="flex items-center gap-2 flex-wrap">
+                {detail.suite && <span className="text-gray-600">Suite {detail.suite}</span>}
+                {detail.sf && <><span>·</span><span>{fmtSf(detail.sf)}</span></>}
+                {detail.leaseType && (
+                  <Badge variant="outline" className={cn('text-[10px]', leaseTypeColors[detail.leaseType] || '')}>
+                    {detail.leaseType}
+                  </Badge>
+                )}
+                <Badge variant="outline" className={detail.active ? 'bg-green-50 text-green-700 border-green-200' : 'bg-gray-50 text-gray-600'}>
+                  {detail.active ? 'Active' : 'Inactive'}
+                </Badge>
+              </SheetDescription>
+            </SheetHeader>
+
+            {/* Core Dates */}
+            <div className="grid grid-cols-3 gap-3 mb-5">
+              <div className="rounded-lg border p-3">
+                <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Commencement</p>
+                <p className="text-sm font-medium">{fmtDate(detail.commencementDate)}</p>
+              </div>
+              <div className="rounded-lg border p-3">
+                <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Rent Start</p>
+                <p className="text-sm font-medium">{fmtDate(detail.rentCommencementDate || detail.commencementDate)}</p>
+              </div>
+              <div className="rounded-lg border p-3">
+                <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Expiration</p>
+                <p className="text-sm font-medium">{fmtDate(detail.expirationDate)}</p>
+              </div>
+            </div>
+
+            {/* Rent Terms */}
+            {detail.terms?.length > 0 && (
+              <div className="mb-5">
+                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                  <DollarSign className="h-3.5 w-3.5" /> Rent Terms
+                </h3>
+                <div className="rounded-lg border overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-gray-50 dark:bg-gray-800">
+                        <TableHead className="text-[10px] font-medium text-gray-500 uppercase">#</TableHead>
+                        <TableHead className="text-[10px] font-medium text-gray-500 uppercase">Period</TableHead>
+                        <TableHead className="text-[10px] font-medium text-gray-500 uppercase">Base Rent</TableHead>
+                        <TableHead className="text-[10px] font-medium text-gray-500 uppercase">Escalation</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {detail.terms.map((term: any, i: number) => (
+                        <TableRow key={term.id || i}>
+                          <TableCell className="text-xs text-gray-500">{i + 1}</TableCell>
+                          <TableCell className="text-xs">{fmtDate(term.startDate)} – {fmtDate(term.endDate)}</TableCell>
+                          <TableCell className="text-xs font-medium">
+                            ${parseFloat(term.baseRentValue || '0').toFixed(2)}
+                            <span className="text-gray-400 ml-1 text-[10px]">
+                              {term.baseRentMode === 'PER_SF_YEAR' ? 'PSF/yr' : term.baseRentMode === 'PER_MONTH' ? '/mo' : '/yr'}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-xs text-gray-500">
+                            {term.escalationType === 'NONE' ? 'None'
+                              : term.escalationType === 'FIXED_DOLLAR' ? `+$${parseFloat(term.escalationValue || '0').toFixed(2)} every ${term.escalationCycleMonths}mo`
+                              : term.escalationType === 'PERCENT' ? `+${parseFloat(term.escalationValue || '0').toFixed(2)}% every ${term.escalationCycleMonths}mo`
+                              : term.escalationType === 'CPI' ? `CPI every ${term.escalationCycleMonths}mo`
+                              : term.escalationType}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+            )}
+
+            {/* Charge Lines (Recoveries) */}
+            {detail.chargeLines?.length > 0 && (
+              <div className="mb-5">
+                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                  <Layers className="h-3.5 w-3.5" /> Recoveries & Charges
+                </h3>
+                <div className="rounded-lg border overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-gray-50 dark:bg-gray-800">
+                        <TableHead className="text-[10px] font-medium text-gray-500 uppercase">Name</TableHead>
+                        <TableHead className="text-[10px] font-medium text-gray-500 uppercase">Type</TableHead>
+                        <TableHead className="text-[10px] font-medium text-gray-500 uppercase">Amount</TableHead>
+                        <TableHead className="text-[10px] font-medium text-gray-500 uppercase">Period</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {detail.chargeLines.map((cl: any) => (
+                        <TableRow key={cl.id}>
+                          <TableCell className="text-xs font-medium">{cl.lineName}</TableCell>
+                          <TableCell className="text-[10px] text-gray-500">{cl.lineType?.replace(/_/g, ' ')}</TableCell>
+                          <TableCell className="text-xs">
+                            ${parseFloat(cl.amountValue || '0').toFixed(2)}
+                            <span className="text-gray-400 ml-1 text-[10px]">{cl.amountMode === 'PER_SF_MONTHLY' ? 'PSF/mo' : '/mo'}</span>
+                          </TableCell>
+                          <TableCell className="text-xs text-gray-500">{fmtDate(cl.startDate)}{cl.endDate ? ` – ${fmtDate(cl.endDate)}` : ''}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+            )}
+
+            {/* Abatements / Concessions */}
+            {detail.abatements?.length > 0 && (
+              <div className="mb-5">
+                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                  <Tag className="h-3.5 w-3.5" /> Abatements & Concessions
+                </h3>
+                <div className="space-y-2">
+                  {detail.abatements.map((ab: any) => (
+                    <div key={ab.id} className="rounded-lg border p-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-xs font-medium capitalize">{ab.abatementType?.replace(/_/g, ' ')}</p>
+                          <p className="text-[10px] text-gray-500 mt-0.5">
+                            {fmtDate(ab.startDate)} – {fmtDate(ab.endDate)} · Applies to: {ab.appliesTo?.replace(/_/g, ' ')}
+                          </p>
+                        </div>
+                        <Badge variant="secondary" className="text-xs">
+                          {ab.abatementType === 'FREE_RENT' ? 'Free Rent'
+                            : ab.abatementType === 'PERCENT_DISCOUNT' ? `${parseFloat(ab.value || '0').toFixed(1)}% discount`
+                            : `$${parseFloat(ab.value || '0').toFixed(2)} credit`}
+                        </Badge>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* TI Programs */}
+            {detail.tiPrograms?.length > 0 && (
+              <div className="mb-5">
+                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                  <Building className="h-3.5 w-3.5" /> Tenant Improvement (TI)
+                </h3>
+                {detail.tiPrograms.map((ti: any) => (
+                  <div key={ti.id} className="rounded-lg border p-3 space-y-2">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <p className="text-[10px] text-gray-500 uppercase tracking-wider">Allowance</p>
+                        <p className="text-sm font-medium">
+                          ${parseFloat(ti.allowanceValue || '0').toFixed(2)}
+                          <span className="text-xs text-gray-400 ml-1">{ti.allowanceMode === 'PER_SF' ? 'PSF' : 'total'}</span>
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] text-gray-500 uppercase tracking-wider">Amortization</p>
+                        <p className="text-sm font-medium">
+                          {ti.amortizeEnabled
+                            ? `${ti.amortizeTermMonths}mo @ ${parseFloat(ti.amortizeRateAnnual || '0').toFixed(2)}%`
+                            : 'None'}
+                        </p>
+                      </div>
+                    </div>
+                    {ti.draws?.length > 0 && (
+                      <div>
+                        <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Draws ({ti.draws.length})</p>
+                        <div className="space-y-1">
+                          {ti.draws.map((draw: any) => (
+                            <div key={draw.id} className="flex justify-between text-xs">
+                              <span className="text-gray-500">{fmtDate(draw.drawDate)}</span>
+                              <span className="font-medium">${parseFloat(draw.amount || '0').toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Recovery Models */}
+            {detail.recoveryModels?.length > 0 && (
+              <div className="mb-5">
+                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                  <RefreshCw className="h-3.5 w-3.5" /> Recovery Model
+                </h3>
+                {detail.recoveryModels.map((rm: any) => (
+                  <div key={rm.id} className="rounded-lg border p-3 space-y-2">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <p className="text-[10px] text-gray-500 uppercase tracking-wider">Tenant Share</p>
+                        <p className="text-xs font-medium">
+                          {rm.tenantShareMode === 'BY_SF' ? 'Pro-rata by SF' : `${parseFloat(rm.tenantSharePercent || '0').toFixed(2)}% fixed`}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] text-gray-500 uppercase tracking-wider">Billing</p>
+                        <p className="text-xs font-medium">{rm.billingTiming?.replace(/_/g, ' ')}</p>
+                      </div>
+                      {rm.baseYear && (
+                        <div>
+                          <p className="text-[10px] text-gray-500 uppercase tracking-wider">Base Year</p>
+                          <p className="text-xs font-medium">{rm.baseYear}</p>
+                        </div>
+                      )}
+                      {rm.grossupEnabled && (
+                        <div>
+                          <p className="text-[10px] text-gray-500 uppercase tracking-wider">Gross-up</p>
+                          <p className="text-xs font-medium">{parseFloat(rm.grossupOccupancyThreshold || '0.95') * 100}% threshold</p>
+                        </div>
+                      )}
+                    </div>
+                    {rm.categories?.length > 0 && (
+                      <div>
+                        <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Categories</p>
+                        <div className="flex flex-wrap gap-1">
+                          {rm.categories.map((cat: any) => (
+                            <Badge key={cat.id} variant="outline" className="text-[10px]">
+                              {cat.category} — {cat.stopType?.replace(/_/g, ' ') || 'None'}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Notes */}
+            {detail.notes && (
+              <div className="mb-5">
+                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                  <FileText className="h-3.5 w-3.5" /> Notes
+                </h3>
+                <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">{detail.notes}</p>
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="flex flex-col items-center justify-center h-64">
+            <p className="text-sm text-gray-500">Lease details unavailable</p>
+          </div>
+        )}
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+export function PropertyLeasesTab({ propertyId }: { propertyId: string }) {
+  const [selectedLeaseId, setSelectedLeaseId] = useState<string | null>(null);
+
+  const [showInactive, setShowInactive] = useState(false);
+
+  const { data, isLoading } = useQuery<{ data: any[]; total: number }>({
+    queryKey: ['property-leases', propertyId, showInactive],
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        propertyId,
+        limit: '100',
+        sortBy: 'tenantName',
+        sortDir: 'asc',
+        ...(showInactive ? {} : { status: 'active' }),
+      });
+      const res = await apiRequest('GET', `/api/commercial-leases/operations/leases?${params}`);
+      return res.json();
+    },
+    enabled: !!propertyId,
+  });
+
+  const leases = data?.data || [];
+
+  return (
+    <div className="space-y-3">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Users className="h-4 w-4 text-gray-400" />
+          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+            {showInactive ? 'All Leases' : 'Active Leases'}
+          </span>
+          {data && (
+            <Badge variant="secondary" className="text-[10px] h-4 px-1.5">{data.total}</Badge>
+          )}
+        </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setShowInactive(!showInactive)}
+          className="text-xs text-gray-500 h-7"
+        >
+          {showInactive ? 'Hide inactive' : 'Show all'}
+        </Button>
+      </div>
+
+      {/* Loading */}
+      {isLoading && (
+        <div className="space-y-2">
+          {[...Array(4)].map((_, i) => (
+            <Card key={i}><CardContent className="p-3"><Skeleton className="h-12 w-full" /></CardContent></Card>
+          ))}
+        </div>
+      )}
+
+      {/* Empty state */}
+      {!isLoading && leases.length === 0 && (
+        <EmptyState
+          icon={Building2}
+          title="No leases on record"
+          subtitle="Commercial lease data will appear here once leases are added for this property."
+        />
+      )}
+
+      {/* Lease Table */}
+      {!isLoading && leases.length > 0 && (
+        <Card className="shadow-sm overflow-hidden">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-gray-50 dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800">
+                <TableHead className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Tenant</TableHead>
+                <TableHead className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Suite</TableHead>
+                <TableHead className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">SF</TableHead>
+                <TableHead className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Type</TableHead>
+                <TableHead className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Term</TableHead>
+                <TableHead className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Rent PSF</TableHead>
+                <TableHead className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Status</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {leases.map((lease: any) => (
+                <TableRow
+                  key={lease.id}
+                  className="cursor-pointer hover:bg-blue-50/50 dark:hover:bg-blue-900/10 transition-colors"
+                  onClick={() => setSelectedLeaseId(lease.id)}
+                >
+                  <TableCell className="font-medium text-sm py-2.5">{lease.tenantName}</TableCell>
+                  <TableCell className="text-xs text-gray-500 py-2.5">{lease.suite || '—'}</TableCell>
+                  <TableCell className="text-xs py-2.5">{fmtSf(lease.sf)}</TableCell>
+                  <TableCell className="py-2.5">
+                    {lease.leaseType ? (
+                      <Badge variant="outline" className={cn('text-[10px] capitalize', leaseTypeColors[lease.leaseType] || '')}>
+                        {lease.leaseType}
+                      </Badge>
+                    ) : '—'}
+                  </TableCell>
+                  <TableCell className="text-xs text-gray-500 py-2.5">
+                    {fmtDate(lease.commencementDate)} – {fmtDate(lease.expirationDate)}
+                  </TableCell>
+                  <TableCell className="text-xs font-medium py-2.5">
+                    {fmtRentPsf(lease.firstTermRent || null)}
+                  </TableCell>
+                  <TableCell className="py-2.5">
+                    <Badge
+                      variant="outline"
+                      className={lease.active
+                        ? 'text-[10px] bg-green-50 text-green-700 border-green-200'
+                        : 'text-[10px] bg-gray-50 text-gray-500'
+                      }
+                    >
+                      {lease.active ? 'Active' : 'Inactive'}
+                    </Badge>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </Card>
+      )}
+
+      {/* Lease Detail Sheet */}
+      {selectedLeaseId && (
+        <LeaseDetailSheet
+          leaseId={selectedLeaseId}
+          open={!!selectedLeaseId}
+          onClose={() => setSelectedLeaseId(null)}
+        />
+      )}
+    </div>
+  );
+}
 
 export function PropertyActivitiesTab({ propertyId }: { propertyId: string }) {
   const [filter, setFilter] = useState<'all' | 'open' | 'done'>('all');

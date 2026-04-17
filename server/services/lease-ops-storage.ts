@@ -6,7 +6,7 @@
  * lease_context = 'operations'.
  */
 
-import { eq, and, or, ilike, sql, desc, asc, gte, lte, isNull } from "drizzle-orm";
+import { eq, and, or, ilike, sql, desc, asc, gte, lte, isNull, inArray } from "drizzle-orm";
 import {
   commercialLeases,
   leaseTerms,
@@ -91,12 +91,41 @@ export async function listOperationsLeases(
     .from(commercialLeases)
     .where(where);
 
+  // Attach first-term rent data for PSF display in list views
+  let enrichedData = data;
+  if (data.length > 0) {
+    const leaseIds = data.map((l: any) => l.id);
+    const firstTerms = await db
+      .select({
+        leaseId: leaseTerms.leaseId,
+        baseRentValue: leaseTerms.baseRentValue,
+        baseRentMode: leaseTerms.baseRentMode,
+        termIndex: leaseTerms.termIndex,
+      })
+      .from(leaseTerms)
+      .where(inArray(leaseTerms.leaseId, leaseIds))
+      .orderBy(asc(leaseTerms.leaseId), asc(leaseTerms.termIndex));
+
+    // Build a map: leaseId -> first term rent info
+    const firstTermMap: Record<string, { baseRentValue: string; baseRentMode: string }> = {};
+    for (const t of firstTerms) {
+      if (!firstTermMap[t.leaseId]) {
+        firstTermMap[t.leaseId] = { baseRentValue: t.baseRentValue, baseRentMode: t.baseRentMode };
+      }
+    }
+
+    enrichedData = data.map((l: any) => ({
+      ...l,
+      firstTermRent: firstTermMap[l.id] || null,
+    }));
+  }
+
   return {
-    data,
+    data: enrichedData,
     total: count,
     limit,
     offset,
-    hasMore: offset + data.length < count,
+    hasMore: offset + enrichedData.length < count,
   };
 }
 

@@ -83,8 +83,18 @@ router.post("/projects/:projectId/leases", async (req: Request, res: Response) =
 
 router.get("/leases/:leaseId", async (req: Request, res: Response) => {
   try {
+    const orgId = getOrgId(req);
     const detail = await storage.getLeaseDetail(db, req.params.leaseId);
     if (!detail) return res.status(404).json({ error: "Lease not found" });
+    // Org-scope check: lease must belong to this org (operations context) or
+    // to a project owned by this org (valuator context)
+    if (detail.orgId && detail.orgId !== orgId) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+    if (!detail.orgId && detail.projectId) {
+      const allowed = await requireProjectInOrg(detail.projectId, orgId);
+      if (!allowed) return res.status(403).json({ error: "Access denied" });
+    }
     res.json(detail);
   } catch (e: any) {
     res.status(500).json({ error: e.message });
