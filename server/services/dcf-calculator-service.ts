@@ -148,7 +148,17 @@ export async function performDCFAnalysis(
   const capitalStackData = await loadCapitalStackData(pool, projectData.modelingProjectId);
 
   // ── Step 1b: Load tenant lease income (if any leases exist) ────────────
-  const leaseIncome = await loadLeaseIncomeForProject(pool, projectId);
+  // Pass the scenario-level CPI rate so CPI/CPI_CAP_FLOOR leases use a
+  // configurable assumption instead of the hardcoded 3% default.
+  // Scenario assumptions may supply `cpiRate` explicitly; if absent we fall
+  // back to 3% (the field is optional — null means "use default").
+  const scenarioCpiRate: number | undefined =
+    typeof scenarioData.assumptions?.cpiRate === 'number'
+      ? scenarioData.assumptions.cpiRate
+      : undefined;
+  const leaseIncome = await loadLeaseIncomeForProject(pool, projectId, {
+    cpiRate: scenarioCpiRate,
+  });
 
   // ── Step 2: Compute Year 1 from Direct Input Engine ─────────────────────
   // ── Inject seasonality if not already in inputAssumptions ──────────────
@@ -543,6 +553,63 @@ function buildQuickFlows(
 
 // ─── Lease Income Loader ─────────────────────────────────────────────────────
 
+/** One row in a SCHEDULE-type step rent plan */
+export interface RentStepEntry {
+  effectiveDate: string;   // ISO date string — when this rent level takes effect
+  value: number;           // absolute rent amount (not an increment)
+  unit: 'PSF_YEAR' | 'PER_YEAR' | 'PER_MONTH' | string;
+  notes?: string;
+}
+
+/**
+ * Return true if the raw object looks like a valid RentStepEntry so callers
+ * can skip malformed rows without throwing.
+ */
+function isValidRentStepEntry(entry: unknown): entry is RentStepEntry {
+  if (!entry || typeof entry !== 'object') return false;
+  const e = entry as Record<string, unknown>;
+  return (
+    typeof e.effectiveDate === 'string' &&
+    e.effectiveDate.length > 0 &&
+    !isNaN(new Date(e.effectiveDate).getTime()) &&
+    typeof e.value === 'number' &&
+    isFinite(e.value) &&
+    typeof e.unit === 'string' &&
+    e.unit.length > 0
+  );
+}
+
+/**
+ * Find the last step in a pre-sorted (ascending effectiveDate) schedule whose
+ * effectiveDate is on or before `atDate`. Returns null if none has taken effect.
+ */
+export function findActiveRentStep(
+  schedule: RentStepEntry[],
+  atDate: Date
+): RentStepEntry | null {
+  let active: RentStepEntry | null = null;
+  for (const step of schedule) {
+    if (new Date(step.effectiveDate) <= atDate) {
+      active = step;
+    } else {
+      break; // sorted ascending — no need to look further
+    }
+  }
+  return active;
+}
+
+/**
+ * Convert a RentStepEntry's absolute rent value to an annual dollar amount.
+ * @param step   The active schedule step
+ * @param sf     Leasable square footage (used when unit is PSF_YEAR)
+ */
+export function convertRentStepToAnnual(step: RentStepEntry, sf: number): number {
+  if (step.unit === 'PSF_YEAR') return step.value * sf;
+  if (step.unit === 'PER_YEAR') return step.value;
+  if (step.unit === 'PER_MONTH') return step.value * 12;
+  return step.value; // unknown unit — treat as annual
+}
+
 export interface LeaseBreakdownEntry {
   leaseId: string;
   tenantName: string;
@@ -551,7 +618,7 @@ export interface LeaseBreakdownEntry {
   baseRentAnnual: number;
   recoveryAnnual: number;
   escalationType: string;
-  escalationRate: number;              // annual pct (decimal)
+  escalationRate: number;              // annual pct (decimal); ignored for SCHEDULE type
   leaseEndDate: string;
   /** ISO date string when the lease starts (used to anchor free-rent timing relative to acquisition) */
   leaseStartDate: string | null;
@@ -559,6 +626,13 @@ export interface LeaseBreakdownEntry {
   rentCommencementDate: string | null;
   /** Number of free-rent months at start of lease (derived from lease_start_date vs rent_commencement_date) */
   freeRentMonths: number;
+  /**
+   * Step schedule for SCHEDULE-type leases. Each entry describes the absolute
+   * rent level starting on effectiveDate. Entries should be sorted ascending.
+   * When present and escalationType === 'SCHEDULE', computeLeaseIncomeByYear
+   * uses this instead of the compounding escalationRate.
+   */
+  scheduleJson?: RentStepEntry[] | null;
 }
 
 export interface LeaseIncomeResult {
@@ -685,11 +759,27 @@ export function computeLeaseIncomeByYear(
           : 1.0;
         if (activeFraction <= 0) continue;
 
-        // Escalation: number of completed lease years since commencement at the start
-        // of this month. Anchored to commencementDate so pre-acquisition escalations
-        // are already baked into the base rent.
+        // Escalation: compute the rent applicable in this month.
+        //
+        // For SCHEDULE leases: find the last step entry whose effectiveDate is
+        // on or before monthStart; convert its absolute value+unit to a monthly
+        // figure. If no step has kicked in yet, use baseRentAnnual / 12.
+        //
+        // For all other types: compound the escalationRate by the number of
+        // full lease years elapsed since commencementDate.
         let escalatedMonthlyRent = lease.baseRentAnnual / 12;
-        if (commencementDate && lease.escalationRate > 0) {
+
+        if (
+          lease.escalationType === 'SCHEDULE' &&
+          lease.scheduleJson &&
+          lease.scheduleJson.length > 0
+        ) {
+          const activeStep = findActiveRentStep(lease.scheduleJson, monthStart);
+          if (activeStep) {
+            escalatedMonthlyRent = convertRentStepToAnnual(activeStep, lease.sf) / 12;
+          }
+          // If no step has taken effect yet, remain at baseRentAnnual / 12 (set above)
+        } else if (commencementDate && lease.escalationRate > 0) {
           const msFromCommencementToMonthStart = monthStart.getTime() - commencementDate.getTime();
           const leaseYearsElapsed = Math.max(
             0,
@@ -751,7 +841,12 @@ export function computeLeaseIncomeByYear(
  * Load and compute annual lease income from tenant_leases, tenant_rent_terms,
  * and tenant_recoveries for a given project.
  */
-export async function loadLeaseIncomeForProject(pool: any, projectId: string): Promise<LeaseIncomeResult> {
+export async function loadLeaseIncomeForProject(
+  pool: any,
+  projectId: string,
+  options?: { cpiRate?: number }
+): Promise<LeaseIncomeResult> {
+  const cpiRate = options?.cpiRate ?? 0.03;
   const empty: LeaseIncomeResult = {
     hasLeases: false,
     leaseCount: 0,
@@ -781,10 +876,11 @@ export async function loadLeaseIncomeForProject(pool: any, projectId: string): P
 
   const leaseIds = leasesResult.rows.map((r: any) => r.id);
 
-  // Fetch initial rent terms for all leases in one query
+  // Fetch initial rent terms for all leases in one query (include schedule_json for SCHEDULE type)
   const termsResult = await pool.query(
     `SELECT lease_id, base_rent_input_unit, base_rent_input_value,
-            escalation_type, escalation_value, escalation_frequency_months
+            escalation_type, escalation_value, escalation_frequency_months,
+            schedule_json
      FROM tenant_rent_terms
      WHERE lease_id = ANY($1::uuid[])
        AND term_type = 'INITIAL'
@@ -841,9 +937,15 @@ export async function loadLeaseIncomeForProject(pool: any, projectId: string): P
       } else if (escalationType === 'DOLLAR_PSF_YEAR' && term.escalation_value && baseRentAnnual > 0) {
         escalationRate = (parseFloat(term.escalation_value) * sf) / baseRentAnnual;
       }
-      // CPI / CPI_CAP_FLOOR / SCHEDULE: default to 3% assumption
-      if (['CPI', 'CPI_CAP_FLOOR', 'SCHEDULE'].includes(escalationType)) {
-        escalationRate = 0.03;
+      // CPI / CPI_CAP_FLOOR: use the scenario-configurable CPI rate (default 3%)
+      if (['CPI', 'CPI_CAP_FLOOR'].includes(escalationType)) {
+        escalationRate = cpiRate;
+      }
+      // SCHEDULE: escalationRate is not used for projection (schedule steps are applied
+      // directly in computeLeaseIncomeByYear). Set 0 so it doesn't distort the
+      // weighted-average escalation summary for this tenant.
+      if (escalationType === 'SCHEDULE') {
+        escalationRate = 0;
       }
     }
 
@@ -872,6 +974,27 @@ export async function loadLeaseIncomeForProject(pool: any, projectId: string): P
       freeRentMonths = Math.round(diffDays / 30.44); // approximate months
     }
 
+    // Parse schedule_json: may be a jsonb object (already parsed by pg driver) or a string.
+    // Each entry is validated before use so malformed rows are silently dropped.
+    let scheduleJson: RentStepEntry[] | null = null;
+    if (term && term.schedule_json) {
+      try {
+        const raw = typeof term.schedule_json === 'string'
+          ? JSON.parse(term.schedule_json)
+          : term.schedule_json;
+        if (Array.isArray(raw)) {
+          const valid = raw.filter(isValidRentStepEntry);
+          if (valid.length > 0) {
+            scheduleJson = valid.sort(
+              (a, b) => new Date(a.effectiveDate).getTime() - new Date(b.effectiveDate).getTime()
+            );
+          }
+        }
+      } catch {
+        // Malformed JSON in schedule_json — treat as no schedule
+      }
+    }
+
     breakdown.push({
       leaseId: lease.id,
       tenantName: lease.tenant_name,
@@ -885,6 +1008,7 @@ export async function loadLeaseIncomeForProject(pool: any, projectId: string): P
       leaseStartDate: lease.lease_start_date ?? null,
       rentCommencementDate: lease.rent_commencement_date ?? null,
       freeRentMonths,
+      scheduleJson,
     });
   }
 

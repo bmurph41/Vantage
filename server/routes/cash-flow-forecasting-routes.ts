@@ -19,7 +19,12 @@ import {
   capitalCalls,
 } from "@shared/schema";
 import { eq, and, desc, sql, gte, lte, count } from "drizzle-orm";
-import { loadLeaseIncomeForProject, type LeaseIncomeResult } from "../services/dcf-calculator-service";
+import {
+  loadLeaseIncomeForProject,
+  findActiveRentStep,
+  convertRentStepToAnnual,
+  type LeaseIncomeResult,
+} from "../services/dcf-calculator-service";
 import { pool } from "../db";
 
 export const cashFlowForecastingRouter = Router();
@@ -54,14 +59,33 @@ async function buildLeaseIncomeCache(
  */
 function computeLeaseEGIForMonth(
   leaseBreakdown: LeaseIncomeResult['leaseBreakdown'],
-  monthsOut: number
+  monthsOut: number,
+  forecastDate?: Date
 ): number {
   let total = 0;
+  const monthDate = forecastDate ?? new Date();
+
   for (const lease of leaseBreakdown) {
     const yearsElapsed = monthsOut / 12;
-    const rentGrowthFactor = Math.pow(1 + lease.escalationRate, yearsElapsed);
-    const recoveryGrowthFactor = Math.pow(1.025, yearsElapsed); // 2.5%/yr for recoveries
-    total += (lease.baseRentAnnual * rentGrowthFactor + lease.recoveryAnnual * recoveryGrowthFactor) / 12;
+    const recoveryGrowthFactor = Math.pow(1.025, yearsElapsed);
+
+    let monthlyBaseRent: number;
+
+    if (
+      lease.escalationType === 'SCHEDULE' &&
+      lease.scheduleJson &&
+      lease.scheduleJson.length > 0
+    ) {
+      const activeStep = findActiveRentStep(lease.scheduleJson, monthDate);
+      monthlyBaseRent = activeStep
+        ? convertRentStepToAnnual(activeStep, lease.sf) / 12
+        : lease.baseRentAnnual / 12;
+    } else {
+      const rentGrowthFactor = Math.pow(1 + lease.escalationRate, yearsElapsed);
+      monthlyBaseRent = (lease.baseRentAnnual * rentGrowthFactor) / 12;
+    }
+
+    total += monthlyBaseRent + lease.recoveryAnnual * recoveryGrowthFactor / 12;
   }
   return total;
 }
@@ -123,10 +147,11 @@ cashFlowForecastingRouter.post("/generate", async (req: Request, res: Response) 
         let incomeSource: "lease_data" | "cap_rate_estimate";
 
         if (leaseData && leaseData.hasLeases) {
-          // Apply per-lease escalation schedules (base rent) and 2.5% recovery growth
-          monthlyNOI = computeLeaseEGIForMonth(leaseData.leaseBreakdown, monthsOut);
-          // Base for op-ex = Year-0 lease EGI (no growth applied)
-          baseMonthlyIncome = computeLeaseEGIForMonth(leaseData.leaseBreakdown, 0);
+          // Apply per-lease escalation schedules (base rent) and 2.5% recovery growth.
+          // Pass the actual forecast calendar date so SCHEDULE steps resolve correctly.
+          monthlyNOI = computeLeaseEGIForMonth(leaseData.leaseBreakdown, monthsOut, forecastDate);
+          // Base for op-ex = Year-0 lease EGI (no growth applied, anchored to today)
+          baseMonthlyIncome = computeLeaseEGIForMonth(leaseData.leaseBreakdown, 0, now);
           incomeSource = "lease_data";
         } else {
           // Estimated monthly NOI (assume 6% cap rate, grow over time)
