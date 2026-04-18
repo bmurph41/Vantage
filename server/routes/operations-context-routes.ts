@@ -109,7 +109,7 @@ const parkingLotSchema = z.object({
 });
 
 const importActualsSchema = z.object({
-  scope: z.enum(['ALL', 'FUEL', 'SHIP_STORE', 'SERVICE', 'BOAT_RENTALS', 'BOAT_CLUB', 'BOAT_SALES', 'COMMERCIAL', 'BOOKKEEPING', 'PAYROLL']),
+  scope: z.enum(['ALL', 'FUEL', 'SHIP_STORE', 'SERVICE', 'BOAT_RENTALS', 'BOAT_CLUB', 'BOAT_SALES', 'COMMERCIAL', 'BOOKKEEPING', 'PAYROLL', 'PARKING_LOT']),
   rangeStart: z.string(),
   rangeEnd: z.string(),
   overwrite: z.boolean().default(false),
@@ -1971,6 +1971,45 @@ router.post('/projects/:projectId/import-actuals', async (req: Request, res: Res
           .onConflictDoUpdate({
             target: [asmpShipStore.projectId, asmpShipStore.periodMonth],
             set: { ...storeInsert, updatedAt: new Date() }
+          });
+        rowsWritten++;
+      }
+    }
+
+    if (scope === 'ALL' || scope === 'PARKING_LOT') {
+      const parkingConditions: SQL<unknown>[] = [
+        between(opsParkingLot.txnDate, rangeStart, rangeEnd),
+      ];
+      if (marinaId) {
+        parkingConditions.push(eq(opsParkingLot.marinaId, marinaId));
+      } else {
+        parkingConditions.push(eq(opsParkingLot.modelingProjectId, projectId));
+      }
+
+      const parkingData = await db.select({
+        month: sql<string>`date_trunc('month', ${opsParkingLot.txnDate})::date`,
+        revenue: sql<string>`sum(${opsParkingLot.grossRevenue})`,
+      })
+        .from(opsParkingLot)
+        .where(and(...parkingConditions))
+        .groupBy(sql`date_trunc('month', ${opsParkingLot.txnDate})::date`);
+
+      for (const row of parkingData) {
+        const periodMonth = row.month;
+        monthsAffected.add(periodMonth);
+
+        const parkingInsert = {
+          projectId,
+          orgId,
+          periodMonth,
+          revenue: row.revenue,
+          importedAt: new Date(),
+          importSource: 'ACTUALS' as const,
+        };
+        await db.insert(asmpParkingLot).values(parkingInsert)
+          .onConflictDoUpdate({
+            target: [asmpParkingLot.projectId, asmpParkingLot.periodMonth],
+            set: { ...parkingInsert, updatedAt: new Date() }
           });
         rowsWritten++;
       }

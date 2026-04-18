@@ -23826,7 +23826,7 @@ export const ownershipStatusEnum = pgEnum("ownership_status", ["OWNED", "DEAL"])
 
 // Import Scope Enum - For import operations
 export const importScopeEnum = pgEnum("import_scope", [
-  "ALL", "FUEL", "SHIP_STORE", "SERVICE", "TENANTS", "RENTALS", "CLUB", "BOAT_SALES", "BOOKKEEPING", "COMMERCIAL", "PAYROLL"
+  "ALL", "FUEL", "SHIP_STORE", "SERVICE", "TENANTS", "RENTALS", "CLUB", "BOAT_SALES", "BOOKKEEPING", "COMMERCIAL", "PAYROLL", "PARKING_LOT"
 ]);
 
 // Data Source Enum - Track where data came from
