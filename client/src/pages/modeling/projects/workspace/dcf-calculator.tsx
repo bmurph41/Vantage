@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef, Fragment } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useParams } from 'wouter';
 import { useHoldPeriod } from '@/hooks/use-hold-period';
@@ -26,13 +26,15 @@ import {
   Trash2,
   ChevronUp,
   ChevronDown,
+  ChevronRight,
   Percent,
   Target,
   Activity,
   Layers,
   AlertCircle,
   Building2,
-  Info
+  Info,
+  Users
 } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { apiRequest, queryClient } from '@/lib/queryClient';
@@ -76,6 +78,23 @@ interface SensitivityMatrix {
   results: number[][];
 }
 
+interface LeaseYearDetail {
+  leaseId: string;
+  tenantName: string;
+  baseRent: number;
+  recovery: number;
+  isExpired: boolean;
+  freeRentReduction: number;
+}
+
+interface YearlyLeaseIncome {
+  year: number;
+  baseRentAnnual: number;
+  recoveryAnnual: number;
+  egiAnnual: number;
+  leaseDetail: LeaseYearDetail[];
+}
+
 interface DCFAnalysis {
   projectId: string;
   scenarios: DCFScenario[];
@@ -109,6 +128,17 @@ interface DCFAnalysis {
     totalRecoveryAnnual: number;
     weightedAvgEscalationRate: number;
   };
+  yearlyLeaseIncome?: YearlyLeaseIncome[];
+  years?: Array<{
+    year: number;
+    label: string;
+    noi: number;
+    capex: number;
+    ncf: number;
+    debtService: number;
+    leveredCF: number;
+    cashOnCash: number;
+  }>;
 }
 
 interface DCFCalculatorPageProps {
@@ -120,7 +150,27 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
   const { projectId } = useParams<{ projectId: string }>();
   const [activeTab, setActiveTab] = useState('overview');
   const [selectedScenario, setSelectedScenario] = useState<string | null>(null);
-  
+  const [expandedCFYears, setExpandedCFYears] = useState<Set<number>>(new Set());
+  const [expandedLeaseYears, setExpandedLeaseYears] = useState<Set<number>>(new Set());
+
+  const toggleCFYear = (year: number) => {
+    setExpandedCFYears(prev => {
+      const next = new Set(prev);
+      if (next.has(year)) next.delete(year);
+      else next.add(year);
+      return next;
+    });
+  };
+
+  const toggleLeaseYear = (year: number) => {
+    setExpandedLeaseYears(prev => {
+      const next = new Set(prev);
+      if (next.has(year)) next.delete(year);
+      else next.add(year);
+      return next;
+    });
+  };
+
   const { holdPeriod: sharedHoldPeriod, setHoldPeriod: setSharedHoldPeriod } = useHoldPeriod(projectId || '');
 
   const { data: scenarios = [] } = useQuery<any[]>({
@@ -249,6 +299,11 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
       setLeaseOverrideEnabled(meta.useLeaseIncomeForDcf === true);
     }
   }, [dcfAnalysis]);
+
+  useEffect(() => {
+    setExpandedCFYears(new Set());
+    setExpandedLeaseYears(new Set());
+  }, [projectId]);
 
   const updateLeaseOverrideMutation = useMutation({
     mutationFn: (enabled: boolean) =>
@@ -1010,13 +1065,22 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
         <TabsContent value="cashflows" className="mt-4">
           <Card>
             <CardHeader>
-              <CardTitle className="finance-section-header">Projected Cash Flows - {baseScenario?.name || 'Base Case'}</CardTitle>
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <CardTitle className="finance-section-header">Projected Cash Flows - {baseScenario?.name || 'Base Case'}</CardTitle>
+                {dcfAnalysis?.yearlyLeaseIncome && dcfAnalysis.yearlyLeaseIncome.length > 0 && (
+                  <span className="inline-flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-full px-2.5 py-1">
+                    <Users className="h-3 w-3" />
+                    Click a year row to see per-tenant lease breakdown
+                  </span>
+                )}
+              </div>
             </CardHeader>
             <CardContent>
               <ScrollArea className="w-full">
                 <table className="finance-table">
                   <thead>
                     <tr>
+                      <th style={{ width: 28 }}></th>
                       <th>Year</th>
                       <th>NOI</th>
                       <th>CF Before Debt</th>
@@ -1025,20 +1089,122 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
                     </tr>
                   </thead>
                   <tbody>
-                    {baseScenario?.cashFlows.map((cf) => (
-                      <tr key={cf.period}>
-                        <td>Year {cf.period}</td>
-                        <td>{formatCurrency(cf.noi)}</td>
-                        <td>{formatCurrency(cf.cashFlowBeforeDebt)}</td>
-                        <td>
-                          <span className={cf.cashFlowAfterDebt >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}>
-                            {formatCurrency(cf.cashFlowAfterDebt)}
-                          </span>
-                        </td>
-                        <td className="text-muted-foreground">{formatCurrency(cf.presentValue)}</td>
-                      </tr>
-                    ))}
+                    {baseScenario?.cashFlows.map((cf) => {
+                      const yearNum = cf.year ?? cf.period;
+                      const leaseYear = dcfAnalysis?.yearlyLeaseIncome?.find(y => y.year === yearNum);
+                      const isExpanded = expandedCFYears.has(yearNum);
+                      const hasLeaseDetail = leaseYear && leaseYear.leaseDetail && leaseYear.leaseDetail.length > 0;
+                      return (
+                        <Fragment key={`cf-frag-${cf.period}`}>
+                          <tr
+                            className={hasLeaseDetail ? 'cursor-pointer hover:bg-muted/40 transition-colors' : ''}
+                            onClick={hasLeaseDetail ? () => toggleCFYear(yearNum) : undefined}
+                          >
+                            <td className="text-center">
+                              {hasLeaseDetail && (
+                                <ChevronRight
+                                  className={cn(
+                                    'h-3.5 w-3.5 text-muted-foreground transition-transform',
+                                    isExpanded && 'rotate-90'
+                                  )}
+                                />
+                              )}
+                            </td>
+                            <td>Year {cf.period}</td>
+                            <td>
+                              <div className="flex items-center gap-1.5">
+                                {formatCurrency(cf.noi)}
+                                {leaseYear && (
+                                  <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">
+                                    EGI {formatCompactCurrency(leaseYear.egiAnnual)}
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                            <td>{formatCurrency(cf.cashFlowBeforeDebt)}</td>
+                            <td>
+                              <span className={cf.cashFlowAfterDebt >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}>
+                                {formatCurrency(cf.cashFlowAfterDebt)}
+                              </span>
+                            </td>
+                            <td className="text-muted-foreground">{formatCurrency(cf.presentValue)}</td>
+                          </tr>
+                          {isExpanded && hasLeaseDetail && (
+                            <tr key={`cf-detail-${cf.period}`} className="bg-emerald-50/60 dark:bg-emerald-950/20">
+                              <td></td>
+                              <td colSpan={5} className="py-3 px-2">
+                                <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                                  <Users className="h-3 w-3" />
+                                  Year {yearNum} — Per-Tenant Lease Income
+                                </div>
+                                <table className="w-full text-xs border-collapse">
+                                  <thead>
+                                    <tr className="text-left border-b border-border">
+                                      <th className="pb-1 font-medium text-muted-foreground pr-4">Tenant</th>
+                                      <th className="pb-1 font-medium text-muted-foreground text-right pr-4">Base Rent</th>
+                                      <th className="pb-1 font-medium text-muted-foreground text-right pr-4">Recoveries</th>
+                                      <th className="pb-1 font-medium text-muted-foreground text-right pr-4">Free Rent Reduction</th>
+                                      <th className="pb-1 font-medium text-muted-foreground text-right">EGI</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {leaseYear.leaseDetail.map((ld) => (
+                                      <tr key={ld.leaseId} className="border-b border-border/40 last:border-0">
+                                        <td className="py-1 pr-4 font-medium">
+                                          <div className="flex items-center gap-1.5">
+                                            {ld.tenantName}
+                                            {ld.isExpired && (
+                                              <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 text-red-600 dark:text-red-400 border-red-300 dark:border-red-800">
+                                                Expired
+                                              </Badge>
+                                            )}
+                                          </div>
+                                        </td>
+                                        <td className={cn('py-1 pr-4 text-right tabular-nums', ld.isExpired && 'text-muted-foreground')}>
+                                          {ld.isExpired ? '$0' : formatCurrency(ld.baseRent)}
+                                        </td>
+                                        <td className={cn('py-1 pr-4 text-right tabular-nums', ld.isExpired && 'text-muted-foreground')}>
+                                          {ld.isExpired ? '$0' : formatCurrency(ld.recovery)}
+                                        </td>
+                                        <td className="py-1 pr-4 text-right tabular-nums">
+                                          {ld.freeRentReduction > 0 ? (
+                                            <span className="text-amber-600 dark:text-amber-400 font-medium">
+                                              -{formatCurrency(ld.freeRentReduction)}
+                                            </span>
+                                          ) : (
+                                            <span className="text-muted-foreground">—</span>
+                                          )}
+                                        </td>
+                                        <td className="py-1 text-right tabular-nums font-semibold">
+                                          {ld.isExpired ? (
+                                            <span className="text-muted-foreground">$0</span>
+                                          ) : (
+                                            formatCurrency(ld.baseRent + ld.recovery - ld.freeRentReduction)
+                                          )}
+                                        </td>
+                                      </tr>
+                                    ))}
+                                    <tr className="border-t border-border font-semibold">
+                                      <td className="pt-1.5 pr-4 text-muted-foreground">Total</td>
+                                      <td className="pt-1.5 pr-4 text-right tabular-nums">{formatCurrency(leaseYear.baseRentAnnual)}</td>
+                                      <td className="pt-1.5 pr-4 text-right tabular-nums">{formatCurrency(leaseYear.recoveryAnnual)}</td>
+                                      <td className="pt-1.5 pr-4 text-right tabular-nums text-amber-600 dark:text-amber-400">
+                                        {leaseYear.leaseDetail.reduce((s, l) => s + l.freeRentReduction, 0) > 0
+                                          ? `-${formatCurrency(leaseYear.leaseDetail.reduce((s, l) => s + l.freeRentReduction, 0))}`
+                                          : '—'}
+                                      </td>
+                                      <td className="pt-1.5 text-right tabular-nums text-emerald-600 dark:text-emerald-400">{formatCurrency(leaseYear.egiAnnual)}</td>
+                                    </tr>
+                                  </tbody>
+                                </table>
+                              </td>
+                            </tr>
+                          )}
+                        </Fragment>
+                      );
+                    })}
                     <tr className="highlight-row">
+                      <td></td>
                       <td>Terminal Value</td>
                       <td colSpan={2}></td>
                       <td>{formatCurrency(baseScenario?.terminalValueAmount || 0)}</td>
@@ -1196,16 +1362,25 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
               {leaseIncomeData.yearlyProjection?.length > 0 && (
                 <Card>
                   <CardHeader>
-                    <CardTitle className="text-base flex items-center gap-2">
-                      <TrendingUp className="h-4 w-4 text-emerald-500" />
-                      Lease Income Projection (with Escalations)
-                    </CardTitle>
-                    <CardDescription>Base rent grows by tenant-specific escalation schedules; recoveries grow at 2.5%/yr</CardDescription>
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <div>
+                        <CardTitle className="text-base flex items-center gap-2">
+                          <TrendingUp className="h-4 w-4 text-emerald-500" />
+                          Lease Income Projection (with Escalations)
+                        </CardTitle>
+                        <CardDescription>Base rent grows by tenant-specific escalation schedules; recoveries grow at 2.5%/yr</CardDescription>
+                      </div>
+                      <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground bg-muted/60 rounded-full px-2.5 py-1">
+                        <ChevronRight className="h-3 w-3" />
+                        Click a row to expand per-tenant detail
+                      </span>
+                    </div>
                   </CardHeader>
                   <CardContent>
                     <Table>
                       <TableHeader>
                         <TableRow>
+                          <TableHead style={{ width: 28 }}></TableHead>
                           <TableHead>Year</TableHead>
                           <TableHead className="text-right">Base Rent</TableHead>
                           <TableHead className="text-right">Recoveries</TableHead>
@@ -1216,19 +1391,108 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
                       <TableBody>
                         {leaseIncomeData.yearlyProjection.map((row: any, idx: number) => {
                           const prev = idx > 0 ? leaseIncomeData.yearlyProjection[idx - 1] : null;
-                          const yoyGrowth = prev && prev.totalEGI > 0
-                            ? ((row.totalEGI - prev.totalEGI) / prev.totalEGI) * 100
+                          const yoyGrowth = prev && (prev.egiAnnual ?? prev.totalEGI) > 0
+                            ? (((row.egiAnnual ?? row.totalEGI) - (prev.egiAnnual ?? prev.totalEGI)) / (prev.egiAnnual ?? prev.totalEGI)) * 100
                             : null;
+                          const leaseYearDetail = dcfAnalysis?.yearlyLeaseIncome?.find(y => y.year === row.year);
+                          const isExpanded = expandedLeaseYears.has(row.year);
+                          const hasDetail = leaseYearDetail && leaseYearDetail.leaseDetail && leaseYearDetail.leaseDetail.length > 0;
                           return (
-                            <TableRow key={row.year}>
-                              <TableCell className="font-medium">Year {row.year}</TableCell>
-                              <TableCell className="text-right">{formatCurrency(row.baseRentAnnual)}</TableCell>
-                              <TableCell className="text-right">{formatCurrency(row.recoveryAnnual)}</TableCell>
-                              <TableCell className="text-right font-semibold">{formatCurrency(row.totalEGI)}</TableCell>
-                              <TableCell className="text-right text-sm text-muted-foreground">
-                                {yoyGrowth !== null ? `+${yoyGrowth.toFixed(1)}%` : '—'}
-                              </TableCell>
-                            </TableRow>
+                            <Fragment key={`ly-frag-${row.year}`}>
+                              <TableRow
+                                className={hasDetail ? 'cursor-pointer hover:bg-muted/40 transition-colors' : ''}
+                                onClick={hasDetail ? () => toggleLeaseYear(row.year) : undefined}
+                              >
+                                <TableCell className="text-center">
+                                  {hasDetail && (
+                                    <ChevronRight
+                                      className={cn(
+                                        'h-3.5 w-3.5 text-muted-foreground transition-transform',
+                                        isExpanded && 'rotate-90'
+                                      )}
+                                    />
+                                  )}
+                                </TableCell>
+                                <TableCell className="font-medium">Year {row.year}</TableCell>
+                                <TableCell className="text-right">{formatCurrency(row.baseRentAnnual)}</TableCell>
+                                <TableCell className="text-right">{formatCurrency(row.recoveryAnnual)}</TableCell>
+                                <TableCell className="text-right font-semibold">{formatCurrency(row.egiAnnual ?? row.totalEGI)}</TableCell>
+                                <TableCell className="text-right text-sm text-muted-foreground">
+                                  {yoyGrowth !== null ? `+${yoyGrowth.toFixed(1)}%` : '—'}
+                                </TableCell>
+                              </TableRow>
+                              {isExpanded && hasDetail && (
+                                <TableRow key={`ly-detail-${row.year}`} className="bg-emerald-50/60 dark:bg-emerald-950/20 hover:bg-emerald-50/60 dark:hover:bg-emerald-950/20">
+                                  <TableCell></TableCell>
+                                  <TableCell colSpan={5} className="py-3">
+                                    <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                                      <Users className="h-3 w-3" />
+                                      Year {row.year} — Per-Tenant Breakdown
+                                    </div>
+                                    <table className="w-full text-xs border-collapse">
+                                      <thead>
+                                        <tr className="text-left border-b border-border">
+                                          <th className="pb-1 font-medium text-muted-foreground pr-4">Tenant</th>
+                                          <th className="pb-1 font-medium text-muted-foreground text-right pr-4">Base Rent</th>
+                                          <th className="pb-1 font-medium text-muted-foreground text-right pr-4">Recoveries</th>
+                                          <th className="pb-1 font-medium text-muted-foreground text-right pr-4">Free Rent</th>
+                                          <th className="pb-1 font-medium text-muted-foreground text-right">EGI</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {leaseYearDetail.leaseDetail.map((ld) => (
+                                          <tr key={ld.leaseId} className="border-b border-border/40 last:border-0">
+                                            <td className="py-1 pr-4 font-medium">
+                                              <div className="flex items-center gap-1.5">
+                                                {ld.tenantName}
+                                                {ld.isExpired && (
+                                                  <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 text-red-600 dark:text-red-400 border-red-300 dark:border-red-800">
+                                                    Expired
+                                                  </Badge>
+                                                )}
+                                              </div>
+                                            </td>
+                                            <td className={cn('py-1 pr-4 text-right tabular-nums', ld.isExpired && 'text-muted-foreground')}>
+                                              {ld.isExpired ? '$0' : formatCurrency(ld.baseRent)}
+                                            </td>
+                                            <td className={cn('py-1 pr-4 text-right tabular-nums', ld.isExpired && 'text-muted-foreground')}>
+                                              {ld.isExpired ? '$0' : formatCurrency(ld.recovery)}
+                                            </td>
+                                            <td className="py-1 pr-4 text-right tabular-nums">
+                                              {ld.freeRentReduction > 0 ? (
+                                                <span className="text-amber-600 dark:text-amber-400 font-medium">
+                                                  -{formatCurrency(ld.freeRentReduction)}
+                                                </span>
+                                              ) : (
+                                                <span className="text-muted-foreground">—</span>
+                                              )}
+                                            </td>
+                                            <td className="py-1 text-right tabular-nums font-semibold">
+                                              {ld.isExpired ? (
+                                                <span className="text-muted-foreground">$0</span>
+                                              ) : (
+                                                formatCurrency(ld.baseRent + ld.recovery - ld.freeRentReduction)
+                                              )}
+                                            </td>
+                                          </tr>
+                                        ))}
+                                        <tr className="border-t border-border font-semibold">
+                                          <td className="pt-1.5 pr-4 text-muted-foreground">Total</td>
+                                          <td className="pt-1.5 pr-4 text-right tabular-nums">{formatCurrency(leaseYearDetail.baseRentAnnual)}</td>
+                                          <td className="pt-1.5 pr-4 text-right tabular-nums">{formatCurrency(leaseYearDetail.recoveryAnnual)}</td>
+                                          <td className="pt-1.5 pr-4 text-right tabular-nums text-amber-600 dark:text-amber-400">
+                                            {leaseYearDetail.leaseDetail.reduce((s, l) => s + l.freeRentReduction, 0) > 0
+                                              ? `-${formatCurrency(leaseYearDetail.leaseDetail.reduce((s, l) => s + l.freeRentReduction, 0))}`
+                                              : '—'}
+                                          </td>
+                                          <td className="pt-1.5 text-right tabular-nums text-emerald-600 dark:text-emerald-400">{formatCurrency(leaseYearDetail.egiAnnual)}</td>
+                                        </tr>
+                                      </tbody>
+                                    </table>
+                                  </TableCell>
+                                </TableRow>
+                              )}
+                            </Fragment>
                           );
                         })}
                       </TableBody>
