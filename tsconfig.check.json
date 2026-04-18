@@ -1,0 +1,26 @@
+{
+  "include": ["client/src/**/*", "server/**/*", "modules/dockit/**/*"],
+  "exclude": ["node_modules", "build", "dist", "dist-types", "shared", "**/*.test.ts"],
+  "compilerOptions": {
+    "incremental": true,
+    "tsBuildInfoFile": "./node_modules/typescript/tsbuildinfo.check",
+    "noEmit": true,
+    "module": "ESNext",
+    "strict": true,
+    "lib": ["esnext", "dom", "dom.iterable"],
+    "jsx": "preserve",
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "allowImportingTsExtensions": true,
+    "moduleResolution": "bundler",
+    "baseUrl": ".",
+    "types": ["node", "vite/client"],
+    "paths": {
+      "@/*": ["./client/src/*"],
+      "@shared/*": ["./dist-types/shared/*", "./shared/*"],
+      "@dockit-shared/*": ["./modules/dockit/shared/*"],
+      "@dockit-server/*": ["./modules/dockit/server/*"],
+      "@dockit-client/*": ["./modules/dockit/client/src/*"]
+    }
+  }
+}
