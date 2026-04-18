@@ -857,9 +857,11 @@ export async function loadLeaseIncomeForProject(
     leaseBreakdown: [],
   };
 
-  // Fetch active/expiring leases that have already commenced (exclude future, expired, archived).
-  // FUTURE leases (lease_start_date > today) are excluded from Year 1 income since
-  // they haven't yet generated income; they can be added to later-year projections separately.
+  // Fetch all active/future leases (exclude only expired and archived).
+  // Future leases (lease_start_date > today) are included so that computeLeaseIncomeByYear
+  // can activate them in the first projection year that overlaps their start date.
+  // Year 1 aggregate totals (used for EGI injection into assumptions) will still
+  // exclude future leases so Year 1 income is not overstated.
   const today = new Date().toISOString().split('T')[0];
   const leasesResult = await pool.query(
     `SELECT id, tenant_name, sf, lease_type, lease_end_date, lease_start_date,
@@ -867,9 +869,8 @@ export async function loadLeaseIncomeForProject(
      FROM tenant_leases
      WHERE project_id = $1
        AND status NOT IN ('EXPIRED', 'ARCHIVED')
-       AND lease_start_date <= $2
      ORDER BY tenant_name`,
-    [projectId, today]
+    [projectId]
   );
 
   if (!leasesResult.rows.length) return empty;
@@ -960,9 +961,15 @@ export async function loadLeaseIncomeForProject(
       else if (['BASE_YEAR_STOP', 'EXPENSE_STOP_PSF'].includes(rec.method) && psf > 0) recoveryAnnual += psf * sf;
     }
 
-    totalBaseRent += baseRentAnnual;
-    totalRecovery += recoveryAnnual;
-    weightedEscRentProduct += escalationRate * baseRentAnnual;
+    // Only include currently-active leases in Year 1 aggregate totals.
+    // Future leases (lease_start_date > today) will be activated by computeLeaseIncomeByYear
+    // starting in the projection year that their lease_start_date falls within.
+    const isFutureLease = lease.lease_start_date && lease.lease_start_date > today;
+    if (!isFutureLease) {
+      totalBaseRent += baseRentAnnual;
+      totalRecovery += recoveryAnnual;
+      weightedEscRentProduct += escalationRate * baseRentAnnual;
+    }
 
     // Compute free-rent months from the gap between lease_start_date and rent_commencement_date.
     // When rent_commencement_date is after lease_start_date, the tenant has a free-rent period.
