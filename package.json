@@ -14,7 +14,8 @@
     "db:push": "drizzle-kit push",
     "check:schema": "tsx scripts/check-schema-drift.ts",
     "gen:migrations": "tsx scripts/generate-startup-migrations.ts",
-    "install-hooks": "bash scripts/install-hooks.sh"
+    "install-hooks": "bash scripts/install-hooks.sh",
+    "postinstall": "bash scripts/install-hooks.sh"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.68.0",

@@ -17,8 +17,8 @@ set -euo pipefail
 REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || true)"
 
 if [ -z "$REPO_ROOT" ]; then
-  echo "[install-hooks] ERROR: Not inside a git repository. Aborting." >&2
-  exit 1
+  echo "[install-hooks] Not inside a git repository — skipping hook installation." >&2
+  exit 0
 fi
 
 HOOKS_DIR="$REPO_ROOT/.git/hooks"
