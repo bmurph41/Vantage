@@ -645,6 +645,7 @@ function AddLeaseSheet({ propertyId, open, onClose }: AddLeaseSheetProps) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['property-leases', propertyId] });
+      queryClient.invalidateQueries({ queryKey: ['property-lease-stats', propertyId] });
       resetAndClose();
     },
     onError: (e: Error) => setError(e.message),
@@ -973,6 +974,7 @@ function LeaseDetailSheet({ leaseId, propertyId, open, onClose }: { leaseId: str
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['lease-detail', leaseId] });
       queryClient.invalidateQueries({ queryKey: ['property-leases', propertyId] });
+      queryClient.invalidateQueries({ queryKey: ['property-lease-stats', propertyId] });
       setEditing(false);
       setEditForm(null);
       setEditTerm(null);
@@ -1469,10 +1471,75 @@ export function PropertyLeasesTab({ propertyId }: { propertyId: string }) {
     enabled: !!propertyId,
   });
 
+  const { data: stats, isLoading: statsLoading } = useQuery<{
+    totalLeases: number;
+    activeLeases: number;
+    totalSf: number;
+    avgRentPerSf: number;
+  }>({
+    queryKey: ['property-lease-stats', propertyId],
+    queryFn: async () => {
+      const res = await apiRequest('GET', `/api/commercial-leases/operations/stats?propertyId=${propertyId}`);
+      return res.json();
+    },
+    enabled: !!propertyId,
+  });
+
   const leases = data?.data || [];
+
+  const occupancyPct = stats && stats.totalLeases > 0
+    ? Math.round((stats.activeLeases / stats.totalLeases) * 100)
+    : null;
 
   return (
     <div className="space-y-3">
+      {/* Rent Roll Summary Card */}
+      {statsLoading && (
+        <Card className="shadow-sm">
+          <CardContent className="p-4">
+            <Skeleton className="h-16 w-full" />
+          </CardContent>
+        </Card>
+      )}
+      {!statsLoading && stats && (
+        <Card className="shadow-sm border-blue-100 dark:border-blue-900 bg-gradient-to-r from-blue-50/60 to-white dark:from-blue-950/30 dark:to-gray-900">
+          <CardContent className="p-4">
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+              <div className="flex flex-col gap-0.5">
+                <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Total Tenants</span>
+                <span className="text-xl font-bold text-gray-900 dark:text-gray-100">{stats.activeLeases}</span>
+                <span className="text-[10px] text-gray-400">{stats.totalLeases} total leases</span>
+              </div>
+              <div className="flex flex-col gap-0.5">
+                <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Total SF</span>
+                <span className="text-xl font-bold text-gray-900 dark:text-gray-100">
+                  {stats.totalSf != null
+                    ? stats.totalSf.toLocaleString('en-US', { maximumFractionDigits: 0 })
+                    : '—'}
+                </span>
+                <span className="text-[10px] text-gray-400">leased square feet</span>
+              </div>
+              <div className="flex flex-col gap-0.5">
+                <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Occupancy</span>
+                <span className="text-xl font-bold text-gray-900 dark:text-gray-100">
+                  {occupancyPct !== null ? `${occupancyPct}%` : '—'}
+                </span>
+                <span className="text-[10px] text-gray-400">active / total leases</span>
+              </div>
+              <div className="flex flex-col gap-0.5">
+                <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Avg Rent PSF</span>
+                <span className="text-xl font-bold text-gray-900 dark:text-gray-100">
+                  {stats.avgRentPerSf != null
+                    ? `$${Number(stats.avgRentPerSf).toFixed(2)}`
+                    : '—'}
+                </span>
+                <span className="text-[10px] text-gray-400">per sq ft / year</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
