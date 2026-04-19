@@ -57,7 +57,7 @@ async function buildLeaseIncomeCache(
  * Compute monthly EGI from a lease breakdown applying per-lease escalation schedules.
  * monthsOut is the number of months from forecast start (0 = current month).
  */
-function computeLeaseEGIForMonth(
+export function computeLeaseEGIForMonth(
   leaseBreakdown: LeaseIncomeResult['leaseBreakdown'],
   monthsOut: number,
   forecastDate?: Date
