@@ -124,7 +124,7 @@ export default function SimplifiedWorkspace({ projectId }: SimplifiedWorkspacePr
   });
 
   const { data: capitalStackRaw } = useQuery<any>({
-    queryKey: ['/api/modeling/projects', projectId, 'capital-stack'],
+    queryKey: ['/api/modeling/projects', projectId, 'capital-stacks'],
     enabled: !!projectId,
   });
 
@@ -172,8 +172,8 @@ export default function SimplifiedWorkspace({ projectId }: SimplifiedWorkspacePr
       : project.purchasePrice
     : 0;
 
-  // Capital stack data
-  const cs = capitalStackRaw ?? {};
+  // Capital stack data — plural endpoint returns an array; take the first entry
+  const cs = (Array.isArray(capitalStackRaw) ? capitalStackRaw[0] : capitalStackRaw) ?? {};
   const equityAmount = cs.equityAmount ?? cs.totalEquity ?? (purchasePrice - (cs.loanAmount ?? 0));
   const loanAmount = cs.loanAmount ?? cs.totalDebt ?? 0;
   const ltv = purchasePrice > 0 ? (loanAmount / purchasePrice) * 100 : 0;
