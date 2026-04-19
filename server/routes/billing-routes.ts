@@ -3,6 +3,7 @@ import express from 'express';
 import Stripe from 'stripe';
 import billingService, { SUBSCRIPTION_TIERS } from '../services/billing-service';
 import { AuthenticatedRequest } from '../middleware/auth-resolver';
+import { requireNotBeta } from '../middleware/require-not-beta';
 
 const router = Router();
 

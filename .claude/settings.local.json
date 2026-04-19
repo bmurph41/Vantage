@@ -258,7 +258,9 @@
       "Bash(pkill -9 -f 'tsx.*server/index')",
       "Bash(ps -p 13359 -o pid,cmd)",
       "Bash(echo \"Started PID: $!\")",
-      "Bash(ps -p 14578 -o pid,cmd)"
+      "Bash(ps -p 14578 -o pid,cmd)",
+      "Bash(REQUIRE_BETA_INVITE=true npm run dev)",
+      "Bash(REQUIRE_BETA_INVITE=true node tmp_beta_smoke.mjs)"
     ]
   }
 }
