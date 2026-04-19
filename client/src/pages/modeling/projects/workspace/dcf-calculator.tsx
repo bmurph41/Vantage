@@ -211,6 +211,17 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
     });
   };
 
+  const { data: dcfAnalysis, isLoading, isError, error: dcfError, refetch } = useQuery<DCFAnalysis>({
+    queryKey: ['/api/modeling/projects', projectId, 'dcf'],
+    enabled: !!projectId,
+    retry: false,
+  });
+
+  const { data: leaseIncomeData } = useQuery<any>({
+    queryKey: ['/api/modeling/projects', projectId, 'lease-income'],
+    enabled: !!projectId,
+  });
+
   const exportLeaseIncome = useCallback((format: 'xlsx' | 'csv') => {
     const data = dcfAnalysis?.yearlyLeaseIncome;
     if (!data || data.length === 0) return;
@@ -363,17 +374,6 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
       setLiveInputs(prev => ({ ...prev, holdPeriod: sharedHoldPeriod }));
     }
   }, [sharedHoldPeriod]);
-
-  const { data: dcfAnalysis, isLoading, isError, error: dcfError, refetch } = useQuery<DCFAnalysis>({
-    queryKey: ['/api/modeling/projects', projectId, 'dcf'],
-    enabled: !!projectId,
-    retry: false,
-  });
-
-  const { data: leaseIncomeData } = useQuery<any>({
-    queryKey: ['/api/modeling/projects', projectId, 'lease-income'],
-    enabled: !!projectId,
-  });
 
   // null = not yet loaded from server; false = disabled; true = enabled
   const [leaseOverrideEnabled, setLeaseOverrideEnabled] = useState<boolean | null>(null);
