@@ -177,6 +177,14 @@ interface DCFCalculatorPageProps {
   onTabChange?: (tab: string) => void;
 }
 
+interface ScenarioAssumptions {
+  rolloverVacancyMonths?: number;
+  rolloverTiLcPerSf?: number;
+  year1NOIOverride?: number;
+  year1NOISource?: string;
+  [key: string]: unknown;
+}
+
 export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProps = {}) {
   const pdfRef = useRef<HTMLDivElement>(null);
   const { projectId } = useParams<{ projectId: string }>();
@@ -385,17 +393,41 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
   // Always reset to 0 for missing keys so stale values from a previous
   // scenario don't bleed through when switching scenarios.
   useEffect(() => {
-    const assumptions = activeScenario?.assumptions;
+    const assumptions: ScenarioAssumptions = activeScenario?.assumptions ?? {};
     setRolloverVacancyMonths(
-      typeof assumptions?.rolloverVacancyMonths === 'number'
+      typeof assumptions.rolloverVacancyMonths === 'number'
         ? assumptions.rolloverVacancyMonths
         : 0
     );
     setRolloverTiLcPerSf(
-      typeof assumptions?.rolloverTiLcPerSf === 'number'
+      typeof assumptions.rolloverTiLcPerSf === 'number'
         ? assumptions.rolloverTiLcPerSf
         : 0
     );
+    // Restore the "Use Lease EGI" override so that refreshing the page keeps
+    // the snapped value and keeps the reconciliation banner dismissed.
+    // When no override is saved (e.g. different scenario), explicitly clear
+    // the override state so stale data from a prior scenario cannot bleed through.
+    if (typeof assumptions.year1NOIOverride === 'number') {
+      const savedNOI = assumptions.year1NOIOverride;
+      const savedSource = assumptions.year1NOISource ?? 'Lease Data';
+      setUserOverrides(prev => ({ ...prev, year1NOI: true }));
+      setLiveInputs(prev => ({ ...prev, year1NOI: savedNOI }));
+      setInputSources(prev => ({ ...prev, year1NOI: savedSource }));
+    } else {
+      setUserOverrides(prev => {
+        if (!prev.year1NOI) return prev;
+        const next = { ...prev };
+        delete next.year1NOI;
+        return next;
+      });
+      setInputSources(prev => {
+        if (prev.year1NOI !== 'Lease Data') return prev;
+        const next = { ...prev };
+        delete next.year1NOI;
+        return next;
+      });
+    }
   // Include assumptions object so UI re-syncs if server assumptions change
   // without an ID change (e.g., another tab updates the same scenario).
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -414,6 +446,18 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'dcf'] });
       queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId] });
+    },
+  });
+
+  const patchScenarioAssumptionsMutation = useMutation({
+    mutationFn: (assumptions: ScenarioAssumptions) => {
+      if (!activeScenario?.id) return Promise.resolve();
+      return apiRequest('PATCH', `/api/modeling/projects/${projectId}/scenarios/${activeScenario.id}`, {
+        assumptions,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'scenarios'] });
     },
   });
 
@@ -498,6 +542,16 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
     }
     if (key === 'exitCapRate') {
       debouncedSaveCapRate(value);
+    }
+    // If the user manually edits year1NOI after a "Use Lease EGI" snap, clear
+    // the persisted override so a page refresh reflects the manual value rather
+    // than the stale lease snap.
+    if (key === 'year1NOI') {
+      const currentAssumptions: ScenarioAssumptions = activeScenario?.assumptions ?? {};
+      if (typeof currentAssumptions.year1NOIOverride === 'number') {
+        const { year1NOIOverride: _ovr, year1NOISource: _src, ...cleared } = currentAssumptions;
+        patchScenarioAssumptionsMutation.mutate(cleared);
+      }
     }
   };
 
@@ -907,6 +961,11 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
                   setUserOverrides(prev => ({ ...prev, year1NOI: true }));
                   setInputSources(prev => ({ ...prev, year1NOI: 'Lease Data' }));
                   debouncedCalculate(newInputs);
+                  patchScenarioAssumptionsMutation.mutate({
+                    ...(activeScenario?.assumptions ?? {}),
+                    year1NOIOverride: leaseEGI,
+                    year1NOISource: 'Lease Data',
+                  });
                 }}
                 data-testid="use-lease-egi-btn"
               >
