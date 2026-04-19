@@ -1517,7 +1517,7 @@ export function PropertyLeasesTab({ propertyId }: { propertyId: string }) {
         <EmptyState
           icon={Building2}
           title="No leases on record"
-          subtitle="Commercial lease data will appear here once leases are added for this property."
+          subtitle="Lease data will appear here once leases are added for this property."
         />
       )}
 

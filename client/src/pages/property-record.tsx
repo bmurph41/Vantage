@@ -360,11 +360,11 @@ export default function PropertyRecordPage() {
           label: 'Demographics',
           content: <PropertyDemographicsTab propertyId={id} city={property.city} state={property.state} />,
         },
-        ...(['retail', 'office', 'industrial', 'other', 'mixed_use', 'commercial'].includes(property.type) ? [{
+        {
           value: 'leases',
           label: 'Leases',
           content: <PropertyLeasesTab propertyId={id} />,
-        }] : []),
+        },
       ] : []}
 
       // ── RIGHT: Associations Sidebar ──
