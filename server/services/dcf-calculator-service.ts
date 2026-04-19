@@ -655,7 +655,11 @@ export interface LeaseIncomeResult {
   leaseCount: number;
   totalBaseRentAnnual: number;
   totalRecoveryAnnual: number;
-  totalEGIAnnual: number;                // base rent + recoveries
+  totalEGIAnnual: number;                // base rent + recoveries (in-place only — same as inPlaceEGIAnnual)
+  /** EGI from currently-active leases only (lease_start_date <= today) */
+  inPlaceEGIAnnual: number;
+  /** EGI from current + pre-leased (future) leases — "stabilized" figure for underwriting */
+  stabilizedEGIAnnual: number;
   weightedAvgEscalationRate: number;     // weighted avg annual escalation pct (decimal)
   leaseBreakdown: LeaseBreakdownEntry[];
 }
@@ -1011,6 +1015,8 @@ export async function loadLeaseIncomeForProject(
     totalBaseRentAnnual: 0,
     totalRecoveryAnnual: 0,
     totalEGIAnnual: 0,
+    inPlaceEGIAnnual: 0,
+    stabilizedEGIAnnual: 0,
     weightedAvgEscalationRate: 0,
     leaseBreakdown: [],
   };
@@ -1069,6 +1075,8 @@ export async function loadLeaseIncomeForProject(
 
   let totalBaseRent = 0;
   let totalRecovery = 0;
+  let stabilizedBaseRent = 0;
+  let stabilizedRecovery = 0;
   let weightedEscRentProduct = 0;
   const breakdown: LeaseIncomeResult['leaseBreakdown'] = [];
 
@@ -1128,6 +1136,9 @@ export async function loadLeaseIncomeForProject(
       totalRecovery += recoveryAnnual;
       weightedEscRentProduct += escalationRate * baseRentAnnual;
     }
+    // Stabilized totals include both in-place and pre-leased (future) leases.
+    stabilizedBaseRent += baseRentAnnual;
+    stabilizedRecovery += recoveryAnnual;
 
     // Compute free-rent months from the gap between lease_start_date and rent_commencement_date.
     // When rent_commencement_date is after lease_start_date, the tenant has a free-rent period.
@@ -1179,6 +1190,7 @@ export async function loadLeaseIncomeForProject(
   }
 
   const totalEGI = totalBaseRent + totalRecovery;
+  const stabilizedEGI = stabilizedBaseRent + stabilizedRecovery;
   const weightedAvgEscalation = totalBaseRent > 0 ? weightedEscRentProduct / totalBaseRent : 0;
 
   return {
@@ -1187,6 +1199,8 @@ export async function loadLeaseIncomeForProject(
     totalBaseRentAnnual: totalBaseRent,
     totalRecoveryAnnual: totalRecovery,
     totalEGIAnnual: totalEGI,
+    inPlaceEGIAnnual: totalEGI,
+    stabilizedEGIAnnual: stabilizedEGI,
     weightedAvgEscalationRate: weightedAvgEscalation,
     leaseBreakdown: breakdown,
   };
