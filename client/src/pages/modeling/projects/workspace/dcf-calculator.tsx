@@ -87,6 +87,18 @@ interface LeaseYearDetail {
   freeRentReduction: number;
 }
 
+interface LeaseBreakdownItem {
+  leaseId: string;
+  tenantName: string;
+  leaseEndDate: string | null;
+  baseRentAnnual: number;
+  recoveryAnnual: number;
+  leaseType: string;
+  sf: number;
+  escalationType: string;
+  escalationRate: number;
+}
+
 interface YearlyLeaseIncome {
   year: number;
   baseRentAnnual: number;
@@ -120,6 +132,7 @@ interface DCFAnalysis {
     hasDebt: boolean;
     overridesApplied: boolean;
     generatedAt: string;
+    acquisitionDate?: string;
   };
   leaseIncome?: {
     hasLeases: boolean;
@@ -1285,6 +1298,79 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
             </Card>
           ) : (
             <>
+              {/* Mid-Hold Lease Expiry Warning */}
+              {(() => {
+                const acquisitionDateStr = dcfAnalysis?.meta?.acquisitionDate;
+                if (!acquisitionDateStr || !leaseIncomeData?.leaseBreakdown?.length) return null;
+                const holdStart = new Date(acquisitionDateStr);
+                const holdPeriod = liveInputs.holdPeriod ?? dcfAnalysis?.holdPeriodYears ?? 5;
+                const holdEnd = new Date(acquisitionDateStr);
+                holdEnd.setFullYear(holdEnd.getFullYear() + holdPeriod);
+                const breakdown = leaseIncomeData.leaseBreakdown as LeaseBreakdownItem[];
+                const expiringLeases = breakdown.filter((lease) => {
+                  if (!lease.leaseEndDate) return false;
+                  const endDate = new Date(lease.leaseEndDate);
+                  return endDate > holdStart && endDate < holdEnd;
+                });
+                if (!expiringLeases.length) return null;
+                const totalEGI = leaseIncomeData.totalEGIAnnual;
+                return (
+                  <div
+                    className="rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-800 p-4"
+                    data-testid="mid-hold-expiry-warning"
+                  >
+                    <div className="flex items-start gap-3">
+                      <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+                          {expiringLeases.length === 1
+                            ? '1 lease expires during the hold period'
+                            : `${expiringLeases.length} leases expire during the hold period`}
+                        </p>
+                        <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">
+                          Income from {expiringLeases.length === 1 ? 'this lease' : 'these leases'} will drop off before the end of Year {holdPeriod}.
+                          Account for re-leasing costs, vacancy, or downside scenarios.
+                        </p>
+                        <div className="mt-3 flex flex-col gap-1.5">
+                          {expiringLeases.map((lease) => {
+                            const egi = lease.baseRentAnnual + lease.recoveryAnnual;
+                            const egiPct = totalEGI > 0 ? (egi / totalEGI) * 100 : null;
+                            const expiryYear = lease.leaseEndDate
+                              ? new Date(lease.leaseEndDate).getFullYear()
+                              : '—';
+                            return (
+                              <div
+                                key={lease.leaseId}
+                                className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs"
+                              >
+                                <span className="font-semibold text-amber-900 dark:text-amber-200">
+                                  {lease.tenantName}
+                                </span>
+                                <Badge
+                                  variant="outline"
+                                  className="text-[10px] px-1.5 py-0 h-4 border-amber-400 dark:border-amber-700 text-amber-700 dark:text-amber-300"
+                                >
+                                  Expires {expiryYear}
+                                </Badge>
+                                {egiPct !== null && (
+                                  <span className="text-amber-700 dark:text-amber-400">
+                                    {egiPct.toFixed(1)}% of EGI
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                        <p className="mt-3 text-xs text-amber-700 dark:text-amber-400 italic">
+                          Tip: Run a downside scenario with a vacancy period or reduced growth rate
+                          to stress-test returns against re-leasing risk.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
               {/* Summary KPIs */}
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                 <Card>
@@ -1525,7 +1611,7 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {leaseIncomeData.leaseBreakdown?.map((lease: any) => {
+                        {(leaseIncomeData.leaseBreakdown as LeaseBreakdownItem[] | undefined)?.map((lease) => {
                           const pct = leaseIncomeData.totalEGIAnnual > 0
                             ? ((lease.baseRentAnnual + lease.recoveryAnnual) / leaseIncomeData.totalEGIAnnual) * 100
                             : 0;

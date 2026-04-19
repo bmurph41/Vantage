@@ -88,6 +88,7 @@ export interface DCFAnalysisResult {
     useLeaseIncomeForDcf: boolean | null; // stored flag: null=auto, true=opt-in, false=opt-out
     revenueGrowthRateUsed: number;      // percent — actual growth rate used in projection
     leaseEscalationRateUsed: number | null; // percent — weighted lease escalation (null if no leases)
+    acquisitionDate: string;            // ISO date — start of hold period
   };
 }
 
@@ -408,6 +409,7 @@ export async function performDCFAnalysis(
       leaseEscalationRateUsed: leaseEscalationRate > 0
         ? leaseEscalationRate * 100
         : null,
+      acquisitionDate,
     },
   };
 }
