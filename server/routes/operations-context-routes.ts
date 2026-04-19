@@ -12,7 +12,7 @@ import {
   assetPerformanceSnapshots, returnsLedger,
   budgets, budgetVersions, budgetLines, budgetAmounts
 } from '@shared/schema';
-import { eq, and, desc, between, sql, gte, lte, SQL, inArray } from 'drizzle-orm';
+import { eq, and, desc, between, sql, gte, lte, SQL, inArray, isNull } from 'drizzle-orm';
 import { z } from 'zod';
 import { resolveOpsModulesForOrg, getOwnedAssetsForOrg } from '../services/operations-module-resolver';
 import { getPnlMappingForAssetClass } from '@shared/asset-class-pnl-categories';
@@ -2017,7 +2017,6 @@ router.post('/projects/:projectId/import-actuals', async (req: Request, res: Res
 
     // Import bookkeeping GL data (works for all asset classes)
     if ((scope === 'ALL' || scope === 'BOOKKEEPING') && marinaId) {
-      const pnlMappings = getPnlMappingForAssetClass(assetType);
       const glData = await db.select({
         month: sql<string>`date_trunc('month', ${opsBookkeepingGl.periodStart})::date`,
         accountType: opsBookkeepingGl.accountType,
@@ -2041,13 +2040,27 @@ router.post('/projects/:projectId/import-actuals', async (req: Request, res: Res
         const d = new Date(periodMonth);
         const isExpense = row.accountType === 'expense' || row.accountType === 'EXPENSE';
 
+        const bookkeepingCategory = isExpense ? 'Expense' : 'Revenue';
+        const bookkeepingSubcategory = row.accountName || 'General';
+
+        await db.delete(modelingActuals)
+          .where(and(
+            eq(modelingActuals.modelingProjectId, projectId),
+            eq(modelingActuals.year, d.getFullYear()),
+            eq(modelingActuals.month, d.getMonth() + 1),
+            eq(modelingActuals.category, bookkeepingCategory),
+            eq(modelingActuals.subcategory, bookkeepingSubcategory),
+            eq(modelingActuals.dataSource, 'ops_sync'),
+            isNull(modelingActuals.lineItemDescription),
+          ));
+
         await db.insert(modelingActuals).values({
           orgId,
           modelingProjectId: projectId,
           year: d.getFullYear(),
           month: d.getMonth() + 1,
-          category: isExpense ? 'Expense' : 'Revenue',
-          subcategory: row.accountName || 'General',
+          category: bookkeepingCategory,
+          subcategory: bookkeepingSubcategory,
           department: 'Operations',
           amount: row.total,
           dataSource: 'ops_sync',
@@ -2077,14 +2090,29 @@ router.post('/projects/:projectId/import-actuals', async (req: Request, res: Res
         monthsAffected.add(periodMonth);
         const d = new Date(periodMonth);
 
+        const commercialCategory = mapping?.category || 'Revenue';
+        const commercialSubcategory = mapping?.subcategory || 'Commercial Tenant Revenue';
+        const commercialDepartment = mapping?.department || 'Leasing';
+
+        await db.delete(modelingActuals)
+          .where(and(
+            eq(modelingActuals.modelingProjectId, projectId),
+            eq(modelingActuals.year, d.getFullYear()),
+            eq(modelingActuals.month, d.getMonth() + 1),
+            eq(modelingActuals.category, commercialCategory),
+            eq(modelingActuals.subcategory, commercialSubcategory),
+            eq(modelingActuals.dataSource, 'ops_sync'),
+            isNull(modelingActuals.lineItemDescription),
+          ));
+
         await db.insert(modelingActuals).values({
           orgId,
           modelingProjectId: projectId,
           year: d.getFullYear(),
           month: d.getMonth() + 1,
-          category: mapping?.category || 'Revenue',
-          subcategory: mapping?.subcategory || 'Commercial Tenant Revenue',
-          department: mapping?.department || 'Leasing',
+          category: commercialCategory,
+          subcategory: commercialSubcategory,
+          department: commercialDepartment,
           amount: row.revenue,
           dataSource: 'ops_sync',
           syncedAt: new Date(),
