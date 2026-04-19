@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback, useEffect, useRef, Fragment } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useParams } from 'wouter';
+import * as XLSX from 'xlsx';
 import { useHoldPeriod } from '@/hooks/use-hold-period';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -183,6 +184,45 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
       return next;
     });
   };
+
+  const exportLeaseIncome = useCallback((format: 'xlsx' | 'csv') => {
+    const data = dcfAnalysis?.yearlyLeaseIncome;
+    if (!data || data.length === 0) return;
+
+    const headers = ['Year', 'Tenant', 'Base Rent', 'Recoveries', 'Free Rent Reduction', 'EGI', 'Status'];
+    const rows: (string | number)[][] = [headers];
+
+    for (const yearRow of data) {
+      for (const ld of yearRow.leaseDetail) {
+        const egi = ld.isExpired ? 0 : ld.baseRent + ld.recovery - ld.freeRentReduction;
+        rows.push([
+          yearRow.year,
+          ld.tenantName,
+          ld.isExpired ? 0 : ld.baseRent,
+          ld.isExpired ? 0 : ld.recovery,
+          ld.freeRentReduction,
+          egi,
+          ld.isExpired ? 'Expired' : 'Active',
+        ]);
+      }
+      rows.push([
+        yearRow.year,
+        'TOTAL',
+        yearRow.baseRentAnnual,
+        yearRow.recoveryAnnual,
+        yearRow.leaseDetail.reduce((s, l) => s + l.freeRentReduction, 0),
+        yearRow.egiAnnual,
+        '',
+      ]);
+    }
+
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Lease Income');
+
+    const filename = `lease-income-breakdown.${format}`;
+    XLSX.writeFile(wb, filename, { bookType: format === 'csv' ? 'csv' : 'xlsx' });
+  }, [dcfAnalysis?.yearlyLeaseIncome]);
 
   const { holdPeriod: sharedHoldPeriod, setHoldPeriod: setSharedHoldPeriod } = useHoldPeriod(projectId || '');
 
@@ -1127,12 +1167,38 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
             <CardHeader>
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <CardTitle className="finance-section-header">Projected Cash Flows - {baseScenario?.name || 'Base Case'}</CardTitle>
-                {dcfAnalysis?.yearlyLeaseIncome && dcfAnalysis.yearlyLeaseIncome.length > 0 && (
-                  <span className="inline-flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-full px-2.5 py-1">
-                    <Users className="h-3 w-3" />
-                    Click a year row to see per-tenant lease breakdown
-                  </span>
-                )}
+                <div className="flex items-center gap-2 flex-wrap">
+                  {dcfAnalysis?.yearlyLeaseIncome && dcfAnalysis.yearlyLeaseIncome.length > 0 && (
+                    <span className="inline-flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-full px-2.5 py-1">
+                      <Users className="h-3 w-3" />
+                      Click a year row to see per-tenant lease breakdown
+                    </span>
+                  )}
+                  {dcfAnalysis?.yearlyLeaseIncome && dcfAnalysis.yearlyLeaseIncome.length > 0 && (
+                    <div className="flex items-center gap-1.5">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-xs gap-1.5"
+                        onClick={() => exportLeaseIncome('xlsx')}
+                        data-testid="export-lease-income-xlsx"
+                      >
+                        <Download className="h-3 w-3" />
+                        Excel
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-xs gap-1.5"
+                        onClick={() => exportLeaseIncome('csv')}
+                        data-testid="export-lease-income-csv"
+                      >
+                        <Download className="h-3 w-3" />
+                        CSV
+                      </Button>
+                    </div>
+                  )}
+                </div>
               </div>
             </CardHeader>
             <CardContent>
@@ -1503,10 +1569,36 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
                         </CardTitle>
                         <CardDescription>Base rent grows by tenant-specific escalation schedules; recoveries grow at 2.5%/yr</CardDescription>
                       </div>
-                      <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground bg-muted/60 rounded-full px-2.5 py-1">
-                        <ChevronRight className="h-3 w-3" />
-                        Click a row to expand per-tenant detail
-                      </span>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground bg-muted/60 rounded-full px-2.5 py-1">
+                          <ChevronRight className="h-3 w-3" />
+                          Click a row to expand per-tenant detail
+                        </span>
+                        {dcfAnalysis?.yearlyLeaseIncome && dcfAnalysis.yearlyLeaseIncome.length > 0 && (
+                          <div className="flex items-center gap-1.5">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-7 text-xs gap-1.5"
+                              onClick={() => exportLeaseIncome('xlsx')}
+                              data-testid="export-lease-income-xlsx-li"
+                            >
+                              <Download className="h-3 w-3" />
+                              Excel
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-7 text-xs gap-1.5"
+                              onClick={() => exportLeaseIncome('csv')}
+                              data-testid="export-lease-income-csv-li"
+                            >
+                              <Download className="h-3 w-3" />
+                              CSV
+                            </Button>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </CardHeader>
                   <CardContent>
