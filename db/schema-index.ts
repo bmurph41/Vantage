@@ -16,7 +16,6 @@
 export * from "./schema-accounting";
 export * from "./schema-commercial-tenants";
 export * from "./schema-lp-portal";
-export * from "./schema-orphan-tables";
 
 // Shared schemas that live outside db/ but need to be visible to the drift
 // checker (server/schema-drift.ts imports db/schema-index to discover all
