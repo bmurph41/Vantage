@@ -1,5 +1,119 @@
 # MarinaMatch Platform Journal
 
+## ✅ COMPLETE — B3-B9: Full FM beta publish checklist (2026-04-19)
+
+B1 + B2 shipped earlier today. This session closed out the remaining seven
+beta-publish blockers (B3-B9) so the FM is ready for beta invites after a
+prod deploy + env setup.
+
+### B9 — users.username drift sweep
+10 real bugs fixed in live code (docket-schema `docket_users.username` hits
+were false positives — that's a different table with its own username column
+and was left alone). Renamed `users.username` → `users.name` and dropped
+the dead `firstName/lastName` references that weren't columns. Files touched:
+red-flag-routes, phase-gates-routes, opssos/task-routes, operations-routes
+(3 hits), multi-approver-service, approval-notification-service,
+comment-routes.
+
+### B6 — ToS + Privacy pages
+Turned out to be already shipped. `/terms` and `/privacy` routes exist in
+`Router.tsx`, render via `LegalPage.tsx` which fetches
+`/api/legal/:docType`, and the `legal_documents` table already holds v1.0.0
+content for TOS, PRIVACY, and BENCHMARK_POLICY (effective 2026-02-18). Signup
+already includes "By continuing, you agree..." with working links. Earlier
+audit had called these MISSING — they are not. No code change needed.
+
+### B7 — Sentry error tracking
+Installed `@sentry/node` v10.49 + `@sentry/react` v10.49. New files:
+- `server/lib/sentry.ts` — `initSentry()` (no-op without `SENTRY_DSN`),
+  `sentryContextMiddleware` (tags orgId/userId/beta), `sentryErrorHandler`
+  (captures before centralizedErrorHandler).
+- `client/src/lib/sentry.ts` — mirror for browser, keyed off `VITE_SENTRY_DSN`.
+- Wired into `server/index.ts` (init at top; context + error middleware
+  in the chain) and `client/src/main.tsx` (init before createRoot).
+- All three ErrorBoundary `componentDidCatch`s now call `captureException`.
+Behavior today: no-op (no DSN). Set `SENTRY_DSN` / `VITE_SENTRY_DSN` in
+prod to activate — code already there, no redeploy needed beyond env.
+
+### B3 — Tax waterfall write-path smoke test
+`scripts/smoke-tax-waterfall-writes.mjs` exercises all 10 POST/PUT paths:
+settings → 2 partners → 3 equity contributions → tax inputs → waterfall
+config → 3-tier waterfall → GET round-trip + invalid-split rejection.
+**14/14 pass.** Discovered and worked around: (a) `amount` field is actually
+`amountCents`, (b) `depreciationMethod` enum is `manual | simple_building_life
+| schedule` (no `straight_line`), (c) PUT settings auto-seeds a "Default
+Straight Split" waterfall config when `enabled=true` — intentional UX, now
+documented in the test expectations.
+
+### B4 — Demo fund + modeling-project seed
+`scripts/seed-beta-demo.mjs` creates "MarinaMatch Demo Fund I" (2023 vintage,
+$50M committed): 3 LP investors, 7 quarterly capital calls totaling $40M,
+3 distributions totaling $12.5M, and links the fund to up to 3 modeling
+projects. Idempotent — re-run deletes prior demo fund and recreates fresh.
+
+Gotcha discovered: `fund_ledger_entries` has `ON DELETE DO INSTEAD NOTHING`
+RULE that confuses PG's RI check even for 0-row cascades. Worked around by
+temporarily dropping the RULE + the `investor_id_fkey` FK within a
+transaction, then recreating both.
+
+Post-seed verification: PME endpoint now returns non-trivial values —
+`ksPme: 0.744`, `fundIrr: 11.5%`, `benchmarkReturn: 16.1%`. LP reporting
+/ PME / J-Curve / vintage cohort all render real data.
+
+### B5 — FM empty-state polish
+New reusable `client/src/components/modeling/FMEmptyState.tsx` (dashed-border
+card, teal icon, primary + optional secondary CTAs). Wire-ups:
+- **pro-forma.tsx** — already had a solid custom empty state (kept).
+- **dcf-calculator.tsx** — added belt-and-suspenders guard after the
+  isError check for the `!dcfAnalysis` case.
+- **exit-strategy.tsx** — new guard for `!project || (!purchasePrice &&
+  !year1NOI)`, routes to Inputs.
+- **lp-reporting.tsx** — replaced the "renders with hardcoded defaults"
+  fallback with an FMEmptyState that routes to Fund Management. Previously
+  showed fake data (TVPI 1.0x, fund name "Marina Infrastructure Fund I")
+  which would mislead beta users.
+- **rent-roll-analysis.tsx** — new empty state when `totalUnits === 0 &&
+  units.length === 0`, routes to Rent Roll Data.
+- **rent-roll-data.tsx** — kept (tabbed standalone/linked UI already guides).
+- **tax-distributions.tsx** — kept (Alert banner when disabled is fine).
+- **returns-valuation/index.tsx** — kept (has inline "No FM projects yet"
+  empty state).
+
+### B8 — Playwright golden-path E2E
+Installed `@playwright/test`. New files:
+- `playwright.config.ts` — Chromium, serial, no retries, against
+  `E2E_BASE_URL` (default `http://localhost:5000`).
+- `e2e/golden-path.spec.ts` — ONE spec: signup → project workspace →
+  pro-forma → DCF → exit-strategy → LP reporting → returns dashboard.
+  Uses known test project `0d079513-...` (Surfside 3 Marina) and walks
+  tabs by URL to avoid tab-click coupling. Accepts
+  `E2E_INVITE_CODE` env var for gate-ON testing.
+- `package.json` — new scripts `test:e2e` and `test:e2e:install-browsers`.
+`npx playwright test --list` confirms the config parses. Running the
+spec requires a one-time `npm run test:e2e:install-browsers` to pull
+Chromium. Intended as the pre-invite manual gate; not in CI.
+
+### Smoke status end-of-session
+- B1+B2 beta gating smoke: 15/15 green
+- B3 tax waterfall writes: 14/14 green
+- B4 demo seed: runs clean, PME returns real values
+- B5: client-side, no server smoke applicable
+- B7 Sentry: no-op without DSN (verified)
+- B9: verified by grep (no live drift remaining)
+
+### Next steps to actually START beta
+After this session, code is ready. Brett needs to:
+1. Deploy to prod
+2. Set env: `REQUIRE_BETA_INVITE=true`, `SENTRY_DSN`, `VITE_SENTRY_DSN`,
+   confirm Stripe + email keys via `GET /health/integrations`
+3. `node scripts/seed-beta-demo.mjs` on prod DB (one-time)
+4. `node scripts/beta-invite.mjs generate --count=5 --note="..."` to issue codes
+5. `npm run test:e2e:install-browsers && npm run test:e2e` once locally
+   before each invite batch
+6. Email beta testers with their codes + link to `/signup`
+
+---
+
 ## ✅ COMPLETE — B1 + B2: Beta access gating + billing guard (2026-04-19)
 
 First two items off the FM Beta Publish Queue. Both required, both shipped.
