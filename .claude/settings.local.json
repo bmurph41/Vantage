@@ -257,7 +257,8 @@
       "Bash(rm -f /home/runner/workspace/tmp_pme_smoke.mjs)",
       "Bash(pkill -9 -f 'tsx.*server/index')",
       "Bash(ps -p 13359 -o pid,cmd)",
-      "Bash(echo \"Started PID: $!\")"
+      "Bash(echo \"Started PID: $!\")",
+      "Bash(ps -p 14578 -o pid,cmd)"
     ]
   }
 }
