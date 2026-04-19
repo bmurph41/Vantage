@@ -91,6 +91,8 @@ interface LeaseYearDetail {
   tiLcCost: number;
   escalationType?: string;
   activeStepRentAnnual?: number | null;
+  isFuture?: boolean;
+  leaseStartDate?: string | null;
 }
 
 interface RentStepEntryFE {
@@ -1965,8 +1967,13 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
                                           const netEgi = ld.baseRent + ld.recovery - ld.freeRentReduction
                                             - vacDed - tiLc;
                                           const isSchedule = ld.escalationType === 'SCHEDULE';
+                                          const isPreCommencement = !!ld.isFuture && !ld.isExpired
+                                            && ld.baseRent === 0 && ld.freeRentReduction === 0;
+                                          const leaseStartFormatted = ld.leaseStartDate
+                                            ? new Date(ld.leaseStartDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                                            : null;
                                           return (
-                                            <tr key={ld.leaseId} className="border-b border-border/40 last:border-0">
+                                            <tr key={ld.leaseId} className={cn('border-b border-border/40 last:border-0', isPreCommencement && 'opacity-70')}>
                                               <td className="py-1 pr-4 font-medium">
                                                 <div className="flex items-center gap-1.5">
                                                   {ld.tenantName}
@@ -1975,6 +1982,22 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
                                                       Expired
                                                     </Badge>
                                                   )}
+                                                  {isPreCommencement && (
+                                                    <TooltipProvider>
+                                                      <Tooltip>
+                                                        <TooltipTrigger asChild>
+                                                          <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 text-violet-600 dark:text-violet-400 border-violet-300 dark:border-violet-700 cursor-default">
+                                                            Pre-Leased
+                                                          </Badge>
+                                                        </TooltipTrigger>
+                                                        <TooltipContent side="top" className="max-w-xs text-xs">
+                                                          {leaseStartFormatted
+                                                            ? `Lease commences ${leaseStartFormatted}. No income until commencement.`
+                                                            : 'Lease has not yet commenced. No income in pre-commencement years.'}
+                                                        </TooltipContent>
+                                                      </Tooltip>
+                                                    </TooltipProvider>
+                                                  )}
                                                   {isSchedule && !ld.isExpired && (
                                                     <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 text-blue-600 dark:text-blue-400 border-blue-300 dark:border-blue-800">
                                                       Step
@@ -1982,8 +2005,8 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
                                                   )}
                                                 </div>
                                               </td>
-                                              <td className={cn('py-1 pr-4 text-right tabular-nums', ld.isExpired && 'text-muted-foreground')}>
-                                                {ld.isExpired ? '$0' : formatCurrency(ld.baseRent)}
+                                              <td className={cn('py-1 pr-4 text-right tabular-nums', (ld.isExpired || isPreCommencement) && 'text-muted-foreground')}>
+                                                {(ld.isExpired || isPreCommencement) ? '$0' : formatCurrency(ld.baseRent)}
                                               </td>
                                               <td className="py-1 pr-4 text-right tabular-nums">
                                                 {isSchedule && !ld.isExpired && ld.activeStepRentAnnual != null ? (
@@ -1994,8 +2017,8 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
                                                   <span className="text-muted-foreground">—</span>
                                                 )}
                                               </td>
-                                              <td className={cn('py-1 pr-4 text-right tabular-nums', ld.isExpired && 'text-muted-foreground')}>
-                                                {ld.isExpired ? '$0' : formatCurrency(ld.recovery)}
+                                              <td className={cn('py-1 pr-4 text-right tabular-nums', (ld.isExpired || isPreCommencement) && 'text-muted-foreground')}>
+                                                {(ld.isExpired || isPreCommencement) ? '$0' : formatCurrency(ld.recovery)}
                                               </td>
                                               <td className="py-1 pr-4 text-right tabular-nums">
                                                 {ld.freeRentReduction > 0 ? (
@@ -2025,7 +2048,22 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
                                                 )}
                                               </td>
                                               <td className="py-1 text-right tabular-nums font-semibold">
-                                                {netEgi < 0 ? (
+                                                {isPreCommencement ? (
+                                                  <TooltipProvider>
+                                                    <Tooltip>
+                                                      <TooltipTrigger asChild>
+                                                        <span className="text-muted-foreground cursor-default inline-flex items-center gap-0.5">
+                                                          $0 <Info className="h-3 w-3" />
+                                                        </span>
+                                                      </TooltipTrigger>
+                                                      <TooltipContent side="left" className="max-w-xs text-xs">
+                                                        {leaseStartFormatted
+                                                          ? `Lease goes live ${leaseStartFormatted}. No income until commencement.`
+                                                          : 'Lease has not yet commenced. No income in pre-commencement years.'}
+                                                      </TooltipContent>
+                                                    </Tooltip>
+                                                  </TooltipProvider>
+                                                ) : netEgi < 0 ? (
                                                   <span className="text-red-600 dark:text-red-400">{formatCurrency(netEgi)}</span>
                                                 ) : netEgi === 0 ? (
                                                   <span className="text-muted-foreground">$0</span>

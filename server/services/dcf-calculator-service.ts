@@ -646,6 +646,8 @@ export interface LeaseBreakdownEntry {
    * uses this instead of the compounding escalationRate.
    */
   scheduleJson?: RentStepEntry[] | null;
+  /** True when lease_start_date is after today — lease has not yet commenced as of the load date */
+  isFuture?: boolean;
 }
 
 export interface LeaseIncomeResult {
@@ -690,6 +692,10 @@ export interface LeaseYearIncome {
     /** For SCHEDULE leases: the annualized rent from the active step at the start of this year.
      *  Null/undefined for non-SCHEDULE leases. */
     activeStepRentAnnual?: number | null;
+    /** True when the lease's start date is in the future (as of the data load date) */
+    isFuture?: boolean;
+    /** ISO date string for when the lease commences — used to display pre-commencement tooltips */
+    leaseStartDate?: string | null;
   }>;
 }
 
@@ -968,6 +974,8 @@ export function computeLeaseIncomeByYear(
         tiLcCost: Math.round(tiLcCost),
         escalationType: lease.escalationType,
         activeStepRentAnnual,
+        isFuture: lease.isFuture ?? false,
+        leaseStartDate: lease.leaseStartDate,
       });
     }
 
@@ -1166,6 +1174,7 @@ export async function loadLeaseIncomeForProject(
       rentCommencementDate: lease.rent_commencement_date ?? null,
       freeRentMonths,
       scheduleJson,
+      isFuture: !!isFutureLease,
     });
   }
 
