@@ -4,8 +4,8 @@ import type { RequestWithUser, AuthenticateOptions } from '@node-saml/passport-s
 import { enterpriseAuthService, type DeviceInfo } from '../services/enterprise-auth-service';
 import { samlPassportService } from '../services/saml-passport-service';
 import { db } from '../db';
-import { organizations, ssoConfigurations, users, userSessions } from '@shared/schema';
-import { eq, and, gt } from 'drizzle-orm';
+import { organizations, ssoConfigurations, users, userSessions, betaInviteCodes, betaInviteRedemptions } from '@shared/schema';
+import { eq, and, gt, sql } from 'drizzle-orm';
 import { logger } from '../lib/logger';
 import { z } from 'zod';
 import { sendEmailVerification, sendMagicLinkEmail, generateVerificationToken } from '../services/email-service';
@@ -77,7 +77,18 @@ const registerSchema = z.object({
   dataBenchmarkingConsent: z.boolean(),
   referralSource: z.string().optional(),
   referralSourceOther: z.string().optional(),
+  inviteCode: z.string().optional(),
 });
+
+// Beta gate: when REQUIRE_BETA_INVITE=true, every signup must present a valid
+// beta_invite_codes row with remaining uses. Brett flips this off in dev as
+// needed. Defaults to true in production, false otherwise — fail-closed in prod.
+function betaInviteRequired(): boolean {
+  const raw = process.env.REQUIRE_BETA_INVITE;
+  if (raw === 'true') return true;
+  if (raw === 'false') return false;
+  return process.env.NODE_ENV === 'production';
+}
 
 function getDeviceInfo(req: Request): DeviceInfo {
   const userAgent = req.headers['user-agent'] || '';
@@ -303,11 +314,34 @@ router.post('/register', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Invalid request', details: parsed.error.errors });
     }
 
-    const { email, password, name, orgId, orgName, dataBenchmarkingConsent, referralSource, referralSourceOther } = parsed.data;
+    const { email, password, name, orgId, orgName, dataBenchmarkingConsent, referralSource, referralSourceOther, inviteCode } = parsed.data;
 
     // Validate consent - required for account creation
     if (!dataBenchmarkingConsent) {
       return res.status(400).json({ error: 'Data use consent is required to create an account.' });
+    }
+
+    // Beta invite-code gate. When required, the code must exist, not be
+    // expired, and have remaining uses. Validation happens BEFORE any user/org
+    // rows are created so failures leave no partial state behind.
+    let validatedInviteCode: string | null = null;
+    if (betaInviteRequired()) {
+      const trimmed = (inviteCode || '').trim().toUpperCase();
+      if (!trimmed) {
+        return res.status(403).json({ error: 'A beta invite code is required during the beta program.' });
+      }
+      const [invite] = await db.select().from(betaInviteCodes)
+        .where(eq(betaInviteCodes.code, trimmed)).limit(1);
+      if (!invite) {
+        return res.status(403).json({ error: 'Invalid beta invite code.' });
+      }
+      if (invite.expiresAt && invite.expiresAt < new Date()) {
+        return res.status(403).json({ error: 'This beta invite code has expired.' });
+      }
+      if (invite.useCount >= invite.maxUses) {
+        return res.status(403).json({ error: 'This beta invite code has already been used.' });
+      }
+      validatedInviteCode = trimmed;
     }
 
     const existingUser = await db.query.users.findFirst({
@@ -321,7 +355,10 @@ router.post('/register', async (req: Request, res: Response) => {
     let organizationId = orgId;
     if (!organizationId && orgName) {
       const [newOrg] = await db.insert(organizations)
-        .values({ name: orgName })
+        .values({
+          name: orgName,
+          isBeta: validatedInviteCode !== null,
+        })
         .returning();
       organizationId = newOrg.id;
     }
@@ -349,6 +386,33 @@ router.post('/register', async (req: Request, res: Response) => {
         referralSourceOther: referralSource === 'other' ? (referralSourceOther || null) : null,
       })
       .returning();
+
+    // Consume the invite code after successful user creation. We increment
+    // use_count conditionally so concurrent redemptions of a multi-use code
+    // cannot exceed max_uses (the WHERE clause enforces the limit).
+    if (validatedInviteCode) {
+      const updated = await db.update(betaInviteCodes)
+        .set({ useCount: sql`${betaInviteCodes.useCount} + 1` })
+        .where(and(
+          eq(betaInviteCodes.code, validatedInviteCode),
+          sql`${betaInviteCodes.useCount} < ${betaInviteCodes.maxUses}`,
+        ))
+        .returning({ code: betaInviteCodes.code });
+
+      if (updated.length === 0) {
+        // Race: another signup consumed the final use between validation and
+        // now. The user + org already exist; we keep them but log so ops can
+        // see it happened. In practice max_uses=1 codes + fast signup make
+        // this vanishingly rare.
+        logger.warn({ inviteCode: validatedInviteCode, userId: newUser.id }, 'Beta invite code race: use_count already at max_uses, user created anyway');
+      }
+
+      await db.insert(betaInviteRedemptions).values({
+        code: validatedInviteCode,
+        userId: newUser.id,
+        orgId: organizationId,
+      });
+    }
 
     // Send welcome/verification email
     try {

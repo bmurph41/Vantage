@@ -248,7 +248,34 @@ export const organizations = pgTable("organizations", {
   ipAllowlist: text("ip_allowlist").array(), // CIDR ranges
   allowedEmailDomains: text("allowed_email_domains").array(), // For JIT provisioning
   benchmarkOptIn: boolean("benchmark_opt_in").notNull().default(true),
+  // Beta program — orgs created via a beta invite code are flagged here.
+  // Stripe / paid-plan surfaces MUST gate on !org.isBeta until GA.
+  isBeta: boolean("is_beta").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// Beta invite codes — gate on /api/auth/register during beta.
+// Each code has a max-use count; register route consumes one use per redemption.
+export const betaInviteCodes = pgTable("beta_invite_codes", {
+  code: varchar("code", { length: 64 }).primaryKey(),
+  note: text("note"), // Internal note — who this code was issued to / why
+  maxUses: integer("max_uses").notNull().default(1),
+  useCount: integer("use_count").notNull().default(0),
+  expiresAt: timestamp("expires_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  createdBy: varchar("created_by"), // user id of issuer (nullable — CLI-issued codes)
+});
+
+export type BetaInviteCode = typeof betaInviteCodes.$inferSelect;
+export type InsertBetaInviteCode = typeof betaInviteCodes.$inferInsert;
+
+// Beta invite code redemptions — audit trail of who redeemed which code.
+export const betaInviteRedemptions = pgTable("beta_invite_redemptions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  code: varchar("code", { length: 64 }).notNull(),
+  userId: varchar("user_id").notNull(),
+  orgId: varchar("org_id").notNull(),
+  redeemedAt: timestamp("redeemed_at").notNull().defaultNow(),
 });
 
 // Legal Documents - versioned legal text (TOS, Privacy, Benchmark Policy)

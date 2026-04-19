@@ -254,7 +254,10 @@
       "Bash(timeout 90 NODE_OPTIONS=--max-old-space-size=4096 npx tsc --noEmit server/routes/tax-waterfall-routes.ts)",
       "Bash(NODE_OPTIONS=--max-old-space-size=4096 timeout 90 npx tsc --noEmit server/routes/tax-waterfall-routes.ts)",
       "Bash(cp /tmp/pme_smoke.mjs /home/runner/workspace/tmp_pme_smoke.mjs)",
-      "Bash(rm -f /home/runner/workspace/tmp_pme_smoke.mjs)"
+      "Bash(rm -f /home/runner/workspace/tmp_pme_smoke.mjs)",
+      "Bash(pkill -9 -f 'tsx.*server/index')",
+      "Bash(ps -p 13359 -o pid,cmd)",
+      "Bash(echo \"Started PID: $!\")"
     ]
   }
 }

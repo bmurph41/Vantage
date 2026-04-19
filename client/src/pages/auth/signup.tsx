@@ -77,6 +77,7 @@ const signupSchema = z.object({
   password: z.string().min(8, "Password must be at least 8 characters"),
   confirmPassword: z.string(),
   orgName: z.string().min(2, "Company name must be at least 2 characters"),
+  inviteCode: z.string().optional(),
   dataBenchmarkingConsent: z.boolean().default(true),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords do not match",
@@ -396,6 +397,7 @@ export default function SignupPage() {
       password: "",
       confirmPassword: "",
       orgName: "",
+      inviteCode: "",
       dataBenchmarkingConsent: true,
     },
   });
@@ -420,6 +422,7 @@ export default function SignupPage() {
         assetClassInterests: values.assetClassInterests,
         referralSource: values.referralSource || undefined,
         referralSourceOther: values.referralSourceOther || undefined,
+        inviteCode: values.inviteCode?.trim() ? values.inviteCode.trim().toUpperCase() : undefined,
       });
       return response.json();
     },
@@ -617,6 +620,29 @@ export default function SignupPage() {
                               autoComplete="organization"
                               className="h-11 border-slate-200 focus:border-cyan-500 focus:ring-cyan-500 bg-slate-50/50"
                               data-testid="input-org-name"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="inviteCode"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-slate-700 flex items-center gap-2">
+                            Beta Invite Code
+                            <Badge variant="outline" className="text-[10px] font-normal border-teal-400 text-teal-700">Required during beta</Badge>
+                          </FormLabel>
+                          <FormControl>
+                            <Input
+                              {...field}
+                              placeholder="FMBETA-XXXXXX"
+                              autoComplete="off"
+                              className="h-11 border-slate-200 focus:border-cyan-500 focus:ring-cyan-500 bg-slate-50/50 font-mono uppercase"
+                              onChange={(e) => field.onChange(e.target.value.toUpperCase())}
+                              data-testid="input-invite-code"
                             />
                           </FormControl>
                           <FormMessage />

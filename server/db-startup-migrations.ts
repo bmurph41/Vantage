@@ -18098,6 +18098,40 @@ const MIGRATIONS: Migration[] = [
       END $$;
     `,
   },
+  {
+    name: "organizations: add is_beta flag",
+    sql: `ALTER TABLE organizations ADD COLUMN IF NOT EXISTS is_beta boolean NOT NULL DEFAULT false`,
+  },
+  {
+    name: "beta_invite_codes: create table",
+    sql: `
+      CREATE TABLE IF NOT EXISTS beta_invite_codes (
+        code varchar(64) PRIMARY KEY,
+        note text,
+        max_uses integer NOT NULL DEFAULT 1,
+        use_count integer NOT NULL DEFAULT 0,
+        expires_at timestamp,
+        created_at timestamp NOT NULL DEFAULT now(),
+        created_by varchar
+      )
+    `,
+  },
+  {
+    name: "beta_invite_redemptions: create table",
+    sql: `
+      CREATE TABLE IF NOT EXISTS beta_invite_redemptions (
+        id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+        code varchar(64) NOT NULL,
+        user_id varchar NOT NULL,
+        org_id varchar NOT NULL,
+        redeemed_at timestamp NOT NULL DEFAULT now()
+      )
+    `,
+  },
+  {
+    name: "beta_invite_redemptions: add index on code",
+    sql: `CREATE INDEX IF NOT EXISTS beta_invite_redemptions_code_idx ON beta_invite_redemptions (code)`,
+  },
 ];
 
 /**
