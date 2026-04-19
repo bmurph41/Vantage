@@ -28,7 +28,7 @@ taskRouter.get("/", async (req, res) => {
         dueAt: opssosTasks.dueAt,
         costCents: opssosTasks.costCents,
         createdAt: opssosTasks.createdAt,
-        assignedUserName: sql<string>`COALESCE(${users.firstName} || ' ' || ${users.lastName}, ${users.username})`,
+        assignedUserName: users.name,
       })
       .from(opssosTasks)
       .leftJoin(users, eq(opssosTasks.assignedUserId, users.id))

@@ -40,7 +40,7 @@ router.get('/pending', async (req: Request, res: Response) => {
       },
       requester: {
         id: users.id,
-        username: users.username,
+        name: users.name,
       },
     })
     .from(crmPhaseGateApprovals)

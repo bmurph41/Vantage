@@ -1351,7 +1351,7 @@ export function registerOperationsRoutes(
           entityType: auditLogs.entityType,
           entityId: auditLogs.entityId,
           userId: auditLogs.userId,
-          username: users.username,
+          userName: users.name,
           userEmail: users.email,
           beforeState: auditLogs.beforeState,
           afterState: auditLogs.afterState,
@@ -1610,26 +1610,26 @@ export function registerOperationsRoutes(
         .select({
           userId: users.id,
           email: users.email,
-          username: users.username,
+          name: users.name,
           role: organizationUserRoles.role,
           isActive: organizationUserRoles.isActive,
         })
         .from(users)
         .leftJoin(
-          organizationUserRoles, 
+          organizationUserRoles,
           and(
             eq(users.id, organizationUserRoles.userId),
             eq(organizationUserRoles.orgId, req.user.orgId)
           )
         )
         // For demo, show all users. In production, add WHERE clause for org membership
-        .orderBy(users.username);
+        .orderBy(users.name);
 
       // Transform to expected format
       const result = orgUsers.map(u => ({
         id: u.userId,
         email: u.email,
-        username: u.username,
+        name: u.name,
         currentRole: u.role || null,
         isActive: u.isActive ?? true,
       }));

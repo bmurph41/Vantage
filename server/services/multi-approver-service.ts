@@ -222,7 +222,7 @@ export class MultiApproverService {
       decision: modelingApproverDecisions.decision,
       comments: modelingApproverDecisions.comments,
       decidedAt: modelingApproverDecisions.decidedAt,
-      approverName: users.username,
+      approverName: users.name,
       approverEmail: users.email
     })
       .from(modelingApproverDecisions)

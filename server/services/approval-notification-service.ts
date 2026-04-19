@@ -382,7 +382,7 @@ export class ApprovalNotificationService {
   async getOrgApprovers(orgId: string): Promise<Array<{ id: string; name: string; email: string }>> {
     const orgUsers = await db.select({
       id: users.id,
-      name: users.username,
+      name: users.name,
       email: users.email,
       role: users.role
     })

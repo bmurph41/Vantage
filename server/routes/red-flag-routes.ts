@@ -29,7 +29,7 @@ router.get('/deal/:dealId', async (req: Request, res: Response) => {
       flag: crmRedFlags,
       raisedBy: {
         id: users.id,
-        username: users.username,
+        name: users.name,
       },
     })
     .from(crmRedFlags)
@@ -306,7 +306,7 @@ router.get('/:flagId/escalations', async (req: Request, res: Response) => {
       escalation: crmRedFlagEscalations,
       escalatedTo: {
         id: users.id,
-        username: users.username,
+        name: users.name,
       },
     })
     .from(crmRedFlagEscalations)

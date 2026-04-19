@@ -527,12 +527,11 @@ export function registerCommentRoutes(app: Router) {
       const searchTerm = `%${(q as string).toLowerCase()}%`;
       const foundUsers = await db.select({
         id: users.id,
-        firstName: users.firstName,
-        lastName: users.lastName,
+        name: users.name,
         email: users.email,
       })
         .from(users)
-        .where(sql`(LOWER(${users.firstName}) LIKE ${searchTerm} OR LOWER(${users.lastName}) LIKE ${searchTerm} OR LOWER(${users.email}) LIKE ${searchTerm})`)
+        .where(sql`(LOWER(${users.name}) LIKE ${searchTerm} OR LOWER(${users.email}) LIKE ${searchTerm})`)
         .limit(10);
 
       res.json(foundUsers);

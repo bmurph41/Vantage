@@ -21,6 +21,10 @@ import { docIntelService } from "./services/doc-intel-service";
 import { configureSecurityMiddleware } from "./middleware/security";
 import { requestIdMiddleware, requestLoggingMiddleware } from "./middleware/logging";
 import { centralizedErrorHandler, notFoundHandler } from "./middleware/error-handler";
+import { initSentry, sentryContextMiddleware, sentryErrorHandler } from "./lib/sentry";
+
+// Init Sentry as early as possible — before any other imports create spans.
+initSentry();
 import { globalRateLimit, loginRateLimit, failedLoginTracker } from "./middleware/rate-limiting";
 import { tenantContextMiddleware } from "./middleware/tenant-context";
 import { logger } from "./lib/logger";
@@ -409,6 +413,8 @@ app.use('/api', deprecationWarning('2027-06-01'));
 
     // Auth middleware for routes mounted outside registerRoutes()
     app.use(authenticateUser);
+    // Sentry per-request context tagging (no-op when SENTRY_DSN unset).
+    app.use(sentryContextMiddleware);
 
     // Then add after auth routes:
     app.use('/api/settings', settingsRoutes);
@@ -423,6 +429,9 @@ app.use(ddChecklistRouter);
     const docketStorage = new DocketStorage();
     registerDocketRoutes(app, docketStorage);
 
+    // Sentry must run BEFORE the centralized handler so errors are captured
+    // even if the central handler transforms them. No-op when SENTRY_DSN unset.
+    app.use(sentryErrorHandler);
     app.use(centralizedErrorHandler);
 
     if (app.get("env") === "development") {

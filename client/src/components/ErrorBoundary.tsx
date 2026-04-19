@@ -20,6 +20,7 @@
  */
 
 import { Component, ReactNode, ErrorInfo, useCallback, useState } from 'react';
+import { captureException } from '@/lib/sentry';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -49,6 +50,9 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 
     // Log to console
     console.error('[ErrorBoundary] Caught error:', error, errorInfo);
+
+    // Report to Sentry (no-op when DSN unset).
+    captureException(error, { componentStack: errorInfo.componentStack, boundary: 'root' });
 
     // Call optional error callback (for external error tracking)
     this.props.onError?.(error, errorInfo);
@@ -143,6 +147,7 @@ export class PageErrorBoundary extends Component<PageErrorBoundaryProps, ErrorBo
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     this.setState({ errorInfo });
     console.error(`[PageErrorBoundary:${this.props.pageName}] Error:`, error, errorInfo);
+    captureException(error, { componentStack: errorInfo.componentStack, boundary: 'page', pageName: this.props.pageName });
     this.props.onError?.(error, errorInfo);
   }
 
@@ -215,6 +220,7 @@ export class SectionErrorBoundary extends Component<SectionErrorBoundaryProps, E
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error(`[SectionErrorBoundary:${this.props.sectionName}] Error:`, error);
+    captureException(error, { componentStack: errorInfo.componentStack, boundary: 'section', sectionName: this.props.sectionName });
   }
 
   render() {
