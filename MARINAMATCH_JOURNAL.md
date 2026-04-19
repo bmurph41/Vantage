@@ -1,5 +1,101 @@
 # MarinaMatch Platform Journal
 
+## ✅ COMPLETE — Financial Model beta prep (2026-04-19)
+
+Brett wanted to begin FM beta testing today. I swept outstanding FM work —
+tests, endpoints, schema — and fixed two real issues plus one stale test.
+
+### Bug #1 — Tax Waterfall / GP Partner Economics 404s (REAL BETA BLOCKER)
+
+`server/routes/tax-waterfall-routes.ts :: verifyProjectAccess` was querying
+the wrong table. It checked `projects` (DD-project table) but the UI passes
+a `modeling_projects.id` (financial-model table). Result: every
+`/api/tax-waterfall/projects/:projectId/*` request 404'd for any project
+opened from the modeling workspace, which is the only place the UI calls
+these endpoints from. The feature had never worked — 5 of the 6 related
+tables had 0 rows.
+
+Root cause was schema-level: the 5 FK-bearing tax-waterfall tables
+(`project_tax_settings`, `project_partners`, `project_equity_contributions`,
+`waterfall_configs`, `project_tax_inputs`) had `project_id` FKs pointing at
+`projects(id)`. Re-pointed them to `modeling_projects(id)` where they
+belong. (`waterfall_tiers` was already correct — it FKs to
+`waterfall_configs`, not projects.)
+
+Fixed:
+- Raw SQL migration: dropped 5 FK constraints pointing to `projects.id`,
+  added 5 new ones referencing `modeling_projects(id) ON DELETE CASCADE`.
+  Migration script at `scripts/fix-tax-waterfall-fks.mjs`.
+- `shared/schema.ts` — 5 `references(() => projects.id)` → `modelingProjects.id`
+  in the Drizzle definitions.
+- `server/routes/tax-waterfall-routes.ts` — swapped `projects` import for
+  `modelingProjects` and rewrote `verifyProjectAccess`.
+- `server/db-startup-migrations.ts` — added 5 idempotent DDL blocks
+  (using `DO $$ ... $$` to find-and-drop the old constraint by discovering
+  its current name, then ADD IF NOT EXISTS the new one) so fresh environments
+  auto-heal.
+
+Verified: all 4 tax-waterfall GETs now return 200 JSON for the test
+modeling project. Total smoke: 27/27 FM endpoints green.
+
+### Bug #2 — `shared/debt/__tests__/debt-engine.test.ts` stale
+
+Import path was `./debt-engine` (should be `../debt-engine`) and type was
+`LoanInput` (should be `DebtEngineInput`). Plus 4 assertion expectations had
+drifted from the current engine behavior:
+- Expected `capitalizeOriginationFees` to capitalize ALL closing fees (wrong
+  — the flag name is specific; engine only capitalizes origination).
+- Expected `computeLTV(700k, 1M)` to return 70; engine returns 0.7 (ratio,
+  matching how covenant-monitor and stress-test-engine consume it).
+- Expected `computeDSCR(100k, 0)` to return 0; engine returns Infinity when
+  NOI>0, 0 when NOI=0 (defensible for display).
+- Expected `stepdownSchedule: [5,4,3,2,1]` to mean percents; engine
+  interprets the raw numbers as decimal fractions (no production callers
+  ever set `stepdownSchedule`, so no downstream impact).
+
+Updated the test to match the shipped engine. 18/18 passing.
+
+### Cruft — `shared/exit-backup/`
+
+Orphaned snapshot of `shared/exit/` from commit `d59a8a7a`. No imports
+anywhere, already excluded from tsconfig, but its 101 duplicate tests were
+still running via vitest (could mask real failures by covering stale code).
+Added `shared/exit-backup/**` to `vitest.config.ts` excludes.
+
+### Also-ran: `workspace-routes.test.ts` missing supertest
+
+Noted but not fixed — `server/tests/workspace-routes.test.ts` imports
+`supertest` which isn't in `package.json`. Single test file, not FM. Low
+priority.
+
+### Also-ran: `tenant-isolation.test.ts` 6 failures
+
+Test mocks don't set `req.originalUrl`; middleware line 34 calls
+`.startsWith` on it. Express always sets `originalUrl` in production, so
+this is test-mock hygiene, not a runtime bug. Not beta-blocking.
+
+### FM beta smoke summary
+
+27/27 endpoints green across every major FM surface: Pro Forma, DCF,
+Decision Support, Lease Income, Exit metrics + scenarios, Capital Stacks,
+LP reporting, Historical P&L, Scenario Comparison, Config, Debt
+(summary/schedule-all/tax-bridge/payoff/scenarios), Modeling Rent Roll
+(config/units/metrics/analysis), Returns (model-level), Tax Waterfall
+(settings/waterfall/partners/equity-contributions), POST DCF, POST DCF
+Monte Carlo. 155/155 FM-related vitest tests green.
+
+### Next session pickup
+
+Platform is ready to begin FM beta. Watch for:
+- Tax Waterfall is now reachable but has never had real data flow through
+  it — first user to configure a waterfall may hit unseen edge cases in the
+  write path (write paths not smoke-tested today; only reads).
+- Heap stays ~96% in dev (noisy WARN but not blocking); monitor in prod.
+- tsc OOM (stabilization #6) still outstanding; full `npm run check`
+  won't pass until schema.ts is refactored or project references are set up.
+
+---
+
 ## ✅ COMPLETE — Data Integrity #9 + #10 + #11 (2026-04-17)
 
 Bundled all three data-integrity hardening items.

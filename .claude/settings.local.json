@@ -250,7 +250,9 @@
       "Bash(awk '/^## ⚠ PARTIAL|^## .*deferred|^##.*financial|^##.*model|^##.*TODO|^##.*BUG/,/^##/' /home/runner/workspace/MARINAMATCH_JOURNAL.md)",
       "Bash(awk '/^## ✅|^## ⚠/' /home/runner/workspace/MARINAMATCH_JOURNAL.md)",
       "Bash(timeout 180 npm test -- --testPathPattern='\\(dcf|pro-forma|exit|xirr|waterfall|monte-carlo|rent-roll|seasonality\\)')",
-      "Bash(awk -F: '{print $1}')"
+      "Bash(awk -F: '{print $1}')",
+      "Bash(timeout 90 NODE_OPTIONS=--max-old-space-size=4096 npx tsc --noEmit server/routes/tax-waterfall-routes.ts)",
+      "Bash(NODE_OPTIONS=--max-old-space-size=4096 timeout 90 npx tsc --noEmit server/routes/tax-waterfall-routes.ts)"
     ]
   }
 }
