@@ -79,14 +79,24 @@ interface HoldPeriodResult {
 function HoldPeriodSummary({ projectId, onTabChange }: HoldPeriodSummaryProps) {
   const [activeTab, setActiveTab] = useState('table');
 
-  const { data: result, isLoading, refetch } = useQuery<HoldPeriodResult>({
+  const { data: result, isLoading, isError, error, refetch } = useQuery<HoldPeriodResult>({
     queryKey: ['hold-period-cf', projectId],
     queryFn: async () => {
-      const res = await apiRequest('POST', '/api/institutional-analysis/hold-period-cf', {
-        projectId,
+      const res = await fetch('/api/institutional-analysis/hold-period-cf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId }),
       });
-      return res.json();
+      const data = await res.json();
+      if (!res.ok) {
+        if (data?.error === 'insufficient_data') {
+          throw Object.assign(new Error(data.message), { code: 'insufficient_data' });
+        }
+        throw new Error(data?.error || 'Failed to compute hold period cash flow');
+      }
+      return data;
     },
+    retry: false,
   });
 
   const chartData = useMemo(() => {
@@ -383,17 +393,21 @@ function HoldPeriodSummary({ projectId, onTabChange }: HoldPeriodSummaryProps) {
         </Card>
       )}
 
-      {/* Empty state */}
-      {!result && !isLoading && (
+      {/* Error / empty state */}
+      {(isError || (!result && !isLoading)) && (
         <Card>
           <CardContent className="py-16 text-center">
             <Calendar className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-            <h3 className="text-lg font-semibold mb-2">No Cash Flow Data Available</h3>
-            <p className="text-muted-foreground mb-4">
-              Ensure the project has debt inputs and pro forma configured to generate the hold period summary.
+            <h3 className="text-lg font-semibold mb-2">
+              {(error as any)?.code === 'insufficient_data'
+                ? 'Missing Required Data'
+                : 'No Cash Flow Data Available'}
+            </h3>
+            <p className="text-muted-foreground mb-4 max-w-md mx-auto">
+              {(error as any)?.message || 'Ensure the project has a purchase price and Year 1 NOI set in the Inputs & Assumptions tab.'}
             </p>
-            <Button onClick={() => onTabChange?.('debt-inputs')}>
-              Configure Debt Inputs
+            <Button onClick={() => onTabChange?.('inputs')}>
+              Go to Inputs & Assumptions
             </Button>
           </CardContent>
         </Card>

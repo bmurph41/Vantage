@@ -20,6 +20,8 @@
 
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
+import { db } from '../db';
+import { sql } from 'drizzle-orm';
 import {
   institutionalAnalysisService,
   PRESET_STRESS_SCENARIOS,
@@ -159,24 +161,104 @@ router.post('/stabilized-noi', async (req: Request, res: Response) => {
 
 router.post('/hold-period-cf', async (req: Request, res: Response) => {
   try {
-    const body = z.object({
-      purchasePrice: z.number().positive(),
-      closingCostPct: z.number().min(0).max(0.2),
-      equityInvested: z.number().positive(),
-      loanAmount: z.number().min(0),
-      interestRate: z.number().min(0).max(1),
-      amortizationMonths: z.number().int().min(0),
-      holdPeriodYears: z.number().int().positive(),
-      year1NOI: z.number().positive(),
-      noiGrowthRate: z.number(),
-      exitCapRate: z.number().positive().max(1),
-      sellingCostPct: z.number().min(0).max(0.2),
-      annualCapEx: z.array(z.number().min(0)),
-      discountRate: z.number().min(0),
-      acquisitionDate: z.string(),
-    }).parse(req.body);
+    // Accept either explicit params OR just a projectId (derive from project data)
+    const schema = z.union([
+      z.object({
+        projectId: z.string(),
+        purchasePrice: z.number().optional(),
+        closingCostPct: z.number().optional(),
+        equityInvested: z.number().optional(),
+        loanAmount: z.number().optional(),
+        interestRate: z.number().optional(),
+        amortizationMonths: z.number().optional(),
+        holdPeriodYears: z.number().optional(),
+        year1NOI: z.number().optional(),
+        noiGrowthRate: z.number().optional(),
+        exitCapRate: z.number().optional(),
+        sellingCostPct: z.number().optional(),
+        annualCapEx: z.array(z.number()).optional(),
+        discountRate: z.number().optional(),
+        acquisitionDate: z.string().optional(),
+      }),
+      z.object({
+        purchasePrice: z.number().positive(),
+        closingCostPct: z.number().min(0).max(0.2),
+        equityInvested: z.number().positive(),
+        loanAmount: z.number().min(0),
+        interestRate: z.number().min(0).max(1),
+        amortizationMonths: z.number().int().min(0),
+        holdPeriodYears: z.number().int().positive(),
+        year1NOI: z.number().positive(),
+        noiGrowthRate: z.number(),
+        exitCapRate: z.number().positive().max(1),
+        sellingCostPct: z.number().min(0).max(0.2),
+        annualCapEx: z.array(z.number().min(0)),
+        discountRate: z.number().min(0),
+        acquisitionDate: z.string(),
+      }),
+    ]);
 
-    const result = institutionalAnalysisService.computeHoldPeriodCF(body);
+    const raw = schema.parse(req.body);
+    let params: {
+      purchasePrice: number; closingCostPct: number; equityInvested: number;
+      loanAmount: number; interestRate: number; amortizationMonths: number;
+      holdPeriodYears: number; year1NOI: number; noiGrowthRate: number;
+      exitCapRate: number; sellingCostPct: number; annualCapEx: number[];
+      discountRate: number; acquisitionDate: string;
+    };
+
+    if ('projectId' in raw && raw.projectId) {
+      // Derive inputs from the project's stored scenario/config data
+      const rows = await db.execute(sql`
+        SELECT
+          mp.purchase_price,
+          mp.created_at,
+          msc.hold_period,
+          msc.custom_metrics
+        FROM modeling_projects mp
+        LEFT JOIN modeling_scenario_config msc ON msc.project_id = mp.id
+        WHERE mp.id = ${raw.projectId}
+        LIMIT 1
+      `);
+      const row: any = rows.rows?.[0] ?? {};
+
+      const pp = raw.purchasePrice ?? parseFloat(row.purchase_price ?? '0') ?? 0;
+      const cm: any = row.custom_metrics ?? {};
+      const holdYears = raw.holdPeriodYears ?? row.hold_period ?? 5;
+      const loanAmt = raw.loanAmount ?? (cm.loanAmount ? parseFloat(cm.loanAmount) : pp * 0.65);
+      const equity = raw.equityInvested ?? Math.max(0, pp - loanAmt + pp * 0.015);
+      const y1NOI = raw.year1NOI ?? (cm.year1NOI ? parseFloat(cm.year1NOI) : 0);
+
+      if (pp <= 0 || y1NOI <= 0) {
+        return res.status(422).json({
+          error: 'insufficient_data',
+          message: 'This project does not yet have a purchase price and Year 1 NOI set. Please fill in the Inputs & Assumptions tab first.',
+        });
+      }
+
+      const acquisitionDate = raw.acquisitionDate ?? (row.created_at ? new Date(row.created_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]);
+
+      params = {
+        purchasePrice: pp,
+        closingCostPct: raw.closingCostPct ?? cm.closingCostPct ?? 0.015,
+        equityInvested: equity,
+        loanAmount: loanAmt,
+        interestRate: raw.interestRate ?? (cm.interestRate ? parseFloat(cm.interestRate) : 0.065),
+        amortizationMonths: raw.amortizationMonths ?? (cm.amortizationMonths ? parseInt(cm.amortizationMonths) : 300),
+        holdPeriodYears: holdYears,
+        year1NOI: y1NOI,
+        noiGrowthRate: raw.noiGrowthRate ?? (cm.noiGrowthRate ?? 0.03),
+        exitCapRate: raw.exitCapRate ?? (cm.exitCapRate ? parseFloat(cm.exitCapRate) : 0.07),
+        sellingCostPct: raw.sellingCostPct ?? 0.025,
+        annualCapEx: raw.annualCapEx ?? Array(holdYears).fill(Math.max(0, pp * 0.005)),
+        discountRate: raw.discountRate ?? (cm.discountRate ?? 0.08),
+        acquisitionDate,
+      };
+    } else {
+      params = raw as typeof params;
+    }
+
+    const result = institutionalAnalysisService.computeHoldPeriodCF(params);
     res.json(result);
   } catch (error: any) {
     console.error('Error computing hold period CF:', error);

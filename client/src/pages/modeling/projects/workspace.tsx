@@ -50,7 +50,6 @@ import {
   Shield,
   Hammer,
   Scale,
-  Landmark,
   PieChart,
   GitBranch,
   FileCheck,
@@ -195,13 +194,20 @@ const TAB_GROUPS: TabGroup[] = [
     tabs: [
       { value: 'historical', label: 'Historical P&L', icon: FileSpreadsheet },
       { value: 'proforma', label: 'Pro Forma', icon: BarChart3 },
+      { value: 'stabilized-noi', label: 'Stabilized NOI', icon: Target },
       { value: 'pricing', label: 'Pricing', icon: DollarSign },
+      { value: 'capex-budget', label: 'CapEx Budget', icon: Hammer },
       { value: 'debt', label: 'Debt', icon: Briefcase },
+      { value: 'loan-sizing', label: 'Loan Sizing', icon: Calculator },
       { value: 'capital', label: 'Capital Stack', icon: Building2 },
       { value: 'exit', label: 'Exit Strategy', icon: Target },
       { value: 'dcf', label: 'DCF', icon: Calculator },
+      { value: 'hold-period-summary', label: 'Hold Period CF', icon: DollarSign },
+      { value: 'pe-waterfall', label: 'PE Waterfall', icon: Layers },
+      { value: 'waterfall-sensitivity', label: 'Waterfall Sensitivity', icon: Activity },
       { value: 'returns', label: 'Returns', icon: TrendingUp },
       { value: 'multi-year', label: 'Multi-Year', icon: TrendingUp },
+      { value: 'depreciation', label: 'Depreciation', icon: Receipt },
       { value: 'tax-dist', label: 'Tax & Distributions', icon: Receipt },
     ],
   },
@@ -211,6 +217,9 @@ const TAB_GROUPS: TabGroup[] = [
     icon: LineChart,
     tabs: [
       { value: 'analytics', label: 'Analytics', icon: SlidersHorizontal },
+      { value: 'irr-decomposition', label: 'IRR Attribution', icon: TrendingUp },
+      { value: 'mark-to-market', label: 'Mark-to-Market', icon: Scale },
+      { value: 'replacement-cost', label: 'Replacement Cost', icon: Building2 },
       { value: 'proforma-charts', label: 'Charts', icon: BarChart3 },
       { value: 'scenario-compare', label: 'Compare', icon: Layers },
       { value: 'deal-compare', label: 'Deal Compare', icon: Scale },
@@ -218,27 +227,9 @@ const TAB_GROUPS: TabGroup[] = [
       { value: 'monte-carlo', label: 'Monte Carlo', icon: Activity },
       { value: 'stress-testing', label: 'Stress Tests', icon: Shield },
       { value: 'benchmark-overlay', label: 'Benchmarks', icon: Target },
-    ],
-  },
-  {
-    id: 'institutional',
-    label: 'Institutional',
-    icon: Landmark,
-    tabs: [
-      { value: 'irr-decomposition', label: 'IRR Attribution', icon: TrendingUp },
-      { value: 'hold-period-summary', label: 'Hold Period CF', icon: DollarSign },
-      { value: 'mark-to-market', label: 'Mark-to-Market', icon: Scale },
-      { value: 'stabilized-noi', label: 'Stabilized NOI', icon: Target },
-      { value: 'capex-budget', label: 'CapEx Budget', icon: Hammer },
-      { value: 'replacement-cost', label: 'Replacement Cost', icon: Building2 },
-      { value: 'loan-sizing', label: 'Loan Sizing', icon: Calculator },
-      { value: 'pe-waterfall', label: 'PE Waterfall', icon: Layers },
-      { value: 'waterfall-sensitivity', label: 'Waterfall Sensitivity', icon: Activity },
-      { value: 'depreciation', label: 'Depreciation', icon: Receipt },
       { value: 'comp-grid', label: 'Comp Adjustments', icon: SlidersHorizontal },
       { value: 'operator-bench', label: 'Operator Benchmark', icon: Gauge },
       { value: 'environmental', label: 'Environmental Risk', icon: Leaf },
-      { value: 'ic-memo', label: 'IC Memo', icon: FileText },
     ],
   },
   {
@@ -270,6 +261,7 @@ const TAB_GROUPS: TabGroup[] = [
     label: 'Output',
     icon: Download,
     tabs: [
+      { value: 'ic-memo', label: 'IC Memo', icon: FileText },
       { value: 'investment-materials', label: 'Investment Materials', icon: Briefcase },
       { value: 'comps', label: 'Comps & Links', icon: Link2 },
       { value: 'export', label: 'Export', icon: FileSpreadsheet },
@@ -1042,7 +1034,7 @@ export default function ProjectWorkspace() {
           <TaxAndDistributionsPage projectId={projectId!} onTabChange={handleTabChange} />
         </TabsContent>
 
-        {/* ─── Institutional Analysis ─── */}
+        {/* ─── Analysis & Institutional Tabs ─── */}
         <TabsContent value="irr-decomposition" className="mt-4 space-y-4">
           <IRRDecomposition projectId={projectId!} onTabChange={handleTabChange} />
         </TabsContent>
