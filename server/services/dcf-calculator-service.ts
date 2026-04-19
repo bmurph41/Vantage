@@ -685,6 +685,11 @@ export interface LeaseYearIncome {
     vacancyDeduction: number;
     /** One-time TI/LC re-leasing cost charged in the first year of vacancy */
     tiLcCost: number;
+    /** Escalation type for this lease (e.g. 'SCHEDULE', 'PERCENT', 'NONE') */
+    escalationType: string;
+    /** For SCHEDULE leases: the annualized rent from the active step at the start of this year.
+     *  Null/undefined for non-SCHEDULE leases. */
+    activeStepRentAnnual?: number | null;
   }>;
 }
 
@@ -931,6 +936,27 @@ export function computeLeaseIncomeByYear(
       totalVacancyDeduction += vacancyDeduction;
       totalTiLcCost += tiLcCost;
 
+      // For SCHEDULE leases: determine which step is active at the start of this year
+      // so the UI can display "effective step rent" per year.
+      // Only set this when the lease is actually earning rent this year (not expired
+      // before the year and not yet to start).
+      let activeStepRentAnnual: number | null = null;
+      if (
+        !isExpiredBeforeYear &&
+        !notYetStarted &&
+        lease.escalationType === 'SCHEDULE' &&
+        lease.scheduleJson &&
+        lease.scheduleJson.length > 0
+      ) {
+        const activeStep = findActiveRentStep(lease.scheduleJson, yearStart);
+        if (activeStep) {
+          activeStepRentAnnual = Math.round(convertRentStepToAnnual(activeStep, lease.sf));
+        } else {
+          // No step has taken effect yet — use base rent
+          activeStepRentAnnual = Math.round(lease.baseRentAnnual);
+        }
+      }
+
       leaseDetail.push({
         leaseId: lease.leaseId,
         tenantName: lease.tenantName,
@@ -940,6 +966,8 @@ export function computeLeaseIncomeByYear(
         freeRentReduction: Math.round(freeRentReduction),
         vacancyDeduction: Math.round(vacancyDeduction),
         tiLcCost: Math.round(tiLcCost),
+        escalationType: lease.escalationType,
+        activeStepRentAnnual,
       });
     }
 

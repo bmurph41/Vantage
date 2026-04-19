@@ -38,6 +38,7 @@ import {
   Users
 } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { cn, formatCurrency, formatPercent } from '@/lib/utils';
 import debounce from 'lodash.debounce';
@@ -88,6 +89,15 @@ interface LeaseYearDetail {
   freeRentReduction: number;
   vacancyDeduction: number;
   tiLcCost: number;
+  escalationType?: string;
+  activeStepRentAnnual?: number | null;
+}
+
+interface RentStepEntryFE {
+  effectiveDate: string;
+  value: number;
+  unit: string;
+  notes?: string;
 }
 
 interface LeaseBreakdownItem {
@@ -100,6 +110,7 @@ interface LeaseBreakdownItem {
   sf: number;
   escalationType: string;
   escalationRate: number;
+  scheduleJson?: RentStepEntryFE[] | null;
 }
 
 interface YearlyLeaseIncome {
@@ -1415,6 +1426,7 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
                                     <tr className="text-left border-b border-border">
                                       <th className="pb-1 font-medium text-muted-foreground pr-4">Tenant</th>
                                       <th className="pb-1 font-medium text-muted-foreground text-right pr-4">Base Rent</th>
+                                      <th className="pb-1 font-medium text-muted-foreground text-right pr-4">Step Rent</th>
                                       <th className="pb-1 font-medium text-muted-foreground text-right pr-4">Recoveries</th>
                                       <th className="pb-1 font-medium text-muted-foreground text-right pr-4">Free Rent</th>
                                       <th className="pb-1 font-medium text-muted-foreground text-right pr-4">Vacancy</th>
@@ -1428,6 +1440,7 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
                                         - (ld.vacancyDeduction ?? 0) - (ld.tiLcCost ?? 0);
                                       const hasVacancy = (ld.vacancyDeduction ?? 0) > 0;
                                       const hasTiLc = (ld.tiLcCost ?? 0) > 0;
+                                      const isSchedule = ld.escalationType === 'SCHEDULE';
                                       return (
                                         <tr key={ld.leaseId} className="border-b border-border/40 last:border-0">
                                           <td className="py-1 pr-4 font-medium">
@@ -1438,10 +1451,24 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
                                                   Expired
                                                 </Badge>
                                               )}
+                                              {isSchedule && !ld.isExpired && (
+                                                <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 text-blue-600 dark:text-blue-400 border-blue-300 dark:border-blue-800">
+                                                  Step
+                                                </Badge>
+                                              )}
                                             </div>
                                           </td>
                                           <td className={cn('py-1 pr-4 text-right tabular-nums', ld.isExpired && 'text-muted-foreground')}>
                                             {ld.isExpired ? '$0' : formatCurrency(ld.baseRent)}
+                                          </td>
+                                          <td className="py-1 pr-4 text-right tabular-nums">
+                                            {isSchedule && !ld.isExpired && ld.activeStepRentAnnual != null ? (
+                                              <span className="text-blue-600 dark:text-blue-400 font-medium">
+                                                {formatCurrency(ld.activeStepRentAnnual)}
+                                              </span>
+                                            ) : (
+                                              <span className="text-muted-foreground">—</span>
+                                            )}
                                           </td>
                                           <td className={cn('py-1 pr-4 text-right tabular-nums', ld.isExpired && 'text-muted-foreground')}>
                                             {ld.isExpired ? '$0' : formatCurrency(ld.recovery)}
@@ -1488,6 +1515,7 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
                                     <tr className="border-t border-border font-semibold">
                                       <td className="pt-1.5 pr-4 text-muted-foreground">Total</td>
                                       <td className="pt-1.5 pr-4 text-right tabular-nums">{formatCurrency(leaseYear.baseRentAnnual)}</td>
+                                      <td className="pt-1.5 pr-4 text-right tabular-nums text-muted-foreground">—</td>
                                       <td className="pt-1.5 pr-4 text-right tabular-nums">{formatCurrency(leaseYear.recoveryAnnual)}</td>
                                       <td className="pt-1.5 pr-4 text-right tabular-nums text-amber-600 dark:text-amber-400">
                                         {leaseYear.leaseDetail.reduce((s, l) => s + l.freeRentReduction, 0) > 0
@@ -1922,6 +1950,7 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
                                         <tr className="text-left border-b border-border">
                                           <th className="pb-1 font-medium text-muted-foreground pr-4">Tenant</th>
                                           <th className="pb-1 font-medium text-muted-foreground text-right pr-4">Base Rent</th>
+                                          <th className="pb-1 font-medium text-muted-foreground text-right pr-4">Step Rent</th>
                                           <th className="pb-1 font-medium text-muted-foreground text-right pr-4">Recoveries</th>
                                           <th className="pb-1 font-medium text-muted-foreground text-right pr-4">Free Rent</th>
                                           <th className="pb-1 font-medium text-muted-foreground text-right pr-4">Vacancy</th>
@@ -1935,6 +1964,7 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
                                           const tiLc = ld.tiLcCost ?? 0;
                                           const netEgi = ld.baseRent + ld.recovery - ld.freeRentReduction
                                             - vacDed - tiLc;
+                                          const isSchedule = ld.escalationType === 'SCHEDULE';
                                           return (
                                             <tr key={ld.leaseId} className="border-b border-border/40 last:border-0">
                                               <td className="py-1 pr-4 font-medium">
@@ -1945,10 +1975,24 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
                                                       Expired
                                                     </Badge>
                                                   )}
+                                                  {isSchedule && !ld.isExpired && (
+                                                    <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 text-blue-600 dark:text-blue-400 border-blue-300 dark:border-blue-800">
+                                                      Step
+                                                    </Badge>
+                                                  )}
                                                 </div>
                                               </td>
                                               <td className={cn('py-1 pr-4 text-right tabular-nums', ld.isExpired && 'text-muted-foreground')}>
                                                 {ld.isExpired ? '$0' : formatCurrency(ld.baseRent)}
+                                              </td>
+                                              <td className="py-1 pr-4 text-right tabular-nums">
+                                                {isSchedule && !ld.isExpired && ld.activeStepRentAnnual != null ? (
+                                                  <span className="text-blue-600 dark:text-blue-400 font-medium">
+                                                    {formatCurrency(ld.activeStepRentAnnual)}
+                                                  </span>
+                                                ) : (
+                                                  <span className="text-muted-foreground">—</span>
+                                                )}
                                               </td>
                                               <td className={cn('py-1 pr-4 text-right tabular-nums', ld.isExpired && 'text-muted-foreground')}>
                                                 {ld.isExpired ? '$0' : formatCurrency(ld.recovery)}
@@ -1995,6 +2039,7 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
                                         <tr className="border-t border-border font-semibold">
                                           <td className="pt-1.5 pr-4 text-muted-foreground">Total</td>
                                           <td className="pt-1.5 pr-4 text-right tabular-nums">{formatCurrency(leaseYearDetail.baseRentAnnual)}</td>
+                                          <td className="pt-1.5 pr-4 text-right tabular-nums text-muted-foreground">—</td>
                                           <td className="pt-1.5 pr-4 text-right tabular-nums">{formatCurrency(leaseYearDetail.recoveryAnnual)}</td>
                                           <td className="pt-1.5 pr-4 text-right tabular-nums text-amber-600 dark:text-amber-400">
                                             {leaseYearDetail.leaseDetail.reduce((s, l) => s + l.freeRentReduction, 0) > 0
@@ -2062,6 +2107,7 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
                             : lease.escalationType === 'SCHEDULE' ? 'Scheduled'
                             : lease.escalationType === 'FIXED_DOLLAR' ? 'Fixed $'
                             : 'Flat';
+                          const hasSchedule = lease.escalationType === 'SCHEDULE' && lease.scheduleJson && lease.scheduleJson.length > 0;
                           return (
                             <TableRow key={lease.leaseId}>
                               <TableCell className="font-medium">{lease.tenantName}</TableCell>
@@ -2071,7 +2117,38 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
                               <TableCell className="text-muted-foreground">{Number(lease.sf).toLocaleString()}</TableCell>
                               <TableCell className="text-right">{formatCurrency(lease.baseRentAnnual)}</TableCell>
                               <TableCell className="text-right">{formatCurrency(lease.recoveryAnnual)}</TableCell>
-                              <TableCell className="text-sm">{escalationLabel}</TableCell>
+                              <TableCell className="text-sm">
+                                {hasSchedule ? (
+                                  <TooltipProvider>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <span className="flex items-center gap-1 cursor-pointer text-blue-600 dark:text-blue-400 underline decoration-dotted whitespace-nowrap">
+                                          Scheduled <Info className="h-3 w-3 shrink-0" />
+                                        </span>
+                                      </TooltipTrigger>
+                                      <TooltipContent side="top" className="max-w-xs p-3">
+                                        <div className="text-xs space-y-1">
+                                          <div className="font-semibold mb-1.5 text-xs">Step Schedule</div>
+                                          {lease.scheduleJson!.map((step, i) => (
+                                            <div key={i} className="flex justify-between gap-6">
+                                              <span className="text-muted-foreground">{step.effectiveDate}</span>
+                                              <span className="font-medium tabular-nums">
+                                                {step.unit === 'PSF_YEAR'
+                                                  ? `$${step.value.toFixed(2)}/sf/yr`
+                                                  : step.unit === 'PER_MONTH'
+                                                  ? `${formatCurrency(step.value)}/mo`
+                                                  : `${formatCurrency(step.value)}/yr`}
+                                              </span>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
+                                ) : (
+                                  escalationLabel
+                                )}
+                              </TableCell>
                               <TableCell className="text-sm text-muted-foreground">{lease.leaseEndDate}</TableCell>
                               <TableCell className="text-right font-medium">{pct.toFixed(1)}%</TableCell>
                             </TableRow>
@@ -2095,11 +2172,13 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
                       </p>
                       <p className="text-emerald-700 dark:text-emerald-400 mt-1">
                         Year 1 NOI is derived from actual tenant base rent and recoveries.
-                        Forward-year projections apply the weighted average escalation rate
-                        ({leaseIncomeData.weightedAvgEscalationRate > 0
-                          ? `${(leaseIncomeData.weightedAvgEscalationRate * 100).toFixed(2)}%/yr from leases`
-                          : 'scenario growth rate'}) as the income growth driver,
-                        with the scenario revenue growth rate applied as a minimum floor.
+                        Forward-year projections apply each lease's escalation method individually:
+                        SCHEDULE leases step to their configured absolute rent amounts (shown in the
+                        "Step Rent" column when you expand a year), while other leases compound using
+                        a {leaseIncomeData.weightedAvgEscalationRate > 0
+                          ? `weighted average escalation rate of ${(leaseIncomeData.weightedAvgEscalationRate * 100).toFixed(2)}%/yr`
+                          : 'the scenario revenue growth rate'}.
+                        The scenario revenue growth rate is applied as a minimum floor.
                       </p>
                     </div>
                   </div>
