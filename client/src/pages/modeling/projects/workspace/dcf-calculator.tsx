@@ -812,6 +812,36 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
       </div>
       </div>
 
+      {/* ── Lease Income Override Status Badge (visible on Overview tab only) ── */}
+      {activeTab === 'overview' && (() => {
+        const injected = dcfAnalysis?.meta?.leaseIncomeInjected === true;
+        const toggled = dcfAnalysis?.meta?.useLeaseIncomeForDcf === true || leaseOverrideEnabled === true;
+        const hasLeases = leaseIncomeData?.hasLeases;
+        if (!toggled && !injected) return null;
+        let label: React.ReactNode;
+        if (injected) {
+          label = <>Lease income is <strong>active</strong> in this DCF{hasLeases ? ` (${leaseIncomeData.leaseCount} lease${leaseIncomeData.leaseCount !== 1 ? 's' : ''})` : ''}</>;
+        } else if (hasLeases) {
+          label = <>Lease income override is <strong>enabled</strong> — recalculate to inject lease data</>;
+        } else {
+          label = <>Lease income override is <strong>enabled</strong> — no leases loaded yet</>;
+        }
+        return (
+          <button
+            type="button"
+            onClick={() => setActiveTab('lease-income')}
+            data-testid="lease-income-status-badge"
+            className="flex items-center gap-2 text-sm w-fit rounded-md px-3 py-1.5 border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring
+              border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100
+              dark:border-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-900/50"
+          >
+            <Info className="h-3.5 w-3.5 shrink-0" />
+            <span>{label}</span>
+            <ChevronRight className="h-3.5 w-3.5 shrink-0 opacity-60" />
+          </button>
+        );
+      })()}
+
       {baseScenario?.cashFlows && baseScenario.cashFlows.length > 0 && (
         <div className="p-4 border rounded-lg bg-card">
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Levered Cash Flow Waterfall</p>
