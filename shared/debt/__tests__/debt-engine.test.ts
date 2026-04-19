@@ -35,10 +35,10 @@ describe('computeLoanFeesAtClose', () => {
     expect(fees.cashFees).toBe(21000);
   });
 
-  it('capitalizes fees into loan balance', () => {
+  it('capitalizes only the origination fee into loan balance', () => {
     const fees = computeLoanFeesAtClose({ ...baseLoan, capitalizeOriginationFees: true });
-    expect(fees.financedFees).toBe(21000);
-    expect(fees.cashFees).toBe(0);
+    expect(fees.financedFees).toBe(10000);
+    expect(fees.cashFees).toBe(11000);
   });
 });
 
@@ -86,10 +86,10 @@ describe('computeLoanSchedule — Amortizing loan', () => {
 });
 
 describe('computeLoanSchedule — Capitalized fees', () => {
-  it('increases beginning balance by financed fees', () => {
+  it('increases beginning balance by the financed origination fee', () => {
     const capLoan: LoanInput = { ...baseLoan, capitalizeOriginationFees: true };
     const schedule = computeLoanSchedule(capLoan);
-    expect(schedule[0].beginBal).toBe(1_021_000);
+    expect(schedule[0].beginBal).toBe(1_010_000);
   });
 
   it('non-capitalized starts at loan amount', () => {
@@ -147,16 +147,16 @@ describe('computeLoanPayoffAtExit', () => {
     expect(payoff.totalPayoff).toBeCloseTo(payoff.payoffBalance + payoff.exitFees, 1);
   });
 
-  it('computes stepdown prepay penalty', () => {
+  it('computes stepdown prepay penalty using the schedule as decimal fractions', () => {
     const stepdownLoan: LoanInput = {
       ...baseLoan,
       prepayType: 'stepdown',
-      stepdownSchedule: [5, 4, 3, 2, 1],
+      stepdownSchedule: [0.05, 0.04, 0.03, 0.02, 0.01],
     };
     const schedule = computeLoanSchedule(stepdownLoan);
     const payoff = computeLoanPayoffAtExit(stepdownLoan, schedule, 24);
-    
-    expect(payoff.prepayPenalty).toBeCloseTo(payoff.payoffBalance * 0.03 / 100 * 100, -1);
+
+    expect(payoff.prepayPenalty).toBeCloseTo(payoff.payoffBalance * 0.03, 1);
   });
 });
 
@@ -178,17 +178,21 @@ describe('computeDSCR', () => {
     expect(computeDSCR(100000, 70000)).toBeCloseTo(1.43, 1);
     expect(computeDSCR(50000, 70000)).toBeCloseTo(0.71, 1);
   });
-  
-  it('returns 0 for zero debt service', () => {
-    expect(computeDSCR(100000, 0)).toBe(0);
+
+  it('returns Infinity for positive NOI with zero debt service', () => {
+    expect(computeDSCR(100000, 0)).toBe(Infinity);
+  });
+
+  it('returns 0 when both NOI and debt service are zero', () => {
+    expect(computeDSCR(0, 0)).toBe(0);
   });
 });
 
 describe('computeLTV', () => {
-  it('calculates LTV correctly', () => {
-    expect(computeLTV(700000, 1000000)).toBe(70);
+  it('returns a decimal ratio (not percent)', () => {
+    expect(computeLTV(700000, 1000000)).toBe(0.7);
   });
-  
+
   it('returns 0 for zero property value', () => {
     expect(computeLTV(700000, 0)).toBe(0);
   });
