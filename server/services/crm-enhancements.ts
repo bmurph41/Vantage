@@ -15,6 +15,7 @@ import { db, pool } from '../db';
 import { sql } from 'drizzle-orm';
 import crypto from 'crypto';
 import Decimal from 'decimal.js';
+import { isDroppedTableError } from '../utils/api-errors';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -168,15 +169,20 @@ class CRMEnhancements {
     const id = crypto.randomUUID();
     const now = new Date();
 
-    await db.execute(sql`
-      INSERT INTO deal_comparisons (
-        id, org_id, name, deal_ids, notes, created_by, created_at, updated_at
-      ) VALUES (
-        ${id}, ${orgId}, ${name || `Comparison ${now.toISOString().slice(0, 10)}`},
-        ${JSON.stringify(dealIds)}::jsonb, ${null},
-        ${createdBy || null}, ${now}, ${now}
-      )
-    `);
+    try {
+      await db.execute(sql`
+        INSERT INTO deal_comparisons (
+          id, org_id, name, deal_ids, notes, created_by, created_at, updated_at
+        ) VALUES (
+          ${id}, ${orgId}, ${name || `Comparison ${now.toISOString().slice(0, 10)}`},
+          ${JSON.stringify(dealIds)}::jsonb, ${null},
+          ${createdBy || null}, ${now}, ${now}
+        )
+      `);
+    } catch (err) {
+      if (isDroppedTableError(err)) throw new Error('Deal comparison feature is unavailable (backing table removed)');
+      throw err;
+    }
 
     return { id, dealIds };
   }
@@ -188,11 +194,17 @@ class CRMEnhancements {
     orgId: string,
     comparisonId: string
   ): Promise<{ comparison: SavedComparison; deals: DealComparisonMetrics[] }> {
-    const compResult = await db.execute(sql`
-      SELECT id, org_id, name, deal_ids, notes, created_by, created_at, updated_at
-      FROM deal_comparisons
-      WHERE id = ${comparisonId} AND org_id = ${orgId}
-    `);
+    let compResult: { rows: any[] };
+    try {
+      compResult = await db.execute(sql`
+        SELECT id, org_id, name, deal_ids, notes, created_by, created_at, updated_at
+        FROM deal_comparisons
+        WHERE id = ${comparisonId} AND org_id = ${orgId}
+      `) as { rows: any[] };
+    } catch (err) {
+      if (isDroppedTableError(err)) throw new Error('Deal comparison feature is unavailable (backing table removed)');
+      throw err;
+    }
 
     if (!compResult.rows.length) {
       throw new Error('Comparison not found');
@@ -274,41 +286,52 @@ class CRMEnhancements {
   ): Promise<string> {
     const now = new Date();
 
-    if (data.id) {
-      await db.execute(sql`
-        UPDATE deal_comparisons
-        SET name = ${data.name},
-            deal_ids = ${JSON.stringify(data.dealIds)}::jsonb,
-            notes = ${data.notes || null},
-            updated_at = ${now}
-        WHERE id = ${data.id} AND org_id = ${orgId}
-      `);
-      return data.id;
-    }
+    try {
+      if (data.id) {
+        await db.execute(sql`
+          UPDATE deal_comparisons
+          SET name = ${data.name},
+              deal_ids = ${JSON.stringify(data.dealIds)}::jsonb,
+              notes = ${data.notes || null},
+              updated_at = ${now}
+          WHERE id = ${data.id} AND org_id = ${orgId}
+        `);
+        return data.id;
+      }
 
-    const id = crypto.randomUUID();
-    await db.execute(sql`
-      INSERT INTO deal_comparisons (
-        id, org_id, name, deal_ids, notes, created_by, created_at, updated_at
-      ) VALUES (
-        ${id}, ${orgId}, ${data.name},
-        ${JSON.stringify(data.dealIds)}::jsonb, ${data.notes || null},
-        ${data.createdBy || null}, ${now}, ${now}
-      )
-    `);
-    return id;
+      const id = crypto.randomUUID();
+      await db.execute(sql`
+        INSERT INTO deal_comparisons (
+          id, org_id, name, deal_ids, notes, created_by, created_at, updated_at
+        ) VALUES (
+          ${id}, ${orgId}, ${data.name},
+          ${JSON.stringify(data.dealIds)}::jsonb, ${data.notes || null},
+          ${data.createdBy || null}, ${now}, ${now}
+        )
+      `);
+      return id;
+    } catch (err) {
+      if (isDroppedTableError(err)) throw new Error('Deal comparison feature is unavailable (backing table removed)');
+      throw err;
+    }
   }
 
   /**
    * List all saved comparisons for an org.
    */
   async listComparisons(orgId: string): Promise<SavedComparison[]> {
-    const result = await db.execute(sql`
-      SELECT id, org_id, name, deal_ids, notes, created_by, created_at, updated_at
-      FROM deal_comparisons
-      WHERE org_id = ${orgId}
-      ORDER BY updated_at DESC
-    `);
+    let result: { rows: any[] };
+    try {
+      result = await db.execute(sql`
+        SELECT id, org_id, name, deal_ids, notes, created_by, created_at, updated_at
+        FROM deal_comparisons
+        WHERE org_id = ${orgId}
+        ORDER BY updated_at DESC
+      `) as { rows: any[] };
+    } catch (err) {
+      if (isDroppedTableError(err)) return [];
+      throw err;
+    }
 
     return (result.rows as any[]).map(r => ({
       id: r.id,
@@ -358,15 +381,19 @@ class CRMEnhancements {
     const id = crypto.randomUUID();
     const now = new Date();
 
-    await db.execute(sql`
-      INSERT INTO email_tracking_events (
-        id, email_id, tracking_id, tracking_type, link_id,
-        ip_address, user_agent, created_at
-      ) VALUES (
-        ${id}, ${metadata.emailId}, ${trackingId}, ${'open'}, ${null},
-        ${metadata.ipAddress || null}, ${metadata.userAgent || null}, ${now}
-      )
-    `);
+    try {
+      await db.execute(sql`
+        INSERT INTO email_tracking_events (
+          id, email_id, tracking_id, tracking_type, link_id,
+          ip_address, user_agent, created_at
+        ) VALUES (
+          ${id}, ${metadata.emailId}, ${trackingId}, ${'open'}, ${null},
+          ${metadata.ipAddress || null}, ${metadata.userAgent || null}, ${now}
+        )
+      `);
+    } catch (err) {
+      if (!isDroppedTableError(err)) throw err;
+    }
 
     // Update the email record's open count
     await db.execute(sql`
@@ -389,16 +416,20 @@ class CRMEnhancements {
     const id = crypto.randomUUID();
     const now = new Date();
 
-    await db.execute(sql`
-      INSERT INTO email_tracking_events (
-        id, email_id, tracking_id, tracking_type, link_id,
-        ip_address, user_agent, url, created_at
-      ) VALUES (
-        ${id}, ${metadata.emailId}, ${trackingId}, ${'click'}, ${linkId},
-        ${metadata.ipAddress || null}, ${metadata.userAgent || null},
-        ${metadata.url || null}, ${now}
-      )
-    `);
+    try {
+      await db.execute(sql`
+        INSERT INTO email_tracking_events (
+          id, email_id, tracking_id, tracking_type, link_id,
+          ip_address, user_agent, url, created_at
+        ) VALUES (
+          ${id}, ${metadata.emailId}, ${trackingId}, ${'click'}, ${linkId},
+          ${metadata.ipAddress || null}, ${metadata.userAgent || null},
+          ${metadata.url || null}, ${now}
+        )
+      `);
+    } catch (err) {
+      if (!isDroppedTableError(err)) throw err;
+    }
 
     await db.execute(sql`
       UPDATE crm_emails
@@ -446,19 +477,29 @@ class CRMEnhancements {
     const totalOpened = Number(stats.total_opened || 0);
     const totalClicked = Number(stats.total_clicked || 0);
 
-    // Daily breakdown
-    const dailyResult = await pool.query(`
-      SELECT
-        DATE(et.created_at) AS date,
-        COUNT(CASE WHEN et.tracking_type = 'open' THEN 1 END) AS opens,
-        COUNT(CASE WHEN et.tracking_type = 'click' THEN 1 END) AS clicks
-      FROM email_tracking_events et
-      JOIN crm_emails e ON e.id = et.email_id
-      WHERE ${where}
-      GROUP BY DATE(et.created_at)
-      ORDER BY DATE(et.created_at) DESC
-      LIMIT 90
-    `, params);
+    // Daily breakdown (email_tracking_events table — may have been dropped)
+    let byDate: Array<{ date: any; opens: number; clicks: number }> = [];
+    try {
+      const dailyResult = await pool.query(`
+        SELECT
+          DATE(et.created_at) AS date,
+          COUNT(CASE WHEN et.tracking_type = 'open' THEN 1 END) AS opens,
+          COUNT(CASE WHEN et.tracking_type = 'click' THEN 1 END) AS clicks
+        FROM email_tracking_events et
+        JOIN crm_emails e ON e.id = et.email_id
+        WHERE ${where}
+        GROUP BY DATE(et.created_at)
+        ORDER BY DATE(et.created_at) DESC
+        LIMIT 90
+      `, params);
+      byDate = (dailyResult.rows as any[]).map(r => ({
+        date: r.date,
+        opens: Number(r.opens),
+        clicks: Number(r.clicks),
+      }));
+    } catch (err) {
+      if (!isDroppedTableError(err)) throw err;
+    }
 
     return {
       totalSent,
@@ -468,11 +509,7 @@ class CRMEnhancements {
       uniqueClicks: Number(stats.unique_clicks || 0),
       openRate: totalSent > 0 ? new Decimal(totalOpened).div(totalSent).times(100).toNumber() : 0,
       clickRate: totalSent > 0 ? new Decimal(totalClicked).div(totalSent).times(100).toNumber() : 0,
-      byDate: (dailyResult.rows as any[]).map(r => ({
-        date: r.date,
-        opens: Number(r.opens),
-        clicks: Number(r.clicks),
-      })),
+      byDate,
     };
   }
 
@@ -483,18 +520,22 @@ class CRMEnhancements {
     orgId: string,
     contactId: string
   ): Promise<{ contactId: string; score: number; breakdown: Record<string, number> }> {
-    const result = await db.execute(sql`
-      SELECT
-        COUNT(CASE WHEN et.tracking_type = 'open' THEN 1 END) AS opens,
-        COUNT(CASE WHEN et.tracking_type = 'click' THEN 1 END) AS clicks,
-        COUNT(DISTINCT e.id) AS emails_received,
-        MAX(et.created_at) AS last_engagement
-      FROM email_tracking_events et
-      JOIN crm_emails e ON e.id = et.email_id
-      WHERE e.org_id = ${orgId} AND e.contact_id = ${contactId}
-    `);
-
-    const stats = (result.rows as any[])[0] || {};
+    let stats: any = {};
+    try {
+      const result = await db.execute(sql`
+        SELECT
+          COUNT(CASE WHEN et.tracking_type = 'open' THEN 1 END) AS opens,
+          COUNT(CASE WHEN et.tracking_type = 'click' THEN 1 END) AS clicks,
+          COUNT(DISTINCT e.id) AS emails_received,
+          MAX(et.created_at) AS last_engagement
+        FROM email_tracking_events et
+        JOIN crm_emails e ON e.id = et.email_id
+        WHERE e.org_id = ${orgId} AND e.contact_id = ${contactId}
+      `);
+      stats = (result.rows as any[])[0] || {};
+    } catch (err) {
+      if (!isDroppedTableError(err)) throw err;
+    }
     const opens = Number(stats.opens || 0);
     const clicks = Number(stats.clicks || 0);
     const emailsReceived = Number(stats.emails_received || 0);

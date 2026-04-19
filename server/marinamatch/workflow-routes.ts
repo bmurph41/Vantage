@@ -25,6 +25,7 @@ import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { pool } from '../db'; // adjust path
 import { WorkflowEngine } from './workflow-engine';
+import { isDroppedTableError } from '../utils/api-errors';
 
 const router = Router();
 
@@ -75,6 +76,7 @@ router.get('/rules', async (req: Request, res: Response) => {
     );
     res.json(rows);
   } catch (err: any) {
+    if (isDroppedTableError(err)) return res.json([]);
     console.error('[WorkflowRoutes] GET rules:', err);
     res.status(500).json({ error: 'Failed to load rules' });
   }
@@ -103,6 +105,7 @@ router.post('/rules', async (req: Request, res: Response) => {
     res.status(201).json(rule);
   } catch (err: any) {
     if (err instanceof z.ZodError) return res.status(400).json({ error: 'Validation error', details: err.errors });
+    if (isDroppedTableError(err)) return res.status(501).json({ error: 'Workflow engine feature is unavailable', code: 'FEATURE_UNAVAILABLE' });
     console.error('[WorkflowRoutes] POST rule:', err);
     res.status(500).json({ error: 'Failed to create rule' });
   }
@@ -148,6 +151,7 @@ router.patch('/rules/:id', async (req: Request, res: Response) => {
     res.json(updated);
   } catch (err: any) {
     if (err instanceof z.ZodError) return res.status(400).json({ error: 'Validation error', details: err.errors });
+    if (isDroppedTableError(err)) return res.status(501).json({ error: 'Workflow engine feature is unavailable', code: 'FEATURE_UNAVAILABLE' });
     console.error('[WorkflowRoutes] PATCH rule:', err);
     res.status(500).json({ error: 'Failed to update rule' });
   }
@@ -166,6 +170,7 @@ router.delete('/rules/:id', async (req: Request, res: Response) => {
     if (!rowCount) return res.status(404).json({ error: 'Rule not found' });
     res.json({ success: true });
   } catch (err: any) {
+    if (isDroppedTableError(err)) return res.json({ success: true, note: 'feature unavailable' });
     console.error('[WorkflowRoutes] DELETE rule:', err);
     res.status(500).json({ error: 'Failed to delete rule' });
   }
@@ -205,6 +210,7 @@ router.post('/rules/:id/trigger', async (req: Request, res: Response) => {
     );
     res.json({ executionId, execution: exec });
   } catch (err: any) {
+    if (isDroppedTableError(err)) return res.status(501).json({ error: 'Workflow engine feature is unavailable', code: 'FEATURE_UNAVAILABLE' });
     console.error('[WorkflowRoutes] manual trigger:', err);
     res.status(500).json({ error: 'Failed to trigger rule' });
   }
@@ -242,6 +248,7 @@ router.get('/executions', async (req: Request, res: Response) => {
     );
     res.json(rows);
   } catch (err: any) {
+    if (isDroppedTableError(err)) return res.json([]);
     console.error('[WorkflowRoutes] GET executions:', err);
     res.status(500).json({ error: 'Failed to load executions' });
   }
@@ -272,6 +279,7 @@ router.get('/tasks', async (req: Request, res: Response) => {
     );
     res.json(rows);
   } catch (err: any) {
+    if (isDroppedTableError(err)) return res.json([]);
     res.status(500).json({ error: 'Failed to load tasks' });
   }
 });
@@ -296,6 +304,7 @@ router.patch('/tasks/:id', async (req: Request, res: Response) => {
     if (!task) return res.status(404).json({ error: 'Task not found' });
     res.json(task);
   } catch (err: any) {
+    if (isDroppedTableError(err)) return res.status(501).json({ error: 'Workflow task feature is unavailable', code: 'FEATURE_UNAVAILABLE' });
     res.status(500).json({ error: 'Failed to update task' });
   }
 });
@@ -314,6 +323,7 @@ router.get('/notifications', async (req: Request, res: Response) => {
     );
     res.json(rows);
   } catch (err: any) {
+    if (isDroppedTableError(err)) return res.json([]);
     res.status(500).json({ error: 'Failed to load notifications' });
   }
 });
@@ -328,6 +338,7 @@ router.post('/notifications/:id/read', async (req: Request, res: Response) => {
     );
     res.json({ success: true });
   } catch (err: any) {
+    if (isDroppedTableError(err)) return res.json({ success: true });
     res.status(500).json({ error: 'Failed to mark read' });
   }
 });
@@ -343,6 +354,7 @@ router.post('/notifications/read-all', async (req: Request, res: Response) => {
     );
     res.json({ success: true });
   } catch (err: any) {
+    if (isDroppedTableError(err)) return res.json({ success: true });
     res.status(500).json({ error: 'Failed to mark all read' });
   }
 });
@@ -382,6 +394,12 @@ router.get('/stats', async (req: Request, res: Response) => {
       unreadNotifications: parseInt(notifRes.rows[0].unread),
     });
   } catch (err: any) {
+    if (isDroppedTableError(err)) return res.json({
+      rules: { active: 0, total: 0 },
+      executions7d: { success: 0, failed: 0, skipped: 0, partial: 0, total: 0 },
+      openTasks: 0,
+      unreadNotifications: 0,
+    });
     console.error('[WorkflowRoutes] stats:', err);
     res.status(500).json({ error: 'Failed to load stats' });
   }

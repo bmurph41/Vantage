@@ -17,6 +17,7 @@ import { db } from '../db';
 import { sql } from 'drizzle-orm';
 import { logger } from '../lib/logger';
 import crypto from 'crypto';
+import { isDroppedTableError } from '../utils/api-errors';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -108,15 +109,20 @@ class WorkflowEnhancements {
     const id = crypto.randomUUID();
     const secret = data.secret || crypto.randomBytes(32).toString('hex');
 
-    await db.execute(sql`
-      INSERT INTO workflow_webhooks (id, org_id, url, event_types, secret, description, is_active, created_at)
-      VALUES (
-        ${id}, ${orgId}, ${data.url},
-        ${JSON.stringify(data.eventTypes)}::jsonb,
-        ${secret}, ${data.description || null},
-        ${data.isActive !== false}, NOW()
-      )
-    `);
+    try {
+      await db.execute(sql`
+        INSERT INTO workflow_webhooks (id, org_id, url, event_types, secret, description, is_active, created_at)
+        VALUES (
+          ${id}, ${orgId}, ${data.url},
+          ${JSON.stringify(data.eventTypes)}::jsonb,
+          ${secret}, ${data.description || null},
+          ${data.isActive !== false}, NOW()
+        )
+      `);
+    } catch (err) {
+      if (isDroppedTableError(err)) throw new Error('Workflow webhook feature is unavailable (backing table removed)');
+      throw err;
+    }
 
     logger.info({ webhookId: id, orgId, url: data.url }, '[WorkflowEnhancements] Webhook registered');
     return { id, secret, url: data.url, eventTypes: data.eventTypes, isActive: true };
@@ -128,11 +134,17 @@ class WorkflowEnhancements {
     event: string,
     payload: Record<string, any>,
   ): Promise<{ success: boolean; statusCode: number | null; attempts: number }> {
-    const rows = await db.execute(sql`
-      SELECT id, url, secret, event_types, is_active
-      FROM workflow_webhooks
-      WHERE id = ${webhookId} AND org_id = ${orgId}
-    `);
+    let rows: any;
+    try {
+      rows = await db.execute(sql`
+        SELECT id, url, secret, event_types, is_active
+        FROM workflow_webhooks
+        WHERE id = ${webhookId} AND org_id = ${orgId}
+      `);
+    } catch (err) {
+      if (isDroppedTableError(err)) throw new Error('Workflow webhook feature is unavailable (backing table removed)');
+      throw err;
+    }
     const webhook = (rows as any).rows?.[0];
     if (!webhook) throw new Error(`Webhook ${webhookId} not found`);
     if (!webhook.is_active) throw new Error(`Webhook ${webhookId} is disabled`);
@@ -203,56 +215,70 @@ class WorkflowEnhancements {
     success: boolean, errorMessage: string | null,
   ) {
     const id = crypto.randomUUID();
-    await db.execute(sql`
-      INSERT INTO workflow_webhook_deliveries
-        (id, org_id, webhook_id, event_type, payload, status_code, response_body, attempt, success, error_message, delivered_at)
-      VALUES (
-        ${id}, ${orgId}, ${webhookId}, ${eventType},
-        ${JSON.stringify(payload)}::jsonb,
-        ${statusCode}, ${responseBody}, ${attempt}, ${success},
-        ${errorMessage}, NOW()
-      )
-    `);
+    try {
+      await db.execute(sql`
+        INSERT INTO workflow_webhook_deliveries
+          (id, org_id, webhook_id, event_type, payload, status_code, response_body, attempt, success, error_message, delivered_at)
+        VALUES (
+          ${id}, ${orgId}, ${webhookId}, ${eventType},
+          ${JSON.stringify(payload)}::jsonb,
+          ${statusCode}, ${responseBody}, ${attempt}, ${success},
+          ${errorMessage}, NOW()
+        )
+      `);
+    } catch (err) {
+      if (!isDroppedTableError(err)) throw err;
+    }
   }
 
   async listWebhooks(orgId: string) {
-    const result = await db.execute(sql`
-      SELECT id, name, url, event_types, is_active, created_at
-      FROM workflow_webhooks
-      WHERE org_id = ${orgId}
-      ORDER BY created_at DESC
-    `);
-    return ((result as any).rows || []).map((r: any) => ({
-      id: r.id,
-      name: r.name,
-      url: r.url,
-      eventTypes: r.event_types,
-      isActive: r.is_active,
-      createdAt: r.created_at,
-    }));
+    try {
+      const result = await db.execute(sql`
+        SELECT id, name, url, event_types, is_active, created_at
+        FROM workflow_webhooks
+        WHERE org_id = ${orgId}
+        ORDER BY created_at DESC
+      `);
+      return ((result as any).rows || []).map((r: any) => ({
+        id: r.id,
+        name: r.name,
+        url: r.url,
+        eventTypes: r.event_types,
+        isActive: r.is_active,
+        createdAt: r.created_at,
+      }));
+    } catch (err) {
+      if (isDroppedTableError(err)) return [];
+      throw err;
+    }
   }
 
   async getWebhookDeliveryLog(orgId: string, webhookId: string): Promise<WebhookDelivery[]> {
-    const result = await db.execute(sql`
-      SELECT id, webhook_id, event_type, payload, status_code, response_body,
-             attempt, success, delivered_at, error_message
-      FROM workflow_webhook_deliveries
-      WHERE org_id = ${orgId} AND webhook_id = ${webhookId}
-      ORDER BY delivered_at DESC
-      LIMIT 100
-    `);
-    return ((result as any).rows || []).map((r: any) => ({
-      id: r.id,
-      webhookId: r.webhook_id,
-      eventType: r.event_type,
-      payload: r.payload,
-      statusCode: r.status_code,
-      responseBody: r.response_body,
-      attempt: r.attempt,
-      success: r.success,
-      deliveredAt: r.delivered_at,
-      errorMessage: r.error_message,
-    }));
+    try {
+      const result = await db.execute(sql`
+        SELECT id, webhook_id, event_type, payload, status_code, response_body,
+               attempt, success, delivered_at, error_message
+        FROM workflow_webhook_deliveries
+        WHERE org_id = ${orgId} AND webhook_id = ${webhookId}
+        ORDER BY delivered_at DESC
+        LIMIT 100
+      `);
+      return ((result as any).rows || []).map((r: any) => ({
+        id: r.id,
+        webhookId: r.webhook_id,
+        eventType: r.event_type,
+        payload: r.payload,
+        statusCode: r.status_code,
+        responseBody: r.response_body,
+        attempt: r.attempt,
+        success: r.success,
+        deliveredAt: r.delivered_at,
+        errorMessage: r.error_message,
+      }));
+    } catch (err) {
+      if (isDroppedTableError(err)) return [];
+      throw err;
+    }
   }
 
   async testWebhook(orgId: string, webhookId: string) {
@@ -270,23 +296,34 @@ class WorkflowEnhancements {
 
   async configureSlack(orgId: string, webhookUrl: string, channel: string) {
     const id = crypto.randomUUID();
-    await db.execute(sql`
-      INSERT INTO workflow_notification_channels (id, org_id, provider, webhook_url, channel, is_active, created_at, updated_at)
-      VALUES (${id}, ${orgId}, 'slack', ${webhookUrl}, ${channel}, true, NOW(), NOW())
-      ON CONFLICT (org_id, provider, channel)
-      DO UPDATE SET webhook_url = ${webhookUrl}, is_active = true, updated_at = NOW()
-    `);
+    try {
+      await db.execute(sql`
+        INSERT INTO workflow_notification_channels (id, org_id, provider, webhook_url, channel, is_active, created_at, updated_at)
+        VALUES (${id}, ${orgId}, 'slack', ${webhookUrl}, ${channel}, true, NOW(), NOW())
+        ON CONFLICT (org_id, provider, channel)
+        DO UPDATE SET webhook_url = ${webhookUrl}, is_active = true, updated_at = NOW()
+      `);
+    } catch (err) {
+      if (isDroppedTableError(err)) throw new Error('Workflow notification feature is unavailable (backing table removed)');
+      throw err;
+    }
     logger.info({ orgId, channel }, '[WorkflowEnhancements] Slack configured');
     return { id, provider: 'slack', channel, isActive: true };
   }
 
   async sendSlackNotification(orgId: string, message: string, channel?: string) {
-    const result = await db.execute(sql`
-      SELECT id, webhook_url, channel FROM workflow_notification_channels
-      WHERE org_id = ${orgId} AND provider = 'slack' AND is_active = true
-      ${channel ? sql`AND channel = ${channel}` : sql``}
-      LIMIT 1
-    `);
+    let result: any;
+    try {
+      result = await db.execute(sql`
+        SELECT id, webhook_url, channel FROM workflow_notification_channels
+        WHERE org_id = ${orgId} AND provider = 'slack' AND is_active = true
+        ${channel ? sql`AND channel = ${channel}` : sql``}
+        LIMIT 1
+      `);
+    } catch (err) {
+      if (isDroppedTableError(err)) throw new Error('Workflow notification feature is unavailable (backing table removed)');
+      throw err;
+    }
     const config = (result as any).rows?.[0];
     if (!config) throw new Error('Slack not configured for this organization');
 
@@ -324,32 +361,47 @@ class WorkflowEnhancements {
       logger.error({ orgId, status: response.status, body }, '[WorkflowEnhancements] Slack notification failed');
     }
 
-    await db.execute(sql`
-      INSERT INTO workflow_notification_log (id, org_id, channel_id, provider, message, success, sent_at)
-      VALUES (${crypto.randomUUID()}, ${orgId}, ${config.id}, 'slack', ${message}, ${success}, NOW())
-    `);
+    try {
+      await db.execute(sql`
+        INSERT INTO workflow_notification_log (id, org_id, channel_id, provider, message, success, sent_at)
+        VALUES (${crypto.randomUUID()}, ${orgId}, ${config.id}, 'slack', ${message}, ${success}, NOW())
+      `);
+    } catch (err) {
+      if (!isDroppedTableError(err)) throw err;
+    }
 
     return { success, provider: 'slack', channel: config.channel };
   }
 
   async configureTeams(orgId: string, webhookUrl: string) {
     const id = crypto.randomUUID();
-    await db.execute(sql`
-      INSERT INTO workflow_notification_channels (id, org_id, provider, webhook_url, channel, is_active, created_at, updated_at)
-      VALUES (${id}, ${orgId}, 'teams', ${webhookUrl}, 'default', true, NOW(), NOW())
-      ON CONFLICT (org_id, provider, channel)
-      DO UPDATE SET webhook_url = ${webhookUrl}, is_active = true, updated_at = NOW()
-    `);
+    try {
+      await db.execute(sql`
+        INSERT INTO workflow_notification_channels (id, org_id, provider, webhook_url, channel, is_active, created_at, updated_at)
+        VALUES (${id}, ${orgId}, 'teams', ${webhookUrl}, 'default', true, NOW(), NOW())
+        ON CONFLICT (org_id, provider, channel)
+        DO UPDATE SET webhook_url = ${webhookUrl}, is_active = true, updated_at = NOW()
+      `);
+    } catch (err) {
+      if (isDroppedTableError(err)) throw new Error('Workflow notification feature is unavailable (backing table removed)');
+      throw err;
+    }
     logger.info({ orgId }, '[WorkflowEnhancements] Teams configured');
     return { id, provider: 'teams', isActive: true };
   }
 
   async sendTeamsNotification(orgId: string, message: string) {
-    const result = await db.execute(sql`
-      SELECT id, webhook_url FROM workflow_notification_channels
-      WHERE org_id = ${orgId} AND provider = 'teams' AND is_active = true
-      LIMIT 1
-    `);
+    let result: any;
+    try {
+      result = await db.execute(sql`
+        SELECT id, webhook_url FROM workflow_notification_channels
+        WHERE org_id = ${orgId} AND provider = 'teams' AND is_active = true
+        LIMIT 1
+      `);
+    } catch (err) {
+      if (isDroppedTableError(err)) throw new Error('Workflow notification feature is unavailable (backing table removed)');
+      throw err;
+    }
     const config = (result as any).rows?.[0];
     if (!config) throw new Error('Teams not configured for this organization');
 
@@ -384,10 +436,14 @@ class WorkflowEnhancements {
       logger.error({ orgId, status: response.status, body }, '[WorkflowEnhancements] Teams notification failed');
     }
 
-    await db.execute(sql`
-      INSERT INTO workflow_notification_log (id, org_id, channel_id, provider, message, success, sent_at)
-      VALUES (${crypto.randomUUID()}, ${orgId}, ${config.id}, 'teams', ${message}, ${success}, NOW())
-    `);
+    try {
+      await db.execute(sql`
+        INSERT INTO workflow_notification_log (id, org_id, channel_id, provider, message, success, sent_at)
+        VALUES (${crypto.randomUUID()}, ${orgId}, ${config.id}, 'teams', ${message}, ${success}, NOW())
+      `);
+    } catch (err) {
+      if (!isDroppedTableError(err)) throw err;
+    }
 
     return { success, provider: 'teams' };
   }
@@ -400,15 +456,20 @@ class WorkflowEnhancements {
     const id = crypto.randomUUID();
     const nextRunAt = this.calculateNextRun(data.cronExpression, data.timezone);
 
-    await db.execute(sql`
-      INSERT INTO workflow_scheduled_triggers
-        (id, org_id, name, cron_expression, workflow_rule_id, entity_type, entity_id, timezone, next_run_at, is_active, created_at)
-      VALUES (
-        ${id}, ${orgId}, ${data.name}, ${data.cronExpression},
-        ${data.workflowRuleId}, ${data.entityType}, ${data.entityId || null},
-        ${data.timezone || 'UTC'}, ${nextRunAt.toISOString()}, true, NOW()
-      )
-    `);
+    try {
+      await db.execute(sql`
+        INSERT INTO workflow_scheduled_triggers
+          (id, org_id, name, cron_expression, workflow_rule_id, entity_type, entity_id, timezone, next_run_at, is_active, created_at)
+        VALUES (
+          ${id}, ${orgId}, ${data.name}, ${data.cronExpression},
+          ${data.workflowRuleId}, ${data.entityType}, ${data.entityId || null},
+          ${data.timezone || 'UTC'}, ${nextRunAt.toISOString()}, true, NOW()
+        )
+      `);
+    } catch (err) {
+      if (isDroppedTableError(err)) throw new Error('Workflow scheduling feature is unavailable (backing table removed)');
+      throw err;
+    }
 
     logger.info({ triggerId: id, orgId, cron: data.cronExpression }, '[WorkflowEnhancements] Scheduled trigger created');
     return { id, name: data.name, cronExpression: data.cronExpression, nextRunAt, isActive: true };
@@ -420,13 +481,19 @@ class WorkflowEnhancements {
    */
   async evaluateScheduledTriggers(): Promise<{ fired: number; errors: number }> {
     const now = new Date().toISOString();
-    const result = await db.execute(sql`
-      SELECT id, org_id, cron_expression, workflow_rule_id, entity_type, entity_id, timezone
-      FROM workflow_scheduled_triggers
-      WHERE is_active = true AND next_run_at <= ${now}
-      ORDER BY next_run_at ASC
-      LIMIT 100
-    `);
+    let result: any;
+    try {
+      result = await db.execute(sql`
+        SELECT id, org_id, cron_expression, workflow_rule_id, entity_type, entity_id, timezone
+        FROM workflow_scheduled_triggers
+        WHERE is_active = true AND next_run_at <= ${now}
+        ORDER BY next_run_at ASC
+        LIMIT 100
+      `);
+    } catch (err) {
+      if (isDroppedTableError(err)) return { fired: 0, errors: 0 };
+      throw err;
+    }
     const triggers = (result as any).rows || [];
 
     let fired = 0;
@@ -463,10 +530,14 @@ class WorkflowEnhancements {
         errors++;
         logger.error({ triggerId: trigger.id, err: err.message }, '[WorkflowEnhancements] Scheduled trigger failed');
 
-        await db.execute(sql`
-          INSERT INTO workflow_scheduled_executions (id, org_id, trigger_id, fired_at, status, error_message)
-          VALUES (${crypto.randomUUID()}, ${trigger.org_id}, ${trigger.id}, NOW(), 'error', ${err.message})
-        `);
+        try {
+          await db.execute(sql`
+            INSERT INTO workflow_scheduled_executions (id, org_id, trigger_id, fired_at, status, error_message)
+            VALUES (${crypto.randomUUID()}, ${trigger.org_id}, ${trigger.id}, NOW(), 'error', ${err.message})
+          `);
+        } catch (innerErr) {
+          if (!isDroppedTableError(innerErr)) throw innerErr;
+        }
       }
     }
 
@@ -477,50 +548,69 @@ class WorkflowEnhancements {
   }
 
   async listScheduledTriggers(orgId: string) {
-    const result = await db.execute(sql`
-      SELECT id, name, cron_expression, workflow_rule_id, action_config,
-             next_run_at, last_run_at, is_active, created_at
-      FROM workflow_scheduled_triggers
-      WHERE org_id = ${orgId}
-      ORDER BY created_at DESC
-    `);
-    return ((result as any).rows || []).map((r: any) => ({
-      id: r.id,
-      name: r.name,
-      cronExpression: r.cron_expression,
-      workflowRuleId: r.workflow_rule_id,
-      actionConfig: r.action_config,
-      nextRunAt: r.next_run_at,
-      lastRunAt: r.last_run_at,
-      isActive: r.is_active,
-      createdAt: r.created_at,
-    }));
+    try {
+      const result = await db.execute(sql`
+        SELECT id, name, cron_expression, workflow_rule_id, action_config,
+               next_run_at, last_run_at, is_active, created_at
+        FROM workflow_scheduled_triggers
+        WHERE org_id = ${orgId}
+        ORDER BY created_at DESC
+      `);
+      return ((result as any).rows || []).map((r: any) => ({
+        id: r.id,
+        name: r.name,
+        cronExpression: r.cron_expression,
+        workflowRuleId: r.workflow_rule_id,
+        actionConfig: r.action_config,
+        nextRunAt: r.next_run_at,
+        lastRunAt: r.last_run_at,
+        isActive: r.is_active,
+        createdAt: r.created_at,
+      }));
+    } catch (err) {
+      if (isDroppedTableError(err)) return [];
+      throw err;
+    }
   }
 
   async pauseScheduledTrigger(orgId: string, triggerId: string) {
-    await db.execute(sql`
-      UPDATE workflow_scheduled_triggers
-      SET is_active = false, updated_at = NOW()
-      WHERE id = ${triggerId} AND org_id = ${orgId}
-    `);
+    try {
+      await db.execute(sql`
+        UPDATE workflow_scheduled_triggers
+        SET is_active = false, updated_at = NOW()
+        WHERE id = ${triggerId} AND org_id = ${orgId}
+      `);
+    } catch (err) {
+      if (!isDroppedTableError(err)) throw err;
+    }
     logger.info({ triggerId, orgId }, '[WorkflowEnhancements] Scheduled trigger paused');
     return { triggerId, isActive: false };
   }
 
   async resumeScheduledTrigger(orgId: string, triggerId: string) {
-    const result = await db.execute(sql`
-      SELECT cron_expression, timezone FROM workflow_scheduled_triggers
-      WHERE id = ${triggerId} AND org_id = ${orgId}
-    `);
+    let result: any;
+    try {
+      result = await db.execute(sql`
+        SELECT cron_expression, timezone FROM workflow_scheduled_triggers
+        WHERE id = ${triggerId} AND org_id = ${orgId}
+      `);
+    } catch (err) {
+      if (isDroppedTableError(err)) throw new Error('Workflow scheduling feature is unavailable (backing table removed)');
+      throw err;
+    }
     const trigger = (result as any).rows?.[0];
     if (!trigger) throw new Error(`Scheduled trigger ${triggerId} not found`);
 
     const nextRun = this.calculateNextRun(trigger.cron_expression, trigger.timezone);
-    await db.execute(sql`
-      UPDATE workflow_scheduled_triggers
-      SET is_active = true, next_run_at = ${nextRun.toISOString()}, updated_at = NOW()
-      WHERE id = ${triggerId} AND org_id = ${orgId}
-    `);
+    try {
+      await db.execute(sql`
+        UPDATE workflow_scheduled_triggers
+        SET is_active = true, next_run_at = ${nextRun.toISOString()}, updated_at = NOW()
+        WHERE id = ${triggerId} AND org_id = ${orgId}
+      `);
+    } catch (err) {
+      if (!isDroppedTableError(err)) throw err;
+    }
     logger.info({ triggerId, orgId, nextRun }, '[WorkflowEnhancements] Scheduled trigger resumed');
     return { triggerId, isActive: true, nextRunAt: nextRun };
   }
@@ -612,36 +702,46 @@ class WorkflowEnhancements {
   async createWorkflowPipeline(orgId: string, data: PipelineDefinition) {
     const id = crypto.randomUUID();
 
-    await db.execute(sql`
-      INSERT INTO workflow_pipelines (id, org_id, name, description, steps, entry_step_id, is_active, created_at)
-      VALUES (
-        ${id}, ${orgId}, ${data.name}, ${data.description || null},
-        ${JSON.stringify(data.steps)}::jsonb,
-        ${data.entryStepId}, true, NOW()
-      )
-    `);
+    try {
+      await db.execute(sql`
+        INSERT INTO workflow_pipelines (id, org_id, name, description, steps, entry_step_id, is_active, created_at)
+        VALUES (
+          ${id}, ${orgId}, ${data.name}, ${data.description || null},
+          ${JSON.stringify(data.steps)}::jsonb,
+          ${data.entryStepId}, true, NOW()
+        )
+      `);
+    } catch (err) {
+      if (isDroppedTableError(err)) throw new Error('Workflow pipeline feature is unavailable (backing table removed)');
+      throw err;
+    }
 
     logger.info({ pipelineId: id, orgId, stepCount: data.steps.length }, '[WorkflowEnhancements] Pipeline created');
     return { id, name: data.name, stepCount: data.steps.length };
   }
 
   async listWorkflowPipelines(orgId: string) {
-    const result = await db.execute(sql`
-      SELECT id, name, description, steps, is_active, created_at
-      FROM workflow_pipelines
-      WHERE org_id = ${orgId}
-      ORDER BY created_at DESC
-    `);
-    return ((result as any).rows || []).map((r: any) => ({
-      id: r.id,
-      name: r.name,
-      description: r.description,
-      steps: typeof r.steps === 'string' ? JSON.parse(r.steps) : r.steps,
-      stepCount: Array.isArray(r.steps) ? r.steps.length :
-                 (typeof r.steps === 'string' ? (JSON.parse(r.steps)?.length ?? 0) : 0),
-      isActive: r.is_active,
-      createdAt: r.created_at,
-    }));
+    try {
+      const result = await db.execute(sql`
+        SELECT id, name, description, steps, is_active, created_at
+        FROM workflow_pipelines
+        WHERE org_id = ${orgId}
+        ORDER BY created_at DESC
+      `);
+      return ((result as any).rows || []).map((r: any) => ({
+        id: r.id,
+        name: r.name,
+        description: r.description,
+        steps: typeof r.steps === 'string' ? JSON.parse(r.steps) : r.steps,
+        stepCount: Array.isArray(r.steps) ? r.steps.length :
+                   (typeof r.steps === 'string' ? (JSON.parse(r.steps)?.length ?? 0) : 0),
+        isActive: r.is_active,
+        createdAt: r.created_at,
+      }));
+    } catch (err) {
+      if (isDroppedTableError(err)) return [];
+      throw err;
+    }
   }
 
   async executePipeline(
@@ -649,10 +749,16 @@ class WorkflowEnhancements {
     pipelineId: string,
     context: Record<string, any>,
   ): Promise<{ executionId: string; status: string; stepResults: any[] }> {
-    const pipelineResult = await db.execute(sql`
-      SELECT id, steps, entry_step_id FROM workflow_pipelines
-      WHERE id = ${pipelineId} AND org_id = ${orgId} AND is_active = true
-    `);
+    let pipelineResult: any;
+    try {
+      pipelineResult = await db.execute(sql`
+        SELECT id, steps, entry_step_id FROM workflow_pipelines
+        WHERE id = ${pipelineId} AND org_id = ${orgId} AND is_active = true
+      `);
+    } catch (err) {
+      if (isDroppedTableError(err)) throw new Error('Workflow pipeline feature is unavailable (backing table removed)');
+      throw err;
+    }
     const pipeline = (pipelineResult as any).rows?.[0];
     if (!pipeline) throw new Error(`Pipeline ${pipelineId} not found or inactive`);
 
@@ -671,15 +777,20 @@ class WorkflowEnhancements {
       output: any;
     }> = [];
 
-    await db.execute(sql`
-      INSERT INTO workflow_pipeline_executions
-        (id, org_id, pipeline_id, context, status, step_results, started_at)
-      VALUES (
-        ${executionId}, ${orgId}, ${pipelineId},
-        ${JSON.stringify(context)}::jsonb, 'running',
-        '[]'::jsonb, NOW()
-      )
-    `);
+    try {
+      await db.execute(sql`
+        INSERT INTO workflow_pipeline_executions
+          (id, org_id, pipeline_id, context, status, step_results, started_at)
+        VALUES (
+          ${executionId}, ${orgId}, ${pipelineId},
+          ${JSON.stringify(context)}::jsonb, 'running',
+          '[]'::jsonb, NOW()
+        )
+      `);
+    } catch (err) {
+      if (isDroppedTableError(err)) throw new Error('Workflow pipeline feature is unavailable (backing table removed)');
+      throw err;
+    }
 
     let currentStepId: string | null = pipeline.entry_step_id;
     let overallStatus = 'completed';
@@ -735,14 +846,18 @@ class WorkflowEnhancements {
               stepStatus = 'waiting';
               overallStatus = 'waiting';
               // Persist current position so the pipeline can resume
-              await db.execute(sql`
-                UPDATE workflow_pipeline_executions
-                SET status = 'waiting',
-                    current_step_id = ${currentStepId},
-                    resume_at = ${stepOutput.scheduledResumeAt},
-                    step_results = ${JSON.stringify([...stepResults, { stepId: step.id, stepName: step.name, type: step.type, status: stepStatus, startedAt: stepStart, completedAt: new Date().toISOString(), output: stepOutput }])}::jsonb
-                WHERE id = ${executionId}
-              `);
+              try {
+                await db.execute(sql`
+                  UPDATE workflow_pipeline_executions
+                  SET status = 'waiting',
+                      current_step_id = ${currentStepId},
+                      resume_at = ${stepOutput.scheduledResumeAt},
+                      step_results = ${JSON.stringify([...stepResults, { stepId: step.id, stepName: step.name, type: step.type, status: stepStatus, startedAt: stepStart, completedAt: new Date().toISOString(), output: stepOutput }])}::jsonb
+                  WHERE id = ${executionId}
+                `);
+              } catch (err) {
+                if (!isDroppedTableError(err)) throw err;
+              }
               stepResults.push({ stepId: step.id, stepName: step.name, type: step.type, status: stepStatus, startedAt: stepStart, completedAt: new Date().toISOString(), output: stepOutput });
               // Exit the loop — a resume job will continue from here
               currentStepId = null;
@@ -766,13 +881,17 @@ class WorkflowEnhancements {
             stepStatus = 'pending_approval';
             overallStatus = 'pending_approval';
 
-            await db.execute(sql`
-              UPDATE workflow_pipeline_executions
-              SET status = 'pending_approval',
-                  current_step_id = ${currentStepId},
-                  step_results = ${JSON.stringify([...stepResults, { stepId: step.id, stepName: step.name, type: step.type, status: stepStatus, startedAt: stepStart, completedAt: null, output: stepOutput }])}::jsonb
-              WHERE id = ${executionId}
-            `);
+            try {
+              await db.execute(sql`
+                UPDATE workflow_pipeline_executions
+                SET status = 'pending_approval',
+                    current_step_id = ${currentStepId},
+                    step_results = ${JSON.stringify([...stepResults, { stepId: step.id, stepName: step.name, type: step.type, status: stepStatus, startedAt: stepStart, completedAt: null, output: stepOutput }])}::jsonb
+                WHERE id = ${executionId}
+              `);
+            } catch (err) {
+              if (!isDroppedTableError(err)) throw err;
+            }
             stepResults.push({ stepId: step.id, stepName: step.name, type: step.type, status: stepStatus, startedAt: stepStart, completedAt: null, output: stepOutput });
             currentStepId = null;
             continue;
@@ -821,27 +940,37 @@ class WorkflowEnhancements {
     }
 
     // Persist final execution state
-    await db.execute(sql`
-      UPDATE workflow_pipeline_executions
-      SET status = ${overallStatus},
-          step_results = ${JSON.stringify(stepResults)}::jsonb,
-          completed_at = ${overallStatus === 'completed' || overallStatus === 'failed' ? new Date().toISOString() : null}
-      WHERE id = ${executionId}
-    `);
+    try {
+      await db.execute(sql`
+        UPDATE workflow_pipeline_executions
+        SET status = ${overallStatus},
+            step_results = ${JSON.stringify(stepResults)}::jsonb,
+            completed_at = ${overallStatus === 'completed' || overallStatus === 'failed' ? new Date().toISOString() : null}
+        WHERE id = ${executionId}
+      `);
+    } catch (err) {
+      if (!isDroppedTableError(err)) throw err;
+    }
 
     logger.info({ executionId, pipelineId, status: overallStatus, steps: stepResults.length }, '[WorkflowEnhancements] Pipeline execution');
     return { executionId, status: overallStatus, stepResults };
   }
 
   async getPipelineExecution(orgId: string, executionId: string) {
-    const result = await db.execute(sql`
-      SELECT e.id, e.pipeline_id, e.context, e.status, e.step_results,
-             e.current_step_id, e.resume_at, e.started_at, e.completed_at,
-             p.name AS pipeline_name
-      FROM workflow_pipeline_executions e
-      JOIN workflow_pipelines p ON p.id = e.pipeline_id
-      WHERE e.id = ${executionId} AND e.org_id = ${orgId}
-    `);
+    let result: any;
+    try {
+      result = await db.execute(sql`
+        SELECT e.id, e.pipeline_id, e.context, e.status, e.step_results,
+               e.current_step_id, e.resume_at, e.started_at, e.completed_at,
+               p.name AS pipeline_name
+        FROM workflow_pipeline_executions e
+        JOIN workflow_pipelines p ON p.id = e.pipeline_id
+        WHERE e.id = ${executionId} AND e.org_id = ${orgId}
+      `);
+    } catch (err) {
+      if (isDroppedTableError(err)) throw new Error('Workflow pipeline feature is unavailable (backing table removed)');
+      throw err;
+    }
     const row = (result as any).rows?.[0];
     if (!row) throw new Error(`Pipeline execution ${executionId} not found`);
 
@@ -869,46 +998,67 @@ class WorkflowEnhancements {
       ? new Date(Date.now() + data.escalateAfterMinutes * 60000).toISOString()
       : null;
 
-    await db.execute(sql`
-      INSERT INTO workflow_approval_requests
-        (id, org_id, workflow_execution_id, pipeline_step_id, title, description,
-         required_approvers, escalate_after_minutes, escalate_to, escalate_at,
-         entity_type, entity_id, status, created_at)
-      VALUES (
-        ${id}, ${orgId}, ${data.workflowExecutionId || null}, ${data.pipelineStepId || null},
-        ${data.title}, ${data.description || null},
-        ${JSON.stringify(data.requiredApprovers)}::jsonb,
-        ${data.escalateAfterMinutes || null}, ${data.escalateTo || null}, ${escalateAt},
-        ${data.entityType || null}, ${data.entityId || null},
-        'pending', NOW()
-      )
-    `);
+    try {
+      await db.execute(sql`
+        INSERT INTO workflow_approval_requests
+          (id, org_id, workflow_execution_id, pipeline_step_id, title, description,
+           required_approvers, escalate_after_minutes, escalate_to, escalate_at,
+           entity_type, entity_id, status, created_at)
+        VALUES (
+          ${id}, ${orgId}, ${data.workflowExecutionId || null}, ${data.pipelineStepId || null},
+          ${data.title}, ${data.description || null},
+          ${JSON.stringify(data.requiredApprovers)}::jsonb,
+          ${data.escalateAfterMinutes || null}, ${data.escalateTo || null}, ${escalateAt},
+          ${data.entityType || null}, ${data.entityId || null},
+          'pending', NOW()
+        )
+      `);
+    } catch (err) {
+      if (isDroppedTableError(err)) throw new Error('Workflow approval feature is unavailable (backing table removed)');
+      throw err;
+    }
 
     logger.info({ approvalId: id, orgId, title: data.title }, '[WorkflowEnhancements] Approval requested');
     return id;
   }
 
   async approveRequest(orgId: string, approvalId: string, userId: string) {
-    const result = await db.execute(sql`
-      SELECT id, status, workflow_execution_id, pipeline_step_id, required_approvers
-      FROM workflow_approval_requests
-      WHERE id = ${approvalId} AND org_id = ${orgId}
-    `);
+    let result: any;
+    try {
+      result = await db.execute(sql`
+        SELECT id, status, workflow_execution_id, pipeline_step_id, required_approvers
+        FROM workflow_approval_requests
+        WHERE id = ${approvalId} AND org_id = ${orgId}
+      `);
+    } catch (err) {
+      if (isDroppedTableError(err)) throw new Error('Workflow approval feature is unavailable (backing table removed)');
+      throw err;
+    }
     const request = (result as any).rows?.[0];
     if (!request) throw new Error(`Approval request ${approvalId} not found`);
     if (request.status !== 'pending') throw new Error(`Approval already ${request.status}`);
 
     // Record the approval action
-    await db.execute(sql`
-      INSERT INTO workflow_approval_actions (id, org_id, approval_id, user_id, action, created_at)
-      VALUES (${crypto.randomUUID()}, ${orgId}, ${approvalId}, ${userId}, 'approved', NOW())
-    `);
+    try {
+      await db.execute(sql`
+        INSERT INTO workflow_approval_actions (id, org_id, approval_id, user_id, action, created_at)
+        VALUES (${crypto.randomUUID()}, ${orgId}, ${approvalId}, ${userId}, 'approved', NOW())
+      `);
+    } catch (err) {
+      if (!isDroppedTableError(err)) throw err;
+    }
 
     // Check if all required approvers have approved
-    const actionsResult = await db.execute(sql`
-      SELECT user_id FROM workflow_approval_actions
-      WHERE approval_id = ${approvalId} AND action = 'approved'
-    `);
+    let actionsResult: any;
+    try {
+      actionsResult = await db.execute(sql`
+        SELECT user_id FROM workflow_approval_actions
+        WHERE approval_id = ${approvalId} AND action = 'approved'
+      `);
+    } catch (err) {
+      if (isDroppedTableError(err)) actionsResult = { rows: [] };
+      else throw err;
+    }
     const approvedBy = ((actionsResult as any).rows || []).map((r: any) => r.user_id);
     const requiredApprovers = typeof request.required_approvers === 'string'
       ? JSON.parse(request.required_approvers) : request.required_approvers;
@@ -918,11 +1068,15 @@ class WorkflowEnhancements {
       : true; // If no specific approvers required, one approval suffices
 
     if (allApproved) {
-      await db.execute(sql`
-        UPDATE workflow_approval_requests
-        SET status = 'approved', resolved_at = NOW()
-        WHERE id = ${approvalId}
-      `);
+      try {
+        await db.execute(sql`
+          UPDATE workflow_approval_requests
+          SET status = 'approved', resolved_at = NOW()
+          WHERE id = ${approvalId}
+        `);
+      } catch (err) {
+        if (!isDroppedTableError(err)) throw err;
+      }
 
       // If linked to a pipeline execution, resume it
       if (request.workflow_execution_id) {
@@ -935,32 +1089,50 @@ class WorkflowEnhancements {
   }
 
   async rejectRequest(orgId: string, approvalId: string, userId: string, reason: string) {
-    const result = await db.execute(sql`
-      SELECT id, status, workflow_execution_id FROM workflow_approval_requests
-      WHERE id = ${approvalId} AND org_id = ${orgId}
-    `);
+    let result: any;
+    try {
+      result = await db.execute(sql`
+        SELECT id, status, workflow_execution_id FROM workflow_approval_requests
+        WHERE id = ${approvalId} AND org_id = ${orgId}
+      `);
+    } catch (err) {
+      if (isDroppedTableError(err)) throw new Error('Workflow approval feature is unavailable (backing table removed)');
+      throw err;
+    }
     const request = (result as any).rows?.[0];
     if (!request) throw new Error(`Approval request ${approvalId} not found`);
     if (request.status !== 'pending') throw new Error(`Approval already ${request.status}`);
 
-    await db.execute(sql`
-      INSERT INTO workflow_approval_actions (id, org_id, approval_id, user_id, action, reason, created_at)
-      VALUES (${crypto.randomUUID()}, ${orgId}, ${approvalId}, ${userId}, 'rejected', ${reason}, NOW())
-    `);
+    try {
+      await db.execute(sql`
+        INSERT INTO workflow_approval_actions (id, org_id, approval_id, user_id, action, reason, created_at)
+        VALUES (${crypto.randomUUID()}, ${orgId}, ${approvalId}, ${userId}, 'rejected', ${reason}, NOW())
+      `);
+    } catch (err) {
+      if (!isDroppedTableError(err)) throw err;
+    }
 
-    await db.execute(sql`
-      UPDATE workflow_approval_requests
-      SET status = 'rejected', rejection_reason = ${reason}, resolved_at = NOW()
-      WHERE id = ${approvalId}
-    `);
+    try {
+      await db.execute(sql`
+        UPDATE workflow_approval_requests
+        SET status = 'rejected', rejection_reason = ${reason}, resolved_at = NOW()
+        WHERE id = ${approvalId}
+      `);
+    } catch (err) {
+      if (!isDroppedTableError(err)) throw err;
+    }
 
     // If linked to a pipeline, mark execution as rejected
     if (request.workflow_execution_id) {
-      await db.execute(sql`
-        UPDATE workflow_pipeline_executions
-        SET status = 'rejected', completed_at = NOW()
-        WHERE id = ${request.workflow_execution_id}
-      `);
+      try {
+        await db.execute(sql`
+          UPDATE workflow_pipeline_executions
+          SET status = 'rejected', completed_at = NOW()
+          WHERE id = ${request.workflow_execution_id}
+        `);
+      } catch (err) {
+        if (!isDroppedTableError(err)) throw err;
+      }
     }
 
     logger.info({ approvalId, userId, reason }, '[WorkflowEnhancements] Approval rejected');
@@ -968,28 +1140,33 @@ class WorkflowEnhancements {
   }
 
   async getApprovalQueue(orgId: string, userId: string) {
-    const result = await db.execute(sql`
-      SELECT r.id, r.title, r.description, r.entity_type, r.entity_id,
-             r.required_approvers, r.escalate_at, r.created_at, r.status
-      FROM workflow_approval_requests r
-      WHERE r.org_id = ${orgId} AND r.status = 'pending'
-        AND (
-          r.required_approvers::jsonb ? ${userId}
-          OR jsonb_array_length(r.required_approvers) = 0
-        )
-      ORDER BY r.created_at ASC
-    `);
-    return ((result as any).rows || []).map((r: any) => ({
-      id: r.id,
-      title: r.title,
-      description: r.description,
-      entityType: r.entity_type,
-      entityId: r.entity_id,
-      requiredApprovers: r.required_approvers,
-      escalateAt: r.escalate_at,
-      createdAt: r.created_at,
-      status: r.status,
-    }));
+    try {
+      const result = await db.execute(sql`
+        SELECT r.id, r.title, r.description, r.entity_type, r.entity_id,
+               r.required_approvers, r.escalate_at, r.created_at, r.status
+        FROM workflow_approval_requests r
+        WHERE r.org_id = ${orgId} AND r.status = 'pending'
+          AND (
+            r.required_approvers::jsonb ? ${userId}
+            OR jsonb_array_length(r.required_approvers) = 0
+          )
+        ORDER BY r.created_at ASC
+      `);
+      return ((result as any).rows || []).map((r: any) => ({
+        id: r.id,
+        title: r.title,
+        description: r.description,
+        entityType: r.entity_type,
+        entityId: r.entity_id,
+        requiredApprovers: r.required_approvers,
+        escalateAt: r.escalate_at,
+        createdAt: r.created_at,
+        status: r.status,
+      }));
+    } catch (err) {
+      if (isDroppedTableError(err)) return [];
+      throw err;
+    }
   }
 
   /**
@@ -998,23 +1175,33 @@ class WorkflowEnhancements {
    */
   async processEscalations(): Promise<number> {
     const now = new Date().toISOString();
-    const result = await db.execute(sql`
-      SELECT id, org_id, title, escalate_to
-      FROM workflow_approval_requests
-      WHERE status = 'pending' AND escalate_at IS NOT NULL AND escalate_at <= ${now}
-        AND escalated = false
-    `);
-    const overdue = (result as any).rows || [];
+    let overdue: any[] = [];
+    try {
+      const result = await db.execute(sql`
+        SELECT id, org_id, title, escalate_to
+        FROM workflow_approval_requests
+        WHERE status = 'pending' AND escalate_at IS NOT NULL AND escalate_at <= ${now}
+          AND escalated = false
+      `);
+      overdue = (result as any).rows || [];
+    } catch (err) {
+      if (isDroppedTableError(err)) return 0;
+      throw err;
+    }
 
     for (const request of overdue) {
       if (request.escalate_to) {
         // Add the escalation target to required approvers
-        await db.execute(sql`
-          UPDATE workflow_approval_requests
-          SET required_approvers = required_approvers || ${JSON.stringify([request.escalate_to])}::jsonb,
-              escalated = true, escalated_at = NOW()
-          WHERE id = ${request.id}
-        `);
+        try {
+          await db.execute(sql`
+            UPDATE workflow_approval_requests
+            SET required_approvers = required_approvers || ${JSON.stringify([request.escalate_to])}::jsonb,
+                escalated = true, escalated_at = NOW()
+            WHERE id = ${request.id}
+          `);
+        } catch (err) {
+          if (!isDroppedTableError(err)) throw err;
+        }
 
         logger.info({ approvalId: request.id, escalateTo: request.escalate_to }, '[WorkflowEnhancements] Approval escalated');
       }
@@ -1024,13 +1211,25 @@ class WorkflowEnhancements {
   }
 
   private async resumePipelineAfterApproval(orgId: string, executionId: string, approvedStepId: string) {
-    const execution = await this.getPipelineExecution(orgId, executionId);
+    let execution: any;
+    try {
+      execution = await this.getPipelineExecution(orgId, executionId);
+    } catch (err) {
+      if (isDroppedTableError(err)) return;
+      throw err;
+    }
     if (execution.status !== 'pending_approval') return;
 
     // Find the approved step and get its onSuccess next step
-    const pipelineResult = await db.execute(sql`
-      SELECT steps FROM workflow_pipelines WHERE id = ${execution.pipelineId}
-    `);
+    let pipelineResult: any;
+    try {
+      pipelineResult = await db.execute(sql`
+        SELECT steps FROM workflow_pipelines WHERE id = ${execution.pipelineId}
+      `);
+    } catch (err) {
+      if (isDroppedTableError(err)) return;
+      throw err;
+    }
     const pipeline = (pipelineResult as any).rows?.[0];
     if (!pipeline) return;
 
@@ -1040,19 +1239,27 @@ class WorkflowEnhancements {
 
     if (approvedStep?.onSuccess) {
       // Re-execute the pipeline from the next step
-      await db.execute(sql`
-        UPDATE workflow_pipeline_executions
-        SET status = 'running', current_step_id = ${approvedStep.onSuccess}
-        WHERE id = ${executionId}
-      `);
+      try {
+        await db.execute(sql`
+          UPDATE workflow_pipeline_executions
+          SET status = 'running', current_step_id = ${approvedStep.onSuccess}
+          WHERE id = ${executionId}
+        `);
+      } catch (err) {
+        if (!isDroppedTableError(err)) throw err;
+      }
       // In production, this would trigger a job queue entry to continue execution
       logger.info({ executionId, nextStep: approvedStep.onSuccess }, '[WorkflowEnhancements] Pipeline resumed after approval');
     } else {
-      await db.execute(sql`
-        UPDATE workflow_pipeline_executions
-        SET status = 'completed', completed_at = NOW()
-        WHERE id = ${executionId}
-      `);
+      try {
+        await db.execute(sql`
+          UPDATE workflow_pipeline_executions
+          SET status = 'completed', completed_at = NOW()
+          WHERE id = ${executionId}
+        `);
+      } catch (err) {
+        if (!isDroppedTableError(err)) throw err;
+      }
     }
   }
 
@@ -1061,143 +1268,163 @@ class WorkflowEnhancements {
   // ═══════════════════════════════════════════════════════════════════════════
 
   async getWorkflowExecutionStats(orgId: string, dateRange: { start: string; end: string }) {
-    const result = await db.execute(sql`
-      SELECT
-        COUNT(*)::int AS total_executions,
-        COUNT(*) FILTER (WHERE status = 'success')::int AS successful,
-        COUNT(*) FILTER (WHERE status = 'failed')::int AS failed,
-        COUNT(*) FILTER (WHERE status = 'skipped')::int AS skipped,
-        ROUND(
-          COUNT(*) FILTER (WHERE status = 'success')::numeric /
-          NULLIF(COUNT(*) FILTER (WHERE status IN ('success', 'failed'))::numeric, 0) * 100,
-          1
-        ) AS success_rate,
-        ROUND(AVG(
-          EXTRACT(EPOCH FROM (completed_at - created_at))
-        ) FILTER (WHERE completed_at IS NOT NULL), 2) AS avg_duration_seconds
-      FROM workflow_execution_log
-      WHERE org_id = ${orgId}
-        AND created_at >= ${dateRange.start}::timestamp
-        AND created_at <= ${dateRange.end}::timestamp
-    `);
-    const row = (result as any).rows?.[0] || {};
-
-    return {
-      totalExecutions: row.total_executions || 0,
-      successful: row.successful || 0,
-      failed: row.failed || 0,
-      skipped: row.skipped || 0,
-      successRate: parseFloat(row.success_rate) || 0,
-      avgDurationSeconds: parseFloat(row.avg_duration_seconds) || 0,
-    };
+    try {
+      const result = await db.execute(sql`
+        SELECT
+          COUNT(*)::int AS total_executions,
+          COUNT(*) FILTER (WHERE status = 'success')::int AS successful,
+          COUNT(*) FILTER (WHERE status = 'failed')::int AS failed,
+          COUNT(*) FILTER (WHERE status = 'skipped')::int AS skipped,
+          ROUND(
+            COUNT(*) FILTER (WHERE status = 'success')::numeric /
+            NULLIF(COUNT(*) FILTER (WHERE status IN ('success', 'failed'))::numeric, 0) * 100,
+            1
+          ) AS success_rate,
+          ROUND(AVG(
+            EXTRACT(EPOCH FROM (completed_at - created_at))
+          ) FILTER (WHERE completed_at IS NOT NULL), 2) AS avg_duration_seconds
+        FROM workflow_execution_log
+        WHERE org_id = ${orgId}
+          AND created_at >= ${dateRange.start}::timestamp
+          AND created_at <= ${dateRange.end}::timestamp
+      `);
+      const row = (result as any).rows?.[0] || {};
+      return {
+        totalExecutions: row.total_executions || 0,
+        successful: row.successful || 0,
+        failed: row.failed || 0,
+        skipped: row.skipped || 0,
+        successRate: parseFloat(row.success_rate) || 0,
+        avgDurationSeconds: parseFloat(row.avg_duration_seconds) || 0,
+      };
+    } catch (err) {
+      if (isDroppedTableError(err)) return { totalExecutions: 0, successful: 0, failed: 0, skipped: 0, successRate: 0, avgDurationSeconds: 0 };
+      throw err;
+    }
   }
 
   async getTopWorkflows(orgId: string, dateRange: { start: string; end: string }) {
-    const result = await db.execute(sql`
-      SELECT
-        e.automation_id,
-        a.name AS workflow_name,
-        a.trigger_type,
-        COUNT(*)::int AS execution_count,
-        COUNT(*) FILTER (WHERE e.status = 'success')::int AS success_count,
-        COUNT(*) FILTER (WHERE e.status = 'failed')::int AS failure_count
-      FROM workflow_execution_log e
-      LEFT JOIN workflow_automations a ON a.id = e.automation_id
-      WHERE e.org_id = ${orgId}
-        AND e.created_at >= ${dateRange.start}::timestamp
-        AND e.created_at <= ${dateRange.end}::timestamp
-      GROUP BY e.automation_id, a.name, a.trigger_type
-      ORDER BY execution_count DESC
-      LIMIT 20
-    `);
-
-    return ((result as any).rows || []).map((r: any) => ({
-      automationId: r.automation_id,
-      workflowName: r.workflow_name,
-      triggerType: r.trigger_type,
-      executionCount: r.execution_count,
-      successCount: r.success_count,
-      failureCount: r.failure_count,
-    }));
+    try {
+      const result = await db.execute(sql`
+        SELECT
+          e.automation_id,
+          a.name AS workflow_name,
+          a.trigger_type,
+          COUNT(*)::int AS execution_count,
+          COUNT(*) FILTER (WHERE e.status = 'success')::int AS success_count,
+          COUNT(*) FILTER (WHERE e.status = 'failed')::int AS failure_count
+        FROM workflow_execution_log e
+        LEFT JOIN workflow_automations a ON a.id = e.automation_id
+        WHERE e.org_id = ${orgId}
+          AND e.created_at >= ${dateRange.start}::timestamp
+          AND e.created_at <= ${dateRange.end}::timestamp
+        GROUP BY e.automation_id, a.name, a.trigger_type
+        ORDER BY execution_count DESC
+        LIMIT 20
+      `);
+      return ((result as any).rows || []).map((r: any) => ({
+        automationId: r.automation_id,
+        workflowName: r.workflow_name,
+        triggerType: r.trigger_type,
+        executionCount: r.execution_count,
+        successCount: r.success_count,
+        failureCount: r.failure_count,
+      }));
+    } catch (err) {
+      if (isDroppedTableError(err)) return [];
+      throw err;
+    }
   }
 
   async getFailureAnalysis(orgId: string, dateRange: { start: string; end: string }) {
-    const result = await db.execute(sql`
-      SELECT
-        e.automation_id,
-        a.name AS workflow_name,
-        e.error_message,
-        COUNT(*)::int AS occurrence_count,
-        MAX(e.created_at) AS last_occurred
-      FROM workflow_execution_log e
-      LEFT JOIN workflow_automations a ON a.id = e.automation_id
-      WHERE e.org_id = ${orgId}
-        AND e.status = 'failed'
-        AND e.created_at >= ${dateRange.start}::timestamp
-        AND e.created_at <= ${dateRange.end}::timestamp
-      GROUP BY e.automation_id, a.name, e.error_message
-      ORDER BY occurrence_count DESC
-      LIMIT 50
-    `);
-
-    return ((result as any).rows || []).map((r: any) => ({
-      automationId: r.automation_id,
-      workflowName: r.workflow_name,
-      errorMessage: r.error_message,
-      occurrenceCount: r.occurrence_count,
-      lastOccurred: r.last_occurred,
-    }));
+    try {
+      const result = await db.execute(sql`
+        SELECT
+          e.automation_id,
+          a.name AS workflow_name,
+          e.error_message,
+          COUNT(*)::int AS occurrence_count,
+          MAX(e.created_at) AS last_occurred
+        FROM workflow_execution_log e
+        LEFT JOIN workflow_automations a ON a.id = e.automation_id
+        WHERE e.org_id = ${orgId}
+          AND e.status = 'failed'
+          AND e.created_at >= ${dateRange.start}::timestamp
+          AND e.created_at <= ${dateRange.end}::timestamp
+        GROUP BY e.automation_id, a.name, e.error_message
+        ORDER BY occurrence_count DESC
+        LIMIT 50
+      `);
+      return ((result as any).rows || []).map((r: any) => ({
+        automationId: r.automation_id,
+        workflowName: r.workflow_name,
+        errorMessage: r.error_message,
+        occurrenceCount: r.occurrence_count,
+        lastOccurred: r.last_occurred,
+      }));
+    } catch (err) {
+      if (isDroppedTableError(err)) return [];
+      throw err;
+    }
   }
 
   async getExecutionTimeline(orgId: string, workflowId: string) {
-    const result = await db.execute(sql`
-      SELECT
-        id, automation_id, trigger_entity_type, trigger_entity_id,
-        status, actions_executed, error_message,
-        created_at, completed_at,
-        EXTRACT(EPOCH FROM (completed_at - created_at)) AS duration_seconds
-      FROM workflow_execution_log
-      WHERE org_id = ${orgId} AND automation_id = ${workflowId}
-      ORDER BY created_at DESC
-      LIMIT 100
-    `);
-
-    return ((result as any).rows || []).map((r: any) => ({
-      id: r.id,
-      automationId: r.automation_id,
-      triggerEntityType: r.trigger_entity_type,
-      triggerEntityId: r.trigger_entity_id,
-      status: r.status,
-      actionsExecuted: r.actions_executed,
-      errorMessage: r.error_message,
-      createdAt: r.created_at,
-      completedAt: r.completed_at,
-      durationSeconds: parseFloat(r.duration_seconds) || null,
-    }));
+    try {
+      const result = await db.execute(sql`
+        SELECT
+          id, automation_id, trigger_entity_type, trigger_entity_id,
+          status, actions_executed, error_message,
+          created_at, completed_at,
+          EXTRACT(EPOCH FROM (completed_at - created_at)) AS duration_seconds
+        FROM workflow_execution_log
+        WHERE org_id = ${orgId} AND automation_id = ${workflowId}
+        ORDER BY created_at DESC
+        LIMIT 100
+      `);
+      return ((result as any).rows || []).map((r: any) => ({
+        id: r.id,
+        automationId: r.automation_id,
+        triggerEntityType: r.trigger_entity_type,
+        triggerEntityId: r.trigger_entity_id,
+        status: r.status,
+        actionsExecuted: r.actions_executed,
+        errorMessage: r.error_message,
+        createdAt: r.created_at,
+        completedAt: r.completed_at,
+        durationSeconds: parseFloat(r.duration_seconds) || null,
+      }));
+    } catch (err) {
+      if (isDroppedTableError(err)) return [];
+      throw err;
+    }
   }
 
   async getActionBreakdown(orgId: string) {
-    const result = await db.execute(sql`
-      SELECT
-        action_elem->>'type' AS action_type,
-        COUNT(*)::int AS usage_count,
-        COUNT(*) FILTER (WHERE (action_elem->>'success')::boolean = true)::int AS success_count,
-        COUNT(*) FILTER (WHERE (action_elem->>'success')::boolean = false)::int AS failure_count
-      FROM workflow_execution_log,
-           jsonb_array_elements(actions_executed) AS action_elem
-      WHERE org_id = ${orgId}
-        AND actions_executed IS NOT NULL
-        AND status != 'skipped'
-      GROUP BY action_elem->>'type'
-      ORDER BY usage_count DESC
-    `);
-
-    return ((result as any).rows || []).map((r: any) => ({
-      actionType: r.action_type,
-      usageCount: r.usage_count,
-      successCount: r.success_count,
-      failureCount: r.failure_count,
-    }));
+    try {
+      const result = await db.execute(sql`
+        SELECT
+          action_elem->>'type' AS action_type,
+          COUNT(*)::int AS usage_count,
+          COUNT(*) FILTER (WHERE (action_elem->>'success')::boolean = true)::int AS success_count,
+          COUNT(*) FILTER (WHERE (action_elem->>'success')::boolean = false)::int AS failure_count
+        FROM workflow_execution_log,
+             jsonb_array_elements(actions_executed) AS action_elem
+        WHERE org_id = ${orgId}
+          AND actions_executed IS NOT NULL
+          AND status != 'skipped'
+        GROUP BY action_elem->>'type'
+        ORDER BY usage_count DESC
+      `);
+      return ((result as any).rows || []).map((r: any) => ({
+        actionType: r.action_type,
+        usageCount: r.usage_count,
+        successCount: r.success_count,
+        failureCount: r.failure_count,
+      }));
+    } catch (err) {
+      if (isDroppedTableError(err)) return [];
+      throw err;
+    }
   }
 }
 

@@ -7,6 +7,7 @@ import { db } from '../db';
 import { sql } from 'drizzle-orm';
 import crypto from 'crypto';
 import Decimal from 'decimal.js';
+import { isDroppedTableError } from '../utils/api-errors';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -458,28 +459,38 @@ class AIDealScoringEngine {
     const recommendation: DealScoreResult['recommendation'] =
       overallScore >= 80 ? 'strong_buy' : overallScore >= 65 ? 'buy' : overallScore >= 50 ? 'hold' : 'pass';
 
-    // Store the score
-    await db.execute(sql`
-      INSERT INTO ai_deal_scores (
-        id, org_id, deal_id, overall_score, factors, risk_flags,
-        recommendation, confidence, scored_at
-      ) VALUES (
-        ${crypto.randomUUID()}, ${orgId}, ${dealId}, ${overallScore},
-        ${JSON.stringify(factors)}::jsonb, ${JSON.stringify(riskFlags)}::jsonb,
-        ${recommendation}, ${0.75}, ${new Date()}
-      )
-    `);
+    // Store the score (ai_deal_scores may have been dropped — silently skip if missing)
+    try {
+      await db.execute(sql`
+        INSERT INTO ai_deal_scores (
+          id, org_id, deal_id, overall_score, factors, risk_flags,
+          recommendation, confidence, scored_at
+        ) VALUES (
+          ${crypto.randomUUID()}, ${orgId}, ${dealId}, ${overallScore},
+          ${JSON.stringify(factors)}::jsonb, ${JSON.stringify(riskFlags)}::jsonb,
+          ${recommendation}, ${0.75}, ${new Date()}
+        )
+      `);
+    } catch (err) {
+      if (!isDroppedTableError(err)) throw err;
+    }
 
     return { dealId, overallScore, factors, riskFlags, recommendation, confidence: 0.75 };
   }
 
   async getHistoricalScores(orgId: string, dealId: string): Promise<DealScoreResult[]> {
-    const result = await db.execute(sql`
-      SELECT * FROM ai_deal_scores
-      WHERE org_id = ${orgId} AND deal_id = ${dealId}
-      ORDER BY scored_at DESC
-      LIMIT 20
-    `);
+    let result: { rows: any[] };
+    try {
+      result = await db.execute(sql`
+        SELECT * FROM ai_deal_scores
+        WHERE org_id = ${orgId} AND deal_id = ${dealId}
+        ORDER BY scored_at DESC
+        LIMIT 20
+      `) as { rows: any[] };
+    } catch (err) {
+      if (isDroppedTableError(err)) return [];
+      throw err;
+    }
     return (result.rows as any[]).map(r => ({
       dealId: r.deal_id, overallScore: r.overall_score,
       factors: r.factors, riskFlags: r.risk_flags,
@@ -613,30 +624,38 @@ class AnomalyDetectionEngine {
       }
     }
 
-    // Store anomalies
+    // Store anomalies (ai_anomalies may have been dropped — silently skip if missing)
     for (const anomaly of anomalies) {
-      await db.execute(sql`
-        INSERT INTO ai_anomalies (
-          id, org_id, entity_type, entity_id, anomaly_type, severity,
-          description, expected_value, actual_value, deviation_percent,
-          detected_at, is_acknowledged
-        ) VALUES (
-          ${anomaly.id}, ${orgId}, ${anomaly.entityType}, ${anomaly.entityId},
-          ${anomaly.anomalyType}, ${anomaly.severity}, ${anomaly.description},
-          ${anomaly.expectedValue}, ${anomaly.actualValue}, ${anomaly.deviationPercent},
-          ${anomaly.detectedAt}, false
-        )
-      `);
+      try {
+        await db.execute(sql`
+          INSERT INTO ai_anomalies (
+            id, org_id, entity_type, entity_id, anomaly_type, severity,
+            description, expected_value, actual_value, deviation_percent,
+            detected_at, is_acknowledged
+          ) VALUES (
+            ${anomaly.id}, ${orgId}, ${anomaly.entityType}, ${anomaly.entityId},
+            ${anomaly.anomalyType}, ${anomaly.severity}, ${anomaly.description},
+            ${anomaly.expectedValue}, ${anomaly.actualValue}, ${anomaly.deviationPercent},
+            ${anomaly.detectedAt}, false
+          )
+        `);
+      } catch (err) {
+        if (!isDroppedTableError(err)) throw err;
+      }
     }
 
     return anomalies;
   }
 
   async acknowledgeAnomaly(orgId: string, anomalyId: string, userId: string): Promise<void> {
-    await db.execute(sql`
-      UPDATE ai_anomalies SET is_acknowledged = true, acknowledged_by = ${userId}, acknowledged_at = ${new Date()}
-      WHERE id = ${anomalyId} AND org_id = ${orgId}
-    `);
+    try {
+      await db.execute(sql`
+        UPDATE ai_anomalies SET is_acknowledged = true, acknowledged_by = ${userId}, acknowledged_at = ${new Date()}
+        WHERE id = ${anomalyId} AND org_id = ${orgId}
+      `);
+    } catch (err) {
+      if (!isDroppedTableError(err)) throw err;
+    }
   }
 
   async getAnomalies(orgId: string, filters?: {
@@ -647,20 +666,25 @@ class AnomalyDetectionEngine {
     if (filters?.severity) conditions.push(`severity = '${filters.severity}'`);
     if (filters?.acknowledged !== undefined) conditions.push(`is_acknowledged = ${filters.acknowledged}`);
 
-    const result = await db.execute(sql.raw(`
-      SELECT * FROM ai_anomalies
-      WHERE ${conditions.join(' AND ')}
-      ORDER BY detected_at DESC
-      LIMIT ${filters?.limit || 100}
-    `));
+    try {
+      const result = await db.execute(sql.raw(`
+        SELECT * FROM ai_anomalies
+        WHERE ${conditions.join(' AND ')}
+        ORDER BY detected_at DESC
+        LIMIT ${filters?.limit || 100}
+      `));
 
-    return (result.rows as any[]).map(r => ({
-      id: r.id, entityType: r.entity_type, entityId: r.entity_id,
-      anomalyType: r.anomaly_type, severity: r.severity, description: r.description,
-      expectedValue: r.expected_value, actualValue: r.actual_value,
-      deviationPercent: parseFloat(r.deviation_percent || '0'),
-      detectedAt: new Date(r.detected_at), isAcknowledged: r.is_acknowledged,
-    }));
+      return (result.rows as any[]).map(r => ({
+        id: r.id, entityType: r.entity_type, entityId: r.entity_id,
+        anomalyType: r.anomaly_type, severity: r.severity, description: r.description,
+        expectedValue: r.expected_value, actualValue: r.actual_value,
+        deviationPercent: parseFloat(r.deviation_percent || '0'),
+        detectedAt: new Date(r.detected_at), isAcknowledged: r.is_acknowledged,
+      }));
+    } catch (err) {
+      if (isDroppedTableError(err)) return [];
+      throw err;
+    }
   }
 }
 
@@ -670,77 +694,103 @@ class ConversationalMemoryManager {
 
   async getOrCreateSession(orgId: string, userId: string, sessionId?: string): Promise<ConversationMemory> {
     if (sessionId) {
-      const result = await db.execute(sql`
-        SELECT * FROM ai_conversation_sessions
-        WHERE id = ${sessionId} AND org_id = ${orgId} AND user_id = ${userId}
-      `);
-      const row = (result.rows as any[])?.[0];
-      if (row) {
-        const messagesResult = await db.execute(sql`
-          SELECT * FROM ai_conversation_messages WHERE session_id = ${sessionId}
-          ORDER BY created_at ASC LIMIT 100
+      try {
+        const result = await db.execute(sql`
+          SELECT * FROM ai_conversation_sessions
+          WHERE id = ${sessionId} AND org_id = ${orgId} AND user_id = ${userId}
         `);
-        return {
-          sessionId: row.id, userId: row.user_id,
-          messages: (messagesResult.rows as any[]).map(m => ({
-            role: m.role, content: m.content,
-            timestamp: new Date(m.created_at), metadata: m.metadata,
-          })),
-          context: row.context || {},
-          createdAt: new Date(row.created_at),
-          lastActiveAt: new Date(row.last_active_at),
-        };
+        const row = (result.rows as any[])?.[0];
+        if (row) {
+          const messagesResult = await db.execute(sql`
+            SELECT * FROM ai_conversation_messages WHERE session_id = ${sessionId}
+            ORDER BY created_at ASC LIMIT 100
+          `);
+          return {
+            sessionId: row.id, userId: row.user_id,
+            messages: (messagesResult.rows as any[]).map(m => ({
+              role: m.role, content: m.content,
+              timestamp: new Date(m.created_at), metadata: m.metadata,
+            })),
+            context: row.context || {},
+            createdAt: new Date(row.created_at),
+            lastActiveAt: new Date(row.last_active_at),
+          };
+        }
+      } catch (err) {
+        if (!isDroppedTableError(err)) throw err;
       }
     }
 
     // Create new session
     const newId = sessionId || crypto.randomUUID();
     const now = new Date();
-    await db.execute(sql`
-      INSERT INTO ai_conversation_sessions (id, org_id, user_id, context, created_at, last_active_at)
-      VALUES (${newId}, ${orgId}, ${userId}, '{}'::jsonb, ${now}, ${now})
-    `);
+    try {
+      await db.execute(sql`
+        INSERT INTO ai_conversation_sessions (id, org_id, user_id, context, created_at, last_active_at)
+        VALUES (${newId}, ${orgId}, ${userId}, '{}'::jsonb, ${now}, ${now})
+      `);
+    } catch (err) {
+      if (!isDroppedTableError(err)) throw err;
+    }
     return { sessionId: newId, userId, messages: [], context: {}, createdAt: now, lastActiveAt: now };
   }
 
   async addMessage(sessionId: string, message: ConversationMessage): Promise<void> {
-    await db.execute(sql`
-      INSERT INTO ai_conversation_messages (id, session_id, role, content, metadata, created_at)
-      VALUES (${crypto.randomUUID()}, ${sessionId}, ${message.role}, ${message.content},
-              ${JSON.stringify(message.metadata || {})}::jsonb, ${message.timestamp || new Date()})
-    `);
-    await db.execute(sql`
-      UPDATE ai_conversation_sessions SET last_active_at = ${new Date()} WHERE id = ${sessionId}
-    `);
+    try {
+      await db.execute(sql`
+        INSERT INTO ai_conversation_messages (id, session_id, role, content, metadata, created_at)
+        VALUES (${crypto.randomUUID()}, ${sessionId}, ${message.role}, ${message.content},
+                ${JSON.stringify(message.metadata || {})}::jsonb, ${message.timestamp || new Date()})
+      `);
+      await db.execute(sql`
+        UPDATE ai_conversation_sessions SET last_active_at = ${new Date()} WHERE id = ${sessionId}
+      `);
+    } catch (err) {
+      if (!isDroppedTableError(err)) throw err;
+    }
   }
 
   async updateContext(sessionId: string, context: Record<string, any>): Promise<void> {
-    await db.execute(sql`
-      UPDATE ai_conversation_sessions
-      SET context = context || ${JSON.stringify(context)}::jsonb, last_active_at = ${new Date()}
-      WHERE id = ${sessionId}
-    `);
+    try {
+      await db.execute(sql`
+        UPDATE ai_conversation_sessions
+        SET context = context || ${JSON.stringify(context)}::jsonb, last_active_at = ${new Date()}
+        WHERE id = ${sessionId}
+      `);
+    } catch (err) {
+      if (!isDroppedTableError(err)) throw err;
+    }
   }
 
   async getRecentSessions(orgId: string, userId: string, limit: number = 10): Promise<ConversationMemory[]> {
-    const result = await db.execute(sql`
-      SELECT * FROM ai_conversation_sessions
-      WHERE org_id = ${orgId} AND user_id = ${userId}
-      ORDER BY last_active_at DESC LIMIT ${limit}
-    `);
-
-    return (result.rows as any[]).map(r => ({
-      sessionId: r.id, userId: r.user_id, messages: [],
-      context: r.context || {}, createdAt: new Date(r.created_at),
-      lastActiveAt: new Date(r.last_active_at),
-    }));
+    try {
+      const result = await db.execute(sql`
+        SELECT * FROM ai_conversation_sessions
+        WHERE org_id = ${orgId} AND user_id = ${userId}
+        ORDER BY last_active_at DESC LIMIT ${limit}
+      `);
+      return (result.rows as any[]).map(r => ({
+        sessionId: r.id, userId: r.user_id, messages: [],
+        context: r.context || {}, createdAt: new Date(r.created_at),
+        lastActiveAt: new Date(r.last_active_at),
+      }));
+    } catch (err) {
+      if (isDroppedTableError(err)) return [];
+      throw err;
+    }
   }
 
   async buildContextWindow(sessionId: string, maxTokens: number = 4000): Promise<string> {
-    const messagesResult = await db.execute(sql`
-      SELECT * FROM ai_conversation_messages WHERE session_id = ${sessionId}
-      ORDER BY created_at DESC LIMIT 50
-    `);
+    let messagesResult: any;
+    try {
+      messagesResult = await db.execute(sql`
+        SELECT * FROM ai_conversation_messages WHERE session_id = ${sessionId}
+        ORDER BY created_at DESC LIMIT 50
+      `);
+    } catch (err) {
+      if (isDroppedTableError(err)) return '';
+      throw err;
+    }
 
     const messages = (messagesResult.rows as any[]).reverse();
     let contextStr = '';
@@ -758,12 +808,17 @@ class ConversationalMemoryManager {
   }
 
   async cleanupOldSessions(orgId: string, daysOld: number = 30): Promise<number> {
-    const cutoff = new Date(Date.now() - daysOld * 24 * 60 * 60 * 1000);
-    const result = await db.execute(sql`
-      DELETE FROM ai_conversation_sessions
-      WHERE org_id = ${orgId} AND last_active_at < ${cutoff}
-    `);
-    return result.rowCount || 0;
+    try {
+      const cutoff = new Date(Date.now() - daysOld * 24 * 60 * 60 * 1000);
+      const result = await db.execute(sql`
+        DELETE FROM ai_conversation_sessions
+        WHERE org_id = ${orgId} AND last_active_at < ${cutoff}
+      `);
+      return result.rowCount || 0;
+    } catch (err) {
+      if (isDroppedTableError(err)) return 0;
+      throw err;
+    }
   }
 }
 

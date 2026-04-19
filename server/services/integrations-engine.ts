@@ -9,6 +9,7 @@ import { sql } from 'drizzle-orm';
 import crypto from 'crypto';
 import { sendEmail } from './email-service';
 import { logger } from '../lib/logger';
+import { isDroppedTableError } from '../utils/api-errors';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -1604,11 +1605,15 @@ class IntegrationsEngine {
       WHERE tracking_id = ${trackingId}
     `);
 
-    // Also log individual click event
-    await db.execute(sql`
-      INSERT INTO email_tracking_events (id, tracking_id, event_type, url, occurred_at)
-      VALUES (${crypto.randomUUID()}, ${trackingId}, 'click', ${url}, NOW())
-    `);
+    // Also log individual click event (email_tracking_events may have been dropped)
+    try {
+      await db.execute(sql`
+        INSERT INTO email_tracking_events (id, tracking_id, event_type, url, occurred_at)
+        VALUES (${crypto.randomUUID()}, ${trackingId}, 'click', ${url}, NOW())
+      `);
+    } catch (err) {
+      if (!isDroppedTableError(err)) throw err;
+    }
 
     logger.info({ trackingId, url }, 'Email click recorded');
   }

@@ -12,6 +12,7 @@
 import { db } from '../db';
 import { sql } from 'drizzle-orm';
 import crypto from 'crypto';
+import { isDroppedTableError } from '../utils/api-errors';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -373,12 +374,16 @@ class SecurityComplianceService {
     const encrypted = this.encryptPII(plaintext);
     const id = crypto.randomUUID();
 
-    await db.execute(sql`
-      INSERT INTO encrypted_fields (id, org_id, table_name, field_name, record_id, encrypted_value, created_at, updated_at)
-      VALUES (${id}, ${orgId}, ${tableName}, ${fieldName}, ${recordId}, ${encrypted}, NOW(), NOW())
-      ON CONFLICT (org_id, table_name, field_name, record_id)
-      DO UPDATE SET encrypted_value = ${encrypted}, updated_at = NOW()
-    `);
+    try {
+      await db.execute(sql`
+        INSERT INTO encrypted_fields (id, org_id, table_name, field_name, record_id, encrypted_value, created_at, updated_at)
+        VALUES (${id}, ${orgId}, ${tableName}, ${fieldName}, ${recordId}, ${encrypted}, NOW(), NOW())
+        ON CONFLICT (org_id, table_name, field_name, record_id)
+        DO UPDATE SET encrypted_value = ${encrypted}, updated_at = NOW()
+      `);
+    } catch (err) {
+      if (!isDroppedTableError(err)) throw err;
+    }
 
     await this.logSecurityEvent({
       orgId,
@@ -399,11 +404,17 @@ class SecurityComplianceService {
     fieldName: string,
     recordId: string
   ): Promise<string | null> {
-    const result = await db.execute(sql`
-      SELECT encrypted_value FROM encrypted_fields
-      WHERE org_id = ${orgId} AND table_name = ${tableName}
-        AND field_name = ${fieldName} AND record_id = ${recordId}
-    `);
+    let result: { rows: any[] };
+    try {
+      result = await db.execute(sql`
+        SELECT encrypted_value FROM encrypted_fields
+        WHERE org_id = ${orgId} AND table_name = ${tableName}
+          AND field_name = ${fieldName} AND record_id = ${recordId}
+      `) as { rows: any[] };
+    } catch (err) {
+      if (isDroppedTableError(err)) return null;
+      throw err;
+    }
 
     const rows = result.rows as any[];
     if (!rows.length) return null;
@@ -731,12 +742,18 @@ class SecurityComplianceService {
    * Get all retention policies for an org.
    */
   async getRetentionPolicies(orgId: string): Promise<RetentionPolicy[]> {
-    const result = await db.execute(sql`
-      SELECT id, org_id, data_type, retention_days, last_applied_at, created_at
-      FROM data_retention_policies
-      WHERE org_id = ${orgId}
-      ORDER BY data_type ASC
-    `);
+    let result: { rows: any[] };
+    try {
+      result = await db.execute(sql`
+        SELECT id, org_id, data_type, retention_days, last_applied_at, created_at
+        FROM data_retention_policies
+        WHERE org_id = ${orgId}
+        ORDER BY data_type ASC
+      `) as { rows: any[] };
+    } catch (err) {
+      if (isDroppedTableError(err)) return [];
+      throw err;
+    }
 
     return (result.rows as any[]).map(row => ({
       id: row.id,
@@ -762,12 +779,17 @@ class SecurityComplianceService {
 
     const id = crypto.randomUUID();
 
-    await db.execute(sql`
-      INSERT INTO data_retention_policies (id, org_id, data_type, retention_days, created_at)
-      VALUES (${id}, ${orgId}, ${dataType}, ${retentionDays}, NOW())
-      ON CONFLICT (org_id, data_type)
-      DO UPDATE SET retention_days = ${retentionDays}
-    `);
+    try {
+      await db.execute(sql`
+        INSERT INTO data_retention_policies (id, org_id, data_type, retention_days, created_at)
+        VALUES (${id}, ${orgId}, ${dataType}, ${retentionDays}, NOW())
+        ON CONFLICT (org_id, data_type)
+        DO UPDATE SET retention_days = ${retentionDays}
+      `);
+    } catch (err) {
+      if (isDroppedTableError(err)) throw new Error('Data retention policy feature is unavailable (backing table removed)');
+      throw err;
+    }
 
     return {
       id,
@@ -1053,17 +1075,25 @@ class SecurityComplianceService {
    * Returns true if no allowlist is configured (open access) or if the IP matches.
    */
   async checkIpAllowlist(orgId: string, ip: string): Promise<boolean> {
-    const result = await db.execute(sql`
-      SELECT cidrs FROM ip_allowlists WHERE org_id = ${orgId}
-    `);
+    try {
+      const result = await db.execute(sql`
+        SELECT cidrs FROM ip_allowlists WHERE org_id = ${orgId}
+      `);
 
-    const rows = result.rows as any[];
-    if (!rows.length) return true; // No allowlist = open access
+      const rows = result.rows as any[];
+      if (!rows.length) return true; // No allowlist = open access
 
-    const cidrs: string[] = rows[0].cidrs || [];
-    if (cidrs.length === 0) return true;
+      const cidrs: string[] = rows[0].cidrs || [];
+      if (cidrs.length === 0) return true;
 
-    return cidrs.some(cidr => this.isIpInCidr(ip, cidr));
+      return cidrs.some(cidr => this.isIpInCidr(ip, cidr));
+    } catch (err) {
+      // Fail closed: if the allowlist table is unavailable we must not grant access.
+      // Throw so callers can surface this as a configuration/feature error rather than
+      // silently bypassing the security control.
+      if (isDroppedTableError(err)) throw new Error('IP allowlist feature is unavailable (backing table removed) — access denied by default');
+      throw err;
+    }
   }
 
   /**
@@ -1079,12 +1109,17 @@ class SecurityComplianceService {
 
     const id = crypto.randomUUID();
 
-    await db.execute(sql`
-      INSERT INTO ip_allowlists (id, org_id, cidrs, updated_at)
-      VALUES (${id}, ${orgId}, ${JSON.stringify(cidrs)}, NOW())
-      ON CONFLICT (org_id)
-      DO UPDATE SET cidrs = ${JSON.stringify(cidrs)}, updated_at = NOW()
-    `);
+    try {
+      await db.execute(sql`
+        INSERT INTO ip_allowlists (id, org_id, cidrs, updated_at)
+        VALUES (${id}, ${orgId}, ${JSON.stringify(cidrs)}, NOW())
+        ON CONFLICT (org_id)
+        DO UPDATE SET cidrs = ${JSON.stringify(cidrs)}, updated_at = NOW()
+      `);
+    } catch (err) {
+      if (isDroppedTableError(err)) throw new Error('IP allowlist feature is unavailable (backing table removed)');
+      throw err;
+    }
 
     await this.logSecurityEvent({
       orgId,
@@ -1098,9 +1133,15 @@ class SecurityComplianceService {
    * Get the current IP allowlist for an org.
    */
   async getIpAllowlist(orgId: string): Promise<string[]> {
-    const result = await db.execute(sql`
-      SELECT cidrs FROM ip_allowlists WHERE org_id = ${orgId}
-    `);
+    let result: { rows: any[] };
+    try {
+      result = await db.execute(sql`
+        SELECT cidrs FROM ip_allowlists WHERE org_id = ${orgId}
+      `) as { rows: any[] };
+    } catch (err) {
+      if (isDroppedTableError(err)) return [];
+      throw err;
+    }
 
     const rows = result.rows as any[];
     if (!rows.length) return [];

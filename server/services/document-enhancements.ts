@@ -7,6 +7,7 @@
 import { db } from '../db';
 import { sql } from 'drizzle-orm';
 import crypto from 'crypto';
+import { isDroppedTableError } from '../utils/api-errors';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -109,24 +110,29 @@ class DocumentVersioningEngine {
     const now = new Date();
 
     // Get next version number
-    const versionResult = await db.execute(sql`
-      SELECT COALESCE(MAX(version_number), 0) + 1 as next_version
-      FROM document_versions
-      WHERE document_id = ${data.documentId} AND org_id = ${orgId}
-    `);
-    const versionNumber = (versionResult.rows as any[])?.[0]?.next_version || 1;
+    let versionNumber = 1;
+    try {
+      const versionResult = await db.execute(sql`
+        SELECT COALESCE(MAX(version_number), 0) + 1 as next_version
+        FROM document_versions
+        WHERE document_id = ${data.documentId} AND org_id = ${orgId}
+      `);
+      versionNumber = (versionResult.rows as any[])?.[0]?.next_version || 1;
 
-    await db.execute(sql`
-      INSERT INTO document_versions (
-        id, org_id, document_id, version_number, rendered_html, rendered_json,
-        token_snapshot, change_description, created_by, created_at
-      ) VALUES (
-        ${id}, ${orgId}, ${data.documentId}, ${versionNumber},
-        ${data.renderedHtml}, ${JSON.stringify(data.renderedJson || {})}::jsonb,
-        ${JSON.stringify(data.tokenSnapshot)}::jsonb,
-        ${data.changeDescription}, ${userId}, ${now}
-      )
-    `);
+      await db.execute(sql`
+        INSERT INTO document_versions (
+          id, org_id, document_id, version_number, rendered_html, rendered_json,
+          token_snapshot, change_description, created_by, created_at
+        ) VALUES (
+          ${id}, ${orgId}, ${data.documentId}, ${versionNumber},
+          ${data.renderedHtml}, ${JSON.stringify(data.renderedJson || {})}::jsonb,
+          ${JSON.stringify(data.tokenSnapshot)}::jsonb,
+          ${data.changeDescription}, ${userId}, ${now}
+        )
+      `);
+    } catch (err) {
+      if (!isDroppedTableError(err)) throw err;
+    }
 
     return {
       id, documentId: data.documentId, versionNumber,
@@ -137,11 +143,17 @@ class DocumentVersioningEngine {
   }
 
   async getVersionHistory(orgId: string, documentId: string): Promise<DocumentVersion[]> {
-    const result = await db.execute(sql`
-      SELECT * FROM document_versions
-      WHERE document_id = ${documentId} AND org_id = ${orgId}
-      ORDER BY version_number DESC
-    `);
+    let result: { rows: any[] };
+    try {
+      result = await db.execute(sql`
+        SELECT * FROM document_versions
+        WHERE document_id = ${documentId} AND org_id = ${orgId}
+        ORDER BY version_number DESC
+      `) as { rows: any[] };
+    } catch (err) {
+      if (isDroppedTableError(err)) return [];
+      throw err;
+    }
 
     return (result.rows as any[]).map(r => ({
       id: r.id, documentId: r.document_id, versionNumber: r.version_number,
@@ -152,16 +164,22 @@ class DocumentVersioningEngine {
   }
 
   async diffVersions(orgId: string, documentId: string, versionA: number, versionB: number): Promise<DocumentDiff> {
-    const [resultA, resultB] = await Promise.all([
-      db.execute(sql`
-        SELECT * FROM document_versions
-        WHERE document_id = ${documentId} AND org_id = ${orgId} AND version_number = ${versionA}
-      `),
-      db.execute(sql`
-        SELECT * FROM document_versions
-        WHERE document_id = ${documentId} AND org_id = ${orgId} AND version_number = ${versionB}
-      `),
-    ]);
+    let resultA: any, resultB: any;
+    try {
+      [resultA, resultB] = await Promise.all([
+        db.execute(sql`
+          SELECT * FROM document_versions
+          WHERE document_id = ${documentId} AND org_id = ${orgId} AND version_number = ${versionA}
+        `),
+        db.execute(sql`
+          SELECT * FROM document_versions
+          WHERE document_id = ${documentId} AND org_id = ${orgId} AND version_number = ${versionB}
+        `),
+      ]);
+    } catch (err) {
+      if (isDroppedTableError(err)) throw new Error('Document versioning feature is unavailable (backing table removed)');
+      throw err;
+    }
 
     const rowA = (resultA.rows as any[])?.[0];
     const rowB = (resultB.rows as any[])?.[0];
@@ -200,10 +218,16 @@ class DocumentVersioningEngine {
   }
 
   async restoreVersion(orgId: string, documentId: string, versionNumber: number, userId: string): Promise<DocumentVersion> {
-    const result = await db.execute(sql`
-      SELECT * FROM document_versions
-      WHERE document_id = ${documentId} AND org_id = ${orgId} AND version_number = ${versionNumber}
-    `);
+    let result: any;
+    try {
+      result = await db.execute(sql`
+        SELECT * FROM document_versions
+        WHERE document_id = ${documentId} AND org_id = ${orgId} AND version_number = ${versionNumber}
+      `);
+    } catch (err) {
+      if (isDroppedTableError(err)) throw new Error('Document versioning feature is unavailable (backing table removed)');
+      throw err;
+    }
     const row = (result.rows as any[])?.[0];
     if (!row) throw new Error('Version not found');
 
@@ -240,16 +264,21 @@ class ESignatureEngine {
       signedAt: null, ipAddress: null,
     }));
 
-    await db.execute(sql`
-      INSERT INTO esignature_requests (
-        id, org_id, document_id, document_title, signers,
-        status, provider, message, created_by, created_at
-      ) VALUES (
-        ${id}, ${orgId}, ${data.documentId}, ${data.documentTitle},
-        ${JSON.stringify(signers)}::jsonb, 'draft', ${provider},
-        ${data.message || null}, ${userId}, ${now}
-      )
-    `);
+    try {
+      await db.execute(sql`
+        INSERT INTO esignature_requests (
+          id, org_id, document_id, document_title, signers,
+          status, provider, message, created_by, created_at
+        ) VALUES (
+          ${id}, ${orgId}, ${data.documentId}, ${data.documentTitle},
+          ${JSON.stringify(signers)}::jsonb, 'draft', ${provider},
+          ${data.message || null}, ${userId}, ${now}
+        )
+      `);
+    } catch (err) {
+      if (isDroppedTableError(err)) throw new Error('E-signature feature is unavailable (backing table removed)');
+      throw err;
+    }
 
     return {
       id, orgId, documentId: data.documentId, documentTitle: data.documentTitle,
@@ -260,10 +289,16 @@ class ESignatureEngine {
   }
 
   async sendForSignature(orgId: string, requestId: string): Promise<ESignatureRequest> {
-    const result = await db.execute(sql`
-      SELECT * FROM esignature_requests
-      WHERE id = ${requestId} AND org_id = ${orgId} AND status = 'draft'
-    `);
+    let result: any;
+    try {
+      result = await db.execute(sql`
+        SELECT * FROM esignature_requests
+        WHERE id = ${requestId} AND org_id = ${orgId} AND status = 'draft'
+      `);
+    } catch (err) {
+      if (isDroppedTableError(err)) throw new Error('E-signature feature is unavailable (backing table removed)');
+      throw err;
+    }
     const row = (result.rows as any[])?.[0];
     if (!row) throw new Error('Signature request not found or not in draft');
 
@@ -280,13 +315,17 @@ class ESignatureEngine {
     const signers = (row.signers || []).map((s: any) => ({ ...s, status: 'sent' }));
     const now = new Date();
 
-    await db.execute(sql`
-      UPDATE esignature_requests
-      SET status = 'sent', signers = ${JSON.stringify(signers)}::jsonb,
-          external_envelope_id = ${externalEnvelopeId},
-          sent_at = ${now}, updated_at = ${now}
-      WHERE id = ${requestId} AND org_id = ${orgId}
-    `);
+    try {
+      await db.execute(sql`
+        UPDATE esignature_requests
+        SET status = 'sent', signers = ${JSON.stringify(signers)}::jsonb,
+            external_envelope_id = ${externalEnvelopeId},
+            sent_at = ${now}, updated_at = ${now}
+        WHERE id = ${requestId} AND org_id = ${orgId}
+      `);
+    } catch (err) {
+      if (!isDroppedTableError(err)) throw err;
+    }
 
     return this.getSignatureRequest(orgId, requestId);
   }
@@ -294,10 +333,16 @@ class ESignatureEngine {
   async recordSignature(orgId: string, requestId: string, signerId: string, data: {
     ipAddress?: string;
   }): Promise<ESignatureRequest> {
-    const result = await db.execute(sql`
-      SELECT * FROM esignature_requests
-      WHERE id = ${requestId} AND org_id = ${orgId}
-    `);
+    let result: any;
+    try {
+      result = await db.execute(sql`
+        SELECT * FROM esignature_requests
+        WHERE id = ${requestId} AND org_id = ${orgId}
+      `);
+    } catch (err) {
+      if (isDroppedTableError(err)) throw new Error('E-signature feature is unavailable (backing table removed)');
+      throw err;
+    }
     const row = (result.rows as any[])?.[0];
     if (!row) throw new Error('Signature request not found');
 
@@ -322,9 +367,15 @@ class ESignatureEngine {
   }
 
   async getSignatureRequest(orgId: string, requestId: string): Promise<ESignatureRequest> {
-    const result = await db.execute(sql`
-      SELECT * FROM esignature_requests WHERE id = ${requestId} AND org_id = ${orgId}
-    `);
+    let result: any;
+    try {
+      result = await db.execute(sql`
+        SELECT * FROM esignature_requests WHERE id = ${requestId} AND org_id = ${orgId}
+      `);
+    } catch (err) {
+      if (isDroppedTableError(err)) throw new Error('E-signature feature is unavailable (backing table removed)');
+      throw err;
+    }
     const row = (result.rows as any[])?.[0];
     if (!row) throw new Error('Signature request not found');
 
@@ -348,9 +399,15 @@ class ESignatureEngine {
     const whereClause = conditions.reduce((acc, c, i) => i === 0 ? c : sql`${acc} AND ${c}`);
     const limit = Math.min(Math.max(1, filters?.limit || 50), 200);
 
-    const result = await db.execute(
-      sql`SELECT * FROM esignature_requests WHERE ${whereClause} ORDER BY created_at DESC LIMIT ${limit}`
-    );
+    let result: any;
+    try {
+      result = await db.execute(
+        sql`SELECT * FROM esignature_requests WHERE ${whereClause} ORDER BY created_at DESC LIMIT ${limit}`
+      );
+    } catch (err) {
+      if (isDroppedTableError(err)) return [];
+      throw err;
+    }
 
     return (result.rows as any[]).map(row => ({
       id: row.id, orgId: row.org_id, documentId: row.document_id,

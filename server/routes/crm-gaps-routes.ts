@@ -5,6 +5,7 @@
 import { Router, Request, Response } from 'express';
 import { pool } from '../db';
 import { sendEmail, wrapEmailTemplate } from '../services/email-service';
+import { isDroppedTableError } from '../utils/api-errors';
 
 export const crmGapsRouter = Router();
 
@@ -250,6 +251,7 @@ crmGapsRouter.get('/custom-fields/:entityType', async (req: Request, res: Respon
       sortOrder: r.sort_order,
     })));
   } catch (err: any) {
+    if (isDroppedTableError(err)) return res.status(501).json({ error: 'Custom fields feature is unavailable', code: 'FEATURE_UNAVAILABLE' });
     console.error('Get custom fields error:', err);
     res.status(500).json({ error: 'Failed to fetch custom fields' });
   }
@@ -276,6 +278,7 @@ crmGapsRouter.post('/custom-fields', async (req: Request, res: Response) => {
 
     res.status(201).json(rows[0]);
   } catch (err: any) {
+    if (isDroppedTableError(err)) return res.status(501).json({ error: 'Custom fields feature is unavailable', code: 'FEATURE_UNAVAILABLE' });
     if (err.message.includes('duplicate key')) {
       return res.status(409).json({ error: 'A field with this key already exists for this entity type' });
     }
@@ -310,6 +313,7 @@ crmGapsRouter.put('/custom-fields/:id', async (req: Request, res: Response) => {
     if (rows.length === 0) return res.status(404).json({ error: 'Field not found' });
     res.json(rows[0]);
   } catch (err: any) {
+    if (isDroppedTableError(err)) return res.status(501).json({ error: 'Custom fields feature is unavailable', code: 'FEATURE_UNAVAILABLE' });
     console.error('Update custom field error:', err);
     res.status(500).json({ error: 'Failed to update custom field' });
   }
@@ -327,6 +331,7 @@ crmGapsRouter.delete('/custom-fields/:id', async (req: Request, res: Response) =
     );
     res.json({ success: true });
   } catch (err: any) {
+    if (isDroppedTableError(err)) return res.status(501).json({ error: 'Custom fields feature is unavailable', code: 'FEATURE_UNAVAILABLE' });
     console.error('Delete custom field error:', err);
     res.status(500).json({ error: 'Failed to delete custom field' });
   }

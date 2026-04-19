@@ -17,6 +17,7 @@
 
 import { db } from '../db';
 import { pool } from '../db';
+import { isDroppedTableError } from '../utils/api-errors';
 import { sql } from 'drizzle-orm';
 import Decimal from 'decimal.js';
 
@@ -313,20 +314,26 @@ class ReportingEngine {
     const now = new Date();
     const nextRunAt = computeNextRun(data.cronExpression, now);
 
-    const result = await pool.query(
-      `INSERT INTO report_schedules (
-        id, org_id, name, report_type, filters_json, cron_expression,
-        delivery_method, recipients, format, next_run_at, status, created_at, updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-      RETURNING *`,
-      [
-        id, orgId, data.name, data.reportType,
-        JSON.stringify(data.filtersJson || {}),
-        data.cronExpression, data.deliveryMethod,
-        JSON.stringify(data.recipients), data.format,
-        nextRunAt, 'active', now, now,
-      ]
-    );
+    let result: { rows: any[] };
+    try {
+      result = await pool.query(
+        `INSERT INTO report_schedules (
+          id, org_id, name, report_type, filters_json, cron_expression,
+          delivery_method, recipients, format, next_run_at, status, created_at, updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+        RETURNING *`,
+        [
+          id, orgId, data.name, data.reportType,
+          JSON.stringify(data.filtersJson || {}),
+          data.cronExpression, data.deliveryMethod,
+          JSON.stringify(data.recipients), data.format,
+          nextRunAt, 'active', now, now,
+        ]
+      );
+    } catch (err) {
+      if (isDroppedTableError(err)) throw new Error('Report scheduling feature is unavailable (backing table removed)');
+      throw err;
+    }
 
     return mapScheduleRow(result.rows[0]);
   }
@@ -339,10 +346,16 @@ class ReportingEngine {
     deliveredTo: string[];
   }> {
     // Fetch the schedule
-    const schedRes = await pool.query(
-      `SELECT * FROM report_schedules WHERE id = $1`,
-      [scheduleId]
-    );
+    let schedRes: { rows: any[] };
+    try {
+      schedRes = await pool.query(
+        `SELECT * FROM report_schedules WHERE id = $1`,
+        [scheduleId]
+      );
+    } catch (err) {
+      if (isDroppedTableError(err)) throw new Error('Report scheduling feature is unavailable (backing table removed)');
+      throw err;
+    }
     if (schedRes.rows.length === 0) {
       throw new Error(`Report schedule ${scheduleId} not found`);
     }
@@ -394,23 +407,36 @@ class ReportingEngine {
   }
 
   async listReportSchedules(orgId: string): Promise<ReportSchedule[]> {
-    const result = await pool.query(
-      `SELECT * FROM report_schedules WHERE org_id = $1 ORDER BY next_run_at ASC`,
-      [orgId]
-    );
-    return result.rows.map(mapScheduleRow);
+    try {
+      const result = await pool.query(
+        `SELECT * FROM report_schedules WHERE org_id = $1 ORDER BY next_run_at ASC`,
+        [orgId]
+      );
+      return result.rows.map(mapScheduleRow);
+    } catch (err) {
+      if (isDroppedTableError(err)) return [];
+      throw err;
+    }
   }
 
   async updateReportScheduleStatus(scheduleId: string, status: ScheduleStatus): Promise<void> {
-    const now = new Date();
-    await pool.query(
-      `UPDATE report_schedules SET status = $1, updated_at = $2 WHERE id = $3`,
-      [status, now, scheduleId]
-    );
+    try {
+      const now = new Date();
+      await pool.query(
+        `UPDATE report_schedules SET status = $1, updated_at = $2 WHERE id = $3`,
+        [status, now, scheduleId]
+      );
+    } catch (err) {
+      if (!isDroppedTableError(err)) throw err;
+    }
   }
 
   async deleteReportSchedule(scheduleId: string): Promise<void> {
-    await pool.query(`DELETE FROM report_schedules WHERE id = $1`, [scheduleId]);
+    try {
+      await pool.query(`DELETE FROM report_schedules WHERE id = $1`, [scheduleId]);
+    } catch (err) {
+      if (!isDroppedTableError(err)) throw err;
+    }
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
