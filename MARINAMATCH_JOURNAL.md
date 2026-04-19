@@ -1,5 +1,89 @@
 # MarinaMatch Platform Journal
 
+## ✅ COMPLETE — B1 + B2: Beta access gating + billing guard (2026-04-19)
+
+First two items off the FM Beta Publish Queue. Both required, both shipped.
+
+### B1 — Beta invite-code gating on /api/auth/register
+
+Signup is no longer open. When `REQUIRE_BETA_INVITE=true` (prod default; dev
+default is false), `POST /api/auth/register` rejects signups that don't
+present a valid code. Valid codes flag the new org `is_beta=true`.
+
+**Schema** (live DB migrated + startup migrations added for fresh envs):
+- `organizations.is_beta boolean NOT NULL DEFAULT false`
+- `beta_invite_codes` — `code PK, note, max_uses, use_count, expires_at, created_at, created_by`
+- `beta_invite_redemptions` — audit trail (`code, user_id, org_id, redeemed_at`)
+
+**Files:**
+- `shared/schema.ts` — added `isBeta` column on organizations, new
+  `betaInviteCodes` + `betaInviteRedemptions` tables with types exported.
+- `server/db-startup-migrations.ts` — 4 idempotent entries for fresh envs.
+- `server/routes/auth-routes.ts` — `betaInviteRequired()` helper reads
+  `REQUIRE_BETA_INVITE` env (defaults true in prod, false in dev). Register
+  handler validates code before any user/org insert; consumes it via a
+  conditional UPDATE (`WHERE use_count < max_uses`) that makes concurrent
+  redemptions of the last use impossible.
+- `client/src/pages/auth/signup.tsx` — added `inviteCode` to zod schema,
+  passes it uppercase to the mutation; new form field right after Company
+  with "Required during beta" badge, `FMBETA-XXXXXX` placeholder.
+- `scripts/beta-invite.mjs` — CLI: `generate`, `list`, `revoke`. Codes are
+  `FMBETA-` prefix + 6 chars from a no-lookalike alphabet (no 0/O/1/I).
+
+### B2 — Beta billing guard: 402 on every charging endpoint
+
+New middleware `server/middleware/require-not-beta.ts`. Looks up the caller's
+org, returns 402 `BETA_BILLING_DISABLED` if `is_beta=true`, fails closed on
+DB error. Applied to every route that could create a charge or collect a
+payment method:
+
+- `server/routes/billing-routes.ts` — `/create-subscription`,
+  `/create-setup-intent`, `/checkout`, `/change-plan`, `/reactivate`,
+  `/seats/purchase`, `/portal`
+- `server/routes/broker-billing-routes.ts` — `/checkout/marketplace-plus`,
+  `/checkout/broker-plan`
+- `server/routes/integrations-engine-routes.ts` — `/stripe/checkout`,
+  `/stripe/portal`
+- `server/routes.ts` (top-level) — `/api/stripe/checkout`,
+  `/api/stripe/billing-portal`, `/api/stripe/portal`, `/api/stripe/subscribe-pack`
+
+Webhooks, read-only routes (`/plans`, `/invoices`, `/usage`,
+`/subscription`), and `/api/stripe/webhook` are intentionally not gated —
+they never move money.
+
+### Smoke test — 15/15 passed (gate ON)
+
+`tmp_beta_smoke.mjs` exercises:
+- Rejects signup without code / invalid / exhausted / expired
+- Accepts valid code and flags org `is_beta=true`
+- Single-use code can't be reused
+- Multi-use code: exactly max_uses successes, then rejects
+- Redemption row logged
+- Beta org hits 402 with `BETA_BILLING_DISABLED` on all 6 charging endpoints
+
+Gate OFF (dev default) also verified: signup without code succeeds and
+produces a non-beta org (2/2 passes).
+
+### Gotchas
+
+- CSRF middleware returns 403 before the billing middleware runs, so the
+  smoke test had to prime a `csrf_token` cookie via GET `/api/auth/me` and
+  echo it back in `x-csrf-token` on every POST. Real browsers handle this
+  automatically.
+- `REQUIRE_BETA_INVITE` env var: explicit `true`/`false` overrides the
+  NODE_ENV-based default. Brett flips it OFF locally when he doesn't want
+  to type a code; prod deployments must have it ON.
+
+### Next up — B3: Tax waterfall write-path verification
+
+Today's tax-waterfall FK fix wired the reads. The write paths (POST settings,
+partners, equity contributions, waterfall configs, tax inputs) have never been
+smoke-tested with real data; the feature had 0 rows across 5 of 6 tables. A
+beta user WILL try to configure a waterfall, so we need a round-trip test
+before any invite goes out.
+
+---
+
 ## ✅ COMPLETE — Financial Model beta prep (2026-04-19)
 
 Brett wanted to begin FM beta testing today. I swept outstanding FM work —

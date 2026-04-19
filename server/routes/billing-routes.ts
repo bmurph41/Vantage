@@ -45,7 +45,7 @@ router.get('/subscription', async (req: Request, res: Response, next: NextFuncti
 });
 
 // POST /create-subscription — create a new subscription
-router.post('/create-subscription', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/create-subscription', requireNotBeta, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const orgId = getOrgId(req);
     const email = getUserEmail(req);
@@ -69,7 +69,7 @@ router.post('/create-subscription', async (req: Request, res: Response, next: Ne
 });
 
 // POST /create-setup-intent — create Stripe SetupIntent for collecting payment method
-router.post('/create-setup-intent', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/create-setup-intent', requireNotBeta, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const stripe = process.env.STRIPE_SECRET_KEY
       ? new Stripe(process.env.STRIPE_SECRET_KEY)
@@ -107,7 +107,7 @@ router.post('/create-setup-intent', async (req: Request, res: Response, next: Ne
 });
 
 // POST /checkout — create Stripe Checkout Session for new subscription (redirect flow)
-router.post('/checkout', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/checkout', requireNotBeta, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const stripe = process.env.STRIPE_SECRET_KEY
       ? new Stripe(process.env.STRIPE_SECRET_KEY)
@@ -166,7 +166,7 @@ router.post('/checkout', async (req: Request, res: Response, next: NextFunction)
 });
 
 // POST /change-plan — change subscription tier
-router.post('/change-plan', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/change-plan', requireNotBeta, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const orgId = getOrgId(req);
     const { newTier } = req.body;
@@ -195,7 +195,7 @@ router.post('/cancel', async (req: Request, res: Response, next: NextFunction) =
 });
 
 // POST /reactivate — reactivate canceled subscription
-router.post('/reactivate', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/reactivate', requireNotBeta, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const orgId = getOrgId(req);
     const updated = await billingService.reactivateSubscription(orgId);
@@ -259,7 +259,7 @@ router.get('/seats/details', async (req: Request, res: Response, next: NextFunct
 });
 
 // POST /seats/purchase — buy additional seats
-router.post('/seats/purchase', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/seats/purchase', requireNotBeta, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const orgId = getOrgId(req);
     const { seats } = req.body;
@@ -352,7 +352,7 @@ router.get('/seats/pricing', async (_req: Request, res: Response, next: NextFunc
 });
 
 // POST /portal — generate Stripe portal session URL
-router.post('/portal', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/portal', requireNotBeta, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const orgId = getOrgId(req);
     const returnUrl = req.body.returnUrl || `${req.protocol}://${req.get('host')}/billing`;

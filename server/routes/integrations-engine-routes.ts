@@ -6,6 +6,7 @@
 
 import { Router, Request, Response } from 'express';
 import { integrationsEngine } from '../services/integrations-engine';
+import { requireNotBeta } from '../middleware/require-not-beta';
 
 export const integrationsEngineRouter = Router();
 
@@ -153,7 +154,7 @@ integrationsEngineRouter.post('/xero/sync/accounts', async (req: Request, res: R
 
 // ─── Stripe ─────────────────────────────────────────────────────────────────
 
-integrationsEngineRouter.post('/stripe/checkout', async (req: Request, res: Response) => {
+integrationsEngineRouter.post('/stripe/checkout', requireNotBeta, async (req: Request, res: Response) => {
   try {
     const orgId = getOrgId(req);
     if (!orgId) return res.status(401).json({ error: 'Authentication required' });
@@ -168,7 +169,7 @@ integrationsEngineRouter.post('/stripe/checkout', async (req: Request, res: Resp
   } catch (e: any) { res.status(400).json({ error: e.message }); }
 });
 
-integrationsEngineRouter.post('/stripe/portal', async (req: Request, res: Response) => {
+integrationsEngineRouter.post('/stripe/portal', requireNotBeta, async (req: Request, res: Response) => {
   try {
     const orgId = getOrgId(req);
     if (!orgId) return res.status(401).json({ error: 'Authentication required' });

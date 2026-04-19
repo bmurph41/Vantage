@@ -21,6 +21,7 @@ import { findAllPotentialDuplicates, getDuplicateExplanation } from "./services/
 import { findCompanyDuplicates, type CompanyDuplicateMatch } from "./services/company-duplicate-service";
 import { requirePermission, requireRole } from "./middleware/rbac";
 import { requireEntitlement } from "./middleware/feature-gate";
+import { requireNotBeta } from "./middleware/require-not-beta";
 import { AuditService } from "./services/audit-service";
 import { setTenantContext, clearTenantContext } from "./middleware/tenant-context";
 import { enforceTenant, requireTenantMatch } from "./middleware/tenant-isolation";
@@ -3104,7 +3105,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
 
   // POST /api/stripe/checkout — create Stripe Checkout Session for pack purchase
-  app.post("/api/stripe/checkout", authenticateUser, async (req: any, res) => {
+  app.post("/api/stripe/checkout", authenticateUser, requireNotBeta, async (req: any, res) => {
     try {
       const Stripe = (await import("stripe")).default;
       const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY) : null;
@@ -3183,7 +3184,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // GET /api/stripe/billing-portal — alias for billing portal (matches billing-service task requirement)
-  app.get("/api/stripe/billing-portal", authenticateUser, async (req: any, res) => {
+  app.get("/api/stripe/billing-portal", authenticateUser, requireNotBeta, async (req: any, res) => {
     try {
       const Stripe = (await import("stripe")).default;
       const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY) : null;
@@ -3210,7 +3211,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
     // POST /api/stripe/portal — open Stripe Customer Portal for subscription management
-  app.post("/api/stripe/portal", authenticateUser, async (req: any, res) => {
+  app.post("/api/stripe/portal", authenticateUser, requireNotBeta, async (req: any, res) => {
     try {
       const Stripe = (await import("stripe")).default;
       const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY) : null;
@@ -3237,7 +3238,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POST /api/stripe/subscribe-pack — inline pack subscription using payment method from Stripe Elements
-  app.post("/api/stripe/subscribe-pack", authenticateUser, async (req: any, res) => {
+  app.post("/api/stripe/subscribe-pack", authenticateUser, requireNotBeta, async (req: any, res) => {
     try {
       const Stripe = (await import("stripe")).default;
       const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY) : null;

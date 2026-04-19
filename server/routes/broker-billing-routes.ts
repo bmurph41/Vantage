@@ -16,6 +16,7 @@ import { brokerRegistrations } from "@shared/schema";
 import { and, eq } from "drizzle-orm";
 import { BROKER_TIERS, BrokerTier } from "../services/broker-tiers";
 import { MARKETPLACE_PLUS_TIERS } from "../services/broker-entitlements";
+import { requireNotBeta } from "../middleware/require-not-beta";
 
 const router = Router();
 
@@ -48,7 +49,7 @@ function getAppBaseUrl(req: Request): string {
  * POST /checkout/marketplace-plus
  * body: { tier: 'solo' | 'pro', billingCycle: 'monthly' | 'annual' }
  */
-router.post("/checkout/marketplace-plus", async (req: Request, res: Response) => {
+router.post("/checkout/marketplace-plus", requireNotBeta, async (req: Request, res: Response) => {
   try {
     if (!stripe) {
       return res
@@ -146,7 +147,7 @@ router.post("/checkout/marketplace-plus", async (req: Request, res: Response) =>
  *
  * Caller must have an approved broker_registration row.
  */
-router.post("/checkout/broker-plan", async (req: Request, res: Response) => {
+router.post("/checkout/broker-plan", requireNotBeta, async (req: Request, res: Response) => {
   try {
     if (!stripe) {
       return res

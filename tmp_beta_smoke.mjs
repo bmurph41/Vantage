@@ -17,7 +17,31 @@ async function post(path, body, extraHeaders = {}) {
   const txt = await res.text();
   let json;
   try { json = JSON.parse(txt); } catch { json = { raw: txt }; }
-  return { status: res.status, body: json };
+  const setCookie = res.headers.get('set-cookie') || '';
+  return { status: res.status, body: json, cookie: setCookie };
+}
+
+function extractSessionCookie(setCookie) {
+  if (!setCookie) return '';
+  const m = setCookie.match(/sessionToken=([^;]+)/);
+  return m ? `sessionToken=${m[1]}` : '';
+}
+
+// Fetch a CSRF token by making a GET — the server sets csrf_token cookie if
+// missing. Returns a `cookie` string that combines sessionToken + csrf_token
+// plus an `x-csrf-token` header value. POSTs must include both.
+async function primeCsrf(sessionCookie) {
+  const res = await fetch(BASE + '/api/auth/me', {
+    headers: { cookie: sessionCookie },
+  });
+  const setCookie = res.headers.get('set-cookie') || '';
+  const m = setCookie.match(/csrf_token=([^;]+)/);
+  if (!m) return { cookie: sessionCookie, csrfHeader: '' };
+  const csrfToken = m[1];
+  return {
+    cookie: `${sessionCookie}; csrf_token=${csrfToken}`,
+    csrfHeader: csrfToken,
+  };
 }
 
 function randEmail() {
@@ -147,6 +171,62 @@ if (gateOn) {
       `SELECT count(*)::int AS n FROM beta_invite_redemptions WHERE code = 'TEST-VALID'`,
     );
     return rows[0]?.n === 1;
+  });
+
+  // ── B2: beta billing guard — charging endpoints return 402 for beta orgs ──
+  await pool.query(
+    `INSERT INTO beta_invite_codes (code, note, max_uses, use_count) VALUES ('TEST-B2', 'B2 billing guard test', 1, 0)`,
+  );
+
+  let betaCookie = '';
+  let csrfHeader = '';
+  await test('can register beta user for B2 tests', async () => {
+    const r = await post('/api/auth/register', {
+      email: randEmail(), password: 'testpass1234', name: 'B2 Guard',
+      orgName: randOrg(), dataBenchmarkingConsent: true,
+      inviteCode: 'TEST-B2',
+    });
+    if (r.status !== 201) return false;
+    const sessionCookie = extractSessionCookie(r.cookie);
+    if (!sessionCookie) return false;
+    const primed = await primeCsrf(sessionCookie);
+    betaCookie = primed.cookie;
+    csrfHeader = primed.csrfHeader;
+    return !!betaCookie && !!csrfHeader;
+  });
+
+  const protectedPost = (path, body) => post(path, body, {
+    cookie: betaCookie, 'x-csrf-token': csrfHeader,
+  });
+
+  await test('B2: /api/stripe/checkout returns 402 for beta org', async () => {
+    const r = await protectedPost('/api/stripe/checkout', { packType: 'modeling_tools' });
+    return r.status === 402 && r.body.code === 'BETA_BILLING_DISABLED';
+  });
+
+  await test('B2: /api/billing/checkout returns 402 for beta org', async () => {
+    const r = await protectedPost('/api/billing/checkout', { packType: 'modeling_tools' });
+    return r.status === 402 && r.body.code === 'BETA_BILLING_DISABLED';
+  });
+
+  await test('B2: /api/billing/create-subscription returns 402 for beta org', async () => {
+    const r = await protectedPost('/api/billing/create-subscription', { planKey: 'starter' });
+    return r.status === 402 && r.body.code === 'BETA_BILLING_DISABLED';
+  });
+
+  await test('B2: /api/billing/portal returns 402 for beta org', async () => {
+    const r = await protectedPost('/api/billing/portal', { returnUrl: 'https://example.com' });
+    return r.status === 402 && r.body.code === 'BETA_BILLING_DISABLED';
+  });
+
+  await test('B2: /api/stripe/subscribe-pack returns 402 for beta org', async () => {
+    const r = await protectedPost('/api/stripe/subscribe-pack', { packType: 'modeling_tools' });
+    return r.status === 402 && r.body.code === 'BETA_BILLING_DISABLED';
+  });
+
+  await test('B2: /api/broker-billing/checkout/broker-plan returns 402 for beta org', async () => {
+    const r = await protectedPost('/api/broker-billing/checkout/broker-plan', { tier: 'starter' });
+    return r.status === 402 && r.body.code === 'BETA_BILLING_DISABLED';
   });
 } else {
   await test('gate OFF: signup works without invite code', async () => {
