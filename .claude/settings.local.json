@@ -246,7 +246,8 @@
       "Bash(rm -f ~/workspace/node_modules/typescript/tsbuildinfo)",
       "Bash(env NODE_OPTIONS=--max-old-space-size=6144 npx tsc --noEmit --traceResolution)",
       "Bash(env NODE_OPTIONS=--max-old-space-size=6144 npx tsc --noEmit --listFiles)",
-      "Bash(env NODE_OPTIONS=--max-old-space-size=2048 npx tsc --noEmit --listFiles)"
+      "Bash(env NODE_OPTIONS=--max-old-space-size=2048 npx tsc --noEmit --listFiles)",
+      "Bash(awk '/^## ⚠ PARTIAL|^## .*deferred|^##.*financial|^##.*model|^##.*TODO|^##.*BUG/,/^##/' /home/runner/workspace/MARINAMATCH_JOURNAL.md)"
     ]
   }
 }
