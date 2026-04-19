@@ -1,6 +1,6 @@
 // PropertyRecordTabs.tsx — Sales Comps, Rate Comps, Market Intel, Activities, Leases tabs
 
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useLocation } from 'wouter';
 import { Badge } from '@/components/ui/badge';
@@ -8,6 +8,14 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Progress } from '@/components/ui/progress';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Switch } from '@/components/ui/switch';
+import { Separator } from '@/components/ui/separator';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
 import {
   Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription,
 } from '@/components/ui/sheet';
@@ -19,10 +27,10 @@ import {
   ChevronRight, Phone, Mail, Calendar, FileText, BarChart3,
   Newspaper, CheckCircle2, Circle, AlertCircle, MessageSquare,
   Anchor, Building2, ArrowUpRight, Scale, Home, Building, Users,
-  RefreshCw, Tag, Layers,
+  RefreshCw, Tag, Layers, Plus, Pencil, X, Save,
 } from 'lucide-react';
 import { format } from 'date-fns';
-import { apiRequest } from '@/lib/queryClient';
+import { apiRequest, queryClient } from '@/lib/queryClient';
 import { cn } from '@/lib/utils';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -535,18 +543,455 @@ const leaseTypeColors: Record<string, string> = {
   other: 'bg-purple-50 text-purple-700 border-purple-200',
 };
 
-function LeaseDetailSheet({ leaseId, open, onClose }: { leaseId: string; open: boolean; onClose: () => void }) {
-  const { data: detail, isLoading } = useQuery<any>({
+// ── Lease form type definitions ───────────────────────────────────────────────
+
+interface LeaseFormState {
+  tenantName: string;
+  suite: string;
+  sf: string;
+  leaseType: string;
+  commencementDate: string;
+  expirationDate: string;
+  rentCommencementDate: string;
+  active: boolean;
+  notes: string;
+}
+
+interface RentTermFormState {
+  baseRentValue: string;
+  baseRentMode: string;
+  escalationType: string;
+  escalationValue: string;
+  escalationCycleMonths: string;
+}
+
+interface LeaseApiBody {
+  lease: Omit<LeaseFormState, 'sf'> & { sf: string; propertyId?: string };
+  initialTerm?: {
+    termStartDate: string;
+    termEndDate: string;
+    baseRentInputValue: number;
+    baseRentInputUnit: string;
+    escalationType: string;
+    escalationValue: number;
+    escalationFrequencyMonths: number;
+  };
+}
+
+// ── Add Lease Sheet ───────────────────────────────────────────────────────────
+
+interface AddLeaseSheetProps {
+  propertyId: string;
+  open: boolean;
+  onClose: () => void;
+}
+
+const EMPTY_LEASE_FORM: LeaseFormState = {
+  tenantName: '', suite: '', sf: '', leaseType: 'retail',
+  commencementDate: '', expirationDate: '', rentCommencementDate: '',
+  active: true, notes: '',
+};
+const EMPTY_TERM_FORM: RentTermFormState = {
+  baseRentValue: '', baseRentMode: 'PER_SF_YEAR',
+  escalationType: 'NONE', escalationValue: '', escalationCycleMonths: '12',
+};
+
+function buildInitialTermPayload(
+  term: RentTermFormState,
+  startDate: string,
+  endDate: string,
+): LeaseApiBody['initialTerm'] | undefined {
+  if (!term.baseRentValue) return undefined;
+  return {
+    termStartDate: startDate,
+    termEndDate: endDate,
+    baseRentInputValue: parseFloat(term.baseRentValue),
+    baseRentInputUnit: term.baseRentMode,
+    escalationType: term.escalationType,
+    escalationValue: term.escalationValue ? parseFloat(term.escalationValue) : 0,
+    escalationFrequencyMonths: parseInt(term.escalationCycleMonths) || 12,
+  };
+}
+
+function AddLeaseSheet({ propertyId, open, onClose }: AddLeaseSheetProps) {
+  const [form, setForm] = useState<LeaseFormState>(EMPTY_LEASE_FORM);
+  const [initialTerm, setInitialTerm] = useState<RentTermFormState>(EMPTY_TERM_FORM);
+  const [error, setError] = useState<string | null>(null);
+
+  function resetAndClose() {
+    setForm(EMPTY_LEASE_FORM);
+    setInitialTerm(EMPTY_TERM_FORM);
+    setError(null);
+    onClose();
+  }
+
+  const mutation = useMutation({
+    mutationFn: async () => {
+      const body: LeaseApiBody = {
+        lease: {
+          ...form,
+          propertyId,
+          sf: form.sf ? String(form.sf) : '0',
+          rentCommencementDate: form.rentCommencementDate || '',
+        },
+        initialTerm: buildInitialTermPayload(initialTerm, form.commencementDate, form.expirationDate),
+      };
+      const res = await apiRequest('POST', '/api/commercial-leases/operations/leases', body);
+      if (!res.ok) {
+        const err = await res.json() as { error?: string };
+        throw new Error(err.error || 'Failed to create lease');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['property-leases', propertyId] });
+      resetAndClose();
+    },
+    onError: (e: Error) => setError(e.message),
+  });
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!form.tenantName || !form.commencementDate || !form.expirationDate) {
+      setError('Tenant name, commencement date, and expiration date are required.');
+      return;
+    }
+    setError(null);
+    mutation.mutate();
+  }
+
+  return (
+    <Sheet open={open} onOpenChange={(v) => !v && resetAndClose()}>
+      <SheetContent side="right" className="w-full sm:max-w-xl overflow-y-auto">
+        <SheetHeader className="pb-4">
+          <SheetTitle className="text-lg font-semibold flex items-center gap-2">
+            <Plus className="h-4 w-4" /> Add Lease
+          </SheetTitle>
+          <SheetDescription>Create a new commercial lease linked to this property.</SheetDescription>
+        </SheetHeader>
+
+        <form onSubmit={handleSubmit} className="space-y-5">
+          {/* Tenant Info */}
+          <div className="space-y-3">
+            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Tenant Details</h3>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="col-span-2 space-y-1">
+                <Label htmlFor="add-tenantName" className="text-xs">Tenant Name <span className="text-red-500">*</span></Label>
+                <Input
+                  id="add-tenantName"
+                  value={form.tenantName}
+                  onChange={(e) => setForm(f => ({ ...f, tenantName: e.target.value }))}
+                  placeholder="e.g. Acme Corp"
+                  className="h-8 text-sm"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="add-suite" className="text-xs">Suite</Label>
+                <Input
+                  id="add-suite"
+                  value={form.suite}
+                  onChange={(e) => setForm(f => ({ ...f, suite: e.target.value }))}
+                  placeholder="e.g. 101"
+                  className="h-8 text-sm"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="add-sf" className="text-xs">Square Footage</Label>
+                <Input
+                  id="add-sf"
+                  type="number"
+                  value={form.sf}
+                  onChange={(e) => setForm(f => ({ ...f, sf: e.target.value }))}
+                  placeholder="e.g. 2500"
+                  className="h-8 text-sm"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Lease Type</Label>
+                <Select value={form.leaseType} onValueChange={(v) => setForm(f => ({ ...f, leaseType: v }))}>
+                  <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="retail">Retail</SelectItem>
+                    <SelectItem value="office">Office</SelectItem>
+                    <SelectItem value="industrial">Industrial</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1 flex items-center gap-2 pt-5">
+                <Switch
+                  id="add-active"
+                  checked={form.active}
+                  onCheckedChange={(v) => setForm(f => ({ ...f, active: v }))}
+                />
+                <Label htmlFor="add-active" className="text-xs cursor-pointer">Active</Label>
+              </div>
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* Dates */}
+          <div className="space-y-3">
+            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Lease Dates</h3>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label htmlFor="add-commencementDate" className="text-xs">Commencement <span className="text-red-500">*</span></Label>
+                <Input
+                  id="add-commencementDate"
+                  type="date"
+                  value={form.commencementDate}
+                  onChange={(e) => setForm(f => ({ ...f, commencementDate: e.target.value }))}
+                  className="h-8 text-sm"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="add-expirationDate" className="text-xs">Expiration <span className="text-red-500">*</span></Label>
+                <Input
+                  id="add-expirationDate"
+                  type="date"
+                  value={form.expirationDate}
+                  onChange={(e) => setForm(f => ({ ...f, expirationDate: e.target.value }))}
+                  className="h-8 text-sm"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="add-rentCommencementDate" className="text-xs">Rent Start (optional)</Label>
+                <Input
+                  id="add-rentCommencementDate"
+                  type="date"
+                  value={form.rentCommencementDate}
+                  onChange={(e) => setForm(f => ({ ...f, rentCommencementDate: e.target.value }))}
+                  className="h-8 text-sm"
+                />
+              </div>
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* Initial Rent Term */}
+          <div className="space-y-3">
+            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Initial Rent Term (optional)</h3>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label htmlFor="add-baseRentValue" className="text-xs">Base Rent</Label>
+                <Input
+                  id="add-baseRentValue"
+                  type="number"
+                  step="0.01"
+                  value={initialTerm.baseRentValue}
+                  onChange={(e) => setInitialTerm(t => ({ ...t, baseRentValue: e.target.value }))}
+                  placeholder="e.g. 28.50"
+                  className="h-8 text-sm"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Rent Mode</Label>
+                <Select value={initialTerm.baseRentMode} onValueChange={(v) => setInitialTerm(t => ({ ...t, baseRentMode: v }))}>
+                  <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="PER_SF_YEAR">Per SF / Year</SelectItem>
+                    <SelectItem value="PER_MONTH">Per Month</SelectItem>
+                    <SelectItem value="PER_YEAR">Per Year</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Escalation</Label>
+                <Select value={initialTerm.escalationType} onValueChange={(v) => setInitialTerm(t => ({ ...t, escalationType: v }))}>
+                  <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="NONE">None</SelectItem>
+                    <SelectItem value="PERCENT">Percent</SelectItem>
+                    <SelectItem value="FIXED_DOLLAR">Fixed Dollar</SelectItem>
+                    <SelectItem value="CPI">CPI</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {initialTerm.escalationType !== 'NONE' && (
+                <>
+                  <div className="space-y-1">
+                    <Label htmlFor="add-escalationValue" className="text-xs">
+                      {initialTerm.escalationType === 'PERCENT' ? 'Rate (%)' : 'Amount ($)'}
+                    </Label>
+                    <Input
+                      id="add-escalationValue"
+                      type="number"
+                      step="0.01"
+                      value={initialTerm.escalationValue}
+                      onChange={(e) => setInitialTerm(t => ({ ...t, escalationValue: e.target.value }))}
+                      placeholder="e.g. 3.0"
+                      className="h-8 text-sm"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="add-escalationCycle" className="text-xs">Cycle (months)</Label>
+                    <Input
+                      id="add-escalationCycle"
+                      type="number"
+                      value={initialTerm.escalationCycleMonths}
+                      onChange={(e) => setInitialTerm(t => ({ ...t, escalationCycleMonths: e.target.value }))}
+                      placeholder="12"
+                      className="h-8 text-sm"
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* Notes */}
+          <div className="space-y-1">
+            <Label htmlFor="add-notes" className="text-xs">Notes</Label>
+            <Textarea
+              id="add-notes"
+              value={form.notes}
+              onChange={(e) => setForm(f => ({ ...f, notes: e.target.value }))}
+              placeholder="Any additional notes..."
+              className="text-sm min-h-[70px] resize-none"
+            />
+          </div>
+
+          {error && (
+            <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</p>
+          )}
+
+          <div className="flex gap-2 pt-1 pb-6">
+            <Button type="submit" disabled={mutation.isPending} className="flex-1 h-9">
+              {mutation.isPending ? 'Saving...' : 'Create Lease'}
+            </Button>
+            <Button type="button" variant="outline" onClick={resetAndClose} className="h-9 px-4">
+              Cancel
+            </Button>
+          </div>
+        </form>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+// ── Lease Detail / Edit Sheet ─────────────────────────────────────────────────
+
+interface LeaseDetail {
+  tenantName: string;
+  suite?: string;
+  sf?: string;
+  leaseType?: string;
+  commencementDate?: string;
+  expirationDate?: string;
+  rentCommencementDate?: string;
+  active?: boolean;
+  notes?: string;
+  terms?: Array<{
+    id: string;
+    startDate?: string;
+    endDate?: string;
+    baseRentValue?: string;
+    baseRentMode?: string;
+    escalationType?: string;
+    escalationValue?: string;
+    escalationCycleMonths?: number;
+  }>;
+  chargeLines?: Array<Record<string, unknown>>;
+  abatements?: Array<Record<string, unknown>>;
+  tiPrograms?: Array<Record<string, unknown>>;
+  recoveryModels?: Array<Record<string, unknown>>;
+  orgId?: string;
+  projectId?: string;
+}
+
+function LeaseDetailSheet({ leaseId, propertyId, open, onClose }: { leaseId: string; propertyId: string; open: boolean; onClose: () => void }) {
+  const [editing, setEditing] = useState(false);
+  const [editForm, setEditForm] = useState<LeaseFormState | null>(null);
+  const [editTerm, setEditTerm] = useState<RentTermFormState | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  const { data: detail, isLoading } = useQuery<LeaseDetail>({
     queryKey: ['lease-detail', leaseId],
     queryFn: async () => {
       const res = await apiRequest('GET', `/api/commercial-leases/leases/${leaseId}`);
-      return res.json();
+      return res.json() as Promise<LeaseDetail>;
     },
     enabled: open && !!leaseId,
   });
 
+  function startEdit() {
+    if (!detail) return;
+    setEditForm({
+      tenantName: detail.tenantName || '',
+      suite: detail.suite || '',
+      sf: detail.sf || '',
+      leaseType: detail.leaseType || 'retail',
+      commencementDate: detail.commencementDate?.slice(0, 10) || '',
+      expirationDate: detail.expirationDate?.slice(0, 10) || '',
+      rentCommencementDate: detail.rentCommencementDate?.slice(0, 10) || '',
+      active: detail.active !== false,
+      notes: detail.notes || '',
+    });
+    const term0 = detail.terms?.[0];
+    setEditTerm({
+      baseRentValue: term0?.baseRentValue || '',
+      baseRentMode: term0?.baseRentMode || 'PER_SF_YEAR',
+      escalationType: term0?.escalationType || 'NONE',
+      escalationValue: term0?.escalationValue || '',
+      escalationCycleMonths: term0?.escalationCycleMonths != null ? String(term0.escalationCycleMonths) : '12',
+    });
+    setSaveError(null);
+    setEditing(true);
+  }
+
+  function cancelEdit() {
+    setEditing(false);
+    setEditForm(null);
+    setEditTerm(null);
+    setSaveError(null);
+  }
+
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      if (!editForm) throw new Error('No form data');
+      const body: LeaseApiBody = {
+        lease: {
+          ...editForm,
+          sf: editForm.sf ? String(editForm.sf) : '0',
+          rentCommencementDate: editForm.rentCommencementDate || '',
+        },
+        initialTerm: editTerm
+          ? buildInitialTermPayload(editTerm, editForm.commencementDate, editForm.expirationDate)
+          : undefined,
+      };
+      const res = await apiRequest('PATCH', `/api/commercial-leases/operations/leases/${leaseId}`, body);
+      if (!res.ok) {
+        const err = await res.json() as { error?: string };
+        throw new Error(err.error || 'Failed to save changes');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['lease-detail', leaseId] });
+      queryClient.invalidateQueries({ queryKey: ['property-leases', propertyId] });
+      setEditing(false);
+      setEditForm(null);
+      setEditTerm(null);
+      setSaveError(null);
+    },
+    onError: (e: Error) => setSaveError(e.message),
+  });
+
+  function handleSave(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editForm?.tenantName || !editForm?.commencementDate || !editForm?.expirationDate) {
+      setSaveError('Tenant name, commencement date, and expiration date are required.');
+      return;
+    }
+    saveMutation.mutate();
+  }
+
   return (
-    <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
+    <Sheet open={open} onOpenChange={(v) => { if (!v) { cancelEdit(); onClose(); } }}>
       <SheetContent side="right" className="w-full sm:max-w-2xl overflow-y-auto">
         {isLoading ? (
           <div className="space-y-4 mt-6">
@@ -558,241 +1003,439 @@ function LeaseDetailSheet({ leaseId, open, onClose }: { leaseId: string; open: b
         ) : detail ? (
           <>
             <SheetHeader className="pb-4">
-              <SheetTitle className="text-lg font-semibold">{detail.tenantName}</SheetTitle>
-              <SheetDescription className="flex items-center gap-2 flex-wrap">
-                {detail.suite && <span className="text-gray-600">Suite {detail.suite}</span>}
-                {detail.sf && <><span>·</span><span>{fmtSf(detail.sf)}</span></>}
-                {detail.leaseType && (
-                  <Badge variant="outline" className={cn('text-[10px]', leaseTypeColors[detail.leaseType] || '')}>
-                    {detail.leaseType}
-                  </Badge>
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex-1 min-w-0">
+                  <SheetTitle className="text-lg font-semibold">{detail.tenantName}</SheetTitle>
+                  <SheetDescription className="flex items-center gap-2 flex-wrap mt-1">
+                    {detail.suite && <span className="text-gray-600">Suite {detail.suite}</span>}
+                    {detail.sf && <><span>·</span><span>{fmtSf(detail.sf)}</span></>}
+                    {detail.leaseType && (
+                      <Badge variant="outline" className={cn('text-[10px]', leaseTypeColors[detail.leaseType] || '')}>
+                        {detail.leaseType}
+                      </Badge>
+                    )}
+                    <Badge variant="outline" className={detail.active ? 'bg-green-50 text-green-700 border-green-200' : 'bg-gray-50 text-gray-600'}>
+                      {detail.active ? 'Active' : 'Inactive'}
+                    </Badge>
+                  </SheetDescription>
+                </div>
+                {!editing && (
+                  <Button variant="outline" size="sm" onClick={startEdit} className="shrink-0 h-8 gap-1.5 text-xs">
+                    <Pencil className="h-3 w-3" /> Edit
+                  </Button>
                 )}
-                <Badge variant="outline" className={detail.active ? 'bg-green-50 text-green-700 border-green-200' : 'bg-gray-50 text-gray-600'}>
-                  {detail.active ? 'Active' : 'Inactive'}
-                </Badge>
-              </SheetDescription>
+              </div>
             </SheetHeader>
 
-            {/* Core Dates */}
-            <div className="grid grid-cols-3 gap-3 mb-5">
-              <div className="rounded-lg border p-3">
-                <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Commencement</p>
-                <p className="text-sm font-medium">{fmtDate(detail.commencementDate)}</p>
-              </div>
-              <div className="rounded-lg border p-3">
-                <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Rent Start</p>
-                <p className="text-sm font-medium">{fmtDate(detail.rentCommencementDate || detail.commencementDate)}</p>
-              </div>
-              <div className="rounded-lg border p-3">
-                <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Expiration</p>
-                <p className="text-sm font-medium">{fmtDate(detail.expirationDate)}</p>
-              </div>
-            </div>
-
-            {/* Rent Terms */}
-            {detail.terms?.length > 0 && (
-              <div className="mb-5">
-                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                  <DollarSign className="h-3.5 w-3.5" /> Rent Terms
-                </h3>
-                <div className="rounded-lg border overflow-hidden">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="bg-gray-50 dark:bg-gray-800">
-                        <TableHead className="text-[10px] font-medium text-gray-500 uppercase">#</TableHead>
-                        <TableHead className="text-[10px] font-medium text-gray-500 uppercase">Period</TableHead>
-                        <TableHead className="text-[10px] font-medium text-gray-500 uppercase">Base Rent</TableHead>
-                        <TableHead className="text-[10px] font-medium text-gray-500 uppercase">Escalation</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {detail.terms.map((term: any, i: number) => (
-                        <TableRow key={term.id || i}>
-                          <TableCell className="text-xs text-gray-500">{i + 1}</TableCell>
-                          <TableCell className="text-xs">{fmtDate(term.startDate)} – {fmtDate(term.endDate)}</TableCell>
-                          <TableCell className="text-xs font-medium">
-                            ${parseFloat(term.baseRentValue || '0').toFixed(2)}
-                            <span className="text-gray-400 ml-1 text-[10px]">
-                              {term.baseRentMode === 'PER_SF_YEAR' ? 'PSF/yr' : term.baseRentMode === 'PER_MONTH' ? '/mo' : '/yr'}
-                            </span>
-                          </TableCell>
-                          <TableCell className="text-xs text-gray-500">
-                            {term.escalationType === 'NONE' ? 'None'
-                              : term.escalationType === 'FIXED_DOLLAR' ? `+$${parseFloat(term.escalationValue || '0').toFixed(2)} every ${term.escalationCycleMonths}mo`
-                              : term.escalationType === 'PERCENT' ? `+${parseFloat(term.escalationValue || '0').toFixed(2)}% every ${term.escalationCycleMonths}mo`
-                              : term.escalationType === 'CPI' ? `CPI every ${term.escalationCycleMonths}mo`
-                              : term.escalationType}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              </div>
-            )}
-
-            {/* Charge Lines (Recoveries) */}
-            {detail.chargeLines?.length > 0 && (
-              <div className="mb-5">
-                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                  <Layers className="h-3.5 w-3.5" /> Recoveries & Charges
-                </h3>
-                <div className="rounded-lg border overflow-hidden">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="bg-gray-50 dark:bg-gray-800">
-                        <TableHead className="text-[10px] font-medium text-gray-500 uppercase">Name</TableHead>
-                        <TableHead className="text-[10px] font-medium text-gray-500 uppercase">Type</TableHead>
-                        <TableHead className="text-[10px] font-medium text-gray-500 uppercase">Amount</TableHead>
-                        <TableHead className="text-[10px] font-medium text-gray-500 uppercase">Period</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {detail.chargeLines.map((cl: any) => (
-                        <TableRow key={cl.id}>
-                          <TableCell className="text-xs font-medium">{cl.lineName}</TableCell>
-                          <TableCell className="text-[10px] text-gray-500">{cl.lineType?.replace(/_/g, ' ')}</TableCell>
-                          <TableCell className="text-xs">
-                            ${parseFloat(cl.amountValue || '0').toFixed(2)}
-                            <span className="text-gray-400 ml-1 text-[10px]">{cl.amountMode === 'PER_SF_MONTHLY' ? 'PSF/mo' : '/mo'}</span>
-                          </TableCell>
-                          <TableCell className="text-xs text-gray-500">{fmtDate(cl.startDate)}{cl.endDate ? ` – ${fmtDate(cl.endDate)}` : ''}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              </div>
-            )}
-
-            {/* Abatements / Concessions */}
-            {detail.abatements?.length > 0 && (
-              <div className="mb-5">
-                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                  <Tag className="h-3.5 w-3.5" /> Abatements & Concessions
-                </h3>
-                <div className="space-y-2">
-                  {detail.abatements.map((ab: any) => (
-                    <div key={ab.id} className="rounded-lg border p-3">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-xs font-medium capitalize">{ab.abatementType?.replace(/_/g, ' ')}</p>
-                          <p className="text-[10px] text-gray-500 mt-0.5">
-                            {fmtDate(ab.startDate)} – {fmtDate(ab.endDate)} · Applies to: {ab.appliesTo?.replace(/_/g, ' ')}
-                          </p>
-                        </div>
-                        <Badge variant="secondary" className="text-xs">
-                          {ab.abatementType === 'FREE_RENT' ? 'Free Rent'
-                            : ab.abatementType === 'PERCENT_DISCOUNT' ? `${parseFloat(ab.value || '0').toFixed(1)}% discount`
-                            : `$${parseFloat(ab.value || '0').toFixed(2)} credit`}
-                        </Badge>
-                      </div>
+            {/* Edit Form */}
+            {editing && editForm && editTerm ? (
+              <form onSubmit={handleSave} className="space-y-5">
+                <div className="space-y-3">
+                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Tenant Details</h3>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="col-span-2 space-y-1">
+                      <Label className="text-xs">Tenant Name <span className="text-red-500">*</span></Label>
+                      <Input
+                        value={editForm.tenantName}
+                        onChange={(e) => setEditForm((f) => f ? { ...f, tenantName: e.target.value } : f)}
+                        className="h-8 text-sm"
+                      />
                     </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* TI Programs */}
-            {detail.tiPrograms?.length > 0 && (
-              <div className="mb-5">
-                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                  <Building className="h-3.5 w-3.5" /> Tenant Improvement (TI)
-                </h3>
-                {detail.tiPrograms.map((ti: any) => (
-                  <div key={ti.id} className="rounded-lg border p-3 space-y-2">
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <p className="text-[10px] text-gray-500 uppercase tracking-wider">Allowance</p>
-                        <p className="text-sm font-medium">
-                          ${parseFloat(ti.allowanceValue || '0').toFixed(2)}
-                          <span className="text-xs text-gray-400 ml-1">{ti.allowanceMode === 'PER_SF' ? 'PSF' : 'total'}</span>
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] text-gray-500 uppercase tracking-wider">Amortization</p>
-                        <p className="text-sm font-medium">
-                          {ti.amortizeEnabled
-                            ? `${ti.amortizeTermMonths}mo @ ${parseFloat(ti.amortizeRateAnnual || '0').toFixed(2)}%`
-                            : 'None'}
-                        </p>
-                      </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Suite</Label>
+                      <Input
+                        value={editForm.suite}
+                        onChange={(e) => setEditForm((f) => f ? { ...f, suite: e.target.value } : f)}
+                        className="h-8 text-sm"
+                      />
                     </div>
-                    {ti.draws?.length > 0 && (
-                      <div>
-                        <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Draws ({ti.draws.length})</p>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Square Footage</Label>
+                      <Input
+                        type="number"
+                        value={editForm.sf}
+                        onChange={(e) => setEditForm((f) => f ? { ...f, sf: e.target.value } : f)}
+                        className="h-8 text-sm"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Lease Type</Label>
+                      <Select value={editForm.leaseType} onValueChange={(v) => setEditForm((f) => f ? { ...f, leaseType: v } : f)}>
+                        <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="retail">Retail</SelectItem>
+                          <SelectItem value="office">Office</SelectItem>
+                          <SelectItem value="industrial">Industrial</SelectItem>
+                          <SelectItem value="other">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1 flex items-center gap-2 pt-5">
+                      <Switch
+                        checked={editForm.active}
+                        onCheckedChange={(v) => setEditForm((f) => f ? { ...f, active: v } : f)}
+                      />
+                      <Label className="text-xs cursor-pointer">Active</Label>
+                    </div>
+                  </div>
+                </div>
+
+                <Separator />
+
+                <div className="space-y-3">
+                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Lease Dates</h3>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <Label className="text-xs">Commencement <span className="text-red-500">*</span></Label>
+                      <Input
+                        type="date"
+                        value={editForm.commencementDate}
+                        onChange={(e) => setEditForm((f) => f ? { ...f, commencementDate: e.target.value } : f)}
+                        className="h-8 text-sm"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Expiration <span className="text-red-500">*</span></Label>
+                      <Input
+                        type="date"
+                        value={editForm.expirationDate}
+                        onChange={(e) => setEditForm((f) => f ? { ...f, expirationDate: e.target.value } : f)}
+                        className="h-8 text-sm"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Rent Start (optional)</Label>
+                      <Input
+                        type="date"
+                        value={editForm.rentCommencementDate}
+                        onChange={(e) => setEditForm((f) => f ? { ...f, rentCommencementDate: e.target.value } : f)}
+                        className="h-8 text-sm"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <Separator />
+
+                {/* Rent Term Editing */}
+                <div className="space-y-3">
+                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
+                    <DollarSign className="h-3.5 w-3.5" /> Rent Term (Term 1)
+                  </h3>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <Label className="text-xs">Base Rent</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={editTerm.baseRentValue}
+                        onChange={(e) => setEditTerm((t) => t ? { ...t, baseRentValue: e.target.value } : t)}
+                        placeholder="e.g. 28.50"
+                        className="h-8 text-sm"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Rent Mode</Label>
+                      <Select value={editTerm.baseRentMode} onValueChange={(v) => setEditTerm((t) => t ? { ...t, baseRentMode: v } : t)}>
+                        <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="PER_SF_YEAR">Per SF / Year</SelectItem>
+                          <SelectItem value="PER_MONTH">Per Month</SelectItem>
+                          <SelectItem value="PER_YEAR">Per Year</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Escalation</Label>
+                      <Select value={editTerm.escalationType} onValueChange={(v) => setEditTerm((t) => t ? { ...t, escalationType: v } : t)}>
+                        <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="NONE">None</SelectItem>
+                          <SelectItem value="PERCENT">Percent</SelectItem>
+                          <SelectItem value="FIXED_DOLLAR">Fixed Dollar</SelectItem>
+                          <SelectItem value="CPI">CPI</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {editTerm.escalationType !== 'NONE' && (
+                      <>
                         <div className="space-y-1">
-                          {ti.draws.map((draw: any) => (
-                            <div key={draw.id} className="flex justify-between text-xs">
-                              <span className="text-gray-500">{fmtDate(draw.drawDate)}</span>
-                              <span className="font-medium">${parseFloat(draw.amount || '0').toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                            </div>
-                          ))}
+                          <Label className="text-xs">
+                            {editTerm.escalationType === 'PERCENT' ? 'Rate (%)' : 'Amount ($)'}
+                          </Label>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            value={editTerm.escalationValue}
+                            onChange={(e) => setEditTerm((t) => t ? { ...t, escalationValue: e.target.value } : t)}
+                            placeholder="e.g. 3.0"
+                            className="h-8 text-sm"
+                          />
                         </div>
-                      </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs">Cycle (months)</Label>
+                          <Input
+                            type="number"
+                            value={editTerm.escalationCycleMonths}
+                            onChange={(e) => setEditTerm((t) => t ? { ...t, escalationCycleMonths: e.target.value } : t)}
+                            placeholder="12"
+                            className="h-8 text-sm"
+                          />
+                        </div>
+                      </>
                     )}
                   </div>
-                ))}
-              </div>
-            )}
+                </div>
 
-            {/* Recovery Models */}
-            {detail.recoveryModels?.length > 0 && (
-              <div className="mb-5">
-                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                  <RefreshCw className="h-3.5 w-3.5" /> Recovery Model
-                </h3>
-                {detail.recoveryModels.map((rm: any) => (
-                  <div key={rm.id} className="rounded-lg border p-3 space-y-2">
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <p className="text-[10px] text-gray-500 uppercase tracking-wider">Tenant Share</p>
-                        <p className="text-xs font-medium">
-                          {rm.tenantShareMode === 'BY_SF' ? 'Pro-rata by SF' : `${parseFloat(rm.tenantSharePercent || '0').toFixed(2)}% fixed`}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] text-gray-500 uppercase tracking-wider">Billing</p>
-                        <p className="text-xs font-medium">{rm.billingTiming?.replace(/_/g, ' ')}</p>
-                      </div>
-                      {rm.baseYear && (
-                        <div>
-                          <p className="text-[10px] text-gray-500 uppercase tracking-wider">Base Year</p>
-                          <p className="text-xs font-medium">{rm.baseYear}</p>
-                        </div>
-                      )}
-                      {rm.grossupEnabled && (
-                        <div>
-                          <p className="text-[10px] text-gray-500 uppercase tracking-wider">Gross-up</p>
-                          <p className="text-xs font-medium">{parseFloat(rm.grossupOccupancyThreshold || '0.95') * 100}% threshold</p>
-                        </div>
-                      )}
+                <Separator />
+
+                <div className="space-y-1">
+                  <Label className="text-xs">Notes</Label>
+                  <Textarea
+                    value={editForm.notes}
+                    onChange={(e) => setEditForm((f) => f ? { ...f, notes: e.target.value } : f)}
+                    className="text-sm min-h-[70px] resize-none"
+                  />
+                </div>
+
+                {saveError && (
+                  <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{saveError}</p>
+                )}
+
+                <div className="flex gap-2 pb-6">
+                  <Button type="submit" disabled={saveMutation.isPending} className="h-9 gap-1.5">
+                    <Save className="h-3.5 w-3.5" />
+                    {saveMutation.isPending ? 'Saving...' : 'Save Changes'}
+                  </Button>
+                  <Button type="button" variant="outline" onClick={cancelEdit} className="h-9 gap-1.5">
+                    <X className="h-3.5 w-3.5" /> Cancel
+                  </Button>
+                </div>
+              </form>
+            ) : (
+              <>
+                {/* Core Dates */}
+                <div className="grid grid-cols-3 gap-3 mb-5">
+                  <div className="rounded-lg border p-3">
+                    <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Commencement</p>
+                    <p className="text-sm font-medium">{fmtDate(detail.commencementDate)}</p>
+                  </div>
+                  <div className="rounded-lg border p-3">
+                    <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Rent Start</p>
+                    <p className="text-sm font-medium">{fmtDate(detail.rentCommencementDate || detail.commencementDate)}</p>
+                  </div>
+                  <div className="rounded-lg border p-3">
+                    <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Expiration</p>
+                    <p className="text-sm font-medium">{fmtDate(detail.expirationDate)}</p>
+                  </div>
+                </div>
+
+                {/* Rent Terms */}
+                {detail.terms?.length > 0 && (
+                  <div className="mb-5">
+                    <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                      <DollarSign className="h-3.5 w-3.5" /> Rent Terms
+                    </h3>
+                    <div className="rounded-lg border overflow-hidden">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-gray-50 dark:bg-gray-800">
+                            <TableHead className="text-[10px] font-medium text-gray-500 uppercase">#</TableHead>
+                            <TableHead className="text-[10px] font-medium text-gray-500 uppercase">Period</TableHead>
+                            <TableHead className="text-[10px] font-medium text-gray-500 uppercase">Base Rent</TableHead>
+                            <TableHead className="text-[10px] font-medium text-gray-500 uppercase">Escalation</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {detail.terms.map((term: any, i: number) => (
+                            <TableRow key={term.id || i}>
+                              <TableCell className="text-xs text-gray-500">{i + 1}</TableCell>
+                              <TableCell className="text-xs">{fmtDate(term.startDate)} – {fmtDate(term.endDate)}</TableCell>
+                              <TableCell className="text-xs font-medium">
+                                ${parseFloat(term.baseRentValue || '0').toFixed(2)}
+                                <span className="text-gray-400 ml-1 text-[10px]">
+                                  {term.baseRentMode === 'PER_SF_YEAR' ? 'PSF/yr' : term.baseRentMode === 'PER_MONTH' ? '/mo' : '/yr'}
+                                </span>
+                              </TableCell>
+                              <TableCell className="text-xs text-gray-500">
+                                {term.escalationType === 'NONE' ? 'None'
+                                  : term.escalationType === 'FIXED_DOLLAR' ? `+$${parseFloat(term.escalationValue || '0').toFixed(2)} every ${term.escalationCycleMonths}mo`
+                                  : term.escalationType === 'PERCENT' ? `+${parseFloat(term.escalationValue || '0').toFixed(2)}% every ${term.escalationCycleMonths}mo`
+                                  : term.escalationType === 'CPI' ? `CPI every ${term.escalationCycleMonths}mo`
+                                  : term.escalationType}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
                     </div>
-                    {rm.categories?.length > 0 && (
-                      <div>
-                        <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Categories</p>
-                        <div className="flex flex-wrap gap-1">
-                          {rm.categories.map((cat: any) => (
-                            <Badge key={cat.id} variant="outline" className="text-[10px]">
-                              {cat.category} — {cat.stopType?.replace(/_/g, ' ') || 'None'}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-                    )}
                   </div>
-                ))}
-              </div>
-            )}
+                )}
 
-            {/* Notes */}
-            {detail.notes && (
-              <div className="mb-5">
-                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                  <FileText className="h-3.5 w-3.5" /> Notes
-                </h3>
-                <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">{detail.notes}</p>
-              </div>
+                {/* Charge Lines (Recoveries) */}
+                {detail.chargeLines?.length > 0 && (
+                  <div className="mb-5">
+                    <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                      <Layers className="h-3.5 w-3.5" /> Recoveries & Charges
+                    </h3>
+                    <div className="rounded-lg border overflow-hidden">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-gray-50 dark:bg-gray-800">
+                            <TableHead className="text-[10px] font-medium text-gray-500 uppercase">Name</TableHead>
+                            <TableHead className="text-[10px] font-medium text-gray-500 uppercase">Type</TableHead>
+                            <TableHead className="text-[10px] font-medium text-gray-500 uppercase">Amount</TableHead>
+                            <TableHead className="text-[10px] font-medium text-gray-500 uppercase">Period</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {detail.chargeLines.map((cl: any) => (
+                            <TableRow key={cl.id}>
+                              <TableCell className="text-xs font-medium">{cl.lineName}</TableCell>
+                              <TableCell className="text-[10px] text-gray-500">{cl.lineType?.replace(/_/g, ' ')}</TableCell>
+                              <TableCell className="text-xs">
+                                ${parseFloat(cl.amountValue || '0').toFixed(2)}
+                                <span className="text-gray-400 ml-1 text-[10px]">{cl.amountMode === 'PER_SF_MONTHLY' ? 'PSF/mo' : '/mo'}</span>
+                              </TableCell>
+                              <TableCell className="text-xs text-gray-500">{fmtDate(cl.startDate)}{cl.endDate ? ` – ${fmtDate(cl.endDate)}` : ''}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
+                )}
+
+                {/* Abatements / Concessions */}
+                {detail.abatements?.length > 0 && (
+                  <div className="mb-5">
+                    <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                      <Tag className="h-3.5 w-3.5" /> Abatements & Concessions
+                    </h3>
+                    <div className="space-y-2">
+                      {detail.abatements.map((ab: any) => (
+                        <div key={ab.id} className="rounded-lg border p-3">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-xs font-medium capitalize">{ab.abatementType?.replace(/_/g, ' ')}</p>
+                              <p className="text-[10px] text-gray-500 mt-0.5">
+                                {fmtDate(ab.startDate)} – {fmtDate(ab.endDate)} · Applies to: {ab.appliesTo?.replace(/_/g, ' ')}
+                              </p>
+                            </div>
+                            <Badge variant="secondary" className="text-xs">
+                              {ab.abatementType === 'FREE_RENT' ? 'Free Rent'
+                                : ab.abatementType === 'PERCENT_DISCOUNT' ? `${parseFloat(ab.value || '0').toFixed(1)}% discount`
+                                : `$${parseFloat(ab.value || '0').toFixed(2)} credit`}
+                            </Badge>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* TI Programs */}
+                {detail.tiPrograms?.length > 0 && (
+                  <div className="mb-5">
+                    <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                      <Building className="h-3.5 w-3.5" /> Tenant Improvement (TI)
+                    </h3>
+                    {detail.tiPrograms.map((ti: any) => (
+                      <div key={ti.id} className="rounded-lg border p-3 space-y-2">
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <p className="text-[10px] text-gray-500 uppercase tracking-wider">Allowance</p>
+                            <p className="text-sm font-medium">
+                              ${parseFloat(ti.allowanceValue || '0').toFixed(2)}
+                              <span className="text-xs text-gray-400 ml-1">{ti.allowanceMode === 'PER_SF' ? 'PSF' : 'total'}</span>
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] text-gray-500 uppercase tracking-wider">Amortization</p>
+                            <p className="text-sm font-medium">
+                              {ti.amortizeEnabled
+                                ? `${ti.amortizeTermMonths}mo @ ${parseFloat(ti.amortizeRateAnnual || '0').toFixed(2)}%`
+                                : 'None'}
+                            </p>
+                          </div>
+                        </div>
+                        {ti.draws?.length > 0 && (
+                          <div>
+                            <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Draws ({ti.draws.length})</p>
+                            <div className="space-y-1">
+                              {ti.draws.map((draw: any) => (
+                                <div key={draw.id} className="flex justify-between text-xs">
+                                  <span className="text-gray-500">{fmtDate(draw.drawDate)}</span>
+                                  <span className="font-medium">${parseFloat(draw.amount || '0').toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Recovery Models */}
+                {detail.recoveryModels?.length > 0 && (
+                  <div className="mb-5">
+                    <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                      <RefreshCw className="h-3.5 w-3.5" /> Recovery Model
+                    </h3>
+                    {detail.recoveryModels.map((rm: any) => (
+                      <div key={rm.id} className="rounded-lg border p-3 space-y-2">
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <p className="text-[10px] text-gray-500 uppercase tracking-wider">Tenant Share</p>
+                            <p className="text-xs font-medium">
+                              {rm.tenantShareMode === 'BY_SF' ? 'Pro-rata by SF' : `${parseFloat(rm.tenantSharePercent || '0').toFixed(2)}% fixed`}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] text-gray-500 uppercase tracking-wider">Billing</p>
+                            <p className="text-xs font-medium">{rm.billingTiming?.replace(/_/g, ' ')}</p>
+                          </div>
+                          {rm.baseYear && (
+                            <div>
+                              <p className="text-[10px] text-gray-500 uppercase tracking-wider">Base Year</p>
+                              <p className="text-xs font-medium">{rm.baseYear}</p>
+                            </div>
+                          )}
+                          {rm.grossupEnabled && (
+                            <div>
+                              <p className="text-[10px] text-gray-500 uppercase tracking-wider">Gross-up</p>
+                              <p className="text-xs font-medium">{parseFloat(rm.grossupOccupancyThreshold || '0.95') * 100}% threshold</p>
+                            </div>
+                          )}
+                        </div>
+                        {rm.categories?.length > 0 && (
+                          <div>
+                            <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Categories</p>
+                            <div className="flex flex-wrap gap-1">
+                              {rm.categories.map((cat: any) => (
+                                <Badge key={cat.id} variant="outline" className="text-[10px]">
+                                  {cat.category} — {cat.stopType?.replace(/_/g, ' ') || 'None'}
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Notes */}
+                {detail.notes && (
+                  <div className="mb-5">
+                    <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                      <FileText className="h-3.5 w-3.5" /> Notes
+                    </h3>
+                    <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">{detail.notes}</p>
+                  </div>
+                )}
+              </>
             )}
           </>
         ) : (
@@ -807,8 +1450,8 @@ function LeaseDetailSheet({ leaseId, open, onClose }: { leaseId: string; open: b
 
 export function PropertyLeasesTab({ propertyId }: { propertyId: string }) {
   const [selectedLeaseId, setSelectedLeaseId] = useState<string | null>(null);
-
   const [showInactive, setShowInactive] = useState(false);
+  const [addSheetOpen, setAddSheetOpen] = useState(false);
 
   const { data, isLoading } = useQuery<{ data: any[]; total: number }>({
     queryKey: ['property-leases', propertyId, showInactive],
@@ -841,14 +1484,23 @@ export function PropertyLeasesTab({ propertyId }: { propertyId: string }) {
             <Badge variant="secondary" className="text-[10px] h-4 px-1.5">{data.total}</Badge>
           )}
         </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => setShowInactive(!showInactive)}
-          className="text-xs text-gray-500 h-7"
-        >
-          {showInactive ? 'Hide inactive' : 'Show all'}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowInactive(!showInactive)}
+            className="text-xs text-gray-500 h-7"
+          >
+            {showInactive ? 'Hide inactive' : 'Show all'}
+          </Button>
+          <Button
+            size="sm"
+            onClick={() => setAddSheetOpen(true)}
+            className="h-7 gap-1.5 text-xs"
+          >
+            <Plus className="h-3.5 w-3.5" /> Add Lease
+          </Button>
+        </div>
       </div>
 
       {/* Loading */}
@@ -925,10 +1577,18 @@ export function PropertyLeasesTab({ propertyId }: { propertyId: string }) {
         </Card>
       )}
 
-      {/* Lease Detail Sheet */}
+      {/* Add Lease Sheet */}
+      <AddLeaseSheet
+        propertyId={propertyId}
+        open={addSheetOpen}
+        onClose={() => setAddSheetOpen(false)}
+      />
+
+      {/* Lease Detail / Edit Sheet */}
       {selectedLeaseId && (
         <LeaseDetailSheet
           leaseId={selectedLeaseId}
+          propertyId={propertyId}
           open={!!selectedLeaseId}
           onClose={() => setSelectedLeaseId(null)}
         />
