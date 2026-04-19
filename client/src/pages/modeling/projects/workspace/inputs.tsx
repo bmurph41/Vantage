@@ -46,9 +46,10 @@ import {
   Settings2, Sun, TrendingUp, TrendingDown, DollarSign, Percent, ChevronDown,
   ChevronRight, Save, Plus, Trash2, Calculator, RefreshCw, Eye, EyeOff,
   Store, Anchor, Home, Building2, Warehouse, Bed, Wrench, Users, Zap,
-  Shield, Receipt, BarChart3, Globe, ArrowUp, Hash, Info,
+  Shield, Receipt, BarChart3, Globe, ArrowUp, Hash, Info, Brain,
   type LucideIcon
 } from 'lucide-react';
+import { Link } from 'wouter';
 import { useToast } from '@/hooks/use-toast';
 import type { ModelingProject } from '@shared/schema';
 import { getModelConfig } from '@shared/asset-class-model-config';
@@ -1184,14 +1185,21 @@ export default function InputsAssumptions({ project }: InputsAssumptionsProps) {
       {currentMode === 'upload' && (
         <Card className="border-blue-200 bg-blue-50/50 dark:bg-blue-950/20">
           <CardContent className="py-4 px-4">
-            <div className="flex items-center gap-3">
-              <Info className="h-5 w-5 text-blue-500 shrink-0" />
-              <div>
+            <div className="flex items-start gap-3">
+              <Info className="h-5 w-5 text-blue-500 shrink-0 mt-0.5" />
+              <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium">Upload Mode Active</p>
-                <p className="text-xs text-muted-foreground">
-                  Financial data will come from your uploaded P&L statements on the Historical P&L tab.
-                  Switch to "Direct Input" above to enter assumptions manually.
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Financial data comes from your uploaded P&L statements. After uploading a document on the <strong>Uploads</strong> tab, open <strong>Document Intelligence</strong> to run AI parsing, review extracted line items, and approve them before they populate the model.
                 </p>
+                <div className="flex gap-2 mt-2">
+                  <Link href={`/modeling/projects/${projectId}/doc-intel`}>
+                    <Button size="sm" variant="default" className="gap-1.5 h-7 text-xs">
+                      <Brain className="h-3.5 w-3.5" />
+                      Open Document Intelligence
+                    </Button>
+                  </Link>
+                </div>
               </div>
             </div>
           </CardContent>

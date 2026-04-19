@@ -1807,6 +1807,7 @@ export default function SetupWizard() {
         zipCode: payload.location.zipCode || undefined,
         purchasePrice: payload.acquisition.purchasePrice || undefined,
         ebitda: payload.ebitda || undefined,
+        modelInputMode: wizardStagedFiles.length > 0 ? 'upload' : undefined,
         dealSource: ["direct_to_seller", "broker", "owned_marina"].includes(payload.dealSource)
           ? payload.dealSource
           : payload.dealSource === "direct" ? "direct_to_seller" : undefined,
