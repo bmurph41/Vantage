@@ -27,7 +27,7 @@ import {
   ChevronRight, Phone, Mail, Calendar, FileText, BarChart3,
   Newspaper, CheckCircle2, Circle, AlertCircle, MessageSquare,
   Anchor, Building2, ArrowUpRight, Scale, Home, Building, Users,
-  RefreshCw, Tag, Layers, Plus, Pencil, X, Save,
+  RefreshCw, Tag, Layers, Plus, Pencil, X, Save, Trash2,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { apiRequest, queryClient } from '@/lib/queryClient';
@@ -904,11 +904,61 @@ interface LeaseDetail {
   projectId?: string;
 }
 
+interface NewTermForm {
+  startDate: string;
+  endDate: string;
+  baseRentValue: string;
+  baseRentMode: string;
+  escalationType: string;
+  escalationValue: string;
+  escalationCycleMonths: string;
+}
+interface NewChargeLineForm {
+  lineName: string;
+  lineType: string;
+  amountValue: string;
+  amountMode: string;
+  startDate: string;
+  endDate: string;
+}
+interface NewAbatementForm {
+  abatementType: string;
+  startDate: string;
+  endDate: string;
+  appliesTo: string;
+  value: string;
+}
+
+const BLANK_TERM: NewTermForm = {
+  startDate: '', endDate: '', baseRentValue: '', baseRentMode: 'PER_SF_YEAR',
+  escalationType: 'NONE', escalationValue: '', escalationCycleMonths: '12',
+};
+const BLANK_CHARGE_LINE: NewChargeLineForm = {
+  lineName: '', lineType: 'RECOVERY_CAM', amountValue: '', amountMode: 'FIXED_MONTHLY',
+  startDate: '', endDate: '',
+};
+const BLANK_ABATEMENT: NewAbatementForm = {
+  abatementType: 'FREE_RENT', startDate: '', endDate: '', appliesTo: 'BASE_ONLY', value: '',
+};
+
 function LeaseDetailSheet({ leaseId, propertyId, open, onClose }: { leaseId: string; propertyId: string; open: boolean; onClose: () => void }) {
   const [editing, setEditing] = useState(false);
   const [editForm, setEditForm] = useState<LeaseFormState | null>(null);
   const [editTerm, setEditTerm] = useState<RentTermFormState | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+
+  const [addingTerm, setAddingTerm] = useState(false);
+  const [newTerm, setNewTerm] = useState<NewTermForm>(BLANK_TERM);
+  const [editingTermId, setEditingTermId] = useState<string | null>(null);
+  const [editTermForm, setEditTermForm] = useState<NewTermForm>(BLANK_TERM);
+  const [addingChargeLine, setAddingChargeLine] = useState(false);
+  const [newChargeLine, setNewChargeLine] = useState<NewChargeLineForm>(BLANK_CHARGE_LINE);
+  const [editingChargeLineId, setEditingChargeLineId] = useState<string | null>(null);
+  const [editChargeLineForm, setEditChargeLineForm] = useState<NewChargeLineForm>(BLANK_CHARGE_LINE);
+  const [addingAbatement, setAddingAbatement] = useState(false);
+  const [newAbatement, setNewAbatement] = useState<NewAbatementForm>(BLANK_ABATEMENT);
+  const [editingAbatementId, setEditingAbatementId] = useState<string | null>(null);
+  const [editAbatementForm, setEditAbatementForm] = useState<NewAbatementForm>(BLANK_ABATEMENT);
 
   const { data: detail, isLoading } = useQuery<LeaseDetail>({
     queryKey: ['lease-detail', leaseId],
@@ -991,6 +1041,123 @@ function LeaseDetailSheet({ leaseId, propertyId, open, onClose }: { leaseId: str
     }
     saveMutation.mutate();
   }
+
+  function invalidateLeaseData() {
+    queryClient.invalidateQueries({ queryKey: ['lease-detail', leaseId] });
+    queryClient.invalidateQueries({ queryKey: ['property-leases', propertyId] });
+    queryClient.invalidateQueries({ queryKey: ['property-lease-stats', propertyId] });
+  }
+
+  function buildTermPayload(data: NewTermForm) {
+    return {
+      startDate: data.startDate,
+      endDate: data.endDate,
+      baseRentValue: data.baseRentValue || '0',
+      baseRentMode: data.baseRentMode,
+      escalationType: data.escalationType,
+      escalationValue: data.escalationType !== 'NONE' && data.escalationValue ? data.escalationValue : '0',
+      escalationCycleMonths: data.escalationType !== 'NONE' && data.escalationCycleMonths ? parseInt(data.escalationCycleMonths) : 12,
+    };
+  }
+
+  function buildChargeLinePayload(data: NewChargeLineForm) {
+    return {
+      lineName: data.lineName,
+      lineType: data.lineType,
+      amountValue: data.amountValue || '0',
+      amountMode: data.amountMode,
+      startDate: data.startDate,
+      endDate: data.endDate || null,
+    };
+  }
+
+  function buildAbatementPayload(data: NewAbatementForm) {
+    return {
+      abatementType: data.abatementType,
+      startDate: data.startDate,
+      endDate: data.endDate,
+      appliesTo: data.appliesTo,
+      value: data.abatementType === 'FREE_RENT' ? '0' : (data.value || '0'),
+    };
+  }
+
+  const addTermMutation = useMutation({
+    mutationFn: async (data: NewTermForm) => {
+      const res = await apiRequest('POST', `/api/commercial-leases/leases/${leaseId}/terms`, buildTermPayload(data));
+      if (!res.ok) { const e = await res.json() as { error?: string }; throw new Error(e.error || 'Failed to add term'); }
+      return res.json();
+    },
+    onSuccess: () => { invalidateLeaseData(); setAddingTerm(false); setNewTerm(BLANK_TERM); },
+  });
+
+  const updateTermMutation = useMutation({
+    mutationFn: async ({ termId, data }: { termId: string; data: NewTermForm }) => {
+      const res = await apiRequest('PUT', `/api/commercial-leases/leases/${leaseId}/terms/${termId}`, buildTermPayload(data));
+      if (!res.ok) { const e = await res.json() as { error?: string }; throw new Error(e.error || 'Failed to update term'); }
+      return res.json();
+    },
+    onSuccess: () => { invalidateLeaseData(); setEditingTermId(null); },
+  });
+
+  const deleteTermMutation = useMutation({
+    mutationFn: async (termId: string) => {
+      const res = await apiRequest('DELETE', `/api/commercial-leases/leases/${leaseId}/terms/${termId}`);
+      if (!res.ok) { const e = await res.json() as { error?: string }; throw new Error(e.error || 'Failed to delete term'); }
+    },
+    onSuccess: () => invalidateLeaseData(),
+  });
+
+  const addChargeLineMutation = useMutation({
+    mutationFn: async (data: NewChargeLineForm) => {
+      const res = await apiRequest('POST', `/api/commercial-leases/leases/${leaseId}/charge-lines`, buildChargeLinePayload(data));
+      if (!res.ok) { const e = await res.json() as { error?: string }; throw new Error(e.error || 'Failed to add charge line'); }
+      return res.json();
+    },
+    onSuccess: () => { invalidateLeaseData(); setAddingChargeLine(false); setNewChargeLine(BLANK_CHARGE_LINE); },
+  });
+
+  const updateChargeLineMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: NewChargeLineForm }) => {
+      const res = await apiRequest('PUT', `/api/commercial-leases/leases/${leaseId}/charge-lines/${id}`, buildChargeLinePayload(data));
+      if (!res.ok) { const e = await res.json() as { error?: string }; throw new Error(e.error || 'Failed to update charge line'); }
+      return res.json();
+    },
+    onSuccess: () => { invalidateLeaseData(); setEditingChargeLineId(null); },
+  });
+
+  const deleteChargeLineMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await apiRequest('DELETE', `/api/commercial-leases/leases/${leaseId}/charge-lines/${id}`);
+      if (!res.ok) { const e = await res.json() as { error?: string }; throw new Error(e.error || 'Failed to delete charge line'); }
+    },
+    onSuccess: () => invalidateLeaseData(),
+  });
+
+  const addAbatementMutation = useMutation({
+    mutationFn: async (data: NewAbatementForm) => {
+      const res = await apiRequest('POST', `/api/commercial-leases/leases/${leaseId}/abatements`, buildAbatementPayload(data));
+      if (!res.ok) { const e = await res.json() as { error?: string }; throw new Error(e.error || 'Failed to add abatement'); }
+      return res.json();
+    },
+    onSuccess: () => { invalidateLeaseData(); setAddingAbatement(false); setNewAbatement(BLANK_ABATEMENT); },
+  });
+
+  const updateAbatementMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: NewAbatementForm }) => {
+      const res = await apiRequest('PUT', `/api/commercial-leases/leases/${leaseId}/abatements/${id}`, buildAbatementPayload(data));
+      if (!res.ok) { const e = await res.json() as { error?: string }; throw new Error(e.error || 'Failed to update abatement'); }
+      return res.json();
+    },
+    onSuccess: () => { invalidateLeaseData(); setEditingAbatementId(null); },
+  });
+
+  const deleteAbatementMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await apiRequest('DELETE', `/api/commercial-leases/leases/${leaseId}/abatements/${id}`);
+      if (!res.ok) { const e = await res.json() as { error?: string }; throw new Error(e.error || 'Failed to delete abatement'); }
+    },
+    onSuccess: () => invalidateLeaseData(),
+  });
 
   return (
     <Sheet open={open} onOpenChange={(v) => { if (!v) { cancelEdit(); onClose(); } }}>
@@ -1233,11 +1400,21 @@ function LeaseDetailSheet({ leaseId, propertyId, open, onClose }: { leaseId: str
                 </div>
 
                 {/* Rent Terms */}
-                {detail.terms?.length > 0 && (
-                  <div className="mb-5">
-                    <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                <div className="mb-5">
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
                       <DollarSign className="h-3.5 w-3.5" /> Rent Terms
                     </h3>
+                    <Button
+                      variant="ghost" size="sm"
+                      className="h-6 px-2 text-xs gap-1"
+                      onClick={() => { setAddingTerm(true); setNewTerm(BLANK_TERM); }}
+                      disabled={addingTerm}
+                    >
+                      <Plus className="h-3 w-3" /> Add
+                    </Button>
+                  </div>
+                  {(detail.terms?.length > 0 || addingTerm) && (
                     <div className="rounded-lg border overflow-hidden">
                       <Table>
                         <TableHeader>
@@ -1246,40 +1423,217 @@ function LeaseDetailSheet({ leaseId, propertyId, open, onClose }: { leaseId: str
                             <TableHead className="text-[10px] font-medium text-gray-500 uppercase">Period</TableHead>
                             <TableHead className="text-[10px] font-medium text-gray-500 uppercase">Base Rent</TableHead>
                             <TableHead className="text-[10px] font-medium text-gray-500 uppercase">Escalation</TableHead>
+                            <TableHead className="w-8" />
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {detail.terms.map((term: any, i: number) => (
-                            <TableRow key={term.id || i}>
-                              <TableCell className="text-xs text-gray-500">{i + 1}</TableCell>
-                              <TableCell className="text-xs">{fmtDate(term.startDate)} – {fmtDate(term.endDate)}</TableCell>
-                              <TableCell className="text-xs font-medium">
-                                ${parseFloat(term.baseRentValue || '0').toFixed(2)}
-                                <span className="text-gray-400 ml-1 text-[10px]">
-                                  {term.baseRentMode === 'PER_SF_YEAR' ? 'PSF/yr' : term.baseRentMode === 'PER_MONTH' ? '/mo' : '/yr'}
-                                </span>
-                              </TableCell>
-                              <TableCell className="text-xs text-gray-500">
-                                {term.escalationType === 'NONE' ? 'None'
-                                  : term.escalationType === 'FIXED_DOLLAR' ? `+$${parseFloat(term.escalationValue || '0').toFixed(2)} every ${term.escalationCycleMonths}mo`
-                                  : term.escalationType === 'PERCENT' ? `+${parseFloat(term.escalationValue || '0').toFixed(2)}% every ${term.escalationCycleMonths}mo`
-                                  : term.escalationType === 'CPI' ? `CPI every ${term.escalationCycleMonths}mo`
-                                  : term.escalationType}
+                          {detail.terms?.map((term: any, i: number) => (
+                            editingTermId === term.id ? (
+                              <TableRow key={term.id}>
+                                <TableCell colSpan={5} className="p-3">
+                                  <div className="space-y-2">
+                                    <div className="grid grid-cols-2 gap-2">
+                                      <div className="space-y-1">
+                                        <Label className="text-[10px]">Start Date</Label>
+                                        <Input type="date" className="h-7 text-xs" value={editTermForm.startDate} onChange={(e) => setEditTermForm(t => ({ ...t, startDate: e.target.value }))} />
+                                      </div>
+                                      <div className="space-y-1">
+                                        <Label className="text-[10px]">End Date</Label>
+                                        <Input type="date" className="h-7 text-xs" value={editTermForm.endDate} onChange={(e) => setEditTermForm(t => ({ ...t, endDate: e.target.value }))} />
+                                      </div>
+                                      <div className="space-y-1">
+                                        <Label className="text-[10px]">Base Rent</Label>
+                                        <Input type="number" step="0.01" className="h-7 text-xs" value={editTermForm.baseRentValue} onChange={(e) => setEditTermForm(t => ({ ...t, baseRentValue: e.target.value }))} />
+                                      </div>
+                                      <div className="space-y-1">
+                                        <Label className="text-[10px]">Rent Mode</Label>
+                                        <Select value={editTermForm.baseRentMode} onValueChange={(v) => setEditTermForm(t => ({ ...t, baseRentMode: v }))}>
+                                          <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+                                          <SelectContent>
+                                            <SelectItem value="PER_SF_YEAR">Per SF / Year</SelectItem>
+                                            <SelectItem value="PER_MONTH">Per Month</SelectItem>
+                                            <SelectItem value="PER_YEAR">Per Year</SelectItem>
+                                          </SelectContent>
+                                        </Select>
+                                      </div>
+                                      <div className="space-y-1">
+                                        <Label className="text-[10px]">Escalation</Label>
+                                        <Select value={editTermForm.escalationType} onValueChange={(v) => setEditTermForm(t => ({ ...t, escalationType: v }))}>
+                                          <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+                                          <SelectContent>
+                                            <SelectItem value="NONE">None</SelectItem>
+                                            <SelectItem value="PERCENT">Percent</SelectItem>
+                                            <SelectItem value="FIXED_DOLLAR">Fixed Dollar</SelectItem>
+                                            <SelectItem value="CPI">CPI</SelectItem>
+                                          </SelectContent>
+                                        </Select>
+                                      </div>
+                                      {editTermForm.escalationType !== 'NONE' && (
+                                        <>
+                                          <div className="space-y-1">
+                                            <Label className="text-[10px]">{editTermForm.escalationType === 'PERCENT' ? 'Rate (%)' : 'Amount ($)'}</Label>
+                                            <Input type="number" step="0.01" className="h-7 text-xs" value={editTermForm.escalationValue} onChange={(e) => setEditTermForm(t => ({ ...t, escalationValue: e.target.value }))} />
+                                          </div>
+                                          <div className="space-y-1">
+                                            <Label className="text-[10px]">Cycle (months)</Label>
+                                            <Input type="number" className="h-7 text-xs" value={editTermForm.escalationCycleMonths} onChange={(e) => setEditTermForm(t => ({ ...t, escalationCycleMonths: e.target.value }))} />
+                                          </div>
+                                        </>
+                                      )}
+                                    </div>
+                                    <div className="flex gap-2 pt-1">
+                                      <Button size="sm" className="h-7 text-xs gap-1" disabled={updateTermMutation.isPending || !editTermForm.startDate || !editTermForm.endDate || !editTermForm.baseRentValue || (editTermForm.escalationType !== 'NONE' && !editTermForm.escalationValue)} onClick={() => updateTermMutation.mutate({ termId: term.id, data: editTermForm })}>
+                                        <Save className="h-3 w-3" /> {updateTermMutation.isPending ? 'Saving…' : 'Save'}
+                                      </Button>
+                                      <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setEditingTermId(null)}>Cancel</Button>
+                                    </div>
+                                    {updateTermMutation.isError && <p className="text-[10px] text-red-600">{(updateTermMutation.error as Error)?.message}</p>}
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            ) : (
+                              <TableRow key={term.id || i}>
+                                <TableCell className="text-xs text-gray-500">{i + 1}</TableCell>
+                                <TableCell className="text-xs">{fmtDate(term.startDate)} – {fmtDate(term.endDate)}</TableCell>
+                                <TableCell className="text-xs font-medium">
+                                  ${parseFloat(term.baseRentValue || '0').toFixed(2)}
+                                  <span className="text-gray-400 ml-1 text-[10px]">
+                                    {term.baseRentMode === 'PER_SF_YEAR' ? 'PSF/yr' : term.baseRentMode === 'PER_MONTH' ? '/mo' : '/yr'}
+                                  </span>
+                                </TableCell>
+                                <TableCell className="text-xs text-gray-500">
+                                  {term.escalationType === 'NONE' ? 'None'
+                                    : term.escalationType === 'FIXED_DOLLAR' ? `+$${parseFloat(term.escalationValue || '0').toFixed(2)} every ${term.escalationCycleMonths}mo`
+                                    : term.escalationType === 'PERCENT' ? `+${parseFloat(term.escalationValue || '0').toFixed(2)}% every ${term.escalationCycleMonths}mo`
+                                    : term.escalationType === 'CPI' ? `CPI every ${term.escalationCycleMonths}mo`
+                                    : term.escalationType}
+                                </TableCell>
+                                <TableCell>
+                                  <div className="flex items-center gap-1">
+                                    <Button
+                                      variant="ghost" size="sm"
+                                      className="h-6 w-6 p-0 text-gray-400 hover:text-blue-500"
+                                      onClick={() => {
+                                        setEditingTermId(term.id);
+                                        setEditTermForm({
+                                          startDate: term.startDate?.slice(0, 10) || '',
+                                          endDate: term.endDate?.slice(0, 10) || '',
+                                          baseRentValue: term.baseRentValue || '',
+                                          baseRentMode: term.baseRentMode || 'PER_SF_YEAR',
+                                          escalationType: term.escalationType || 'NONE',
+                                          escalationValue: term.escalationValue || '',
+                                          escalationCycleMonths: term.escalationCycleMonths != null ? String(term.escalationCycleMonths) : '12',
+                                        });
+                                      }}
+                                    >
+                                      <Pencil className="h-3 w-3" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost" size="sm"
+                                      className="h-6 w-6 p-0 text-gray-400 hover:text-red-500"
+                                      disabled={deleteTermMutation.isPending}
+                                      onClick={() => term.id && deleteTermMutation.mutate(term.id)}
+                                    >
+                                      <Trash2 className="h-3 w-3" />
+                                    </Button>
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            )
+                          ))}
+                          {addingTerm && (
+                            <TableRow>
+                              <TableCell colSpan={5} className="p-3">
+                                <div className="space-y-2">
+                                  <div className="grid grid-cols-2 gap-2">
+                                    <div className="space-y-1">
+                                      <Label className="text-[10px]">Start Date</Label>
+                                      <Input type="date" className="h-7 text-xs" value={newTerm.startDate} onChange={(e) => setNewTerm(t => ({ ...t, startDate: e.target.value }))} />
+                                    </div>
+                                    <div className="space-y-1">
+                                      <Label className="text-[10px]">End Date</Label>
+                                      <Input type="date" className="h-7 text-xs" value={newTerm.endDate} onChange={(e) => setNewTerm(t => ({ ...t, endDate: e.target.value }))} />
+                                    </div>
+                                    <div className="space-y-1">
+                                      <Label className="text-[10px]">Base Rent</Label>
+                                      <Input type="number" step="0.01" className="h-7 text-xs" placeholder="e.g. 28.50" value={newTerm.baseRentValue} onChange={(e) => setNewTerm(t => ({ ...t, baseRentValue: e.target.value }))} />
+                                    </div>
+                                    <div className="space-y-1">
+                                      <Label className="text-[10px]">Rent Mode</Label>
+                                      <Select value={newTerm.baseRentMode} onValueChange={(v) => setNewTerm(t => ({ ...t, baseRentMode: v }))}>
+                                        <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="PER_SF_YEAR">Per SF / Year</SelectItem>
+                                          <SelectItem value="PER_MONTH">Per Month</SelectItem>
+                                          <SelectItem value="PER_YEAR">Per Year</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+                                    <div className="space-y-1">
+                                      <Label className="text-[10px]">Escalation</Label>
+                                      <Select value={newTerm.escalationType} onValueChange={(v) => setNewTerm(t => ({ ...t, escalationType: v }))}>
+                                        <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="NONE">None</SelectItem>
+                                          <SelectItem value="PERCENT">Percent</SelectItem>
+                                          <SelectItem value="FIXED_DOLLAR">Fixed Dollar</SelectItem>
+                                          <SelectItem value="CPI">CPI</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+                                    {newTerm.escalationType !== 'NONE' && (
+                                      <>
+                                        <div className="space-y-1">
+                                          <Label className="text-[10px]">{newTerm.escalationType === 'PERCENT' ? 'Rate (%)' : 'Amount ($)'}</Label>
+                                          <Input type="number" step="0.01" className="h-7 text-xs" placeholder="e.g. 3.0" value={newTerm.escalationValue} onChange={(e) => setNewTerm(t => ({ ...t, escalationValue: e.target.value }))} />
+                                        </div>
+                                        <div className="space-y-1">
+                                          <Label className="text-[10px]">Cycle (months)</Label>
+                                          <Input type="number" className="h-7 text-xs" placeholder="12" value={newTerm.escalationCycleMonths} onChange={(e) => setNewTerm(t => ({ ...t, escalationCycleMonths: e.target.value }))} />
+                                        </div>
+                                      </>
+                                    )}
+                                  </div>
+                                  <div className="flex gap-2 pt-1">
+                                    <Button size="sm" className="h-7 text-xs gap-1" disabled={addTermMutation.isPending || !newTerm.startDate || !newTerm.endDate || !newTerm.baseRentValue || (newTerm.escalationType !== 'NONE' && !newTerm.escalationValue)} onClick={() => addTermMutation.mutate(newTerm)}>
+                                      <Save className="h-3 w-3" /> {addTermMutation.isPending ? 'Saving…' : 'Save Term'}
+                                    </Button>
+                                    <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setAddingTerm(false)}>
+                                      Cancel
+                                    </Button>
+                                  </div>
+                                  {addTermMutation.isError && (
+                                    <p className="text-[10px] text-red-600">{(addTermMutation.error as Error)?.message}</p>
+                                  )}
+                                </div>
                               </TableCell>
                             </TableRow>
-                          ))}
+                          )}
                         </TableBody>
                       </Table>
                     </div>
-                  </div>
-                )}
+                  )}
+                  {!detail.terms?.length && !addingTerm && (
+                    <p className="text-xs text-gray-400 italic">No rent terms — click Add to create one.</p>
+                  )}
+                </div>
 
                 {/* Charge Lines (Recoveries) */}
-                {detail.chargeLines?.length > 0 && (
-                  <div className="mb-5">
-                    <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                <div className="mb-5">
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
                       <Layers className="h-3.5 w-3.5" /> Recoveries & Charges
                     </h3>
+                    <Button
+                      variant="ghost" size="sm"
+                      className="h-6 px-2 text-xs gap-1"
+                      onClick={() => { setAddingChargeLine(true); setNewChargeLine(BLANK_CHARGE_LINE); }}
+                      disabled={addingChargeLine}
+                    >
+                      <Plus className="h-3 w-3" /> Add
+                    </Button>
+                  </div>
+                  {(detail.chargeLines?.length > 0 || addingChargeLine) && (
                     <div className="rounded-lg border overflow-hidden">
                       <Table>
                         <TableHeader>
@@ -1288,34 +1642,246 @@ function LeaseDetailSheet({ leaseId, propertyId, open, onClose }: { leaseId: str
                             <TableHead className="text-[10px] font-medium text-gray-500 uppercase">Type</TableHead>
                             <TableHead className="text-[10px] font-medium text-gray-500 uppercase">Amount</TableHead>
                             <TableHead className="text-[10px] font-medium text-gray-500 uppercase">Period</TableHead>
+                            <TableHead className="w-8" />
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {detail.chargeLines.map((cl: any) => (
-                            <TableRow key={cl.id}>
-                              <TableCell className="text-xs font-medium">{cl.lineName}</TableCell>
-                              <TableCell className="text-[10px] text-gray-500">{cl.lineType?.replace(/_/g, ' ')}</TableCell>
-                              <TableCell className="text-xs">
-                                ${parseFloat(cl.amountValue || '0').toFixed(2)}
-                                <span className="text-gray-400 ml-1 text-[10px]">{cl.amountMode === 'PER_SF_MONTHLY' ? 'PSF/mo' : '/mo'}</span>
-                              </TableCell>
-                              <TableCell className="text-xs text-gray-500">{fmtDate(cl.startDate)}{cl.endDate ? ` – ${fmtDate(cl.endDate)}` : ''}</TableCell>
-                            </TableRow>
+                          {detail.chargeLines?.map((cl: any) => (
+                            editingChargeLineId === cl.id ? (
+                              <TableRow key={cl.id}>
+                                <TableCell colSpan={5} className="p-3">
+                                  <div className="space-y-2">
+                                    <div className="grid grid-cols-2 gap-2">
+                                      <div className="space-y-1">
+                                        <Label className="text-[10px]">Name</Label>
+                                        <Input className="h-7 text-xs" value={editChargeLineForm.lineName} onChange={(e) => setEditChargeLineForm(c => ({ ...c, lineName: e.target.value }))} />
+                                      </div>
+                                      <div className="space-y-1">
+                                        <Label className="text-[10px]">Type</Label>
+                                        <Select value={editChargeLineForm.lineType} onValueChange={(v) => setEditChargeLineForm(c => ({ ...c, lineType: v }))}>
+                                          <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+                                          <SelectContent>
+                                            <SelectItem value="RECOVERY_CAM">CAM Recovery</SelectItem>
+                                            <SelectItem value="RECOVERY_TAX">Tax Recovery</SelectItem>
+                                            <SelectItem value="RECOVERY_INSURANCE">Insurance Recovery</SelectItem>
+                                            <SelectItem value="RECOVERY_UTILITIES">Utilities Recovery</SelectItem>
+                                            <SelectItem value="MISC_INCOME">Misc Income</SelectItem>
+                                            <SelectItem value="DISCOUNT">Discount</SelectItem>
+                                            <SelectItem value="TI_AMORTIZATION">TI Amortization</SelectItem>
+                                          </SelectContent>
+                                        </Select>
+                                      </div>
+                                      <div className="space-y-1">
+                                        <Label className="text-[10px]">Amount</Label>
+                                        <Input type="number" step="0.01" className="h-7 text-xs" value={editChargeLineForm.amountValue} onChange={(e) => setEditChargeLineForm(c => ({ ...c, amountValue: e.target.value }))} />
+                                      </div>
+                                      <div className="space-y-1">
+                                        <Label className="text-[10px]">Mode</Label>
+                                        <Select value={editChargeLineForm.amountMode} onValueChange={(v) => setEditChargeLineForm(c => ({ ...c, amountMode: v }))}>
+                                          <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+                                          <SelectContent>
+                                            <SelectItem value="PER_SF_MONTHLY">Per SF / Month</SelectItem>
+                                            <SelectItem value="FIXED_MONTHLY">Flat / Month</SelectItem>
+                                          </SelectContent>
+                                        </Select>
+                                      </div>
+                                      <div className="space-y-1">
+                                        <Label className="text-[10px]">Start Date</Label>
+                                        <Input type="date" className="h-7 text-xs" value={editChargeLineForm.startDate} onChange={(e) => setEditChargeLineForm(c => ({ ...c, startDate: e.target.value }))} />
+                                      </div>
+                                      <div className="space-y-1">
+                                        <Label className="text-[10px]">End Date (optional)</Label>
+                                        <Input type="date" className="h-7 text-xs" value={editChargeLineForm.endDate} onChange={(e) => setEditChargeLineForm(c => ({ ...c, endDate: e.target.value }))} />
+                                      </div>
+                                    </div>
+                                    <div className="flex gap-2 pt-1">
+                                      <Button size="sm" className="h-7 text-xs gap-1" disabled={updateChargeLineMutation.isPending || !editChargeLineForm.lineName || !editChargeLineForm.amountValue || !editChargeLineForm.startDate} onClick={() => updateChargeLineMutation.mutate({ id: cl.id, data: editChargeLineForm })}>
+                                        <Save className="h-3 w-3" /> {updateChargeLineMutation.isPending ? 'Saving…' : 'Save'}
+                                      </Button>
+                                      <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setEditingChargeLineId(null)}>Cancel</Button>
+                                    </div>
+                                    {updateChargeLineMutation.isError && <p className="text-[10px] text-red-600">{(updateChargeLineMutation.error as Error)?.message}</p>}
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            ) : (
+                              <TableRow key={cl.id}>
+                                <TableCell className="text-xs font-medium">{cl.lineName}</TableCell>
+                                <TableCell className="text-[10px] text-gray-500">{cl.lineType?.replace(/_/g, ' ')}</TableCell>
+                                <TableCell className="text-xs">
+                                  ${parseFloat(cl.amountValue || '0').toFixed(2)}
+                                  <span className="text-gray-400 ml-1 text-[10px]">{cl.amountMode === 'PER_SF_MONTHLY' ? 'PSF/mo' : '/mo'}</span>
+                                </TableCell>
+                                <TableCell className="text-xs text-gray-500">{fmtDate(cl.startDate)}{cl.endDate ? ` – ${fmtDate(cl.endDate)}` : ''}</TableCell>
+                                <TableCell>
+                                  <div className="flex items-center gap-1">
+                                    <Button
+                                      variant="ghost" size="sm"
+                                      className="h-6 w-6 p-0 text-gray-400 hover:text-blue-500"
+                                      onClick={() => {
+                                        setEditingChargeLineId(cl.id);
+                                        setEditChargeLineForm({
+                                          lineName: cl.lineName || '',
+                                          lineType: cl.lineType || 'RECOVERY_CAM',
+                                          amountValue: cl.amountValue || '',
+                                          amountMode: cl.amountMode || 'FIXED_MONTHLY',
+                                          startDate: cl.startDate?.slice(0, 10) || '',
+                                          endDate: cl.endDate?.slice(0, 10) || '',
+                                        });
+                                      }}
+                                    >
+                                      <Pencil className="h-3 w-3" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost" size="sm"
+                                      className="h-6 w-6 p-0 text-gray-400 hover:text-red-500"
+                                      disabled={deleteChargeLineMutation.isPending}
+                                      onClick={() => cl.id && deleteChargeLineMutation.mutate(cl.id)}
+                                    >
+                                      <Trash2 className="h-3 w-3" />
+                                    </Button>
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            )
                           ))}
+                          {addingChargeLine && (
+                            <TableRow>
+                              <TableCell colSpan={5} className="p-3">
+                                <div className="space-y-2">
+                                  <div className="grid grid-cols-2 gap-2">
+                                    <div className="space-y-1">
+                                      <Label className="text-[10px]">Name</Label>
+                                      <Input className="h-7 text-xs" placeholder="e.g. CAM Recovery" value={newChargeLine.lineName} onChange={(e) => setNewChargeLine(c => ({ ...c, lineName: e.target.value }))} />
+                                    </div>
+                                    <div className="space-y-1">
+                                      <Label className="text-[10px]">Type</Label>
+                                      <Select value={newChargeLine.lineType} onValueChange={(v) => setNewChargeLine(c => ({ ...c, lineType: v }))}>
+                                        <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="RECOVERY_CAM">CAM Recovery</SelectItem>
+                                          <SelectItem value="RECOVERY_TAX">Tax Recovery</SelectItem>
+                                          <SelectItem value="RECOVERY_INSURANCE">Insurance Recovery</SelectItem>
+                                          <SelectItem value="RECOVERY_UTILITIES">Utilities Recovery</SelectItem>
+                                          <SelectItem value="MISC_INCOME">Misc Income</SelectItem>
+                                          <SelectItem value="DISCOUNT">Discount</SelectItem>
+                                          <SelectItem value="TI_AMORTIZATION">TI Amortization</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+                                    <div className="space-y-1">
+                                      <Label className="text-[10px]">Amount</Label>
+                                      <Input type="number" step="0.01" className="h-7 text-xs" placeholder="e.g. 2.50" value={newChargeLine.amountValue} onChange={(e) => setNewChargeLine(c => ({ ...c, amountValue: e.target.value }))} />
+                                    </div>
+                                    <div className="space-y-1">
+                                      <Label className="text-[10px]">Mode</Label>
+                                      <Select value={newChargeLine.amountMode} onValueChange={(v) => setNewChargeLine(c => ({ ...c, amountMode: v }))}>
+                                        <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="PER_SF_MONTHLY">Per SF / Month</SelectItem>
+                                          <SelectItem value="FIXED_MONTHLY">Flat / Month</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+                                    <div className="space-y-1">
+                                      <Label className="text-[10px]">Start Date</Label>
+                                      <Input type="date" className="h-7 text-xs" value={newChargeLine.startDate} onChange={(e) => setNewChargeLine(c => ({ ...c, startDate: e.target.value }))} />
+                                    </div>
+                                    <div className="space-y-1">
+                                      <Label className="text-[10px]">End Date (optional)</Label>
+                                      <Input type="date" className="h-7 text-xs" value={newChargeLine.endDate} onChange={(e) => setNewChargeLine(c => ({ ...c, endDate: e.target.value }))} />
+                                    </div>
+                                  </div>
+                                  <div className="flex gap-2 pt-1">
+                                    <Button size="sm" className="h-7 text-xs gap-1" disabled={addChargeLineMutation.isPending || !newChargeLine.lineName || !newChargeLine.amountValue || !newChargeLine.startDate} onClick={() => addChargeLineMutation.mutate(newChargeLine)}>
+                                      <Save className="h-3 w-3" /> {addChargeLineMutation.isPending ? 'Saving…' : 'Save Line'}
+                                    </Button>
+                                    <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setAddingChargeLine(false)}>
+                                      Cancel
+                                    </Button>
+                                  </div>
+                                  {addChargeLineMutation.isError && (
+                                    <p className="text-[10px] text-red-600">{(addChargeLineMutation.error as Error)?.message}</p>
+                                  )}
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          )}
                         </TableBody>
                       </Table>
                     </div>
-                  </div>
-                )}
+                  )}
+                  {!detail.chargeLines?.length && !addingChargeLine && (
+                    <p className="text-xs text-gray-400 italic">No charge lines — click Add to create one.</p>
+                  )}
+                </div>
 
                 {/* Abatements / Concessions */}
-                {detail.abatements?.length > 0 && (
-                  <div className="mb-5">
-                    <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                <div className="mb-5">
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
                       <Tag className="h-3.5 w-3.5" /> Abatements & Concessions
                     </h3>
-                    <div className="space-y-2">
-                      {detail.abatements.map((ab: any) => (
+                    <Button
+                      variant="ghost" size="sm"
+                      className="h-6 px-2 text-xs gap-1"
+                      onClick={() => { setAddingAbatement(true); setNewAbatement(BLANK_ABATEMENT); }}
+                      disabled={addingAbatement}
+                    >
+                      <Plus className="h-3 w-3" /> Add
+                    </Button>
+                  </div>
+                  <div className="space-y-2">
+                    {detail.abatements?.map((ab: any) => (
+                      editingAbatementId === ab.id ? (
+                        <div key={ab.id} className="rounded-lg border p-3 space-y-2">
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="space-y-1">
+                              <Label className="text-[10px]">Type</Label>
+                              <Select value={editAbatementForm.abatementType} onValueChange={(v) => setEditAbatementForm(a => ({ ...a, abatementType: v }))}>
+                                <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="FREE_RENT">Free Rent</SelectItem>
+                                  <SelectItem value="PERCENT_DISCOUNT">Percent Discount</SelectItem>
+                                  <SelectItem value="FIXED_CREDIT">Fixed Dollar Credit</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-[10px]">Applies To</Label>
+                              <Select value={editAbatementForm.appliesTo} onValueChange={(v) => setEditAbatementForm(a => ({ ...a, appliesTo: v }))}>
+                                <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="BASE_ONLY">Base Rent Only</SelectItem>
+                                  <SelectItem value="BASE_PLUS_RECOVERIES">Base + Recoveries</SelectItem>
+                                  <SelectItem value="ALL_CHARGES">All Charges</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-[10px]">Start Date</Label>
+                              <Input type="date" className="h-7 text-xs" value={editAbatementForm.startDate} onChange={(e) => setEditAbatementForm(a => ({ ...a, startDate: e.target.value }))} />
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-[10px]">End Date</Label>
+                              <Input type="date" className="h-7 text-xs" value={editAbatementForm.endDate} onChange={(e) => setEditAbatementForm(a => ({ ...a, endDate: e.target.value }))} />
+                            </div>
+                            {editAbatementForm.abatementType !== 'FREE_RENT' && (
+                              <div className="space-y-1 col-span-2">
+                                <Label className="text-[10px]">{editAbatementForm.abatementType === 'PERCENT_DISCOUNT' ? 'Discount (%)' : 'Credit Amount ($)'}</Label>
+                                <Input type="number" step="0.01" className="h-7 text-xs" value={editAbatementForm.value} onChange={(e) => setEditAbatementForm(a => ({ ...a, value: e.target.value }))} />
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex gap-2 pt-1">
+                            <Button size="sm" className="h-7 text-xs gap-1" disabled={updateAbatementMutation.isPending || !editAbatementForm.startDate || !editAbatementForm.endDate || (editAbatementForm.abatementType !== 'FREE_RENT' && !editAbatementForm.value)} onClick={() => updateAbatementMutation.mutate({ id: ab.id, data: editAbatementForm })}>
+                              <Save className="h-3 w-3" /> {updateAbatementMutation.isPending ? 'Saving…' : 'Save'}
+                            </Button>
+                            <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setEditingAbatementId(null)}>Cancel</Button>
+                          </div>
+                          {updateAbatementMutation.isError && <p className="text-[10px] text-red-600">{(updateAbatementMutation.error as Error)?.message}</p>}
+                        </div>
+                      ) : (
                         <div key={ab.id} className="rounded-lg border p-3">
                           <div className="flex items-center justify-between">
                             <div>
@@ -1324,17 +1890,99 @@ function LeaseDetailSheet({ leaseId, propertyId, open, onClose }: { leaseId: str
                                 {fmtDate(ab.startDate)} – {fmtDate(ab.endDate)} · Applies to: {ab.appliesTo?.replace(/_/g, ' ')}
                               </p>
                             </div>
-                            <Badge variant="secondary" className="text-xs">
-                              {ab.abatementType === 'FREE_RENT' ? 'Free Rent'
-                                : ab.abatementType === 'PERCENT_DISCOUNT' ? `${parseFloat(ab.value || '0').toFixed(1)}% discount`
-                                : `$${parseFloat(ab.value || '0').toFixed(2)} credit`}
-                            </Badge>
+                            <div className="flex items-center gap-2">
+                              <Badge variant="secondary" className="text-xs">
+                                {ab.abatementType === 'FREE_RENT' ? 'Free Rent'
+                                  : ab.abatementType === 'PERCENT_DISCOUNT' ? `${parseFloat(ab.value || '0').toFixed(1)}% discount`
+                                  : `$${parseFloat(ab.value || '0').toFixed(2)} credit`}
+                              </Badge>
+                              <Button
+                                variant="ghost" size="sm"
+                                className="h-6 w-6 p-0 text-gray-400 hover:text-blue-500"
+                                onClick={() => {
+                                  setEditingAbatementId(ab.id);
+                                  setEditAbatementForm({
+                                    abatementType: ab.abatementType || 'FREE_RENT',
+                                    startDate: ab.startDate?.slice(0, 10) || '',
+                                    endDate: ab.endDate?.slice(0, 10) || '',
+                                    appliesTo: ab.appliesTo || 'BASE_ONLY',
+                                    value: ab.value || '',
+                                  });
+                                }}
+                              >
+                                <Pencil className="h-3 w-3" />
+                              </Button>
+                              <Button
+                                variant="ghost" size="sm"
+                                className="h-6 w-6 p-0 text-gray-400 hover:text-red-500"
+                                disabled={deleteAbatementMutation.isPending}
+                                onClick={() => ab.id && deleteAbatementMutation.mutate(ab.id)}
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            </div>
                           </div>
                         </div>
-                      ))}
-                    </div>
+                      )
+                    ))}
+                    {addingAbatement && (
+                      <div className="rounded-lg border p-3 space-y-2">
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="space-y-1">
+                            <Label className="text-[10px]">Type</Label>
+                            <Select value={newAbatement.abatementType} onValueChange={(v) => setNewAbatement(a => ({ ...a, abatementType: v }))}>
+                              <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="FREE_RENT">Free Rent</SelectItem>
+                                <SelectItem value="PERCENT_DISCOUNT">Percent Discount</SelectItem>
+                                <SelectItem value="FIXED_CREDIT">Fixed Dollar Credit</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-[10px]">Applies To</Label>
+                            <Select value={newAbatement.appliesTo} onValueChange={(v) => setNewAbatement(a => ({ ...a, appliesTo: v }))}>
+                              <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="BASE_ONLY">Base Rent Only</SelectItem>
+                                <SelectItem value="BASE_PLUS_RECOVERIES">Base + Recoveries</SelectItem>
+                                <SelectItem value="ALL_CHARGES">All Charges</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-[10px]">Start Date</Label>
+                            <Input type="date" className="h-7 text-xs" value={newAbatement.startDate} onChange={(e) => setNewAbatement(a => ({ ...a, startDate: e.target.value }))} />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-[10px]">End Date</Label>
+                            <Input type="date" className="h-7 text-xs" value={newAbatement.endDate} onChange={(e) => setNewAbatement(a => ({ ...a, endDate: e.target.value }))} />
+                          </div>
+                          {newAbatement.abatementType !== 'FREE_RENT' && (
+                            <div className="space-y-1 col-span-2">
+                              <Label className="text-[10px]">{newAbatement.abatementType === 'PERCENT_DISCOUNT' ? 'Discount (%)' : 'Credit Amount ($)'} <span className="text-red-500">*</span></Label>
+                              <Input type="number" step="0.01" className="h-7 text-xs" placeholder="e.g. 5.0" value={newAbatement.value} onChange={(e) => setNewAbatement(a => ({ ...a, value: e.target.value }))} />
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex gap-2 pt-1">
+                          <Button size="sm" className="h-7 text-xs gap-1" disabled={addAbatementMutation.isPending || !newAbatement.startDate || !newAbatement.endDate || (newAbatement.abatementType !== 'FREE_RENT' && !newAbatement.value)} onClick={() => addAbatementMutation.mutate(newAbatement)}>
+                            <Save className="h-3 w-3" /> {addAbatementMutation.isPending ? 'Saving…' : 'Save Abatement'}
+                          </Button>
+                          <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setAddingAbatement(false)}>
+                            Cancel
+                          </Button>
+                        </div>
+                        {addAbatementMutation.isError && (
+                          <p className="text-[10px] text-red-600">{(addAbatementMutation.error as Error)?.message}</p>
+                        )}
+                      </div>
+                    )}
+                    {!detail.abatements?.length && !addingAbatement && (
+                      <p className="text-xs text-gray-400 italic">No abatements — click Add to create one.</p>
+                    )}
                   </div>
-                )}
+                </div>
 
                 {/* TI Programs */}
                 {detail.tiPrograms?.length > 0 && (
