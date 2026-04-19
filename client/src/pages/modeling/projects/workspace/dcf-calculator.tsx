@@ -698,8 +698,8 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
         if (!leaseIncomeInjected) return null;
         const leaseEGI = dcfAnalysis?.leaseIncome?.totalEGIAnnual ?? leaseIncomeData?.totalEGIAnnual;
         if (!leaseEGI) return null;
-        // Use the original pro-forma value as baseline; fall back to current model input
-        const proFormaNOI = proFormaData?.metrics?.year1Noi || proFormaData?.noi?.[0] || liveInputs.year1NOI;
+        // Compare against the live modeling input — if user has snapped to lease EGI this becomes 0
+        const proFormaNOI = liveInputs.year1NOI || proFormaData?.metrics?.year1Noi || proFormaData?.noi?.[0];
         if (!proFormaNOI) return null;
         const delta = leaseEGI - proFormaNOI;
         const variancePct = Math.abs(delta / proFormaNOI) * 100;
@@ -723,12 +723,29 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
                 The DCF is using lease-derived income as the Year&nbsp;1 basis.
               </p>
             </div>
-            <Badge
-              variant="outline"
-              className="shrink-0 text-amber-700 dark:text-amber-300 border-amber-400 dark:border-amber-700"
-            >
-              {variancePct.toFixed(1)}% variance
-            </Badge>
+            <div className="flex items-center gap-2 shrink-0">
+              <Badge
+                variant="outline"
+                className="text-amber-700 dark:text-amber-300 border-amber-400 dark:border-amber-700"
+              >
+                {variancePct.toFixed(1)}% variance
+              </Badge>
+              <Button
+                size="sm"
+                variant="outline"
+                className="border-amber-400 dark:border-amber-700 text-amber-800 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/40 whitespace-nowrap"
+                onClick={() => {
+                  const newInputs = { ...liveInputs, year1NOI: leaseEGI };
+                  setLiveInputs(newInputs);
+                  setUserOverrides(prev => ({ ...prev, year1NOI: true }));
+                  setInputSources(prev => ({ ...prev, year1NOI: 'Lease Data' }));
+                  debouncedCalculate(newInputs);
+                }}
+                data-testid="use-lease-egi-btn"
+              >
+                Use Lease EGI
+              </Button>
+            </div>
           </div>
         );
       })()}
