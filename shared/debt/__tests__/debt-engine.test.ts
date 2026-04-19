@@ -6,8 +6,8 @@ import {
   computeAnnualDebtService,
   computeDSCR,
   computeLTV,
-  type LoanInput,
-} from './debt-engine';
+  type DebtEngineInput as LoanInput,
+} from '../debt-engine';
 
 const baseLoan: LoanInput = {
   loanAmount: 1_000_000,
