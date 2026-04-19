@@ -8,11 +8,13 @@
  *   - computeLeaseEGIForMonth (from cash-flow-forecasting-routes.ts) SCHEDULE path
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   findActiveRentStep,
   convertRentStepToAnnual,
   computeLeaseIncomeByYear,
+  performDCFAnalysis,
+  computeQuickIRR,
   type RentStepEntry,
   type LeaseBreakdownEntry,
 } from '../dcf-calculator-service';
@@ -420,5 +422,397 @@ describe('computeLeaseEGIForMonth — SCHEDULE step resolution', () => {
       const result = computeLeaseEGIForMonth([lease], 24, forecastDate);
       expect(result).toBeCloseTo(1000, 0);
     });
+  });
+});
+
+// ─── use_lease_income_for_dcf flag — IRR consistency tests ───────────────────
+//
+// These tests exercise performDCFAnalysis and computeQuickIRR through a
+// fully-mocked database pool so no real DB connection is required.
+// The mock pool routes each SQL query to canned data based on the table name
+// present in the query string.
+//
+// Scenarios covered:
+//   1. flag=null  → lease income NOT injected (backwards-compatible default)
+//   2. flag=true  → lease income IS injected, NOI overrides are passed
+//   3. flag=false → lease income NOT injected even when leases are present
+//   4. computeQuickIRR returns the same IRR as performDCFAnalysis for the same input
+
+// ── Shared fixture data ───────────────────────────────────────────────────────
+
+const ACQUISITION_DATE = '2024-01-01';
+const HOLD_PERIOD = 5;
+const PURCHASE_PRICE = 5_000_000;
+const TOTAL_DEBT = 3_000_000;
+const BLENDED_RATE = 0.05;
+
+/**
+ * Returns a fake db pool whose .query() method resolves with canned rows
+ * based on which table the SQL string references.
+ *
+ * @param useLeaseIncomeForDcf  The flag value stored in modeling_project_config
+ * @param hasLeases             Whether to return tenant lease rows
+ */
+function makeMockPool(
+  useLeaseIncomeForDcf: boolean | null,
+  hasLeases: boolean
+) {
+  return {
+    query: vi.fn(async (sql: string) => {
+      // ── modeling_projects ──────────────────────────────────────────────────
+      if (sql.includes('modeling_projects')) {
+        return {
+          rows: [{
+            modeling_project_id: 'model-proj-1',
+            asset_class: 'mf',
+            custom_metrics: {
+              inputAssumptions: {
+                grossRevenue: 500_000,
+                noi: 350_000,
+                occupancy: 95,
+              },
+              unitMix: [],
+            },
+            purchase_price: PURCHASE_PRICE,
+          }],
+        };
+      }
+
+      // ── modeling_scenario_versions ─────────────────────────────────────────
+      if (sql.includes('modeling_scenario_versions')) {
+        return {
+          rows: [{
+            revenue_growth_rate: 3,
+            expense_growth_rate: 2.5,
+            exit_cap_rate: 7,
+            assumptions: {},
+          }],
+        };
+      }
+
+      // ── modeling_project_config ────────────────────────────────────────────
+      if (sql.includes('modeling_project_config')) {
+        return {
+          rows: [{
+            hold_period: HOLD_PERIOD,
+            acquisition_close_date: ACQUISITION_DATE,
+            cash_flow_granularity: 'annual',
+            use_lease_income_for_dcf: useLeaseIncomeForDcf,
+          }],
+        };
+      }
+
+      // ── capital_stacks ─────────────────────────────────────────────────────
+      if (sql.includes('capital_stacks')) {
+        return {
+          rows: [{
+            hold_period_years: HOLD_PERIOD,
+            noi_growth_rate: 3,
+            exit_cap_rate: 7,
+            total_equity: PURCHASE_PRICE - TOTAL_DEBT,
+            purchase_price: PURCHASE_PRICE,
+            total_debt: TOTAL_DEBT,
+            blended_debt_rate: BLENDED_RATE,
+          }],
+        };
+      }
+
+      // ── tenant_leases ──────────────────────────────────────────────────────
+      if (sql.includes('tenant_leases')) {
+        if (!hasLeases) return { rows: [] };
+        return {
+          rows: [{
+            id: 'lease-001',
+            tenant_name: 'Acme Corp',
+            sf: 5000,
+            lease_type: 'NNN',
+            lease_end_date: '2030-06-01',
+            lease_start_date: '2024-01-01',
+            rent_commencement_date: '2024-01-01',
+            status: 'ACTIVE',
+          }],
+        };
+      }
+
+      // ── tenant_rent_terms ──────────────────────────────────────────────────
+      if (sql.includes('tenant_rent_terms')) {
+        return {
+          rows: [{
+            lease_id: 'lease-001',
+            base_rent_input_unit: 'PSF_YEAR',
+            base_rent_input_value: '30',      // $30 × 5 000 sf = $150 000/yr
+            escalation_type: 'PERCENT',
+            escalation_value: '0.03',
+            escalation_frequency_months: 12,
+            schedule_json: null,
+          }],
+        };
+      }
+
+      // ── tenant_recoveries ─────────────────────────────────────────────────
+      if (sql.includes('tenant_recoveries')) {
+        return {
+          rows: [{
+            lease_id: 'lease-001',
+            method: 'FIXED_ANNUAL',
+            amount: '12000',
+            psf_amount: null,
+          }],
+        };
+      }
+
+      // Fallback — no rows
+      return { rows: [] };
+    }),
+  };
+}
+
+/**
+ * Minimal computeDirectInputFinancials stub.
+ * Returns a year-1 financial object consistent with the fixture assumptions.
+ */
+function makeYear1(_assetClass: string, assumptions: any, _unitMix: any) {
+  return {
+    grossRevenue: assumptions.leaseEGIAnnual ?? 500_000,
+    effectiveGrossIncome: assumptions.leaseEGIAnnual ?? 500_000,
+    noi: assumptions.leaseEGIAnnual
+      ? assumptions.leaseEGIAnnual * 0.7
+      : 350_000,
+    operatingExpenses: 150_000,
+    occupancy: 95,
+  };
+}
+
+/**
+ * Minimal computeMultiYearProjection stub.
+ * Honors noiOverrides if passed (simulating the production engine's behaviour).
+ */
+function makeProjection(year1: any, config: any) {
+  const baseNOI = year1.noi ?? 350_000;
+  const growthRate = config.revenueGrowthRate ?? 0.03;
+  const exitCapRate = config.exitCapRate ?? 0.07;
+  const holdPeriod = config.holdPeriod ?? HOLD_PERIOD;
+
+  const years = Array.from({ length: holdPeriod }, (_, i) => {
+    const yr = i + 1;
+    const noi = config.noiOverrides?.[i] ?? Math.round(baseNOI * Math.pow(1 + growthRate, i));
+    return {
+      year: yr,
+      label: `Year ${yr}`,
+      noi,
+      capex: 0,
+      ncf: noi,
+    };
+  });
+
+  const exitNOI = config.noiOverrides
+    ? Math.round(config.noiOverrides[holdPeriod - 1] * (1 + growthRate))
+    : Math.round(baseNOI * Math.pow(1 + growthRate, holdPeriod));
+
+  const exitValue = Math.round(exitNOI / exitCapRate);
+  const sellingCosts = Math.round(exitValue * 0.03);
+  const netSaleProceeds = exitValue - sellingCosts;
+
+  return { years, exit: { exitNOI, exitCapRate, exitValue, sellingCosts, netSaleProceeds } };
+}
+
+/** Default deps shared across flag tests */
+const baseDeps = {
+  computeDirectInputFinancials: makeYear1,
+  computeMultiYearProjection: makeProjection,
+};
+
+// ── Test suite ────────────────────────────────────────────────────────────────
+
+describe('performDCFAnalysis — use_lease_income_for_dcf flag behavior', () => {
+  describe('flag = null (unset / legacy default)', () => {
+    it('does NOT inject lease income into assumptions', async () => {
+      const pool = makeMockPool(null, true /* leases exist */);
+      const result = await performDCFAnalysis(
+        { projectId: 'proj-1', orgId: 'org-1' },
+        { pool, ...baseDeps }
+      );
+      expect(result.meta.leaseIncomeInjected).toBe(false);
+    });
+
+    it('records useLeaseIncomeForDcf as null in meta', async () => {
+      const pool = makeMockPool(null, true);
+      const result = await performDCFAnalysis(
+        { projectId: 'proj-1', orgId: 'org-1' },
+        { pool, ...baseDeps }
+      );
+      expect(result.meta.useLeaseIncomeForDcf).toBeNull();
+    });
+
+    it('returns a valid IRR even without lease injection', async () => {
+      const pool = makeMockPool(null, true);
+      const result = await performDCFAnalysis(
+        { projectId: 'proj-1', orgId: 'org-1' },
+        { pool, ...baseDeps }
+      );
+      expect(typeof result.irr).toBe('number');
+      expect(isFinite(result.irr)).toBe(true);
+    });
+  });
+
+  describe('flag = false (user explicitly opted out)', () => {
+    it('does NOT inject lease income even when leases exist', async () => {
+      const pool = makeMockPool(false, true /* leases exist */);
+      const result = await performDCFAnalysis(
+        { projectId: 'proj-1', orgId: 'org-1' },
+        { pool, ...baseDeps }
+      );
+      expect(result.meta.leaseIncomeInjected).toBe(false);
+    });
+
+    it('records useLeaseIncomeForDcf as false in meta', async () => {
+      const pool = makeMockPool(false, true);
+      const result = await performDCFAnalysis(
+        { projectId: 'proj-1', orgId: 'org-1' },
+        { pool, ...baseDeps }
+      );
+      expect(result.meta.useLeaseIncomeForDcf).toBe(false);
+    });
+
+    it('produces the same IRR as flag=null for the same inputs', async () => {
+      const poolNull = makeMockPool(null, true);
+      const poolFalse = makeMockPool(false, true);
+
+      const [resultNull, resultFalse] = await Promise.all([
+        performDCFAnalysis({ projectId: 'proj-1', orgId: 'org-1' }, { pool: poolNull, ...baseDeps }),
+        performDCFAnalysis({ projectId: 'proj-1', orgId: 'org-1' }, { pool: poolFalse, ...baseDeps }),
+      ]);
+
+      expect(resultFalse.irr).toBeCloseTo(resultNull.irr, 6);
+    });
+  });
+
+  describe('flag = true (user explicitly opted in)', () => {
+    it('DOES inject lease income into assumptions', async () => {
+      const pool = makeMockPool(true, true /* leases exist */);
+      const result = await performDCFAnalysis(
+        { projectId: 'proj-1', orgId: 'org-1' },
+        { pool, ...baseDeps }
+      );
+      expect(result.meta.leaseIncomeInjected).toBe(true);
+    });
+
+    it('records useLeaseIncomeForDcf as true in meta', async () => {
+      const pool = makeMockPool(true, true);
+      const result = await performDCFAnalysis(
+        { projectId: 'proj-1', orgId: 'org-1' },
+        { pool, ...baseDeps }
+      );
+      expect(result.meta.useLeaseIncomeForDcf).toBe(true);
+    });
+
+    it('does NOT inject lease income when no leases exist, even with flag=true', async () => {
+      const pool = makeMockPool(true, false /* no leases */);
+      const result = await performDCFAnalysis(
+        { projectId: 'proj-1', orgId: 'org-1' },
+        { pool, ...baseDeps }
+      );
+      expect(result.meta.leaseIncomeInjected).toBe(false);
+    });
+
+    it('passes noiOverrides to computeMultiYearProjection when leases exist', async () => {
+      const pool = makeMockPool(true, true);
+      const projectionSpy = vi.fn(makeProjection);
+
+      await performDCFAnalysis(
+        { projectId: 'proj-1', orgId: 'org-1' },
+        { pool, computeDirectInputFinancials: makeYear1, computeMultiYearProjection: projectionSpy }
+      );
+
+      // The spy should have been called at least once (main projection + sensitivity matrix)
+      expect(projectionSpy).toHaveBeenCalled();
+
+      // The FIRST call (main DCF projection) must carry noiOverrides
+      const firstCallConfig = projectionSpy.mock.calls[0][1];
+      expect(firstCallConfig).toHaveProperty('noiOverrides');
+      expect(Array.isArray(firstCallConfig.noiOverrides)).toBe(true);
+      expect(firstCallConfig.noiOverrides.length).toBe(HOLD_PERIOD);
+    });
+
+    it('produces a different IRR than flag=null because NOI overrides change cash flows', async () => {
+      const poolTrue = makeMockPool(true, true);
+      const poolNull = makeMockPool(null, true);
+
+      const [resultTrue, resultNull] = await Promise.all([
+        performDCFAnalysis({ projectId: 'proj-1', orgId: 'org-1' }, { pool: poolTrue, ...baseDeps }),
+        performDCFAnalysis({ projectId: 'proj-1', orgId: 'org-1' }, { pool: poolNull, ...baseDeps }),
+      ]);
+
+      // IRRs may differ because lease EGI ($162 000/yr) differs from
+      // the generic growth-based NOI ($350 000) — the key check is that both
+      // are numerically valid and that the flag actually changed something.
+      expect(isFinite(resultTrue.irr)).toBe(true);
+      expect(isFinite(resultNull.irr)).toBe(true);
+      // When injected lease EGI ($162 000) < generic NOI ($350 000), IRR will be lower
+      expect(resultTrue.irr).not.toBeCloseTo(resultNull.irr, 2);
+    });
+  });
+});
+
+describe('computeQuickIRR — delegates to performDCFAnalysis and returns identical IRR', () => {
+  it('returns the same leveredIrr as performDCFAnalysis for flag=null', async () => {
+    const pool1 = makeMockPool(null, false);
+    const pool2 = makeMockPool(null, false);
+
+    const [fullResult, quickResult] = await Promise.all([
+      performDCFAnalysis({ projectId: 'proj-1', orgId: 'org-1' }, { pool: pool1, ...baseDeps }),
+      computeQuickIRR({ projectId: 'proj-1', orgId: 'org-1' }, { pool: pool2, ...baseDeps }),
+    ]);
+
+    expect(quickResult.irr).toBeCloseTo(fullResult.leveredIrr, 6);
+  });
+
+  it('returns the same leveredIrr as performDCFAnalysis for flag=false (with leases)', async () => {
+    const pool1 = makeMockPool(false, true);
+    const pool2 = makeMockPool(false, true);
+
+    const [fullResult, quickResult] = await Promise.all([
+      performDCFAnalysis({ projectId: 'proj-1', orgId: 'org-1' }, { pool: pool1, ...baseDeps }),
+      computeQuickIRR({ projectId: 'proj-1', orgId: 'org-1' }, { pool: pool2, ...baseDeps }),
+    ]);
+
+    expect(quickResult.irr).toBeCloseTo(fullResult.leveredIrr, 6);
+  });
+
+  it('returns the same leveredIrr as performDCFAnalysis for flag=true (with leases)', async () => {
+    const pool1 = makeMockPool(true, true);
+    const pool2 = makeMockPool(true, true);
+
+    const [fullResult, quickResult] = await Promise.all([
+      performDCFAnalysis({ projectId: 'proj-1', orgId: 'org-1' }, { pool: pool1, ...baseDeps }),
+      computeQuickIRR({ projectId: 'proj-1', orgId: 'org-1' }, { pool: pool2, ...baseDeps }),
+    ]);
+
+    expect(quickResult.irr).toBeCloseTo(fullResult.leveredIrr, 6);
+  });
+
+  it('exposes the same NPV and equityMultiple as the full analysis', async () => {
+    const pool1 = makeMockPool(null, false);
+    const pool2 = makeMockPool(null, false);
+
+    const [fullResult, quickResult] = await Promise.all([
+      performDCFAnalysis({ projectId: 'proj-1', orgId: 'org-1' }, { pool: pool1, ...baseDeps }),
+      computeQuickIRR({ projectId: 'proj-1', orgId: 'org-1' }, { pool: pool2, ...baseDeps }),
+    ]);
+
+    expect(quickResult.npv).toBeCloseTo(fullResult.npv, 0);
+    expect(quickResult.equityMultiple).toBeCloseTo(fullResult.equityMultiple, 4);
+  });
+
+  it('IRR is the same whether flag is false or null (no lease injection in both)', async () => {
+    const poolNull = makeMockPool(null, true);
+    const poolFalse = makeMockPool(false, true);
+
+    const [quickNull, quickFalse] = await Promise.all([
+      computeQuickIRR({ projectId: 'proj-1', orgId: 'org-1' }, { pool: poolNull, ...baseDeps }),
+      computeQuickIRR({ projectId: 'proj-1', orgId: 'org-1' }, { pool: poolFalse, ...baseDeps }),
+    ]);
+
+    expect(quickNull.irr).toBeCloseTo(quickFalse.irr, 6);
   });
 });
