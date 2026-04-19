@@ -249,7 +249,8 @@
       "Bash(env NODE_OPTIONS=--max-old-space-size=2048 npx tsc --noEmit --listFiles)",
       "Bash(awk '/^## ⚠ PARTIAL|^## .*deferred|^##.*financial|^##.*model|^##.*TODO|^##.*BUG/,/^##/' /home/runner/workspace/MARINAMATCH_JOURNAL.md)",
       "Bash(awk '/^## ✅|^## ⚠/' /home/runner/workspace/MARINAMATCH_JOURNAL.md)",
-      "Bash(timeout 180 npm test -- --testPathPattern='\\(dcf|pro-forma|exit|xirr|waterfall|monte-carlo|rent-roll|seasonality\\)')"
+      "Bash(timeout 180 npm test -- --testPathPattern='\\(dcf|pro-forma|exit|xirr|waterfall|monte-carlo|rent-roll|seasonality\\)')",
+      "Bash(awk -F: '{print $1}')"
     ]
   }
 }
