@@ -140,7 +140,6 @@ import AssumptionAudit from './workspace/assumption-audit';
 import FundGnAModel from './workspace/fund-gna-model';
 import GpPartnerEconomics from './workspace/gp-partner-economics';
 import FundCashFlowDetail from './workspace/fund-cashflow-detail';
-import ScenarioBar from '@/components/modeling/ScenarioBar';
 import InvestmentMaterialsTab from './workspace/investment-materials';
 
 interface TabItem {
@@ -672,8 +671,6 @@ export default function ProjectWorkspace() {
     <div className="flex flex-col min-h-screen bg-background">
       {/* ── Persistent Project Header ─────────────────────────────────────── */}
       <div className="sticky top-0 z-30 bg-white border-b border-border/40 shadow-sm">
-        {/* Scenario Bar */}
-        <ScenarioBar projectId={projectId!} />
         {/* Breadcrumb row */}
         <div className="flex items-center gap-1.5 px-6 pt-2.5 pb-0 text-[11px] text-muted-foreground">
           <button
