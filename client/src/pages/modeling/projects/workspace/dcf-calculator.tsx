@@ -438,6 +438,46 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
     return formatCurrency(value);
   };
 
+  const leaseExpiryWarnings = useMemo(() => {
+    const yearlyLeaseIncome = dcfAnalysis?.yearlyLeaseIncome;
+    if (!yearlyLeaseIncome || yearlyLeaseIncome.length === 0) return [];
+
+    const year1 = yearlyLeaseIncome[0];
+    if (!year1 || !year1.leaseDetail || year1.leaseDetail.length === 0) return [];
+
+    const year1TotalEGI = year1.egiAnnual;
+    if (!year1TotalEGI || year1TotalEGI <= 0) return [];
+
+    const holdPeriodYears = yearlyLeaseIncome.length;
+    const holdYears = yearlyLeaseIncome.filter(y => y.year >= 1 && y.year <= holdPeriodYears);
+
+    const warnings: { tenantName: string; leaseId: string; egiPct: number; expiryYear: number }[] = [];
+
+    for (const detail of year1.leaseDetail) {
+      if (detail.isExpired) continue;
+
+      const tenantYear1EGI = detail.baseRent + detail.recovery - detail.freeRentReduction;
+      const egiPct = tenantYear1EGI / year1TotalEGI;
+
+      if (egiPct < 0.15) continue;
+
+      let expiryYear: number | null = null;
+      for (const yearData of holdYears) {
+        const tenantInYear = yearData.leaseDetail.find(d => d.leaseId === detail.leaseId);
+        if (tenantInYear && tenantInYear.isExpired) {
+          expiryYear = yearData.year;
+          break;
+        }
+      }
+
+      if (expiryYear !== null) {
+        warnings.push({ tenantName: detail.tenantName, leaseId: detail.leaseId, egiPct, expiryYear });
+      }
+    }
+
+    return warnings;
+  }, [dcfAnalysis?.yearlyLeaseIncome]);
+
   if (isLoading) {
     return (
       <div className="space-y-4 p-6">
@@ -489,10 +529,10 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
   const comparison = dcfAnalysis?.scenarioComparison;
 
   const quickResult = calculateQuickIRR.data as any;
-  const displayIRR = quickResult?.irr ?? baseScenario?.irr ?? 0;
-  const displayLeveredIRR = quickResult?.leveredIrr ?? baseScenario?.leveredIRR ?? 0;
-  const displayNPV = quickResult?.npv ?? baseScenario?.npv ?? 0;
-  const displayEquityMultiple = quickResult?.equityMultiple ?? baseScenario?.equityMultiple ?? 0;
+  const displayIRR = quickResult?.irr ?? (dcfAnalysis?.baseScenario?.irr ?? 0);
+  const displayLeveredIRR = quickResult?.leveredIrr ?? (dcfAnalysis?.baseScenario?.leveredIRR ?? 0);
+  const displayNPV = quickResult?.npv ?? (dcfAnalysis?.baseScenario?.npv ?? 0);
+  const displayEquityMultiple = quickResult?.equityMultiple ?? (dcfAnalysis?.baseScenario?.equityMultiple ?? 0);
 
   const SourceBadge = ({ field }: { field: string }) => {
     const src = inputSources[field];
@@ -789,6 +829,54 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
           </div>
         );
       })()}
+
+      {/* ── Major Tenant Lease Expiry Warning ── */}
+      {leaseExpiryWarnings.length > 0 && (
+        <div
+          className="flex items-start gap-3 p-4 rounded-lg border border-red-300 bg-red-50 dark:bg-red-950/30 dark:border-red-800 cursor-pointer hover:bg-red-100 dark:hover:bg-red-950/50 transition-colors"
+          data-testid="lease-expiry-warning-banner"
+          role="button"
+          tabIndex={0}
+          onClick={() => {
+            setActiveTab('cashflows');
+            setExpandedCFYears(prev => {
+              const next = new Set(prev);
+              leaseExpiryWarnings.forEach(w => next.add(w.expiryYear));
+              return next;
+            });
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              setActiveTab('cashflows');
+              setExpandedCFYears(prev => {
+                const next = new Set(prev);
+                leaseExpiryWarnings.forEach(w => next.add(w.expiryYear));
+                return next;
+              });
+            }
+          }}
+        >
+          <AlertCircle className="h-4 w-4 text-red-500 mt-0.5 shrink-0" />
+          <div className="flex-1 min-w-0 text-sm">
+            <p className="font-semibold text-red-800 dark:text-red-300">
+              Major tenant{leaseExpiryWarnings.length > 1 ? 's' : ''} rolling during hold period
+            </p>
+            <ul className="mt-1 space-y-0.5">
+              {leaseExpiryWarnings.map(w => (
+                <li key={w.leaseId} className="text-red-700 dark:text-red-400">
+                  <strong>{w.tenantName}</strong> ({(w.egiPct * 100).toFixed(0)}% of Year&nbsp;1 EGI) — expires in{' '}
+                  <strong>Year&nbsp;{w.expiryYear}</strong>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <span className="text-xs text-red-600 dark:text-red-400 whitespace-nowrap">View Cash Flows</span>
+            <ChevronRight className="h-4 w-4 text-red-500" />
+          </div>
+        </div>
+      )}
 
       {/* ── Institutional KPI strip ── */}
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 divide-x divide-border border rounded-lg overflow-hidden">
