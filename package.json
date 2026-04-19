@@ -15,7 +15,9 @@
     "check:schema": "tsx scripts/check-schema-drift.ts",
     "gen:migrations": "tsx scripts/generate-startup-migrations.ts",
     "install-hooks": "bash scripts/install-hooks.sh",
-    "postinstall": "bash scripts/install-hooks.sh"
+    "postinstall": "bash scripts/install-hooks.sh",
+    "test:e2e": "playwright test",
+    "test:e2e:install-browsers": "playwright install chromium"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.68.0",
@@ -182,6 +184,7 @@
     "zustand": "^5.0.9"
   },
   "devDependencies": {
+    "@playwright/test": "^1.59.1",
     "@replit/vite-plugin-cartographer": "^0.3.0",
     "@replit/vite-plugin-runtime-error-modal": "^0.0.3",
     "@tailwindcss/typography": "^0.5.15",

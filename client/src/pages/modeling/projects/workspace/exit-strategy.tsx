@@ -23,6 +23,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip as RechartTooltip, ResponsiveConta
 import type { ModelingProject, ModelingCase } from "@shared/schema";
 import type { ProjectConfig, ProFormaData } from '@/types/modeling';
 import { WorkflowNavigation } from '@/components/modeling/workflow-navigation';
+import { FMEmptyState } from '@/components/modeling/FMEmptyState';
 import { defaultScenarios, type ScenarioConfig } from '@/lib/modeling-scenarios';
 import { useExitStrategiesStore } from "@/stores/exitStrategiesStore";
 
@@ -151,6 +152,21 @@ export default function WorkspaceExitStrategy({ projectId, onTabChange }: Worksp
         </div>
         <Skeleton className="h-96" />
       </div>
+    );
+  }
+
+  // Exit strategy needs at minimum a purchase price + NOI. Without those the
+  // sale-price math is nonsense and the charts render at zero — better to
+  // route the user to Inputs.
+  if (!project || (!purchasePrice && !year1NOI)) {
+    return (
+      <FMEmptyState
+        icon={TrendingUp}
+        title="Exit strategy needs inputs"
+        description="Enter a purchase price and operating assumptions on the Inputs tab. Exit modeling uses NOI × exit cap rate to project sale price, so both are required."
+        actionLabel="Go to Inputs"
+        onAction={() => onTabChange?.('inputs')}
+      />
     );
   }
 

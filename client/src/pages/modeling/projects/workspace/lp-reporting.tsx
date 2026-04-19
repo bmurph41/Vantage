@@ -26,9 +26,11 @@ import {
   Building2,
   Calendar,
   FileText,
+  Users,
 } from 'lucide-react';
 import { apiRequest } from '@/lib/queryClient';
 import { cn, formatCurrency } from '@/lib/utils';
+import { FMEmptyState } from '@/components/modeling/FMEmptyState';
 
 interface FundSummary {
   tvpi: number;
@@ -207,6 +209,24 @@ function LPReporting({ projectId, onTabChange }: LPReportingProps) {
           <Card key={i}><CardContent className="p-6"><div className="h-24 bg-muted animate-pulse rounded" /></CardContent></Card>
         ))}
       </div>
+    );
+  }
+
+  // No real fund data: show an empty state instead of rendering the page with
+  // hardcoded defaults (which would look like live-but-fake numbers to a user).
+  const hasFundData = !!data && (
+    (data.fundSummary?.totalCommitted ?? 0) > 0 ||
+    (data.investments?.length ?? 0) > 0
+  );
+  if (!hasFundData) {
+    return (
+      <FMEmptyState
+        icon={Users}
+        title="No fund linked to this project"
+        description="LP reporting appears when this modeling project is allocated to a fund. Create or attach a fund in Fund Management, then come back here for TVPI, capital accounts, NAV bridge, and investment summaries."
+        actionLabel="Open Fund Management"
+        actionHref="/modeling/funds"
+      />
     );
   }
 

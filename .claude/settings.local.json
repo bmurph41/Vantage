@@ -262,7 +262,8 @@
       "Bash(REQUIRE_BETA_INVITE=true npm run dev)",
       "Bash(REQUIRE_BETA_INVITE=true node tmp_beta_smoke.mjs)",
       "Bash(pkill -9 -f 'NODE_OPTIONS.*tsx')",
-      "Bash(ps -p 18172 -o pid,cmd)"
+      "Bash(ps -p 18172 -o pid,cmd)",
+      "Bash(npx playwright *)"
     ]
   }
 }

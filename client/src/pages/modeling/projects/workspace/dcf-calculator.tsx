@@ -44,6 +44,7 @@ import { cn, formatCurrency, formatPercent } from '@/lib/utils';
 import debounce from 'lodash.debounce';
 import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartTooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 import { WorkflowNavigation } from '@/components/modeling/workflow-navigation';
+import { FMEmptyState } from '@/components/modeling/FMEmptyState';
 import { MarketRatePicker, MarketRateContext } from '@/components/modeling/MarketRatePicker';
 import { ExportPdfButton } from '@/components/ui/export-pdf-button';
 import { DCFMonteCarloPanel, DecisionSupportAccordion } from '@/components/workspace/DCFMonteCarloPanel';
@@ -591,6 +592,20 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
           </Button>
         </div>
       </div>
+    );
+  }
+
+  // Belt-and-suspenders: if query succeeded but returned no analysis object,
+  // treat that as "needs inputs" rather than rendering downstream with undefined.
+  if (!dcfAnalysis) {
+    return (
+      <FMEmptyState
+        icon={TrendingUp}
+        title="DCF analysis not yet available"
+        description="DCF metrics appear after you complete property inputs — occupancy, revenue assumptions, unit mix, and debt. Open the Inputs & Data tab to get started."
+        actionLabel="Go to Inputs"
+        onAction={() => window.dispatchEvent(new CustomEvent('navigate-tab', { detail: 'inputs' }))}
+      />
     );
   }
 

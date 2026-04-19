@@ -49,6 +49,7 @@ import {
 } from 'recharts';
 import { formatCurrency, cn } from '@/lib/utils';
 import { ExportPdfButton } from '@/components/ui/export-pdf-button';
+import { FMEmptyState } from '@/components/modeling/FMEmptyState';
 import UtilizationSection from '@/components/utilization/UtilizationSection';
 
 interface RentRollAnalysisProps {
@@ -691,6 +692,21 @@ export default function RentRollAnalysis({ projectId, projectName, onTabChange }
     dockBreakdown: {},
     recentActivity: [],
   };
+
+  // No units entered yet: empty state instead of all-zero charts.
+  if (!isLoading && data.totalUnits === 0 && units.length === 0) {
+    return (
+      <FMEmptyState
+        icon={Anchor}
+        title="No rent roll data yet"
+        description="Rent-roll analysis appears after you enter lease data. Add units on the Rent Roll Data tab, or link this project to an existing portfolio location."
+        actionLabel="Add lease data"
+        onAction={() => onTabChange?.('storage-leases')}
+        secondaryLabel="Go to Rent Roll Data"
+        onSecondary={() => onTabChange?.('rent-roll-data')}
+      />
+    );
+  }
 
   return (
     <div ref={pdfRef} className="space-y-6">
