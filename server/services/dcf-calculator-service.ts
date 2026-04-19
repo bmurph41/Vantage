@@ -240,11 +240,22 @@ export async function performDCFAnalysis(
     const acquisitionDate = scenarioData.acquisitionCloseDate
       ?? new Date().toISOString().split('T')[0];
 
-    // Compute per-year lease EGI with per-tenant escalation schedules
+    // Read rollover vacancy settings from scenario assumptions (stored in jsonb)
+    const rolloverVacancyMonths =
+      typeof scenarioData.assumptions?.rolloverVacancyMonths === 'number'
+        ? scenarioData.assumptions.rolloverVacancyMonths
+        : 0;
+    const rolloverTiLcPerSf =
+      typeof scenarioData.assumptions?.rolloverTiLcPerSf === 'number'
+        ? scenarioData.assumptions.rolloverTiLcPerSf
+        : 0;
+
+    // Compute per-year lease EGI with per-tenant escalation schedules and rollover vacancy
     yearlyLeaseIncome = computeLeaseIncomeByYear(
       leaseIncome.leaseBreakdown,
       holdPeriod,
-      acquisitionDate
+      acquisitionDate,
+      { rolloverVacancyMonths, rolloverTiLcPerSf }
     );
 
     // Derive NOI from EGI using the engine's implied NOI margin
@@ -656,8 +667,12 @@ export interface LeaseYearIncome {
   baseRentAnnual: number;
   /** Aggregate recovery income for this year across all active leases */
   recoveryAnnual: number;
-  /** Total EGI = baseRentAnnual + recoveryAnnual */
+  /** Total EGI = baseRentAnnual + recoveryAnnual - vacancyDeductions - tiLcCosts */
   egiAnnual: number;
+  /** Total rollover vacancy deductions across all leases this year */
+  vacancyDeductionTotal: number;
+  /** Total TI/LC costs across all leases this year */
+  tiLcCostTotal: number;
   /** Per-lease detail for transparency */
   leaseDetail: Array<{
     leaseId: string;
@@ -666,25 +681,67 @@ export interface LeaseYearIncome {
     recovery: number;
     isExpired: boolean;
     freeRentReduction: number;
+    /** Lost rent during rollover vacancy period (months after lease expiry within this year) */
+    vacancyDeduction: number;
+    /** One-time TI/LC re-leasing cost charged in the first year of vacancy */
+    tiLcCost: number;
   }>;
 }
 
 /**
  * Compute per-lease EGI for each hold year, applying individual escalation
- * rates, free-rent concessions, and lease expiry.
+ * rates, free-rent concessions, lease expiry, and optional rollover vacancy.
  *
- * @param leaseBreakdown  Output from loadLeaseIncomeForProject().leaseBreakdown
- * @param holdPeriod      Number of projection years (1-based)
- * @param acquisitionDate ISO date string for year 1 start (defaults to today)
+ * @param leaseBreakdown      Output from loadLeaseIncomeForProject().leaseBreakdown
+ * @param holdPeriod          Number of projection years (1-based)
+ * @param acquisitionDate     ISO date string for year 1 start (defaults to today)
+ * @param options.rolloverVacancyMonths  Months of vacancy assumed after each mid-hold expiry (default 0)
+ * @param options.rolloverTiLcPerSf      One-time TI/LC cost per SF charged in the first vacancy year (default 0)
  */
 export function computeLeaseIncomeByYear(
   leaseBreakdown: LeaseBreakdownEntry[],
   holdPeriod: number,
-  acquisitionDate?: string
+  acquisitionDate?: string,
+  options?: {
+    rolloverVacancyMonths?: number;
+    rolloverTiLcPerSf?: number;
+  }
 ): LeaseYearIncome[] {
   const refDate = acquisitionDate ? new Date(acquisitionDate) : new Date();
   const MS_PER_DAY = 1000 * 60 * 60 * 24;
   const DAYS_PER_YEAR = 365.25;
+
+  const rolloverVacancyMonths = options?.rolloverVacancyMonths ?? 0;
+  const rolloverTiLcPerSf = options?.rolloverTiLcPerSf ?? 0;
+
+  // Hold period end date — leases expiring AFTER this have no mid-hold effect
+  const holdEnd = new Date(refDate);
+  holdEnd.setFullYear(holdEnd.getFullYear() + holdPeriod);
+
+  // Helper: compute the escalated monthly rent for a given lease at a specific date
+  // (mirrors the month-by-month logic in the main loop below)
+  const getEscalatedMonthlyRent = (
+    lease: LeaseBreakdownEntry,
+    atDate: Date,
+    commencementDate: Date | null
+  ): number => {
+    let rate = lease.baseRentAnnual / 12;
+    if (
+      lease.escalationType === 'SCHEDULE' &&
+      lease.scheduleJson &&
+      lease.scheduleJson.length > 0
+    ) {
+      const activeStep = findActiveRentStep(lease.scheduleJson, atDate);
+      if (activeStep) {
+        rate = convertRentStepToAnnual(activeStep, lease.sf) / 12;
+      }
+    } else if (commencementDate && lease.escalationRate > 0) {
+      const msElapsed = atDate.getTime() - commencementDate.getTime();
+      const leaseYearsElapsed = Math.max(0, Math.floor(msElapsed / (MS_PER_DAY * DAYS_PER_YEAR)));
+      rate = (lease.baseRentAnnual / 12) * Math.pow(1 + lease.escalationRate, leaseYearsElapsed);
+    }
+    return rate;
+  };
 
   const results: LeaseYearIncome[] = [];
 
@@ -697,6 +754,8 @@ export function computeLeaseIncomeByYear(
 
     let totalBaseRent = 0;
     let totalRecovery = 0;
+    let totalVacancyDeduction = 0;
+    let totalTiLcCost = 0;
     const leaseDetail: LeaseYearIncome['leaseDetail'] = [];
 
     for (const lease of leaseBreakdown) {
@@ -709,129 +768,190 @@ export function computeLeaseIncomeByYear(
         ? new Date(lease.rentCommencementDate)
         : leaseStartDate;
 
-      // Quick rejection: lease entirely outside this projection year
-      const isExpired = leaseEndDate !== null && leaseEndDate <= yearStart;
+      // Whether the lease was already fully expired before this year started
+      const isExpiredBeforeYear = leaseEndDate !== null && leaseEndDate <= yearStart;
+      // Whether the lease hasn't started yet for this year
       const notYetStarted = leaseStartDate !== null && leaseStartDate >= yearEnd;
-      if (isExpired || notYetStarted) {
-        leaseDetail.push({
-          leaseId: lease.leaseId,
-          tenantName: lease.tenantName,
-          baseRent: 0,
-          recovery: 0,
-          isExpired,
-          freeRentReduction: 0,
-        });
-        continue;
-      }
 
-      // ── Month-by-month computation ──────────────────────────────────────────
-      // Process each of the 12 calendar months within this projection year.
-      // For each month we determine:
-      //   1. Is the lease active? (between leaseStart and leaseEnd)
-      //   2. Is rent due? (on or after commencementDate — i.e., free-rent has ended)
-      //   3. What escalation factor applies? (based on completed lease anniversaries
-      //      since commencementDate, not since acquisition date)
-      //
-      // This unified timeline ensures free-rent, active window, and escalation are
-      // never double-applied or double-counted.
+      // ── Part 1: Lease income computation ──────────────────────────────────
+      // Expired/not-yet-started leases yield $0 income for this year.
+      // Active and mid-year-expiring leases get the month-by-month calculation.
 
       let netBaseRent = 0;
-      let grossBaseRentIfNoFreeRent = 0; // for computing freeRentReduction as a delta
+      let freeRentReduction = 0;
+      let escalatedRecovery = 0;
 
-      for (let m = 0; m < 12; m++) {
-        // Month boundaries within this projection year (calendar month offset from yearStart)
-        const monthStart = new Date(yearStart);
-        monthStart.setMonth(yearStart.getMonth() + m);
-        const monthEnd = new Date(yearStart);
-        monthEnd.setMonth(yearStart.getMonth() + m + 1);
-
-        // Lease not yet started this month
-        if (leaseStartDate && leaseStartDate >= monthEnd) continue;
-        // Lease already expired this month
-        if (leaseEndDate && leaseEndDate <= monthStart) continue;
-
-        // Effective active window within this month (handles partial first/last months)
-        const effectiveStart = leaseStartDate && leaseStartDate > monthStart
-          ? leaseStartDate : monthStart;
-        const effectiveEnd = leaseEndDate && leaseEndDate < monthEnd
-          ? leaseEndDate : monthEnd;
-        const monthMs = monthEnd.getTime() - monthStart.getTime();
-        const activeFraction = monthMs > 0
-          ? Math.max(0, (effectiveEnd.getTime() - effectiveStart.getTime()) / monthMs)
-          : 1.0;
-        if (activeFraction <= 0) continue;
-
-        // Escalation: compute the rent applicable in this month.
+      if (!isExpiredBeforeYear && !notYetStarted) {
+        // ── Month-by-month computation ────────────────────────────────────────
+        // Process each of the 12 calendar months within this projection year.
+        // For each month we determine:
+        //   1. Is the lease active? (between leaseStart and leaseEnd)
+        //   2. Is rent due? (on or after commencementDate — free-rent has ended)
+        //   3. What escalation factor applies? (based on completed lease anniversaries
+        //      since commencementDate, not since acquisition date)
         //
-        // For SCHEDULE leases: find the last step entry whose effectiveDate is
-        // on or before monthStart; convert its absolute value+unit to a monthly
-        // figure. If no step has kicked in yet, use baseRentAnnual / 12.
-        //
-        // For all other types: compound the escalationRate by the number of
-        // full lease years elapsed since commencementDate.
-        let escalatedMonthlyRent = lease.baseRentAnnual / 12;
+        // This unified timeline ensures free-rent, active window, and escalation are
+        // never double-applied or double-counted.
 
-        if (
-          lease.escalationType === 'SCHEDULE' &&
-          lease.scheduleJson &&
-          lease.scheduleJson.length > 0
-        ) {
-          const activeStep = findActiveRentStep(lease.scheduleJson, monthStart);
-          if (activeStep) {
-            escalatedMonthlyRent = convertRentStepToAnnual(activeStep, lease.sf) / 12;
+        let grossBaseRentIfNoFreeRent = 0; // for computing freeRentReduction as a delta
+
+        for (let m = 0; m < 12; m++) {
+          // Month boundaries within this projection year (calendar month offset from yearStart)
+          const monthStart = new Date(yearStart);
+          monthStart.setMonth(yearStart.getMonth() + m);
+          const monthEnd = new Date(yearStart);
+          monthEnd.setMonth(yearStart.getMonth() + m + 1);
+
+          // Lease not yet started this month
+          if (leaseStartDate && leaseStartDate >= monthEnd) continue;
+          // Lease already expired this month
+          if (leaseEndDate && leaseEndDate <= monthStart) continue;
+
+          // Effective active window within this month (handles partial first/last months)
+          const effectiveStart = leaseStartDate && leaseStartDate > monthStart
+            ? leaseStartDate : monthStart;
+          const effectiveEnd = leaseEndDate && leaseEndDate < monthEnd
+            ? leaseEndDate : monthEnd;
+          const monthMs = monthEnd.getTime() - monthStart.getTime();
+          const activeFraction = monthMs > 0
+            ? Math.max(0, (effectiveEnd.getTime() - effectiveStart.getTime()) / monthMs)
+            : 1.0;
+          if (activeFraction <= 0) continue;
+
+          // Escalation: compute the rent applicable in this month.
+          //
+          // For SCHEDULE leases: find the last step entry whose effectiveDate is
+          // on or before monthStart; convert its absolute value+unit to a monthly
+          // figure. If no step has kicked in yet, use baseRentAnnual / 12.
+          //
+          // For all other types: compound the escalationRate by the number of
+          // full lease years elapsed since commencementDate.
+          let escalatedMonthlyRent = lease.baseRentAnnual / 12;
+
+          if (
+            lease.escalationType === 'SCHEDULE' &&
+            lease.scheduleJson &&
+            lease.scheduleJson.length > 0
+          ) {
+            const activeStep = findActiveRentStep(lease.scheduleJson, monthStart);
+            if (activeStep) {
+              escalatedMonthlyRent = convertRentStepToAnnual(activeStep, lease.sf) / 12;
+            }
+            // If no step has taken effect yet, remain at baseRentAnnual / 12 (set above)
+          } else if (commencementDate && lease.escalationRate > 0) {
+            const msFromCommencementToMonthStart = monthStart.getTime() - commencementDate.getTime();
+            const leaseYearsElapsed = Math.max(
+              0,
+              Math.floor(msFromCommencementToMonthStart / (MS_PER_DAY * DAYS_PER_YEAR))
+            );
+            escalatedMonthlyRent = (lease.baseRentAnnual / 12) *
+              Math.pow(1 + lease.escalationRate, leaseYearsElapsed);
           }
-          // If no step has taken effect yet, remain at baseRentAnnual / 12 (set above)
-        } else if (commencementDate && lease.escalationRate > 0) {
-          const msFromCommencementToMonthStart = monthStart.getTime() - commencementDate.getTime();
-          const leaseYearsElapsed = Math.max(
-            0,
-            Math.floor(msFromCommencementToMonthStart / (MS_PER_DAY * DAYS_PER_YEAR))
-          );
-          escalatedMonthlyRent = (lease.baseRentAnnual / 12) *
-            Math.pow(1 + lease.escalationRate, leaseYearsElapsed);
+
+          // What the month would earn without any free-rent (for computing freeRentReduction)
+          grossBaseRentIfNoFreeRent += escalatedMonthlyRent * activeFraction;
+
+          // Free-rent: month is rent-free if rent has not yet commenced
+          const isFreePeriod = commencementDate !== null && monthStart < commencementDate;
+          if (isFreePeriod) continue; // no rent this month
+
+          netBaseRent += escalatedMonthlyRent * activeFraction;
         }
 
-        // What the month would earn without any free-rent (for computing freeRentReduction)
-        grossBaseRentIfNoFreeRent += escalatedMonthlyRent * activeFraction;
+        freeRentReduction = Math.max(0, grossBaseRentIfNoFreeRent - netBaseRent);
 
-        // Free-rent: month is rent-free if rent has not yet commenced
-        const isFreePeriod = commencementDate !== null && monthStart < commencementDate;
-        if (isFreePeriod) continue; // no rent this month
-
-        netBaseRent += escalatedMonthlyRent * activeFraction;
+        // Recovery income: annual × active fraction of the full year, growing at 2.5%/year
+        // (consistent with the prior /lease-income route). No free-rent applies to recoveries.
+        const yearMs = yearEnd.getTime() - yearStart.getTime();
+        const fullYearActiveFraction = yearMs > 0 ? Math.max(0, Math.min(1,
+          (Math.min(leaseEndDate?.getTime() ?? yearEnd.getTime(), yearEnd.getTime()) -
+           Math.max(leaseStartDate?.getTime() ?? yearStart.getTime(), yearStart.getTime()))
+          / yearMs
+        )) : 1.0;
+        escalatedRecovery = lease.recoveryAnnual * Math.pow(1.025, yr - 1) * fullYearActiveFraction;
       }
 
-      const freeRentReduction = Math.max(0, grossBaseRentIfNoFreeRent - netBaseRent);
+      // ── Part 2: Rollover vacancy computation ──────────────────────────────
+      // Runs for EVERY lease in EVERY year — not just expired ones.
+      // A lease "expires mid-hold" if leaseEndDate falls after the acquisition
+      // date and before the hold period end date.
+      //
+      // The vacancy window is [leaseEndDate, leaseEndDate + rolloverVacancyMonths).
+      // For any projection year that overlaps the vacancy window, we deduct the
+      // equivalent monthly rent (at the escalated rate as of the expiry date).
+      // The TI/LC one-time cost is charged in the single year where the lease expires.
 
-      // Recovery income: annual × active fraction of the full year, growing at 2.5%/year
-      // (consistent with the prior /lease-income route). No free-rent applies to recoveries.
-      const yearMs = yearEnd.getTime() - yearStart.getTime();
-      const fullYearActiveFraction = yearMs > 0 ? Math.max(0, Math.min(1,
-        (Math.min(leaseEndDate?.getTime() ?? yearEnd.getTime(), yearEnd.getTime()) -
-         Math.max(leaseStartDate?.getTime() ?? yearStart.getTime(), yearStart.getTime()))
-        / yearMs
-      )) : 1.0;
-      const escalatedRecovery = lease.recoveryAnnual *
-        Math.pow(1.025, yr - 1) * fullYearActiveFraction;
+      let vacancyDeduction = 0;
+      let tiLcCost = 0;
+
+      // Both vacancy and TI/LC apply only to leases that expire mid-hold
+      // (after acquisition date, before hold period end).
+      const qualifiesForRollover =
+        leaseEndDate !== null &&
+        leaseEndDate > refDate &&  // expires after acquisition
+        leaseEndDate < holdEnd;    // expires before end of hold period
+
+      // ── Vacancy deduction ────────────────────────────────────────────────────
+      // Gated separately on rolloverVacancyMonths > 0.
+      // Uses exact day-based proration so exactly N months of rent is lost in
+      // total, spread across projection years proportionally.
+      if (qualifiesForRollover && rolloverVacancyMonths > 0) {
+        const vacancyStart = new Date(leaseEndDate!);
+        const vacancyEnd = new Date(leaseEndDate!);
+        vacancyEnd.setMonth(vacancyEnd.getMonth() + rolloverVacancyMonths);
+
+        const totalVacancyMs = vacancyEnd.getTime() - vacancyStart.getTime();
+        const overlapStartMs = Math.max(vacancyStart.getTime(), yearStart.getTime());
+        const overlapEndMs   = Math.min(vacancyEnd.getTime(),   yearEnd.getTime());
+
+        if (overlapEndMs > overlapStartMs && totalVacancyMs > 0) {
+          const overlapFraction = (overlapEndMs - overlapStartMs) / totalVacancyMs;
+          const monthlyRentAtExpiry = getEscalatedMonthlyRent(
+            lease,
+            vacancyStart,
+            commencementDate
+          );
+          vacancyDeduction = overlapFraction * rolloverVacancyMonths * monthlyRentAtExpiry;
+        }
+      }
+
+      // ── TI/LC cost ───────────────────────────────────────────────────────────
+      // Gated separately on rolloverTiLcPerSf > 0 — independent of vacancy months.
+      // One-time charge in the single year the lease expires.
+      if (qualifiesForRollover && rolloverTiLcPerSf > 0 && lease.sf > 0) {
+        const leaseExpiresInThisYear =
+          leaseEndDate! >= yearStart && leaseEndDate! < yearEnd;
+        if (leaseExpiresInThisYear) {
+          tiLcCost = rolloverTiLcPerSf * lease.sf;
+        }
+      }
 
       totalBaseRent += netBaseRent;
       totalRecovery += escalatedRecovery;
+      totalVacancyDeduction += vacancyDeduction;
+      totalTiLcCost += tiLcCost;
 
       leaseDetail.push({
         leaseId: lease.leaseId,
         tenantName: lease.tenantName,
         baseRent: Math.round(netBaseRent),
         recovery: Math.round(escalatedRecovery),
-        isExpired: false,
+        isExpired: isExpiredBeforeYear,
         freeRentReduction: Math.round(freeRentReduction),
+        vacancyDeduction: Math.round(vacancyDeduction),
+        tiLcCost: Math.round(tiLcCost),
       });
     }
+
+    const netEGI = totalBaseRent + totalRecovery - totalVacancyDeduction - totalTiLcCost;
 
     results.push({
       year: yr,
       baseRentAnnual: Math.round(totalBaseRent),
       recoveryAnnual: Math.round(totalRecovery),
-      egiAnnual: Math.round(totalBaseRent + totalRecovery),
+      egiAnnual: Math.round(netEGI),
+      vacancyDeductionTotal: Math.round(totalVacancyDeduction),
+      tiLcCostTotal: Math.round(totalTiLcCost),
       leaseDetail,
     });
   }
