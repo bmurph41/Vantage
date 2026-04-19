@@ -562,6 +562,21 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
     queryKey: ['/api/modeling-rent-roll/projects', projectId, 'units'],
   });
 
+  const { data: leaseIncomeData } = useQuery<{
+    hasLeases: boolean;
+    leaseBreakdown: Array<{ escalationType: string }>;
+  }>({
+    queryKey: ['/api/modeling/projects', projectId, 'lease-income'],
+    enabled: !!projectId,
+  });
+
+  const hasCpiLeases = useMemo(() => {
+    if (!leaseIncomeData?.leaseBreakdown) return false;
+    return leaseIncomeData.leaseBreakdown.some(
+      l => l.escalationType === 'CPI' || l.escalationType === 'CPI_CAP_FLOOR'
+    );
+  }, [leaseIncomeData]);
+
   const initScenariosMutation = useMutation({
     mutationFn: () => apiRequest('POST', `/api/modeling/projects/${projectId}/scenarios/init`),
     onSuccess: () => {
@@ -656,6 +671,7 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
     workingCapitalAmount: 0,
   });
   const [exitCapRateValue, setExitCapRateValue] = useState<number>(7);
+  const [cpiRateValue, setCpiRateValue] = useState<number>(3);
   const [expandedStorageTypes, setExpandedStorageTypes] = useState<Record<string, boolean>>({});
   const [expandedOccupancyTypes, setExpandedOccupancyTypes] = useState<Record<string, boolean>>({});
 
@@ -893,6 +909,8 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
       const dealPricingCap = (project as any)?.customMetrics?.dealPricing?.exitCapRate;
       const fallbackCap = dealPricingCap && !isNaN(Number(dealPricingCap)) && Number(dealPricingCap) > 0 ? Number(dealPricingCap) : 7;
       setExitCapRateValue(activeScenario?.exitCapRate ? parseFloat(activeScenario.exitCapRate) * 100 : fallbackCap);
+      const storedCpiRate = typeof assumptions.cpiRate === 'number' ? assumptions.cpiRate * 100 : 3;
+      setCpiRateValue(storedCpiRate);
       setHasChanges(false);
     } else {
       setGrowthRates(getDefaultGrowthRates(activeScenarioType));
@@ -905,6 +923,7 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
       const dealPricingCapElse = (project as any)?.customMetrics?.dealPricing?.exitCapRate;
       const fallbackCapElse = dealPricingCapElse && !isNaN(Number(dealPricingCapElse)) && Number(dealPricingCapElse) > 0 ? Number(dealPricingCapElse) : 7;
       setExitCapRateValue(fallbackCapElse);
+      setCpiRateValue(3);
       setHasChanges(false);
     }
   }, [activeScenario, activeScenarioType, holdPeriod, project]);
@@ -1012,7 +1031,7 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
     if (pendingSaveRef.current) {
       changesSinceSaveRef.current = true;
     }
-  }, [hasChanges, growthRates, expenseGrowth, occupancy, margins, storageGrowth, belowTheLine, exitAssumptions, exitCapRateValue]);
+  }, [hasChanges, growthRates, expenseGrowth, occupancy, margins, storageGrowth, belowTheLine, exitAssumptions, exitCapRateValue, cpiRateValue]);
 
   const saveMutation = useMutation({
     mutationFn: ({ createNewVersion, isAutosave }: { createNewVersion: boolean; isAutosave?: boolean }) => {
@@ -1036,6 +1055,7 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
         belowTheLine,
         exitAssumptions,
         yearlyGrowthRates: yearlyGrowthRatesForEngine,
+        cpiRate: parseFloat((cpiRateValue / 100).toFixed(4)),
       };
       const exitCapRateDecimal = (exitCapRateValue / 100).toFixed(4);
       if (!activeScenario) {
@@ -1125,7 +1145,7 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
         clearTimeout(autosaveTimerRef.current);
       }
     };
-  }, [hasChanges, growthRates, expenseGrowth, occupancy, margins, storageGrowth, belowTheLine, exitAssumptions]);
+  }, [hasChanges, growthRates, expenseGrowth, occupancy, margins, storageGrowth, belowTheLine, exitAssumptions, cpiRateValue]);
 
   useEffect(() => {
     return () => {
@@ -1873,6 +1893,41 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
                   <p className="text-[10px] text-muted-foreground px-2">Exit Value = Final Year NOI / Exit Cap Rate</p>
                 </div>
               </SectionCard>
+
+              {hasCpiLeases && (
+                <SectionCard
+                  title="CPI Assumption"
+                  description="Annual CPI rate used for CPI and CPI Cap/Floor leases"
+                  accent="blue"
+                  icon={Percent}
+                >
+                  <div className="p-1 space-y-2">
+                    <div className="flex items-center gap-2 py-1.5 px-2 rounded-md bg-white dark:bg-slate-800/50 border border-transparent hover:border-slate-200 dark:hover:border-slate-600 transition-all">
+                      <div className="flex items-center gap-1.5 min-w-0 flex-shrink-0 w-[140px]">
+                        <div className="w-5 h-5 rounded flex items-center justify-center bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 flex-shrink-0">
+                          <Percent className="w-3 h-3" />
+                        </div>
+                        <span className="text-[11px] font-medium text-slate-700 dark:text-slate-300 truncate">CPI Rate</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 flex-1">
+                        <NumericInput
+                          className="w-20 h-7 text-xs text-center"
+                          value={cpiRateValue}
+                          onChange={(val) => {
+                            setCpiRateValue(val);
+                            setHasChanges(true);
+                            changesSinceSaveRef.current = true;
+                            hasChangesRef.current = true;
+                          }}
+                          disabled={isScenarioLocked}
+                        />
+                        <span className="text-[10px] text-muted-foreground">%</span>
+                      </div>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground px-2">Applied to all CPI and CPI Cap/Floor escalation clauses in this scenario.</p>
+                  </div>
+                </SectionCard>
+              )}
 
               <SectionCard
                 title="Exit Assumptions"
