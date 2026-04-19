@@ -3,7 +3,12 @@
  * Generate idempotent migration stubs for schema drift.
  *
  * Usage:
- *   npx tsx scripts/generate-startup-migrations.ts
+ *   npx tsx scripts/generate-startup-migrations.ts           # print stubs only
+ *   npx tsx scripts/generate-startup-migrations.ts --apply   # write stubs automatically
+ *
+ *   Via npm:
+ *   npm run gen:migrations                  # print stubs only
+ *   npm run gen:migrations -- --apply       # write stubs automatically
  *
  * The script:
  *  1. Scans db/schema-*.ts files and regenerates db/schema-index.ts so that
@@ -16,12 +21,17 @@
  *     CREATE INDEX IF NOT EXISTS entries already present in
  *     server/db-startup-migrations.ts and prints stubs for missing indexes.
  *
- * It does NOT write to db-startup-migrations.ts automatically — it prints stubs
- * to stdout so a developer can review and paste them in at the appropriate place.
+ * Without --apply it prints stubs to stdout so a developer can review and paste
+ * them in at the appropriate place.
+ *
+ * With --apply it writes the stubs directly into server/db-startup-migrations.ts
+ * just before the closing `];` of the MIGRATIONS array, prints a summary of what
+ * was added, and exits 0. New column stubs use 'text' as a placeholder type —
+ * review the file afterwards and adjust PostgreSQL types as needed.
  *
  * Exit codes:
- *   0 — all schema definitions are already covered
- *   1 — at least one table, column, or index lacks a migration stub
+ *   0 — all schema definitions are already covered (or --apply succeeded)
+ *   1 — at least one table, column, or index lacks a migration stub (print mode)
  */
 
 import { readFileSync, readdirSync, writeFileSync } from "fs";
@@ -310,9 +320,10 @@ for (const { tableName, columns, indexes } of schemaTables) {
   }
 }
 
-// ─── 6. Report ────────────────────────────────────────────────────────────────
+// ─── 6. Report / Auto-apply ───────────────────────────────────────────────────
 
 const totalMissing = missingColumnCount + missingIndexCount;
+const applyMode = process.argv.includes("--apply");
 
 if (totalMissing === 0) {
   console.log(
@@ -320,6 +331,54 @@ if (totalMissing === 0) {
   );
   process.exit(0);
 }
+
+// Build the combined stub block that will be inserted (or printed).
+const allStubLines = [...columnOutputLines, ...indexOutputLines];
+const stubBlock = allStubLines.join("\n");
+
+if (applyMode) {
+  // ── Auto-apply: insert stubs before the closing `];` of MIGRATIONS ──────────
+  const marker = "\n];";
+  const insertionIdx = migrationsSource.lastIndexOf(marker);
+  if (insertionIdx === -1) {
+    console.error(
+      "[generate-migrations] ERROR: Could not locate the closing `];` of the MIGRATIONS array in server/db-startup-migrations.ts.\n" +
+        "  Please paste the stubs manually."
+    );
+    process.exit(1);
+  }
+
+  const updatedSource =
+    migrationsSource.slice(0, insertionIdx) +
+    "\n" +
+    stubBlock +
+    migrationsSource.slice(insertionIdx);
+
+  writeFileSync(migrationsFilePath, updatedSource, "utf8");
+
+  console.log(
+    `[generate-migrations] Auto-applied ${totalMissing} stub(s) to server/db-startup-migrations.ts.\n`
+  );
+
+  if (missingColumnCount > 0) {
+    console.log(`  + ${missingColumnCount} ADD COLUMN stub(s)`);
+  }
+  if (missingIndexCount > 0) {
+    console.log(`  + ${missingIndexCount} CREATE INDEX stub(s)`);
+  }
+
+  console.log("\n─".repeat(72));
+  console.log(stubBlock);
+  console.log("─".repeat(72));
+  console.log(
+    "\nNOTE: The stubs use 'text' as a placeholder type for new columns.\n" +
+      "      Review server/db-startup-migrations.ts and adjust PostgreSQL types as needed."
+  );
+
+  process.exit(0);
+}
+
+// ── Print-only mode (default) ────────────────────────────────────────────────
 
 if (missingColumnCount > 0) {
   console.log(
@@ -357,5 +416,10 @@ if (missingIndexCount > 0) {
     `\n${missingIndexCount} index stub(s) generated. Review and paste into MIGRATIONS.`
   );
 }
+
+console.log(
+  "\nTip: run with --apply to write these stubs automatically:\n" +
+    "  npm run gen:migrations -- --apply"
+);
 
 process.exit(1);

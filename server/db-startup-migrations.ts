@@ -46,9 +46,19 @@
  *    what the schema defines vs. what is already covered here:
  *
  *      npx tsx scripts/generate-startup-migrations.ts
+ *      # or via npm:
+ *      npm run gen:migrations
  *
  *    The script prints ready-to-paste migration stubs for every table, column, and
  *    named index that is in the Drizzle schema but has no matching entry in this file.
+ *
+ *    Pass --apply to have the script write the stubs directly into this file
+ *    (inserted just before the closing `];` of the MIGRATIONS array):
+ *
+ *      npm run gen:migrations -- --apply
+ *
+ *    The script will print a summary of what was added and exit 0.
+ *    Remember to review the auto-applied entries and fix placeholder 'text' types.
  *
  * 5. CI GUARD — the project includes a drift-check script that exits non-zero when
  *    the live database is missing schema columns, making it suitable as a CI step:
