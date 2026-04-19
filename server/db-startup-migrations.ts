@@ -17949,6 +17949,155 @@ const MIGRATIONS: Migration[] = [
 
 
   // ─── Final drift fixes ────────────────────────────────────────────────────
+
+  // ─── Tax-waterfall tables: repoint FKs from projects -> modeling_projects ──
+  // Tax Waterfall / GP Partner Economics belongs to the financial-modeling
+  // stack (modeling_projects), not the DD stack (projects). Historic FKs
+  // pointed to projects.id and produced 404s in the UI for every
+  // modeling-project-scoped request.
+  {
+    name: "project_tax_settings: repoint project_id FK to modeling_projects",
+    sql: `
+      DO $$
+      DECLARE cname text;
+      BEGIN
+        SELECT tc.constraint_name INTO cname
+        FROM information_schema.table_constraints tc
+        JOIN information_schema.constraint_column_usage ccu
+          ON ccu.constraint_name = tc.constraint_name
+        WHERE tc.table_name = 'project_tax_settings'
+          AND tc.constraint_type = 'FOREIGN KEY'
+          AND ccu.table_name = 'projects';
+        IF cname IS NOT NULL THEN
+          EXECUTE format('ALTER TABLE project_tax_settings DROP CONSTRAINT %I', cname);
+        END IF;
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.table_constraints
+          WHERE table_name='project_tax_settings'
+            AND constraint_name='project_tax_settings_project_id_modeling_projects_id_fk'
+        ) THEN
+          ALTER TABLE project_tax_settings
+            ADD CONSTRAINT project_tax_settings_project_id_modeling_projects_id_fk
+            FOREIGN KEY (project_id) REFERENCES modeling_projects(id) ON DELETE CASCADE;
+        END IF;
+      END $$;
+    `,
+  },
+  {
+    name: "project_partners: repoint project_id FK to modeling_projects",
+    sql: `
+      DO $$
+      DECLARE cname text;
+      BEGIN
+        SELECT tc.constraint_name INTO cname
+        FROM information_schema.table_constraints tc
+        JOIN information_schema.constraint_column_usage ccu
+          ON ccu.constraint_name = tc.constraint_name
+        WHERE tc.table_name = 'project_partners'
+          AND tc.constraint_type = 'FOREIGN KEY'
+          AND ccu.table_name = 'projects';
+        IF cname IS NOT NULL THEN
+          EXECUTE format('ALTER TABLE project_partners DROP CONSTRAINT %I', cname);
+        END IF;
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.table_constraints
+          WHERE table_name='project_partners'
+            AND constraint_name='project_partners_project_id_modeling_projects_id_fk'
+        ) THEN
+          ALTER TABLE project_partners
+            ADD CONSTRAINT project_partners_project_id_modeling_projects_id_fk
+            FOREIGN KEY (project_id) REFERENCES modeling_projects(id) ON DELETE CASCADE;
+        END IF;
+      END $$;
+    `,
+  },
+  {
+    name: "project_equity_contributions: repoint project_id FK to modeling_projects",
+    sql: `
+      DO $$
+      DECLARE cname text;
+      BEGIN
+        SELECT tc.constraint_name INTO cname
+        FROM information_schema.table_constraints tc
+        JOIN information_schema.key_column_usage kcu
+          ON kcu.constraint_name = tc.constraint_name
+        JOIN information_schema.constraint_column_usage ccu
+          ON ccu.constraint_name = tc.constraint_name
+        WHERE tc.table_name = 'project_equity_contributions'
+          AND tc.constraint_type = 'FOREIGN KEY'
+          AND kcu.column_name = 'project_id'
+          AND ccu.table_name = 'projects';
+        IF cname IS NOT NULL THEN
+          EXECUTE format('ALTER TABLE project_equity_contributions DROP CONSTRAINT %I', cname);
+        END IF;
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.table_constraints
+          WHERE table_name='project_equity_contributions'
+            AND constraint_name='project_equity_contributions_project_id_modeling_projects_id_fk'
+        ) THEN
+          ALTER TABLE project_equity_contributions
+            ADD CONSTRAINT project_equity_contributions_project_id_modeling_projects_id_fk
+            FOREIGN KEY (project_id) REFERENCES modeling_projects(id) ON DELETE CASCADE;
+        END IF;
+      END $$;
+    `,
+  },
+  {
+    name: "waterfall_configs: repoint project_id FK to modeling_projects",
+    sql: `
+      DO $$
+      DECLARE cname text;
+      BEGIN
+        SELECT tc.constraint_name INTO cname
+        FROM information_schema.table_constraints tc
+        JOIN information_schema.constraint_column_usage ccu
+          ON ccu.constraint_name = tc.constraint_name
+        WHERE tc.table_name = 'waterfall_configs'
+          AND tc.constraint_type = 'FOREIGN KEY'
+          AND ccu.table_name = 'projects';
+        IF cname IS NOT NULL THEN
+          EXECUTE format('ALTER TABLE waterfall_configs DROP CONSTRAINT %I', cname);
+        END IF;
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.table_constraints
+          WHERE table_name='waterfall_configs'
+            AND constraint_name='waterfall_configs_project_id_modeling_projects_id_fk'
+        ) THEN
+          ALTER TABLE waterfall_configs
+            ADD CONSTRAINT waterfall_configs_project_id_modeling_projects_id_fk
+            FOREIGN KEY (project_id) REFERENCES modeling_projects(id) ON DELETE CASCADE;
+        END IF;
+      END $$;
+    `,
+  },
+  {
+    name: "project_tax_inputs: repoint project_id FK to modeling_projects",
+    sql: `
+      DO $$
+      DECLARE cname text;
+      BEGIN
+        SELECT tc.constraint_name INTO cname
+        FROM information_schema.table_constraints tc
+        JOIN information_schema.constraint_column_usage ccu
+          ON ccu.constraint_name = tc.constraint_name
+        WHERE tc.table_name = 'project_tax_inputs'
+          AND tc.constraint_type = 'FOREIGN KEY'
+          AND ccu.table_name = 'projects';
+        IF cname IS NOT NULL THEN
+          EXECUTE format('ALTER TABLE project_tax_inputs DROP CONSTRAINT %I', cname);
+        END IF;
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.table_constraints
+          WHERE table_name='project_tax_inputs'
+            AND constraint_name='project_tax_inputs_project_id_modeling_projects_id_fk'
+        ) THEN
+          ALTER TABLE project_tax_inputs
+            ADD CONSTRAINT project_tax_inputs_project_id_modeling_projects_id_fk
+            FOREIGN KEY (project_id) REFERENCES modeling_projects(id) ON DELETE CASCADE;
+        END IF;
+      END $$;
+    `,
+  },
 ];
 
 /**

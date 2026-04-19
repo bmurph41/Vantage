@@ -26332,7 +26332,7 @@ export const insertTaxProfileSchema = createInsertSchema(taxProfiles).omit({ id:
 export type InsertTaxProfile = z.infer<typeof insertTaxProfileSchema>;
 
 export const projectTaxSettings = pgTable('project_tax_settings', {
-  projectId: varchar('project_id').primaryKey().references(() => projects.id, { onDelete: 'cascade' }),
+  projectId: varchar('project_id').primaryKey().references(() => modelingProjects.id, { onDelete: 'cascade' }),
   enabled: boolean('enabled').notNull().default(false),
   taxMode: twTaxModeEnum('tax_mode').notNull().default('flat'),
   taxTiming: twTaxTimingEnum('tax_timing').notNull().default('annual'),
@@ -26348,7 +26348,7 @@ export type InsertProjectTaxSettings = z.infer<typeof insertProjectTaxSettingsSc
 
 export const projectPartners = pgTable('project_partners', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
-  projectId: varchar('project_id').notNull().references(() => projects.id, { onDelete: 'cascade' }),
+  projectId: varchar('project_id').notNull().references(() => modelingProjects.id, { onDelete: 'cascade' }),
   name: text('name').notNull(),
   role: twPartnerRoleEnum('role').notNull().default('lp'),
   entityType: twEntityTypeEnum('entity_type').notNull().default('individual'),
@@ -26366,7 +26366,7 @@ export type InsertProjectPartner = z.infer<typeof insertProjectPartnerSchema>;
 
 export const projectEquityContributions = pgTable('project_equity_contributions', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
-  projectId: varchar('project_id').notNull().references(() => projects.id, { onDelete: 'cascade' }),
+  projectId: varchar('project_id').notNull().references(() => modelingProjects.id, { onDelete: 'cascade' }),
   partnerId: varchar('partner_id').notNull().references(() => projectPartners.id, { onDelete: 'cascade' }),
   date: date('date').notNull(),
   amountCents: decimal('amount_cents', { precision: 18, scale: 0 }).notNull(),
@@ -26382,7 +26382,7 @@ export type InsertProjectEquityContribution = z.infer<typeof insertProjectEquity
 
 export const waterfallConfigs = pgTable('waterfall_configs', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
-  projectId: varchar('project_id').notNull().references(() => projects.id, { onDelete: 'cascade' }),
+  projectId: varchar('project_id').notNull().references(() => modelingProjects.id, { onDelete: 'cascade' }),
   name: text('name').notNull(),
   templateType: twWaterfallTemplateEnum('template_type').notNull().default('straight_split'),
   isActive: boolean('is_active').notNull().default(true),
@@ -26417,7 +26417,7 @@ export const insertWaterfallTierSchema = createInsertSchema(waterfallTiers).omit
 export type InsertWaterfallTier = z.infer<typeof insertWaterfallTierSchema>;
 
 export const projectTaxInputs = pgTable('project_tax_inputs', {
-  projectId: varchar('project_id').primaryKey().references(() => projects.id, { onDelete: 'cascade' }),
+  projectId: varchar('project_id').primaryKey().references(() => modelingProjects.id, { onDelete: 'cascade' }),
   annualDepreciationCents: decimal('annual_depreciation_cents', { precision: 18, scale: 0 }),
   depreciationMethod: twDepreciationMethodEnum('depreciation_method').notNull().default('manual'),
   buildingBasisCents: decimal('building_basis_cents', { precision: 18, scale: 0 }),

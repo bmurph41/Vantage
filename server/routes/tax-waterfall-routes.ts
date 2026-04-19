@@ -4,7 +4,7 @@ import { z } from "zod";
 import { eq, and, asc } from "drizzle-orm";
 import {
   taxProfiles, projectTaxSettings, projectPartners, projectEquityContributions,
-  waterfallConfigs, waterfallTiers, projectTaxInputs, projects,
+  waterfallConfigs, waterfallTiers, projectTaxInputs, modelingProjects,
   insertTaxProfileSchema, insertProjectTaxSettingsSchema,
   insertProjectPartnerSchema, insertProjectEquityContributionSchema,
   insertWaterfallConfigSchema, insertWaterfallTierSchema, insertProjectTaxInputsSchema,
@@ -26,8 +26,8 @@ function getOrgId(req: Request): string | null {
 }
 
 async function verifyProjectAccess(projectId: string, orgId: string): Promise<boolean> {
-  const [project] = await db.select({ id: projects.id }).from(projects)
-    .where(and(eq(projects.id, projectId), eq(projects.orgId, orgId)));
+  const [project] = await db.select({ id: modelingProjects.id }).from(modelingProjects)
+    .where(and(eq(modelingProjects.id, projectId), eq(modelingProjects.orgId, orgId)));
   return !!project;
 }
 
