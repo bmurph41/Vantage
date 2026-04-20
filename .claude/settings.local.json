@@ -263,7 +263,9 @@
       "Bash(REQUIRE_BETA_INVITE=true node tmp_beta_smoke.mjs)",
       "Bash(pkill -9 -f 'NODE_OPTIONS.*tsx')",
       "Bash(ps -p 18172 -o pid,cmd)",
-      "Bash(npx playwright *)"
+      "Bash(npx playwright *)",
+      "Bash(echo \"Started PID $!\")",
+      "Bash(kill 32763)"
     ]
   }
 }
