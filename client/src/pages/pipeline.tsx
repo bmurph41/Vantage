@@ -60,6 +60,7 @@ import PipelineTemplateSelector from "@/components/pipeline/PipelineTemplateSele
 import { SlaTrackingPanel } from "@/components/crm/panels/sla-tracking-panel";
 import { PipelineForecastingPanel } from "@/components/crm/panels/pipeline-forecasting-panel";
 import { StageTemplateEditor } from "@/components/crm/panels/StageTemplateEditor";
+import { MobilePipelineAccordion, MobileSearchBar } from "@/components/crm/MobileCrmViews";
 import {
   ASSET_CLASSES,
   DEAL_PRIORITIES,
@@ -1450,33 +1451,56 @@ export default function Pipeline() {
       <div className="flex-1 overflow-hidden">
         {/* Kanban View */}
         {viewMode === "kanban" && (
-          <div className="overflow-x-auto overflow-y-hidden p-4 h-full" data-testid="kanban-board">
-            <DndContext
-              sensors={sensors}
-              collisionDetection={closestCorners}
-              onDragStart={handleDragStart}
-              onDragEnd={handleDragEnd}
-            >
-              <div className="flex gap-3 h-full">
-                {stages.map(stage => (
-                  <PipelineColumn
-                    key={stage.id}
-                    stage={stage}
-                    deals={dealsByStage[stage.id] || []}
-                    onDealClick={handleDealClick}
-                    followUps={followUps}
-                  />
-                ))}
+          <>
+            {/* Mobile accordion — hidden on desktop */}
+            <div className="md:hidden flex flex-col flex-1 overflow-hidden">
+              <MobileSearchBar
+                value={searchTerm}
+                onChange={setSearchTerm}
+                placeholder="Search deals..."
+              />
+              <div className="flex-1 overflow-y-auto">
+                <MobilePipelineAccordion
+                  stages={stages}
+                  dealsByStage={dealsByStage}
+                  onDealClick={handleDealClick}
+                  onMoveStage={({ dealId, stageId, stage, fromStageId }) =>
+                    updateDealMutation.mutate({ dealId, stageId, stage, fromStageId })
+                  }
+                  isMovePending={updateDealMutation.isPending}
+                />
               </div>
-              <DragOverlay>
-                {activeId ? (
-                  <div className="opacity-80 rotate-3">
-                    <DealCard deal={deals.find(d => d.id === activeId)!} onClick={() => {}} followUp={followUps[activeId] || null} />
-                  </div>
-                ) : null}
-              </DragOverlay>
-            </DndContext>
-          </div>
+            </div>
+
+            {/* Desktop kanban — hidden on mobile */}
+            <div className="hidden md:block overflow-x-auto overflow-y-hidden p-4 h-full" data-testid="kanban-board">
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCorners}
+                onDragStart={handleDragStart}
+                onDragEnd={handleDragEnd}
+              >
+                <div className="flex gap-3 h-full">
+                  {stages.map(stage => (
+                    <PipelineColumn
+                      key={stage.id}
+                      stage={stage}
+                      deals={dealsByStage[stage.id] || []}
+                      onDealClick={handleDealClick}
+                      followUps={followUps}
+                    />
+                  ))}
+                </div>
+                <DragOverlay>
+                  {activeId ? (
+                    <div className="opacity-80 rotate-3">
+                      <DealCard deal={deals.find(d => d.id === activeId)!} onClick={() => {}} followUp={followUps[activeId] || null} />
+                    </div>
+                  ) : null}
+                </DragOverlay>
+              </DndContext>
+            </div>
+          </>
         )}
 
         {/* Gantt View */}

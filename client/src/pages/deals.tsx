@@ -19,6 +19,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import DealFormModal from "@/components/modals/deal-form-modal";
 import { DealDrawer } from "@/components/deal-drawer";
 import { DealKanbanBoard } from "@/components/deals/DealKanbanBoard";
+import { MobileDealCards, MobileSearchBar } from "@/components/crm/MobileCrmViews";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/utils";
@@ -960,15 +961,33 @@ export default function Deals() {
               Clear Filters
             </Button>
           </div>
-        ) : viewMode === "kanban" ? (
-          stages && (
-            <DealKanbanBoard 
-              deals={filteredDeals} 
-              stages={stages} 
-              onDealClick={setSelectedDeal}
-            />
-          )
-        ) : viewMode === "grid" ? (
+        ) : (
+          <>
+            {/* Mobile card feed — hidden on desktop */}
+            <div className="md:hidden">
+              <MobileSearchBar
+                value={searchQuery}
+                onChange={setSearchQuery}
+                placeholder="Search deals..."
+              />
+              <MobileDealCards
+                deals={filteredDeals}
+                isLoading={isLoading}
+                stages={stages || []}
+                onCardClick={setSelectedDeal}
+              />
+            </div>
+            {/* Desktop views — hidden on mobile */}
+            <div className="hidden md:block">
+              {viewMode === "kanban" ? (
+                stages && (
+                  <DealKanbanBoard 
+                    deals={filteredDeals} 
+                    stages={stages} 
+                    onDealClick={setSelectedDeal}
+                  />
+                )
+              ) : viewMode === "grid" ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {filteredDeals.map((deal: DealWithRelations) => (
               <Card 
@@ -1238,6 +1257,9 @@ export default function Deals() {
               </table>
             </div>
           </div>
+              )}
+            </div>
+          </>
         )}
 
         <DealFormModal

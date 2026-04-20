@@ -18,6 +18,7 @@ import { ImportResultsModal, type ImportResult } from "@/components/import-resul
 import { CrmPageShell } from "@/components/crm/CrmPageShell";
 import { CrmTopBar } from "@/components/crm/CrmTopBar";
 import { CrmDataTable, type CrmColumn } from "@/components/crm/CrmDataTable";
+import { MobileContactCards, MobileSearchBar } from "@/components/crm/MobileCrmViews";
 import { CsvExportButton } from "@/components/crm/csv-export-button";
 import { DetailDrawer } from "@/components/crm/detail-drawer";
 import { SavedViewsSidebar } from '@/components/crm/SavedViewsSidebar';
@@ -555,21 +556,39 @@ export default function Contacts() {
               <CrmListsManager entityType="contact" />
             </div>
           ) : (
-            <CrmDataTable
-              data={filteredContacts}
-              columns={columns}
-              isLoading={isLoading}
-              selectedId={drawerContactId}
-              onRowClick={handleRowClick}
-              getRowId={(c) => c.id}
-              selectedIds={selectedIds}
-              onSelectionChange={setSelectedIds}
-              emptyState={{
-                title: searchTerm || statusFilter !== 'all' ? 'No contacts found' : 'No contacts yet',
-                description: searchTerm || statusFilter !== 'all' ? 'Try adjusting your search or filter criteria.' : 'Start by adding your first contact.',
-                action: !searchTerm && statusFilter === 'all' ? { label: 'Add Contact', onClick: handleAdd } : undefined
-              }}
-            />
+            <>
+              {/* Mobile card feed */}
+              <div className="md:hidden">
+                <MobileSearchBar
+                  value={searchTerm}
+                  onChange={setSearchTerm}
+                  placeholder="Search contacts..."
+                  hasActiveFilters={statusFilter !== 'all' || contactTagFilter !== 'all'}
+                />
+                <MobileContactCards
+                  contacts={filteredContacts}
+                  isLoading={isLoading}
+                />
+              </div>
+              {/* Desktop table */}
+              <div className="hidden md:block">
+                <CrmDataTable
+                  data={filteredContacts}
+                  columns={columns}
+                  isLoading={isLoading}
+                  selectedId={drawerContactId}
+                  onRowClick={handleRowClick}
+                  getRowId={(c) => c.id}
+                  selectedIds={selectedIds}
+                  onSelectionChange={setSelectedIds}
+                  emptyState={{
+                    title: searchTerm || statusFilter !== 'all' ? 'No contacts found' : 'No contacts yet',
+                    description: searchTerm || statusFilter !== 'all' ? 'Try adjusting your search or filter criteria.' : 'Start by adding your first contact.',
+                    action: !searchTerm && statusFilter === 'all' ? { label: 'Add Contact', onClick: handleAdd } : undefined
+                  }}
+                />
+              </div>
+            </>
           )}
         </div>
       </div>

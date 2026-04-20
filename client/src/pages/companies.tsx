@@ -18,6 +18,7 @@ import KpiSettingsModal from "@/components/modals/kpi-settings-modal";
 import { CrmPageShell } from "@/components/crm/CrmPageShell";
 import { CrmTopBar } from "@/components/crm/CrmTopBar";
 import { CrmDataTable, type CrmColumn } from "@/components/crm/CrmDataTable";
+import { MobileCompanyCards, MobileSearchBar } from "@/components/crm/MobileCrmViews";
 import { DetailDrawer } from "@/components/crm/detail-drawer";
 import { SavedViewsSidebar } from '@/components/crm/SavedViewsSidebar';
 import { apiRequest } from "@/lib/queryClient";
@@ -679,23 +680,41 @@ export default function Companies() {
               <CrmListsManager entityType="company" />
             </div>
           ) : (
-            <CrmDataTable
-              data={filteredCompanies}
-              columns={columns}
-              isLoading={isLoading}
-              selectedId={drawerCompanyId}
-              onRowClick={handleRowClick}
-              getRowId={(c) => c.id}
-              selectedIds={selectedIds}
-              onSelectionChange={setSelectedIds}
-              emptyState={{
-                title: searchTerm || industryFilter !== 'all' || sizeFilter !== 'all' ? 'No companies found' : 'No companies yet',
-                description: searchTerm || industryFilter !== 'all' || sizeFilter !== 'all' 
-                  ? 'Try adjusting your search or filter criteria.'
-                  : 'Start by adding your first company to build your network.',
-                action: !searchTerm && industryFilter === 'all' && sizeFilter === 'all' ? { label: 'Add Company', onClick: handleAdd } : undefined
-              }}
-            />
+            <>
+              {/* Mobile card feed */}
+              <div className="md:hidden">
+                <MobileSearchBar
+                  value={searchTerm}
+                  onChange={setSearchTerm}
+                  placeholder="Search companies..."
+                  hasActiveFilters={industryFilter !== 'all' || sizeFilter !== 'all'}
+                />
+                <MobileCompanyCards
+                  companies={filteredCompanies}
+                  isLoading={isLoading}
+                />
+              </div>
+              {/* Desktop table */}
+              <div className="hidden md:block">
+                <CrmDataTable
+                  data={filteredCompanies}
+                  columns={columns}
+                  isLoading={isLoading}
+                  selectedId={drawerCompanyId}
+                  onRowClick={handleRowClick}
+                  getRowId={(c) => c.id}
+                  selectedIds={selectedIds}
+                  onSelectionChange={setSelectedIds}
+                  emptyState={{
+                    title: searchTerm || industryFilter !== 'all' || sizeFilter !== 'all' ? 'No companies found' : 'No companies yet',
+                    description: searchTerm || industryFilter !== 'all' || sizeFilter !== 'all'
+                      ? 'Try adjusting your search or filter criteria.'
+                      : 'Start by adding your first company to build your network.',
+                    action: !searchTerm && industryFilter === 'all' && sizeFilter === 'all' ? { label: 'Add Company', onClick: handleAdd } : undefined
+                  }}
+                />
+              </div>
+            </>
           )}
         </div>
       </div>
