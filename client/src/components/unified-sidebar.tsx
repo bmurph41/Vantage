@@ -600,35 +600,7 @@ export default function UnifiedSidebar() {
   return (
     <TooltipProvider delayDuration={0}>
       <>
-        {/* Mobile Header Bar - replaces floating hamburger to avoid overlap */}
-        <div className="fixed top-0 left-0 right-0 z-40 md:hidden bg-sidebar border-b border-sidebar-border shadow-sm mobile-header-bar">
-          <div className="flex items-center justify-between px-3 h-14 safe-area-top">
-            <button
-              onClick={() => setMobileMenuOpen(true)}
-              className="p-2 -ml-1 rounded-lg hover:bg-sidebar-accent transition-colors touch-target"
-              data-testid="button-mobile-menu"
-              aria-label="Open menu"
-            >
-              <Menu className="w-5 h-5 text-sidebar-foreground" />
-            </button>
-            <Link href="/" className="flex items-center gap-2">
-              <div className="w-7 h-7 bg-gradient-to-r from-blue-500 to-blue-600 rounded flex items-center justify-center flex-shrink-0">
-                <Anchor className="w-4 h-4 text-white" />
-              </div>
-              <span className="text-base font-bold text-sidebar-foreground">Vantage</span>
-            </Link>
-            <button
-              onClick={() => {
-                const event = new KeyboardEvent('keydown', { key: 'k', metaKey: true, bubbles: true });
-                document.dispatchEvent(event);
-              }}
-              className="p-2 -mr-1 rounded-lg hover:bg-sidebar-accent transition-colors touch-target"
-              aria-label="Search"
-            >
-              <Search className="w-5 h-5 text-sidebar-foreground/70" />
-            </button>
-          </div>
-        </div>
+        {/* Mobile header bar replaced by MobileTopHeader in Router.tsx (md:hidden) */}
 
         {/* Mobile Overlay */}
         {mobileMenuOpen && (

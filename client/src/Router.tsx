@@ -11,6 +11,7 @@ import { OpsModuleGuard } from "@/components/operations/OpsModuleGuard";
 import { Button } from "@/components/ui/button";
 import { PageLoader } from "@/components/PageLoader";
 import { PageErrorBoundary } from "@/components/ErrorBoundary";
+import { MobileTopHeader, MobileBottomNav } from "@/components/layout/MobileBottomNav";
 
 const Dashboard = lazy(() => import("@/pages/dashboard"));
 const CRMDashboard = lazy(() => import("@/pages/crm-dashboard"));
@@ -372,15 +373,18 @@ function UnifiedLayout({ children }: { children: React.ReactNode }) {
   
   return (
     <div className="flex h-screen bg-background overflow-x-hidden">
+      {/* Mobile compact top header — shown only on < md, hidden on desktop */}
+      <MobileTopHeader />
+      {/* Desktop sidebar — hidden on mobile via its own md: classes */}
       <Suspense fallback={<SidebarLoader />}>
         <UnifiedSidebar />
       </Suspense>
-      <div className="flex-1 flex flex-col overflow-hidden pt-14 md:pt-0 min-w-0">
+      <div className="flex-1 flex flex-col overflow-hidden pt-12 md:pt-0 min-w-0">
         <Suspense fallback={<div className="h-10" />}>
           <PendingNotificationsBanner />
         </Suspense>
-        <Breadcrumb />
-        <main className="flex-1 overflow-auto mobile-main-content min-w-0">
+        <div className="hidden md:block"><Breadcrumb /></div>
+        <main className="flex-1 overflow-auto mobile-main-content min-w-0 pb-16 md:pb-0">
           <PageErrorBoundary>
             <Suspense fallback={<PageLoader />}>
               {children}
@@ -388,6 +392,8 @@ function UnifiedLayout({ children }: { children: React.ReactNode }) {
           </PageErrorBoundary>
         </main>
       </div>
+      {/* Mobile bottom tab bar — shown only on < md */}
+      <MobileBottomNav />
       <CommandPalette />
       <AIAssistant />
       <Suspense fallback={null}>
