@@ -195,6 +195,7 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
   const [selectedScenario, setSelectedScenario] = useState<string | null>(null);
   const [expandedCFYears, setExpandedCFYears] = useState<Set<number>>(new Set());
   const [expandedLeaseYears, setExpandedLeaseYears] = useState<Set<number>>(new Set());
+  const [showStepRentChart, setShowStepRentChart] = useState(true);
 
   const toggleCFYear = (year: number) => {
     setExpandedCFYears(prev => {
@@ -2101,6 +2102,140 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
                       </Badge>
                     )}
                   </div>
+                );
+              })()}
+
+              {/* Rent Step Timeline Chart */}
+              {(() => {
+                const yearlyLeaseIncome = dcfAnalysis?.yearlyLeaseIncome as YearlyLeaseIncome[] | undefined;
+                if (!yearlyLeaseIncome || yearlyLeaseIncome.length === 0) return null;
+
+                const tenantMap = new Map<string, string>();
+                for (const y of yearlyLeaseIncome) {
+                  for (const d of y.leaseDetail) {
+                    if (d.escalationType === 'SCHEDULE') {
+                      tenantMap.set(d.leaseId, d.tenantName);
+                    }
+                  }
+                }
+                const scheduleTenants = Array.from(tenantMap.entries()).map(([leaseId, tenantName]) => ({ leaseId, tenantName }));
+                if (scheduleTenants.length === 0) return null;
+
+                const chartKey = (leaseId: string) => `lease_${leaseId}`;
+                const keyToName = new Map<string, string>(
+                  scheduleTenants.map(({ leaseId, tenantName }) => [chartKey(leaseId), tenantName])
+                );
+
+                type StepChartRow = { yearLabel: string; [leaseKey: string]: string | number };
+
+                const chartData: StepChartRow[] = yearlyLeaseIncome.map(y => {
+                  const entry: StepChartRow = { yearLabel: `Yr ${y.year}` };
+                  for (const { leaseId } of scheduleTenants) {
+                    const detail = y.leaseDetail.find(d => d.leaseId === leaseId);
+                    entry[chartKey(leaseId)] = detail && !detail.isExpired
+                      ? (detail.activeStepRentAnnual ?? detail.baseRent)
+                      : 0;
+                  }
+                  return entry;
+                });
+
+                const stepChangeYears = new Set<string>();
+                for (const { leaseId } of scheduleTenants) {
+                  for (let i = 1; i < yearlyLeaseIncome.length; i++) {
+                    const prev = yearlyLeaseIncome[i - 1].leaseDetail.find(d => d.leaseId === leaseId);
+                    const curr = yearlyLeaseIncome[i].leaseDetail.find(d => d.leaseId === leaseId);
+                    if (prev && curr && !curr.isExpired && !prev.isExpired) {
+                      const prevVal = prev.activeStepRentAnnual ?? prev.baseRent;
+                      const currVal = curr.activeStepRentAnnual ?? curr.baseRent;
+                      if (Math.abs(currVal - prevVal) > 1) {
+                        stepChangeYears.add(`Yr ${yearlyLeaseIncome[i].year}`);
+                      }
+                    }
+                  }
+                }
+
+                const CHART_COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#8b5cf6', '#ef4444', '#06b6d4', '#ec4899', '#84cc16'];
+
+                return (
+                  <Card data-testid="rent-step-timeline-card">
+                    <CardHeader className="pb-2">
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <div>
+                          <CardTitle className="text-base flex items-center gap-2">
+                            <BarChart3 className="h-4 w-4 text-blue-500" />
+                            Rent Step Timeline
+                          </CardTitle>
+                          <CardDescription className="text-xs">
+                            Projected annual base rent for SCHEDULE-type tenants — dashed markers indicate step-change years
+                          </CardDescription>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 text-xs gap-1"
+                          onClick={() => setShowStepRentChart(v => !v)}
+                          data-testid="rent-step-chart-toggle"
+                        >
+                          {showStepRentChart
+                            ? <><ChevronUp className="h-3.5 w-3.5" />Collapse</>
+                            : <><ChevronDown className="h-3.5 w-3.5" />Expand</>}
+                        </Button>
+                      </div>
+                    </CardHeader>
+                    {showStepRentChart && (
+                      <CardContent>
+                        <ResponsiveContainer width="100%" height={220}>
+                          <ComposedChart data={chartData} margin={{ top: 8, right: 16, bottom: 0, left: 8 }}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-border" />
+                            <XAxis dataKey="yearLabel" tick={{ fontSize: 11 }} />
+                            <YAxis
+                              tickFormatter={(v: number) => v >= 1000000 ? `$${(v / 1000000).toFixed(1)}M` : `$${(v / 1000).toFixed(0)}K`}
+                              tick={{ fontSize: 11 }}
+                              width={60}
+                            />
+                            <RechartTooltip
+                              formatter={(value: number, key: string) => [formatCurrency(value), keyToName.get(key) ?? key]}
+                              contentStyle={{ fontSize: 12 }}
+                            />
+                            {scheduleTenants.map(({ leaseId, tenantName }, i) => (
+                              <Bar
+                                key={leaseId}
+                                dataKey={chartKey(leaseId)}
+                                stackId="rent"
+                                fill={CHART_COLORS[i % CHART_COLORS.length]}
+                                name={tenantName}
+                                radius={i === scheduleTenants.length - 1 ? [3, 3, 0, 0] : [0, 0, 0, 0]}
+                              />
+                            ))}
+                            {Array.from(stepChangeYears).map(yr => (
+                              <ReferenceLine
+                                key={yr}
+                                x={yr}
+                                stroke="#f59e0b"
+                                strokeDasharray="4 2"
+                                strokeWidth={1.5}
+                                label={{ value: '▲', position: 'insideTopLeft', fontSize: 10, fill: '#f59e0b' }}
+                              />
+                            ))}
+                          </ComposedChart>
+                        </ResponsiveContainer>
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-3 px-1">
+                          {scheduleTenants.map(({ leaseId, tenantName }, i) => (
+                            <span key={leaseId} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                              <span className="h-2.5 w-2.5 rounded-sm shrink-0" style={{ background: CHART_COLORS[i % CHART_COLORS.length] }} />
+                              {tenantName}
+                            </span>
+                          ))}
+                          {stepChangeYears.size > 0 && (
+                            <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                              <span className="inline-block h-px w-5 border-t-2 border-dashed border-amber-400" />
+                              Step change
+                            </span>
+                          )}
+                        </div>
+                      </CardContent>
+                    )}
+                  </Card>
                 );
               })()}
 
