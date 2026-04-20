@@ -123,7 +123,7 @@ function SortablePinnedItem({
       style={style} 
       {...attributes}
       className={cn(
-        'flex items-center gap-3 p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors group relative',
+        'flex items-center gap-3 p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors group relative min-h-[48px]',
         isDragging && 'shadow-lg',
         isStale && 'opacity-60 border-destructive/50'
       )}
@@ -199,15 +199,15 @@ function RecentItemRow({ item }: { item: UserRecentItem }) {
 
   return (
     <Link href={item.link}>
-      <div className="flex items-center gap-3 p-3 rounded-lg hover:bg-accent/50 transition-colors cursor-pointer" data-testid={`link-recent-${item.id}`}>
-        <div className="h-8 w-8 rounded-md bg-muted flex items-center justify-center">
+      <div className="flex items-center gap-3 p-3 rounded-lg hover:bg-accent/50 transition-colors cursor-pointer min-h-[48px]" data-testid={`link-recent-${item.id}`}>
+        <div className="h-8 w-8 rounded-md bg-muted flex items-center justify-center flex-shrink-0">
           <Icon className="h-4 w-4 text-muted-foreground" />
         </div>
         <div className="flex-1 min-w-0">
           <p className="font-medium text-sm truncate">{item.title}</p>
           <p className="text-xs text-muted-foreground">{timeAgo}</p>
         </div>
-        <Badge variant="outline" className="text-xs capitalize">
+        <Badge variant="outline" className="text-xs capitalize flex-shrink-0">
           {item.itemType.replace('_', ' ')}
         </Badge>
       </div>
@@ -225,7 +225,7 @@ function FavoriteItemRow({
   const Icon = getIcon(item.icon, item.itemType);
 
   return (
-    <div className="flex items-center gap-3 p-3 rounded-lg hover:bg-accent/50 transition-colors group relative">
+    <div className="flex items-center gap-3 p-3 rounded-lg hover:bg-accent/50 transition-colors group relative min-h-[48px]">
       <Link href={item.link} className="absolute inset-0 z-0" data-testid={`link-favorite-${item.id}`} />
       <div className="h-8 w-8 rounded-md bg-yellow-500/10 flex items-center justify-center z-10 pointer-events-none">
         <Icon className="h-4 w-4 text-yellow-600" />

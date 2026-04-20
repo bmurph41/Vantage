@@ -414,6 +414,47 @@ function CustomModuleContent({
   }
 }
 
+function DashboardFAB() {
+  const [open, setOpen] = useState(false);
+  const [, navigate] = useLocation();
+
+  const actions = [
+    { label: 'New Deal', icon: DollarSign, href: '/crm/deals', bg: 'bg-blue-600' },
+    { label: 'Add Contact', icon: Users, href: '/contacts', bg: 'bg-green-600' },
+    { label: 'Log Activity', icon: Activity, href: '/crm/activities', bg: 'bg-purple-600' },
+  ];
+
+  return (
+    <div className="fixed bottom-20 right-4 md:hidden z-40 flex flex-col items-end gap-3">
+      {open && (
+        <>
+          <div className="fixed inset-0 -z-10" onClick={() => setOpen(false)} aria-hidden="true" />
+          {actions.map((action) => {
+            const Icon = action.icon;
+            return (
+              <button
+                key={action.label}
+                onClick={() => { navigate(action.href); setOpen(false); }}
+                className={`flex items-center gap-2 pl-4 pr-5 py-3 rounded-full text-white text-sm font-medium shadow-lg ${action.bg} active:opacity-80 transition-opacity`}
+              >
+                <Icon className="h-4 w-4" />
+                {action.label}
+              </button>
+            );
+          })}
+        </>
+      )}
+      <button
+        onClick={() => setOpen((p) => !p)}
+        aria-label="Quick Actions"
+        className={`h-14 w-14 rounded-full bg-primary text-primary-foreground shadow-xl flex items-center justify-center active:scale-95 transition-all duration-200 ${open ? 'rotate-45' : ''}`}
+      >
+        <Plus className="h-6 w-6" />
+      </button>
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const { toast } = useToast();
   const [, navigate] = useLocation();
@@ -1661,39 +1702,42 @@ export default function Dashboard() {
               Your comprehensive real estate investment intelligence platform
             </p>
           </div>
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
-            <ExportMenu 
-              timeRange={timeRange}
-              selectedModules={selectedModules}
-            />
-            <Button
-              size="sm"
-              onClick={() => setIsAddModuleModalOpen(true)}
-              data-testid="button-customize-dashboard"
-              className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Customize Dashboard
-            </Button>
-            <SavedLayoutsPanel
-              currentModuleOrder={moduleOrder}
-              currentCollapsedModules={Array.from(collapsedModules)}
-              currentVisibleModules={selectedModules}
-              onLoadLayout={(layoutData) => {
-                if (layoutData.moduleOrder) {
-                  setModuleOrder(layoutData.moduleOrder);
-                }
-                if (layoutData.collapsedModules) {
-                  setCollapsedModules(new Set(layoutData.collapsedModules));
-                }
-                if (layoutData.visibleModules) {
-                  queryClient.setQueryData(['/api/dashboards/modules'], { selectedModules: layoutData.visibleModules });
-                  saveModulesMutation.mutate(layoutData.visibleModules);
-                }
-                queryClient.invalidateQueries({ queryKey: ['/api/dashboards/data'] });
-                queryClient.invalidateQueries({ queryKey: ['/api/dashboards/widgets/query'] });
-              }}
-            />
+          <div className="flex flex-row items-center gap-2 sm:gap-3">
+            {/* Desktop-only controls — hidden on mobile where FAB handles quick actions */}
+            <div className="hidden sm:flex items-center gap-2 sm:gap-3">
+              <ExportMenu 
+                timeRange={timeRange}
+                selectedModules={selectedModules}
+              />
+              <Button
+                size="sm"
+                onClick={() => setIsAddModuleModalOpen(true)}
+                data-testid="button-customize-dashboard"
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Customize Dashboard
+              </Button>
+              <SavedLayoutsPanel
+                currentModuleOrder={moduleOrder}
+                currentCollapsedModules={Array.from(collapsedModules)}
+                currentVisibleModules={selectedModules}
+                onLoadLayout={(layoutData) => {
+                  if (layoutData.moduleOrder) {
+                    setModuleOrder(layoutData.moduleOrder);
+                  }
+                  if (layoutData.collapsedModules) {
+                    setCollapsedModules(new Set(layoutData.collapsedModules));
+                  }
+                  if (layoutData.visibleModules) {
+                    queryClient.setQueryData(['/api/dashboards/modules'], { selectedModules: layoutData.visibleModules });
+                    saveModulesMutation.mutate(layoutData.visibleModules);
+                  }
+                  queryClient.invalidateQueries({ queryKey: ['/api/dashboards/data'] });
+                  queryClient.invalidateQueries({ queryKey: ['/api/dashboards/widgets/query'] });
+                }}
+              />
+            </div>
             <TimeRangeSelector value={timeRange} onChange={setTimeRange} />
           </div>
         </div>
@@ -2454,6 +2498,8 @@ export default function Dashboard() {
           />
         )}
       </DetailPanel>
+
+      <DashboardFAB />
     </div>
   );
 }

@@ -137,9 +137,9 @@ export default function PendingNotificationsBanner() {
           className="rounded-none border-x-0 border-t-0 bg-blue-50 border-blue-200" 
           data-testid={`pending-banner-${notification.id}`}
         >
-          <AlertCircle className="h-4 w-4 text-blue-600" />
-          <AlertDescription className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
+          <AlertCircle className="h-4 w-4 text-blue-600 flex-shrink-0 mt-0.5" />
+          <AlertDescription className="flex items-start sm:items-center justify-between gap-2 w-full">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 min-w-0">
               <span className="text-sm text-blue-900">
                 <strong>{notification.count}</strong> {notification.message(notification.count).split(' ').slice(1).join(' ')}
               </span>
@@ -156,9 +156,10 @@ export default function PendingNotificationsBanner() {
             <Button
               variant="ghost"
               size="sm"
-              className="h-6 w-6 p-0 text-blue-600 hover:text-blue-900 hover:bg-blue-100"
+              className="h-11 w-11 p-0 flex-shrink-0 text-blue-600 hover:text-blue-900 hover:bg-blue-100"
               onClick={() => handleDismiss(notification.id)}
               data-testid={`button-dismiss-${notification.id}`}
+              aria-label="Dismiss notification"
             >
               <X className="h-4 w-4" />
             </Button>

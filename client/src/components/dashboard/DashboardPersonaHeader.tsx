@@ -119,7 +119,7 @@ export function DashboardPersonaHeader() {
           </div>
 
           {data.metrics.length > 0 && (
-            <div className="flex flex-wrap gap-4" data-testid="header-metrics">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3" data-testid="header-metrics">
               {data.metrics.map((metric, idx) => {
                 const IconComponent = metric.icon ? iconMap[metric.icon] : null;
                 const textColor = metric.color ? colorMap[metric.color] : "text-foreground";
@@ -130,11 +130,11 @@ export function DashboardPersonaHeader() {
                 const metricContent = (
                   <>
                     {IconComponent && (
-                      <IconComponent className={`h-5 w-5 ${textColor}`} />
+                      <IconComponent className={`h-4 w-4 sm:h-5 sm:w-5 ${textColor} flex-shrink-0`} />
                     )}
-                    <div className="text-center">
-                      <div className={`text-lg font-bold ${textColor}`}>{metric.value}</div>
-                      <div className="text-xs text-muted-foreground">{metric.label}</div>
+                    <div className="text-center min-w-0">
+                      <div className={`text-base sm:text-lg font-bold ${textColor} truncate`}>{metric.value}</div>
+                      <div className="text-xs text-muted-foreground truncate">{metric.label}</div>
                     </div>
                   </>
                 );
@@ -144,7 +144,7 @@ export function DashboardPersonaHeader() {
                     <button
                       key={idx}
                       onClick={() => navigate(href!)}
-                      className={`flex items-center gap-3 px-4 py-3 rounded-lg ${bgColor} cursor-pointer transition-all hover:shadow-md hover:scale-105 focus:outline-none focus:ring-2 focus:ring-primary/50`}
+                      className={`flex items-center justify-center gap-2 sm:gap-3 px-3 py-3 sm:px-4 rounded-lg ${bgColor} cursor-pointer transition-all hover:shadow-md hover:scale-105 focus:outline-none focus:ring-2 focus:ring-primary/50 min-h-[60px]`}
                       data-testid={`metric-${metric.label.toLowerCase().replace(/\s+/g, '-')}`}
                     >
                       {metricContent}
@@ -155,7 +155,7 @@ export function DashboardPersonaHeader() {
                 return (
                   <div
                     key={idx}
-                    className={`flex items-center gap-3 px-4 py-3 rounded-lg ${bgColor}`}
+                    className={`flex items-center justify-center gap-2 sm:gap-3 px-3 py-3 sm:px-4 rounded-lg ${bgColor} min-h-[60px]`}
                     data-testid={`metric-${metric.label.toLowerCase().replace(/\s+/g, '-')}`}
                   >
                     {metricContent}
