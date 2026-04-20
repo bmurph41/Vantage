@@ -4,11 +4,12 @@ import { useQuery } from "@tanstack/react-query";
 import {
   LayoutDashboard, Users, Handshake, Building2, MoreHorizontal,
   Bell, ChevronRight, Calculator, BarChart3, FileText, DollarSign,
-  Target, Shield, Plug, Anchor, Search, Briefcase, Megaphone, X,
+  Target, Shield, Plug, Anchor, Briefcase, Megaphone, X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { useAuth } from "@/contexts/AuthContext";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { UserMenu } from "@/components/layout/UserMenu";
 
 type BootstrapData = {
@@ -143,7 +144,7 @@ function MoreSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
 
   return (
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
-      <SheetContent side="bottom" className="h-[85vh] flex flex-col p-0 rounded-t-2xl">
+      <SheetContent side="bottom" className="h-[100dvh] flex flex-col p-0" aria-describedby={undefined}>
         <SheetHeader className="px-4 pt-4 pb-2 border-b border-border flex-shrink-0">
           <div className="flex items-center justify-between">
             <SheetTitle className="text-base font-semibold">More</SheetTitle>
@@ -255,33 +256,22 @@ export function MobileTopHeader() {
     (bootstrapData?.pendingCounts?.contacts || 0) +
     (bootstrapData?.pendingCounts?.companies || 0);
 
+  const initials = user?.name
+    ? user.name.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)
+    : user?.email?.[0]?.toUpperCase() || "U";
+
   return (
     <header className="fixed top-0 left-0 right-0 z-40 md:hidden bg-sidebar border-b border-sidebar-border shadow-sm safe-area-top">
       <div className="flex items-center justify-between px-4 h-12">
-        <Link href="/" className="flex items-center gap-2">
-          <div className="w-6 h-6 bg-gradient-to-r from-blue-500 to-blue-600 rounded flex items-center justify-center flex-shrink-0">
-            <Anchor className="w-3.5 h-3.5 text-white" />
-          </div>
-          <span className="text-[15px] font-semibold text-sidebar-foreground truncate max-w-[140px]">
-            {pageTitle}
-          </span>
-        </Link>
+        {/* Left: page title */}
+        <span className="text-[15px] font-semibold text-sidebar-foreground truncate max-w-[200px]">
+          {pageTitle}
+        </span>
 
-        <div className="flex items-center gap-1">
+        {/* Right: notification bell + avatar */}
+        <div className="flex items-center gap-0.5">
           <button
-            onClick={() => {
-              const event = new KeyboardEvent("keydown", { key: "k", metaKey: true, bubbles: true });
-              document.dispatchEvent(event);
-            }}
-            className="p-2.5 rounded-lg hover:bg-sidebar-accent transition-colors touch-manipulation"
-            style={{ minWidth: 44, minHeight: 44 }}
-            aria-label="Search"
-          >
-            <Search className="w-[18px] h-[18px] text-sidebar-foreground/70" />
-          </button>
-
-          <button
-            className="relative p-2.5 rounded-lg hover:bg-sidebar-accent transition-colors touch-manipulation"
+            className="relative flex items-center justify-center rounded-lg hover:bg-sidebar-accent transition-colors touch-manipulation"
             style={{ minWidth: 44, minHeight: 44 }}
             aria-label="Notifications"
           >
@@ -291,6 +281,19 @@ export function MobileTopHeader() {
                 {totalPending > 9 ? "9+" : totalPending}
               </span>
             )}
+          </button>
+
+          <button
+            className="flex items-center justify-center rounded-lg hover:bg-sidebar-accent transition-colors touch-manipulation"
+            style={{ minWidth: 44, minHeight: 44 }}
+            aria-label="Account"
+          >
+            <Avatar className="w-7 h-7">
+              {user?.avatarUrl && <AvatarImage src={user.avatarUrl} alt={user.name || "User"} />}
+              <AvatarFallback className="text-[11px] font-semibold bg-primary text-primary-foreground">
+                {initials}
+              </AvatarFallback>
+            </Avatar>
           </button>
         </div>
       </div>
