@@ -2529,8 +2529,8 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
                             : 0;
                           const escalationLabel =
                             lease.escalationType === 'PERCENT' ? `${(lease.escalationRate * 100).toFixed(2)}%/yr`
-                            : lease.escalationType === 'CPI' ? 'CPI'
-                            : lease.escalationType === 'CPI_CAP_FLOOR' ? 'CPI (capped)'
+                            : lease.escalationType === 'CPI' ? `CPI @ ${(lease.escalationRate * 100).toFixed(1)}%`
+                            : lease.escalationType === 'CPI_CAP_FLOOR' ? `CPI @ ${(lease.escalationRate * 100).toFixed(1)}% (capped)`
                             : lease.escalationType === 'SCHEDULE' ? 'Scheduled'
                             : lease.escalationType === 'FIXED_DOLLAR' ? 'Fixed $'
                             : 'Flat';
