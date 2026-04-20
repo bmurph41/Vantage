@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import {
   LayoutDashboard, Users, Handshake, Building2, MoreHorizontal,
   Bell, ChevronRight, Calculator, BarChart3, FileText, DollarSign,
-  Target, Shield, Plug, Anchor, Briefcase, Megaphone, X,
+  Target, Shield, Plug, Briefcase, Megaphone, X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
