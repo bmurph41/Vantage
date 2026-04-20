@@ -157,8 +157,18 @@ export async function performDCFAnalysis(
     typeof scenarioData.assumptions?.cpiRate === 'number'
       ? scenarioData.assumptions.cpiRate
       : undefined;
+  const scenarioCpiCap: number | undefined =
+    typeof scenarioData.assumptions?.cpiCap === 'number'
+      ? scenarioData.assumptions.cpiCap
+      : undefined;
+  const scenarioCpiFloor: number | undefined =
+    typeof scenarioData.assumptions?.cpiFloor === 'number'
+      ? scenarioData.assumptions.cpiFloor
+      : undefined;
   const leaseIncome = await loadLeaseIncomeForProject(pool, projectId, {
     cpiRate: scenarioCpiRate,
+    cpiCap: scenarioCpiCap,
+    cpiFloor: scenarioCpiFloor,
   });
 
   // ── Step 2: Compute Year 1 from Direct Input Engine ─────────────────────
@@ -1006,9 +1016,11 @@ export function computeLeaseIncomeByYear(
 export async function loadLeaseIncomeForProject(
   pool: any,
   projectId: string,
-  options?: { cpiRate?: number }
+  options?: { cpiRate?: number; cpiCap?: number; cpiFloor?: number }
 ): Promise<LeaseIncomeResult> {
   const cpiRate = options?.cpiRate ?? 0.03;
+  const cpiCap = options?.cpiCap;
+  const cpiFloor = options?.cpiFloor;
   const empty: LeaseIncomeResult = {
     hasLeases: false,
     leaseCount: 0,
@@ -1104,9 +1116,22 @@ export async function loadLeaseIncomeForProject(
       } else if (escalationType === 'DOLLAR_PSF_YEAR' && term.escalation_value && baseRentAnnual > 0) {
         escalationRate = (parseFloat(term.escalation_value) * sf) / baseRentAnnual;
       }
-      // CPI / CPI_CAP_FLOOR: use the scenario-configurable CPI rate (default 3%)
-      if (['CPI', 'CPI_CAP_FLOOR'].includes(escalationType)) {
+      // CPI: use the scenario-configurable CPI rate (default 3%)
+      if (escalationType === 'CPI') {
         escalationRate = cpiRate;
+      }
+      // CPI_CAP_FLOOR: apply the CPI rate clamped between the floor and cap bounds.
+      // If both are set and floor > cap (inverted), treat floor as the effective rate
+      // so projections are always deterministic regardless of input order.
+      if (escalationType === 'CPI_CAP_FLOOR') {
+        let rate = cpiRate;
+        const effectiveFloor = cpiFloor;
+        const effectiveCap = (cpiCap !== undefined && cpiFloor !== undefined && cpiCap < cpiFloor)
+          ? cpiFloor
+          : cpiCap;
+        if (effectiveFloor !== undefined) rate = Math.max(rate, effectiveFloor);
+        if (effectiveCap !== undefined) rate = Math.min(rate, effectiveCap);
+        escalationRate = rate;
       }
       // SCHEDULE: escalationRate is not used for projection (schedule steps are applied
       // directly in computeLeaseIncomeByYear). Set 0 so it doesn't distort the
