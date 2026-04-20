@@ -3,7 +3,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { AlertCircle, X } from "lucide-react";
 import { Link } from "wouter";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef, type ReactNode } from "react";
 
 const DISMISSED_STORAGE_KEY = 'vantage-dismissed-pending-notifications';
 
@@ -132,40 +132,76 @@ export default function PendingNotificationsBanner() {
   return (
     <div className="border-b border-gray-200">
       {activeNotifications.map((notification) => (
-        <Alert 
-          key={notification.id}
-          className="rounded-none border-x-0 border-t-0 bg-blue-50 border-blue-200" 
-          data-testid={`pending-banner-${notification.id}`}
-        >
-          <AlertCircle className="h-4 w-4 text-blue-600 flex-shrink-0 mt-0.5" />
-          <AlertDescription className="flex items-start sm:items-center justify-between gap-2 w-full">
-            <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 min-w-0">
-              <span className="text-sm text-blue-900">
-                <strong>{notification.count}</strong> {notification.message(notification.count).split(' ').slice(1).join(' ')}
-              </span>
-              <Link href={notification.href}>
-                <Button 
-                  variant="link" 
-                  className="h-auto p-0 text-sm text-blue-600 hover:text-blue-800 underline"
-                  data-testid={`button-view-pending-${notification.id}`}
-                >
-                  {notification.linkText}
-                </Button>
-              </Link>
-            </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-11 w-11 p-0 flex-shrink-0 text-blue-600 hover:text-blue-900 hover:bg-blue-100"
-              onClick={() => handleDismiss(notification.id)}
-              data-testid={`button-dismiss-${notification.id}`}
-              aria-label="Dismiss notification"
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          </AlertDescription>
-        </Alert>
+        <SwipeableBanner key={notification.id} onSwipeDismiss={() => handleDismiss(notification.id)}>
+          <Alert 
+            className="rounded-none border-x-0 border-t-0 bg-blue-50 border-blue-200" 
+            data-testid={`pending-banner-${notification.id}`}
+          >
+            <AlertCircle className="h-4 w-4 text-blue-600 flex-shrink-0 mt-0.5" />
+            <AlertDescription className="flex items-start sm:items-center justify-between gap-2 w-full">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 min-w-0">
+                <span className="text-sm text-blue-900">
+                  <strong>{notification.count}</strong> {notification.message(notification.count).split(' ').slice(1).join(' ')}
+                </span>
+                <Link href={notification.href}>
+                  <Button 
+                    variant="link" 
+                    className="h-auto p-0 text-sm text-blue-600 hover:text-blue-800 underline"
+                    data-testid={`button-view-pending-${notification.id}`}
+                  >
+                    {notification.linkText}
+                  </Button>
+                </Link>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-11 w-11 p-0 flex-shrink-0 text-blue-600 hover:text-blue-900 hover:bg-blue-100"
+                onClick={() => handleDismiss(notification.id)}
+                data-testid={`button-dismiss-${notification.id}`}
+                aria-label="Dismiss notification"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </AlertDescription>
+          </Alert>
+        </SwipeableBanner>
       ))}
+    </div>
+  );
+}
+
+function SwipeableBanner({ children, onSwipeDismiss }: { children: ReactNode; onSwipeDismiss: () => void }) {
+  const touchStartX = useRef<number | null>(null);
+  const [translateX, setTranslateX] = useState(0);
+  const SWIPE_THRESHOLD = 80;
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (touchStartX.current === null) return;
+    const delta = e.touches[0].clientX - touchStartX.current;
+    if (delta < 0) setTranslateX(delta);
+  };
+
+  const handleTouchEnd = () => {
+    if (translateX < -SWIPE_THRESHOLD) {
+      onSwipeDismiss();
+    }
+    setTranslateX(0);
+    touchStartX.current = null;
+  };
+
+  return (
+    <div
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      style={{ transform: `translateX(${translateX}px)`, transition: translateX === 0 ? 'transform 0.2s ease' : 'none' }}
+    >
+      {children}
     </div>
   );
 }

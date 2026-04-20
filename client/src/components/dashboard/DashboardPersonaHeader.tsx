@@ -5,6 +5,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Link, useLocation } from "wouter";
 import {
   TrendingUp,
+  TrendingDown,
+  Minus,
   DollarSign,
   Home,
   Briefcase,
@@ -127,14 +129,26 @@ export function DashboardPersonaHeader() {
                 const href = metric.href || getMetricHref(metric.label, data.personaType);
                 const isClickable = !!href;
 
+                const trendVal = metric.trend;
+                const isPositive = trendVal && (trendVal.startsWith('+') || (!trendVal.startsWith('-') && parseFloat(trendVal) > 0));
+                const isNegative = trendVal && (trendVal.startsWith('-') || parseFloat(trendVal) < 0);
+                const TrendIcon = isPositive ? TrendingUp : isNegative ? TrendingDown : trendVal ? Minus : null;
+                const trendColor = isPositive ? 'text-green-600' : isNegative ? 'text-red-500' : 'text-muted-foreground';
+
                 const metricContent = (
                   <>
                     {IconComponent && (
                       <IconComponent className={`h-4 w-4 sm:h-5 sm:w-5 ${textColor} flex-shrink-0`} />
                     )}
                     <div className="text-center min-w-0">
-                      <div className={`text-base sm:text-lg font-bold ${textColor} truncate`}>{metric.value}</div>
-                      <div className="text-xs text-muted-foreground truncate">{metric.label}</div>
+                      <div className="flex items-center justify-center gap-1">
+                        <span className={`text-base sm:text-lg font-bold ${textColor}`}>{metric.value}</span>
+                        {TrendIcon && <TrendIcon className={`h-3 w-3 flex-shrink-0 ${trendColor}`} />}
+                      </div>
+                      <div className="text-xs text-muted-foreground">{metric.label}</div>
+                      {trendVal && (
+                        <div className={`text-xs font-medium ${trendColor}`}>{trendVal}</div>
+                      )}
                     </div>
                   </>
                 );

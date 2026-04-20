@@ -1764,18 +1764,33 @@ export default function Dashboard() {
           onDragEnd={handleDragEnd}
         >
           <SortableContext items={extendedModuleOrder} strategy={rectSortingStrategy}>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" data-tour="dashboard-pipeline">
+            {/* Mobile: snap-x horizontal carousel; Desktop: multi-column grid */}
+            <div
+              className="flex overflow-x-auto snap-x snap-mandatory scroll-smooth gap-4 pb-3 -mx-4 px-4 md:mx-0 md:px-0 md:grid md:overflow-visible md:grid-cols-2 lg:grid-cols-3 md:gap-6"
+              data-tour="dashboard-pipeline"
+            >
               {orderedModules.map((module) => (
                 <SectionErrorBoundary key={module.id} sectionName={module.title}>
-                  <SortableModule
-                    module={module}
-                    isCollapsed={collapsedModules.has(module.id)}
-                    onToggleCollapse={() => toggleModuleCollapse(module.id)}
-                    onRemove={() => handleRemoveModule(module.id)}
-                  />
+                  <div className="snap-center w-[min(85vw,340px)] shrink-0 md:w-auto md:shrink">
+                    <SortableModule
+                      module={module}
+                      isCollapsed={collapsedModules.has(module.id)}
+                      onToggleCollapse={() => toggleModuleCollapse(module.id)}
+                      onRemove={() => handleRemoveModule(module.id)}
+                    />
+                  </div>
                 </SectionErrorBoundary>
               ))}
             </div>
+            {/* Carousel scroll hint — mobile only */}
+            {orderedModules.length > 1 && (
+              <div className="flex items-center justify-center gap-1.5 mt-2 md:hidden">
+                {orderedModules.map((_, i) => (
+                  <div key={i} className="w-1.5 h-1.5 rounded-full bg-muted-foreground/30" />
+                ))}
+                <span className="text-xs text-muted-foreground ml-1">swipe</span>
+              </div>
+            )}
           </SortableContext>
         </DndContext>
 
