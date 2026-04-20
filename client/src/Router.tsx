@@ -934,7 +934,9 @@ function Router() {
       <Route path="/vdr/activity">
         {() => (
           <UnifiedLayout>
-            <VDRActivity />
+            <DesktopOnlyGate featureName="The Virtual Data Room">
+              <VDRActivity />
+            </DesktopOnlyGate>
           </UnifiedLayout>
         )}
       </Route>
@@ -2325,7 +2327,9 @@ function Router() {
       <Route path="/analysis/benchmarks">
         {() => (
           <GatedLayout pack="analysis">
-            <BenchmarksIndex />
+            <DesktopOnlyGate featureName="Benchmarks & Capital Markets">
+              <BenchmarksIndex />
+            </DesktopOnlyGate>
           </GatedLayout>
         )}
       </Route>
