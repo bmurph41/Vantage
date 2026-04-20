@@ -380,9 +380,7 @@ export default function UnifiedSidebar() {
   ];
 
 
-  const handleNavClick = () => {
-    // Navigation click handler (sidebar is desktop-only; MobileShell handles mobile nav)
-  };
+  const handleNavClick = () => {};
 
   const NavLink = ({ item, depth = 0 }: { item: { name: string; href: string; icon?: any; badge?: string; disabled?: boolean }; depth?: number }) => {
     // Check if current location is a child of this nav item's href

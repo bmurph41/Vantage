@@ -409,12 +409,6 @@ function MobileBottomBar({
   );
 }
 
-/**
- * MobileShell — renders both the compact top header and the bottom tab bar.
- * Shared `moreOpen` state lets the avatar button in the header AND the "More"
- * tab both open the same full-screen navigation sheet.
- * Both pieces are md:hidden — completely invisible on desktop.
- */
 export function MobileShell() {
   const [moreOpen, setMoreOpen] = useState(false);
 
