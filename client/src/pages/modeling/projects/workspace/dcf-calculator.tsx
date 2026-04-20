@@ -218,6 +218,7 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
     { key: 'year', label: 'Year' },
     { key: 'tenant', label: 'Tenant' },
     { key: 'baseRent', label: 'Base Rent' },
+    { key: 'activeStepRent', label: 'Step Rent (Active)' },
     { key: 'recoveries', label: 'Recoveries' },
     { key: 'freeRentReduction', label: 'Free Rent Reduction' },
     { key: 'vacancyDeduction', label: 'Vacancy Deduction' },
@@ -303,6 +304,12 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
         case 'year': return yearRow.year;
         case 'tenant': return isTotal ? 'TOTAL' : detail.tenantName;
         case 'baseRent': return isTotal ? yearRow.baseRentAnnual : (detail.isExpired ? 0 : detail.baseRent);
+        case 'activeStepRent': {
+          if (isTotal) return '';
+          if (detail.escalationType !== 'SCHEDULE') return '';
+          if (detail.isExpired) return '';
+          return detail.activeStepRentAnnual ?? '';
+        }
         case 'recoveries': return isTotal ? yearRow.recoveryAnnual : (detail.isExpired ? 0 : detail.recovery);
         case 'freeRentReduction': return isTotal
           ? yearRow.leaseDetail.reduce((s: number, l: any) => s + l.freeRentReduction, 0)
@@ -333,6 +340,31 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Lease Income');
 
+    // For XLSX: append a second sheet with the full step rent schedule for SCHEDULE-type leases
+    if (format === 'xlsx') {
+      const leaseBreakdown: any[] = leaseIncomeData?.leaseBreakdown ?? [];
+      const scheduleLeases = leaseBreakdown.filter(
+        (lb: any) => lb.escalationType === 'SCHEDULE' && Array.isArray(lb.scheduleJson) && lb.scheduleJson.length > 0
+      );
+      if (scheduleLeases.length > 0) {
+        const schedHeaders = ['Tenant', 'Effective Date', 'Rent Value', 'Unit', 'Notes'];
+        const schedRows: (string | number)[][] = [schedHeaders];
+        for (const lb of scheduleLeases) {
+          for (const step of lb.scheduleJson) {
+            schedRows.push([
+              lb.tenantName,
+              step.effectiveDate,
+              step.value,
+              step.unit,
+              step.notes ?? '',
+            ]);
+          }
+        }
+        const schedWs = XLSX.utils.aoa_to_sheet(schedRows);
+        XLSX.utils.book_append_sheet(wb, schedWs, 'Step Rent Schedule');
+      }
+    }
+
     const projectSlug = (dcfProject?.name ?? 'project')
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
@@ -340,7 +372,7 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
     const dateStr = new Date().toISOString().slice(0, 10);
     const filename = `${projectSlug}-lease-income-${dateStr}.${format}`;
     XLSX.writeFile(wb, filename, { bookType: format === 'csv' ? 'csv' : 'xlsx' });
-  }, [dcfAnalysis?.yearlyLeaseIncome, selectedExportColumns, dcfProject]);
+  }, [dcfAnalysis?.yearlyLeaseIncome, selectedExportColumns, dcfProject, leaseIncomeData]);
 
   const { holdPeriod: sharedHoldPeriod, setHoldPeriod: setSharedHoldPeriod } = useHoldPeriod(projectId || '');
 
