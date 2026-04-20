@@ -305,18 +305,15 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
   };
 
   const applyExportPreset = (name: string) => {
-    setExportPresets(prev => {
-      const preset = prev.find(p => p.name === name);
-      if (!preset) return prev;
-      const valid = preset.columns.filter((k): k is LeaseExportColumnKey =>
-        ALL_COLUMN_KEYS.includes(k as LeaseExportColumnKey)
-      );
-      if (valid.length === 0) return prev;
-      const next = new Set(valid);
-      setSelectedExportColumns(next);
-      localStorage.setItem(SESSION_KEY, JSON.stringify(Array.from(next)));
-      return prev;
-    });
+    const preset = exportPresets.find(p => p.name === name);
+    if (!preset) return;
+    const valid = preset.columns.filter((k): k is LeaseExportColumnKey =>
+      ALL_COLUMN_KEYS.includes(k as LeaseExportColumnKey)
+    );
+    if (valid.length === 0) return;
+    const next = new Set(valid);
+    setSelectedExportColumns(next);
+    localStorage.setItem(SESSION_KEY, JSON.stringify(Array.from(next)));
   };
 
   const deleteExportPreset = (name: string) => {
@@ -2696,27 +2693,34 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
             Select the columns to include in the {exportDialogFormat === 'xlsx' ? 'Excel' : 'CSV'} export. At least one column must remain selected.
           </p>
 
-          {/* Preset chips — click to apply, × to delete */}
+          {/* Preset dropdown — load a saved preset */}
           {exportPresets.length > 0 && (
-            <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Saved presets</Label>
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Label className="text-xs text-muted-foreground shrink-0">Load preset:</Label>
+                <Select onValueChange={applyExportPreset}>
+                  <SelectTrigger className="h-8 text-sm flex-1">
+                    <SelectValue placeholder="Choose a preset…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {exportPresets.map(p => (
+                      <SelectItem key={p.name} value={p.name}>
+                        {p.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="flex flex-wrap gap-1.5">
                 {exportPresets.map(p => (
                   <div
                     key={p.name}
-                    className="flex items-center gap-1 rounded-full border bg-muted/40 px-2.5 py-0.5 text-xs"
+                    className="flex items-center gap-1 rounded-full border bg-muted/40 px-2 py-0.5 text-xs text-muted-foreground"
                   >
+                    <span>{p.name}</span>
                     <button
                       type="button"
-                      className="hover:text-primary transition-colors"
-                      onClick={() => applyExportPreset(p.name)}
-                      title={`Apply "${p.name}"`}
-                    >
-                      {p.name}
-                    </button>
-                    <button
-                      type="button"
-                      className="ml-0.5 text-muted-foreground hover:text-destructive transition-colors"
+                      className="hover:text-destructive transition-colors"
                       onClick={() => deleteExportPreset(p.name)}
                       title={`Delete "${p.name}"`}
                     >
