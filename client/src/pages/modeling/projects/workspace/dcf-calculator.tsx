@@ -382,7 +382,12 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
           ? ((yearRow.tiLcCostTotal ?? 0) > 0 ? -(yearRow.tiLcCostTotal ?? 0) : 0)
           : (tiLc > 0 ? -tiLc : 0);
         case 'netEgi': return netEgi;
-        case 'status': return isTotal ? '' : (detail.isExpired ? 'Expired' : 'Active');
+        case 'status': {
+          if (isTotal) return '';
+          if (detail.isExpired) return 'Expired';
+          if (detail.notYetStarted) return 'Pre-Leased (pre-commencement)';
+          return 'Active';
+        }
         default: return '';
       }
     };

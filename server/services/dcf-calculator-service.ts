@@ -710,6 +710,8 @@ export interface LeaseYearIncome {
     isFuture?: boolean;
     /** ISO date string for when the lease commences — used to display pre-commencement tooltips */
     leaseStartDate?: string | null;
+    /** True when the lease has not yet started in this specific projection year (income is $0 pre-commencement) */
+    notYetStarted?: boolean;
   }>;
 }
 
@@ -990,6 +992,7 @@ export function computeLeaseIncomeByYear(
         activeStepRentAnnual,
         isFuture: lease.isFuture ?? false,
         leaseStartDate: lease.leaseStartDate,
+        notYetStarted,
       });
     }
 
