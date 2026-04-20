@@ -5,6 +5,7 @@
  *   - findActiveRentStep
  *   - convertRentStepToAnnual (PSF_YEAR, PER_YEAR, PER_MONTH)
  *   - computeLeaseIncomeByYear with SCHEDULE-type leases
+ *   - computeLeaseIncomeByYear rollover vacancy and TI/LC logic
  *   - computeLeaseEGIForMonth (from cash-flow-forecasting-routes.ts) SCHEDULE path
  */
 
@@ -323,6 +324,360 @@ describe('computeLeaseIncomeByYear — SCHEDULE type', () => {
       const result = computeLeaseIncomeByYear([scheduleLease, percentLease], 1, acquisitionDate);
       // SCHEDULE: 12 000; PERCENT year 1 (0 years elapsed): 10 000 × (1.03)^0 = 10 000
       expect(result[0].baseRentAnnual).toBe(22000);
+    });
+  });
+});
+
+// ─── computeLeaseIncomeByYear — rollover vacancy and TI/LC ───────────────────
+//
+// A lease "qualifies for rollover" when its end date falls strictly after the
+// acquisition date AND strictly before the hold-period end date.
+//
+// Vacancy deduction: proportional share of (rolloverVacancyMonths × monthly rent)
+//   attributed to each year that overlaps the [leaseEnd, leaseEnd + N months) window.
+//
+// TI/LC cost: one-time charge of (rolloverTiLcPerSf × lease.sf) in the single
+//   year in which the lease expires.
+
+function makeSimpleLease(
+  overrides: Partial<LeaseBreakdownEntry> = {}
+): LeaseBreakdownEntry {
+  return {
+    leaseId: 'rollover-lease-1',
+    tenantName: 'Rollover Tenant',
+    sf: 1000,
+    leaseType: 'NNN',
+    baseRentAnnual: 12000,
+    recoveryAnnual: 0,
+    escalationType: 'NONE',
+    escalationRate: 0,
+    leaseStartDate: '2024-01-01',
+    leaseEndDate: '2026-01-01',
+    rentCommencementDate: '2024-01-01',
+    freeRentMonths: 0,
+    scheduleJson: null,
+    ...overrides,
+  };
+}
+
+describe('computeLeaseIncomeByYear — rollover vacancy deduction', () => {
+  const acquisitionDate = '2024-01-01';
+
+  describe('vacancy deduction falls entirely within one projection year', () => {
+    it('deducts the full N months of rent in the year the vacancy window falls', () => {
+      // Lease expires 2025-07-01; 6-month vacancy window: 2025-07-01 → 2026-01-01
+      // That window is entirely within Year 2 (2025-01-01 → 2026-01-01)
+      const lease = makeSimpleLease({ leaseEndDate: '2025-07-01' });
+      const result = computeLeaseIncomeByYear([lease], 5, acquisitionDate, {
+        rolloverVacancyMonths: 6,
+      });
+
+      // Year 1 (2024-01-01 – 2025-01-01): no overlap with vacancy window
+      expect(result[0].vacancyDeductionTotal).toBe(0);
+
+      // Year 2 (2025-01-01 – 2026-01-01): full 6-month window; deduction = 6 × 1000 = 6000
+      const expectedDeduction = 6 * (12000 / 12);
+      expect(result[1].vacancyDeductionTotal).toBeCloseTo(expectedDeduction, 0);
+
+      // Years 3-5: no overlap
+      expect(result[2].vacancyDeductionTotal).toBe(0);
+      expect(result[3].vacancyDeductionTotal).toBe(0);
+      expect(result[4].vacancyDeductionTotal).toBe(0);
+    });
+
+    it('reflects the deduction in the per-lease detail entry', () => {
+      const lease = makeSimpleLease({ leaseEndDate: '2025-07-01' });
+      const result = computeLeaseIncomeByYear([lease], 5, acquisitionDate, {
+        rolloverVacancyMonths: 6,
+      });
+
+      const year2Detail = result[1].leaseDetail[0];
+      expect(year2Detail.vacancyDeduction).toBeCloseTo(6 * (12000 / 12), 0);
+    });
+
+    it('reduces egiAnnual by the vacancy deduction amount', () => {
+      const lease = makeSimpleLease({ leaseEndDate: '2025-07-01' });
+      const result = computeLeaseIncomeByYear([lease], 5, acquisitionDate, {
+        rolloverVacancyMonths: 6,
+      });
+
+      // EGI = baseRent + recovery − vacancyDeduction − tiLcCost
+      const yr2 = result[1];
+      expect(yr2.egiAnnual).toBeCloseTo(
+        yr2.baseRentAnnual + yr2.recoveryAnnual - yr2.vacancyDeductionTotal - yr2.tiLcCostTotal,
+        1
+      );
+    });
+  });
+
+  describe('vacancy window spans two projection years', () => {
+    // Lease expires 2025-07-01; 12-month vacancy: 2025-07-01 → 2026-07-01
+    // Straddles Year 2 (2025-01-01 – 2026-01-01) and Year 3 (2026-01-01 – 2027-01-01)
+    //
+    // Proration is computed with exact millisecond overlap fractions:
+    //   totalVacancyMs  = Date('2026-07-01') − Date('2025-07-01') = 365 days
+    //   Year 2 overlapMs = Date('2026-01-01') − Date('2025-07-01') = 184 days → fraction = 184/365
+    //   Year 3 overlapMs = Date('2026-07-01') − Date('2026-01-01') = 181 days → fraction = 181/365
+    //   deductionY2 = (184/365) × 12 months × $1 000/mo ≈ $6 049
+    //   deductionY3 = (181/365) × 12 months × $1 000/mo ≈ $5 951
+
+    it('deducts the correctly prorated amount in Year 2 (Jul-01 → Jan-01 overlap)', () => {
+      const lease = makeSimpleLease({ leaseEndDate: '2025-07-01' });
+      const result = computeLeaseIncomeByYear([lease], 5, acquisitionDate, {
+        rolloverVacancyMonths: 12,
+      });
+
+      // 184/365 × 12 000 ≈ 6049
+      const expectedY2 = (184 / 365) * 12 * (12000 / 12);
+      expect(result[1].vacancyDeductionTotal).toBeCloseTo(expectedY2, 0);
+    });
+
+    it('deducts the correctly prorated amount in Year 3 (Jan-01 → Jul-01 overlap)', () => {
+      const lease = makeSimpleLease({ leaseEndDate: '2025-07-01' });
+      const result = computeLeaseIncomeByYear([lease], 5, acquisitionDate, {
+        rolloverVacancyMonths: 12,
+      });
+
+      // 181/365 × 12 000 ≈ 5951
+      const expectedY3 = (181 / 365) * 12 * (12000 / 12);
+      expect(result[2].vacancyDeductionTotal).toBeCloseTo(expectedY3, 0);
+    });
+
+    it('deductions in Year 2 and Year 3 sum to the total lost rent', () => {
+      const lease = makeSimpleLease({ leaseEndDate: '2025-07-01' });
+      const result = computeLeaseIncomeByYear([lease], 5, acquisitionDate, {
+        rolloverVacancyMonths: 12,
+      });
+
+      const totalExpected = 12 * (12000 / 12); // 12 months × $1 000/mo = $12 000
+      const totalActual = result.reduce((sum, yr) => sum + yr.vacancyDeductionTotal, 0);
+      expect(totalActual).toBeCloseTo(totalExpected, 1);
+    });
+
+    it('Year 1 and years after the window have zero vacancy deduction', () => {
+      const lease = makeSimpleLease({ leaseEndDate: '2025-07-01' });
+      const result = computeLeaseIncomeByYear([lease], 5, acquisitionDate, {
+        rolloverVacancyMonths: 12,
+      });
+      expect(result[0].vacancyDeductionTotal).toBe(0);
+      expect(result[3].vacancyDeductionTotal).toBe(0);
+      expect(result[4].vacancyDeductionTotal).toBe(0);
+    });
+  });
+
+  describe('vacancy window extends past hold period end (truncation)', () => {
+    it('deducts only the in-hold portion when window extends beyond holdEnd', () => {
+      // holdPeriod = 5; holdEnd = 2029-01-01
+      // Lease expires 2028-07-01; 12-month vacancy window: 2028-07-01 → 2029-07-01
+      // Only the in-hold portion (2028-07-01 → 2029-01-01 = 184 days) is captured in Year 5.
+      // The remaining ~181 days (Jan-01 → Jul-01 2029) fall past holdEnd and are discarded
+      // because there is no Year 6 projection year.
+      //
+      // Year 5 deduction = (184/365) × 12 × 1000 ≈ 6049  (NOT the full 12 000)
+      const lease = makeSimpleLease({ leaseEndDate: '2028-07-01' });
+      const result = computeLeaseIncomeByYear([lease], 5, acquisitionDate, {
+        rolloverVacancyMonths: 12,
+      });
+
+      // Years 1-4 must be zero
+      expect(result[0].vacancyDeductionTotal).toBe(0);
+      expect(result[1].vacancyDeductionTotal).toBe(0);
+      expect(result[2].vacancyDeductionTotal).toBe(0);
+      expect(result[3].vacancyDeductionTotal).toBe(0);
+
+      // Year 5: only the in-hold fragment, not the full 12 months
+      const expectedY5 = (184 / 365) * 12 * (12000 / 12); // ≈ 6049
+      expect(result[4].vacancyDeductionTotal).toBeCloseTo(expectedY5, 0);
+
+      // Total must be less than the full 12-month deduction
+      const totalActual = result.reduce((sum, yr) => sum + yr.vacancyDeductionTotal, 0);
+      expect(totalActual).toBeLessThan(12 * (12000 / 12));
+    });
+  });
+
+  describe('no vacancy deduction when rolloverVacancyMonths = 0', () => {
+    it('produces zero vacancy deduction for a mid-hold expiring lease', () => {
+      const lease = makeSimpleLease({ leaseEndDate: '2025-07-01' });
+      const result = computeLeaseIncomeByYear([lease], 5, acquisitionDate, {
+        rolloverVacancyMonths: 0,
+      });
+      result.forEach((yr) => expect(yr.vacancyDeductionTotal).toBe(0));
+    });
+
+    it('produces zero vacancy deduction when options are omitted entirely', () => {
+      const lease = makeSimpleLease({ leaseEndDate: '2025-07-01' });
+      const result = computeLeaseIncomeByYear([lease], 5, acquisitionDate);
+      result.forEach((yr) => expect(yr.vacancyDeductionTotal).toBe(0));
+    });
+  });
+
+  describe('lease that does not qualify for rollover', () => {
+    it('does not deduct vacancy when lease expires after hold period end', () => {
+      // Lease ends 2030-06-01; holdEnd = 2029-01-01 → does not qualify
+      const lease = makeSimpleLease({ leaseEndDate: '2030-06-01' });
+      const result = computeLeaseIncomeByYear([lease], 5, acquisitionDate, {
+        rolloverVacancyMonths: 6,
+      });
+      result.forEach((yr) => expect(yr.vacancyDeductionTotal).toBe(0));
+    });
+
+    it('does not deduct vacancy when lease expires exactly on acquisition date', () => {
+      // leaseEndDate === refDate is NOT > refDate, so qualifiesForRollover = false
+      const lease = makeSimpleLease({ leaseEndDate: '2024-01-01' });
+      const result = computeLeaseIncomeByYear([lease], 5, acquisitionDate, {
+        rolloverVacancyMonths: 6,
+      });
+      result.forEach((yr) => expect(yr.vacancyDeductionTotal).toBe(0));
+    });
+  });
+
+  describe('lease expires in the final hold year (boundary edge case)', () => {
+    it('charges vacancy deduction only within the hold period — no carry-over past holdEnd', () => {
+      // holdPeriod = 5; holdEnd = 2029-01-01
+      // Lease expires 2028-07-01; 6-month window ends 2029-01-01 (exactly holdEnd)
+      // The entire 6-month window falls inside Year 5 (2028-01-01 – 2029-01-01)
+      const lease = makeSimpleLease({ leaseEndDate: '2028-07-01' });
+      const result = computeLeaseIncomeByYear([lease], 5, acquisitionDate, {
+        rolloverVacancyMonths: 6,
+      });
+
+      // Years 1-4 must be zero
+      expect(result[0].vacancyDeductionTotal).toBe(0);
+      expect(result[1].vacancyDeductionTotal).toBe(0);
+      expect(result[2].vacancyDeductionTotal).toBe(0);
+      expect(result[3].vacancyDeductionTotal).toBe(0);
+
+      // Year 5 must carry the full 6-month deduction = 6 × 1000 = 6000
+      expect(result[4].vacancyDeductionTotal).toBeCloseTo(6 * (12000 / 12), 0);
+    });
+  });
+
+  describe('zero-SF lease does not affect vacancy calculation', () => {
+    it('vacancy deduction is still computed for a zero-SF lease (based on rent, not SF)', () => {
+      // Vacancy deduction is rent-based, not SF-based — zero SF does not prevent it
+      const lease = makeSimpleLease({ leaseEndDate: '2025-07-01', sf: 0, baseRentAnnual: 12000 });
+      const result = computeLeaseIncomeByYear([lease], 5, acquisitionDate, {
+        rolloverVacancyMonths: 6,
+      });
+      // Deduction should still equal 6 months × 1000/mo = 6000
+      expect(result[1].vacancyDeductionTotal).toBeCloseTo(6 * (12000 / 12), 0);
+    });
+  });
+});
+
+describe('computeLeaseIncomeByYear — TI/LC cost', () => {
+  const acquisitionDate = '2024-01-01';
+
+  describe('one-time TI/LC charged in the year the lease expires', () => {
+    it('charges TI/LC in Year 2 when lease expires at the start of Year 2', () => {
+      // Year 2 = 2025-01-01 – 2026-01-01; lease ends 2025-01-01 (inside Year 2)
+      const lease = makeSimpleLease({ leaseEndDate: '2025-01-01', sf: 1000 });
+      const result = computeLeaseIncomeByYear([lease], 5, acquisitionDate, {
+        rolloverTiLcPerSf: 10,
+      });
+
+      expect(result[0].tiLcCostTotal).toBe(0);
+      expect(result[1].tiLcCostTotal).toBeCloseTo(10 * 1000, 0);
+      expect(result[2].tiLcCostTotal).toBe(0);
+      expect(result[3].tiLcCostTotal).toBe(0);
+      expect(result[4].tiLcCostTotal).toBe(0);
+    });
+
+    it('charges TI/LC in the expiry year only — not in subsequent years', () => {
+      const lease = makeSimpleLease({ leaseEndDate: '2026-06-15', sf: 2000 });
+      const result = computeLeaseIncomeByYear([lease], 5, acquisitionDate, {
+        rolloverTiLcPerSf: 5,
+      });
+
+      // Year 3 (2026-01-01 – 2027-01-01) contains 2026-06-15
+      const tiLcYear = result[2].tiLcCostTotal;
+      expect(tiLcYear).toBeCloseTo(5 * 2000, 0);
+
+      // All other years must be zero
+      [0, 1, 3, 4].forEach((i) => expect(result[i].tiLcCostTotal).toBe(0));
+    });
+
+    it('reflects the TI/LC in the per-lease detail entry', () => {
+      const lease = makeSimpleLease({ leaseEndDate: '2025-01-01', sf: 1000 });
+      const result = computeLeaseIncomeByYear([lease], 5, acquisitionDate, {
+        rolloverTiLcPerSf: 10,
+      });
+
+      const year2Detail = result[1].leaseDetail[0];
+      expect(year2Detail.tiLcCost).toBeCloseTo(10 * 1000, 0);
+    });
+
+    it('reduces egiAnnual by the TI/LC cost amount', () => {
+      const lease = makeSimpleLease({ leaseEndDate: '2025-01-01', sf: 1000 });
+      const result = computeLeaseIncomeByYear([lease], 5, acquisitionDate, {
+        rolloverTiLcPerSf: 10,
+      });
+
+      const yr2 = result[1];
+      expect(yr2.egiAnnual).toBeCloseTo(
+        yr2.baseRentAnnual + yr2.recoveryAnnual - yr2.vacancyDeductionTotal - yr2.tiLcCostTotal,
+        1
+      );
+    });
+  });
+
+  describe('zero rolloverTiLcPerSf suppresses TI/LC even for qualifying leases', () => {
+    it('produces zero TI/LC cost when rolloverTiLcPerSf = 0', () => {
+      const lease = makeSimpleLease({ leaseEndDate: '2025-01-01', sf: 1000 });
+      const result = computeLeaseIncomeByYear([lease], 5, acquisitionDate, {
+        rolloverTiLcPerSf: 0,
+      });
+      result.forEach((yr) => expect(yr.tiLcCostTotal).toBe(0));
+    });
+
+    it('produces zero TI/LC cost when options are omitted', () => {
+      const lease = makeSimpleLease({ leaseEndDate: '2025-01-01', sf: 1000 });
+      const result = computeLeaseIncomeByYear([lease], 5, acquisitionDate);
+      result.forEach((yr) => expect(yr.tiLcCostTotal).toBe(0));
+    });
+  });
+
+  describe('zero-SF lease produces no TI/LC cost', () => {
+    it('charges zero TI/LC when lease SF is 0', () => {
+      const lease = makeSimpleLease({ leaseEndDate: '2025-01-01', sf: 0 });
+      const result = computeLeaseIncomeByYear([lease], 5, acquisitionDate, {
+        rolloverTiLcPerSf: 10,
+      });
+      result.forEach((yr) => expect(yr.tiLcCostTotal).toBe(0));
+    });
+  });
+
+  describe('TI/LC combined with vacancy deduction', () => {
+    it('applies both vacancy deduction and TI/LC in the same hold run', () => {
+      // Lease expires 2025-07-01 (mid-hold); 6 months vacancy; TI/LC $10/sf; 1000 sf
+      // Year 2 (2025-01-01 – 2026-01-01):
+      //   vacancyDeduction ≈ 6000  (6 months × $1000/mo)
+      //   tiLcCost = 10 × 1000 = 10000
+      const lease = makeSimpleLease({ leaseEndDate: '2025-07-01', sf: 1000 });
+      const result = computeLeaseIncomeByYear([lease], 5, acquisitionDate, {
+        rolloverVacancyMonths: 6,
+        rolloverTiLcPerSf: 10,
+      });
+
+      // Year 2 must have both charges
+      expect(result[1].vacancyDeductionTotal).toBeCloseTo(6 * (12000 / 12), 0);
+      expect(result[1].tiLcCostTotal).toBeCloseTo(10 * 1000, 0);
+
+      // Years 1 and 3+ must have neither
+      expect(result[0].vacancyDeductionTotal).toBe(0);
+      expect(result[0].tiLcCostTotal).toBe(0);
+      expect(result[2].tiLcCostTotal).toBe(0);
+    });
+
+    it('TI/LC and vacancy are independent — vacancy months = 0 does not suppress TI/LC', () => {
+      const lease = makeSimpleLease({ leaseEndDate: '2025-01-01', sf: 1000 });
+      const result = computeLeaseIncomeByYear([lease], 5, acquisitionDate, {
+        rolloverVacancyMonths: 0,
+        rolloverTiLcPerSf: 10,
+      });
+
+      result.forEach((yr) => expect(yr.vacancyDeductionTotal).toBe(0));
+      expect(result[1].tiLcCostTotal).toBeCloseTo(10 * 1000, 0);
     });
   });
 });
