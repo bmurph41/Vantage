@@ -240,7 +240,7 @@ function MoreSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   );
 }
 
-export function MobileTopHeader() {
+function MobileTopHeader({ onOpenMore }: { onOpenMore: () => void }) {
   const [location] = useLocation();
   const { user } = useAuth();
   const pageTitle = usePageTitle(location);
@@ -283,10 +283,12 @@ export function MobileTopHeader() {
             )}
           </button>
 
+          {/* Avatar — tapping opens the More sheet where UserMenu lives */}
           <button
+            onClick={onOpenMore}
             className="flex items-center justify-center rounded-lg hover:bg-sidebar-accent transition-colors touch-manipulation"
             style={{ minWidth: 44, minHeight: 44 }}
-            aria-label="Account"
+            aria-label="Account and more options"
           >
             <Avatar className="w-7 h-7">
               {user?.avatarUrl && <AvatarImage src={user.avatarUrl} alt={user.name || "User"} />}
@@ -328,18 +330,23 @@ const BOTTOM_TABS = [
   },
 ];
 
-export function MobileBottomNav() {
+function MobileBottomBar({
+  moreOpen,
+  onOpenMore,
+  onCloseMore,
+}: {
+  moreOpen: boolean;
+  onOpenMore: () => void;
+  onCloseMore: () => void;
+}) {
   const [location] = useLocation();
-  const [moreOpen, setMoreOpen] = useState(false);
 
   const isTabActive = (prefixes: string[]) =>
     prefixes.some(
       (p) => location === p || location.startsWith(p + "/") || location.startsWith(p + "?")
     );
 
-  const moreActive =
-    !isTabActive(BOTTOM_TABS.flatMap((t) => t.matchPrefixes)) &&
-    location !== "/dashboard";
+  const moreActive = !isTabActive(BOTTOM_TABS.flatMap((t) => t.matchPrefixes));
 
   return (
     <>
@@ -376,7 +383,7 @@ export function MobileBottomNav() {
           })}
 
           <button
-            onClick={() => setMoreOpen(true)}
+            onClick={onOpenMore}
             className={cn(
               "flex-1 flex flex-col items-center justify-center gap-1 transition-colors touch-manipulation active:bg-sidebar-accent/50",
               moreActive
@@ -395,7 +402,28 @@ export function MobileBottomNav() {
         </div>
       </nav>
 
-      <MoreSheet open={moreOpen} onClose={() => setMoreOpen(false)} />
+      <MoreSheet open={moreOpen} onClose={onCloseMore} />
+    </>
+  );
+}
+
+/**
+ * MobileShell — renders both the compact top header and the bottom tab bar.
+ * Shared `moreOpen` state lets the avatar button in the header AND the "More"
+ * tab both open the same full-screen navigation sheet.
+ * Both pieces are md:hidden — completely invisible on desktop.
+ */
+export function MobileShell() {
+  const [moreOpen, setMoreOpen] = useState(false);
+
+  return (
+    <>
+      <MobileTopHeader onOpenMore={() => setMoreOpen(true)} />
+      <MobileBottomBar
+        moreOpen={moreOpen}
+        onOpenMore={() => setMoreOpen(true)}
+        onCloseMore={() => setMoreOpen(false)}
+      />
     </>
   );
 }

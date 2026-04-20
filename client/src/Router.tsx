@@ -11,7 +11,7 @@ import { OpsModuleGuard } from "@/components/operations/OpsModuleGuard";
 import { Button } from "@/components/ui/button";
 import { PageLoader } from "@/components/PageLoader";
 import { PageErrorBoundary } from "@/components/ErrorBoundary";
-import { MobileTopHeader, MobileBottomNav } from "@/components/layout/MobileBottomNav";
+import { MobileShell } from "@/components/layout/MobileBottomNav";
 
 const Dashboard = lazy(() => import("@/pages/dashboard"));
 const CRMDashboard = lazy(() => import("@/pages/crm-dashboard"));
@@ -373,9 +373,9 @@ function UnifiedLayout({ children }: { children: React.ReactNode }) {
   
   return (
     <div className="flex h-screen bg-background overflow-x-hidden">
-      {/* Mobile compact top header — shown only on < md, hidden on desktop */}
-      <MobileTopHeader />
-      {/* Desktop sidebar — hidden on mobile via its own md: classes */}
+      {/* Mobile shell: compact top header + bottom tab bar (both md:hidden) */}
+      <MobileShell />
+      {/* Desktop sidebar — hidden on mobile via its own translate classes */}
       <Suspense fallback={<SidebarLoader />}>
         <UnifiedSidebar />
       </Suspense>
@@ -392,8 +392,6 @@ function UnifiedLayout({ children }: { children: React.ReactNode }) {
           </PageErrorBoundary>
         </main>
       </div>
-      {/* Mobile bottom tab bar — shown only on < md */}
-      <MobileBottomNav />
       <CommandPalette />
       <AIAssistant />
       <Suspense fallback={null}>
