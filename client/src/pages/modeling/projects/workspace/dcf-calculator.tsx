@@ -315,10 +315,10 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
     const next = new Set(valid);
     setSelectedExportColumns(next);
     localStorage.setItem(SESSION_KEY, JSON.stringify(Array.from(next)));
-    setSelectedPresetName('');
   };
 
   const deleteExportPreset = (name: string) => {
+    if (selectedPresetName === name) setSelectedPresetName('');
     setExportPresets(prev => {
       const updated = prev.filter(p => p.name !== name);
       localStorage.setItem(PRESETS_KEY, JSON.stringify(updated));
