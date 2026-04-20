@@ -234,7 +234,7 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
   const SESSION_KEY = 'leaseExportColumns';
   const loadSavedColumns = (): Set<LeaseExportColumnKey> => {
     try {
-      const raw = sessionStorage.getItem(SESSION_KEY);
+      const raw = localStorage.getItem(SESSION_KEY);
       if (raw) {
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed)) {
@@ -261,7 +261,7 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
       } else {
         next.add(key);
       }
-      sessionStorage.setItem(SESSION_KEY, JSON.stringify(Array.from(next)));
+      localStorage.setItem(SESSION_KEY, JSON.stringify(Array.from(next)));
       return next;
     });
   };
@@ -2656,7 +2656,7 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
               onClick={() => {
                 const all = new Set(ALL_COLUMN_KEYS);
                 setSelectedExportColumns(all);
-                sessionStorage.setItem(SESSION_KEY, JSON.stringify(ALL_COLUMN_KEYS));
+                localStorage.setItem(SESSION_KEY, JSON.stringify(ALL_COLUMN_KEYS));
               }}
             >
               Select All
