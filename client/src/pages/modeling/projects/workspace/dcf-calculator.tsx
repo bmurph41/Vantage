@@ -35,10 +35,13 @@ import {
   AlertCircle,
   Building2,
   Info,
-  Users
+  Users,
+  Settings2
 } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { cn, formatCurrency, formatPercent } from '@/lib/utils';
 import debounce from 'lodash.debounce';
@@ -211,6 +214,61 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
     });
   };
 
+  const LEASE_EXPORT_COLUMNS = [
+    { key: 'year', label: 'Year' },
+    { key: 'tenant', label: 'Tenant' },
+    { key: 'baseRent', label: 'Base Rent' },
+    { key: 'recoveries', label: 'Recoveries' },
+    { key: 'freeRentReduction', label: 'Free Rent Reduction' },
+    { key: 'vacancyDeduction', label: 'Vacancy Deduction' },
+    { key: 'tiLcCost', label: 'TI/LC Cost' },
+    { key: 'netEgi', label: 'Net EGI' },
+    { key: 'status', label: 'Status' },
+  ] as const;
+
+  type LeaseExportColumnKey = typeof LEASE_EXPORT_COLUMNS[number]['key'];
+  const ALL_COLUMN_KEYS = LEASE_EXPORT_COLUMNS.map(c => c.key) as LeaseExportColumnKey[];
+
+  const SESSION_KEY = 'leaseExportColumns';
+  const loadSavedColumns = (): Set<LeaseExportColumnKey> => {
+    try {
+      const raw = sessionStorage.getItem(SESSION_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          const valid = parsed.filter((k): k is LeaseExportColumnKey =>
+            ALL_COLUMN_KEYS.includes(k as LeaseExportColumnKey)
+          );
+          if (valid.length > 0) return new Set(valid);
+        }
+      }
+    } catch {}
+    return new Set(ALL_COLUMN_KEYS);
+  };
+
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
+  const [exportDialogFormat, setExportDialogFormat] = useState<'xlsx' | 'csv'>('xlsx');
+  const [selectedExportColumns, setSelectedExportColumns] = useState<Set<LeaseExportColumnKey>>(loadSavedColumns);
+
+  const toggleExportColumn = (key: LeaseExportColumnKey) => {
+    setSelectedExportColumns(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        if (next.size === 1) return prev;
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      sessionStorage.setItem(SESSION_KEY, JSON.stringify(Array.from(next)));
+      return next;
+    });
+  };
+
+  const openExportDialog = (format: 'xlsx' | 'csv') => {
+    setExportDialogFormat(format);
+    setExportDialogOpen(true);
+  };
+
   const { data: dcfAnalysis, isLoading, isError, error: dcfError, refetch } = useQuery<DCFAnalysis>({
     queryKey: ['/api/modeling/projects', projectId, 'dcf'],
     enabled: !!projectId,
@@ -222,41 +280,48 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
     enabled: !!projectId,
   });
 
-  const exportLeaseIncome = useCallback((format: 'xlsx' | 'csv') => {
+  const exportLeaseIncome = useCallback((format: 'xlsx' | 'csv', cols?: Set<LeaseExportColumnKey>) => {
     const data = dcfAnalysis?.yearlyLeaseIncome;
     if (!data || data.length === 0) return;
 
-    const headers = ['Year', 'Tenant', 'Base Rent', 'Recoveries', 'Free Rent Reduction', 'Vacancy Deduction', 'TI/LC Cost', 'Net EGI', 'Status'];
+    const activeCols = cols ?? selectedExportColumns;
+    const colDefs = (LEASE_EXPORT_COLUMNS as ReadonlyArray<{ key: LeaseExportColumnKey; label: string }>)
+      .filter(c => activeCols.has(c.key));
+
+    const pick = (colKey: string, detail: any, yearRow: any, isTotal: boolean): string | number => {
+      const vacDed = detail?.vacancyDeduction ?? 0;
+      const tiLc = detail?.tiLcCost ?? 0;
+      const netEgi = isTotal
+        ? yearRow.egiAnnual
+        : (detail.isExpired ? 0 : detail.baseRent) + (detail.isExpired ? 0 : detail.recovery) - detail.freeRentReduction - vacDed - tiLc;
+      switch (colKey) {
+        case 'year': return yearRow.year;
+        case 'tenant': return isTotal ? 'TOTAL' : detail.tenantName;
+        case 'baseRent': return isTotal ? yearRow.baseRentAnnual : (detail.isExpired ? 0 : detail.baseRent);
+        case 'recoveries': return isTotal ? yearRow.recoveryAnnual : (detail.isExpired ? 0 : detail.recovery);
+        case 'freeRentReduction': return isTotal
+          ? yearRow.leaseDetail.reduce((s: number, l: any) => s + l.freeRentReduction, 0)
+          : detail.freeRentReduction;
+        case 'vacancyDeduction': return isTotal
+          ? ((yearRow.vacancyDeductionTotal ?? 0) > 0 ? -(yearRow.vacancyDeductionTotal ?? 0) : 0)
+          : (vacDed > 0 ? -vacDed : 0);
+        case 'tiLcCost': return isTotal
+          ? ((yearRow.tiLcCostTotal ?? 0) > 0 ? -(yearRow.tiLcCostTotal ?? 0) : 0)
+          : (tiLc > 0 ? -tiLc : 0);
+        case 'netEgi': return netEgi;
+        case 'status': return isTotal ? '' : (detail.isExpired ? 'Expired' : 'Active');
+        default: return '';
+      }
+    };
+
+    const headers = colDefs.map(c => c.label);
     const rows: (string | number)[][] = [headers];
 
     for (const yearRow of data) {
       for (const ld of yearRow.leaseDetail) {
-        const vacDed = ld.vacancyDeduction ?? 0;
-        const tiLc = ld.tiLcCost ?? 0;
-        const netEgi = ld.baseRent + ld.recovery - ld.freeRentReduction - vacDed - tiLc;
-        rows.push([
-          yearRow.year,
-          ld.tenantName,
-          ld.isExpired ? 0 : ld.baseRent,
-          ld.isExpired ? 0 : ld.recovery,
-          ld.freeRentReduction,
-          vacDed > 0 ? -vacDed : 0,
-          tiLc > 0 ? -tiLc : 0,
-          netEgi,
-          ld.isExpired ? 'Expired' : 'Active',
-        ]);
+        rows.push(colDefs.map(c => pick(c.key, ld, yearRow, false)));
       }
-      rows.push([
-        yearRow.year,
-        'TOTAL',
-        yearRow.baseRentAnnual,
-        yearRow.recoveryAnnual,
-        yearRow.leaseDetail.reduce((s, l) => s + l.freeRentReduction, 0),
-        (yearRow.vacancyDeductionTotal ?? 0) > 0 ? -(yearRow.vacancyDeductionTotal ?? 0) : 0,
-        (yearRow.tiLcCostTotal ?? 0) > 0 ? -(yearRow.tiLcCostTotal ?? 0) : 0,
-        yearRow.egiAnnual,
-        '',
-      ]);
+      rows.push(colDefs.map(c => pick(c.key, null, yearRow, true)));
     }
 
     const ws = XLSX.utils.aoa_to_sheet(rows);
@@ -265,7 +330,7 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
 
     const filename = `lease-income-breakdown.${format}`;
     XLSX.writeFile(wb, filename, { bookType: format === 'csv' ? 'csv' : 'xlsx' });
-  }, [dcfAnalysis?.yearlyLeaseIncome]);
+  }, [dcfAnalysis?.yearlyLeaseIncome, selectedExportColumns]);
 
   const { holdPeriod: sharedHoldPeriod, setHoldPeriod: setSharedHoldPeriod } = useHoldPeriod(projectId || '');
 
@@ -1414,7 +1479,7 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
                         variant="outline"
                         size="sm"
                         className="h-7 text-xs gap-1.5"
-                        onClick={() => exportLeaseIncome('xlsx')}
+                        onClick={() => openExportDialog('xlsx')}
                         data-testid="export-lease-income-xlsx"
                       >
                         <Download className="h-3 w-3" />
@@ -1424,7 +1489,7 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
                         variant="outline"
                         size="sm"
                         className="h-7 text-xs gap-1.5"
-                        onClick={() => exportLeaseIncome('csv')}
+                        onClick={() => openExportDialog('csv')}
                         data-testid="export-lease-income-csv"
                       >
                         <Download className="h-3 w-3" />
@@ -1947,7 +2012,7 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
                               variant="outline"
                               size="sm"
                               className="h-7 text-xs gap-1.5"
-                              onClick={() => exportLeaseIncome('xlsx')}
+                              onClick={() => openExportDialog('xlsx')}
                               data-testid="export-lease-income-xlsx-li"
                             >
                               <Download className="h-3 w-3" />
@@ -1957,7 +2022,7 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
                               variant="outline"
                               size="sm"
                               className="h-7 text-xs gap-1.5"
-                              onClick={() => exportLeaseIncome('csv')}
+                              onClick={() => openExportDialog('csv')}
                               data-testid="export-lease-income-csv-li"
                             >
                               <Download className="h-3 w-3" />
@@ -2306,6 +2371,63 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
 
       {/* Decision Support (Tornado, Attribution, IC Memo) */}
       {projectId && <DecisionSupportAccordion projectId={projectId} />}
+
+      {/* Lease Income Export Column Picker */}
+      <Dialog open={exportDialogOpen} onOpenChange={setExportDialogOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Settings2 className="h-4 w-4" />
+              Choose Export Columns
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground -mt-1">
+            Select the columns to include in the {exportDialogFormat === 'xlsx' ? 'Excel' : 'CSV'} export. At least one column must remain selected.
+          </p>
+          <div className="grid grid-cols-2 gap-3 py-2">
+            {LEASE_EXPORT_COLUMNS.map(col => (
+              <label
+                key={col.key}
+                className="flex items-center gap-2 cursor-pointer select-none"
+              >
+                <Checkbox
+                  checked={selectedExportColumns.has(col.key)}
+                  onCheckedChange={() => toggleExportColumn(col.key)}
+                  id={`export-col-${col.key}`}
+                />
+                <span className="text-sm">{col.label}</span>
+              </label>
+            ))}
+          </div>
+          <DialogFooter className="flex items-center gap-2 pt-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                const all = new Set(ALL_COLUMN_KEYS);
+                setSelectedExportColumns(all);
+                sessionStorage.setItem(SESSION_KEY, JSON.stringify(ALL_COLUMN_KEYS));
+              }}
+            >
+              Select All
+            </Button>
+            <div className="flex-1" />
+            <Button variant="outline" size="sm" onClick={() => setExportDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => {
+                setExportDialogOpen(false);
+                exportLeaseIncome(exportDialogFormat, selectedExportColumns);
+              }}
+            >
+              <Download className="h-3.5 w-3.5 mr-1.5" />
+              Export
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
     </div>
   );
