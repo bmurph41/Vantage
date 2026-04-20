@@ -14,7 +14,7 @@
  *   1 — an error occurred
  */
 
-import { readdirSync, writeFileSync, readFileSync } from "fs";
+import { readdirSync, writeFileSync, readFileSync, existsSync } from "fs";
 import { resolve, join, dirname, basename } from "path";
 import { fileURLToPath } from "url";
 
@@ -22,6 +22,29 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const dbDir = resolve(__dirname, "../db");
 const outputPath = join(dbDir, "schema-index.ts");
+
+/**
+ * Extra schema files that live outside db/ but must always be re-exported by
+ * the index so the drift checker (server/schema-drift.ts) can discover them.
+ * These are path-aliased relative to db/schema-index.ts.
+ *
+ * Only entries whose files actually exist on disk are emitted, so a deleted
+ * shared schema file will not produce a stale import.
+ */
+const SHARED_EXPORTS: Array<{ importPath: string; diskPath: string }> = [
+  {
+    importPath: "../shared/commercial-lease-schema",
+    diskPath: resolve(__dirname, "../shared/commercial-lease-schema.ts"),
+  },
+  {
+    importPath: "../shared/document-builder/schema",
+    diskPath: resolve(__dirname, "../shared/document-builder/schema.ts"),
+  },
+  {
+    importPath: "../server/listings/ingestion_v2/schema",
+    diskPath: resolve(__dirname, "../server/listings/ingestion_v2/schema.ts"),
+  },
+];
 
 function generateBarrelContent(schemaFiles: string[]): string {
   const header = `/**
@@ -38,21 +61,47 @@ function generateBarrelContent(schemaFiles: string[]): string {
  * automatically whenever it is executed.
  */\n`;
 
+  const lines: string[] = [];
+
   if (schemaFiles.length === 0) {
-    return header + "\n// No secondary schema files found.\n";
+    lines.push("// No secondary schema files found.");
+  } else {
+    for (const f of schemaFiles) {
+      lines.push(`export * from "./${basename(f, ".ts")}";`);
+    }
   }
 
-  const exports = schemaFiles
-    .map((f) => `export * from "./${basename(f, ".ts")}";`)
-    .join("\n");
+  const presentShared = SHARED_EXPORTS.filter((e) => existsSync(e.diskPath));
 
-  return header + "\n" + exports + "\n";
+  if (presentShared.length > 0) {
+    lines.push("");
+    lines.push(
+      "// Shared schemas that live outside db/ but need to be visible to the drift"
+    );
+    lines.push(
+      "// checker (server/schema-drift.ts imports db/schema-index to discover all"
+    );
+    lines.push(
+      "// table definitions). These must be path-aliased relative to this file."
+    );
+    for (const e of presentShared) {
+      lines.push(`export * from "${e.importPath}";`);
+    }
+  }
+
+  return header + "\n" + lines.join("\n") + "\n";
 }
 
 let schemaFiles: string[];
 try {
   schemaFiles = readdirSync(dbDir)
-    .filter((f) => f.startsWith("schema-") && f.endsWith(".ts") && f !== "schema-index.ts")
+    .filter(
+      (f) =>
+        f.startsWith("schema-") &&
+        f.endsWith(".ts") &&
+        !f.endsWith(".d.ts") &&
+        f !== "schema-index.ts"
+    )
     .sort();
 } catch (err) {
   console.error("[sync-schema-index] Could not read db/ directory:", err);
@@ -78,7 +127,10 @@ if (newContent === existingContent) {
 try {
   writeFileSync(outputPath, newContent, "utf8");
 } catch (err) {
-  console.error("[sync-schema-index] Could not write db/schema-index.ts:", err);
+  console.error(
+    "[sync-schema-index] Could not write db/schema-index.ts:",
+    err
+  );
   process.exit(1);
 }
 
@@ -87,4 +139,14 @@ console.log(
 );
 for (const f of schemaFiles) {
   console.log(`  - db/${f}`);
+}
+
+const presentShared = SHARED_EXPORTS.filter((e) => existsSync(e.diskPath));
+if (presentShared.length > 0) {
+  console.log(
+    `[sync-schema-index] Also re-exports ${presentShared.length} shared schema file(s):`
+  );
+  for (const e of presentShared) {
+    console.log(`  - ${e.importPath}`);
+  }
 }
