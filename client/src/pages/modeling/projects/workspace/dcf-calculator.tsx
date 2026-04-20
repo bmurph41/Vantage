@@ -280,6 +280,11 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
     enabled: !!projectId,
   });
 
+  const { data: dcfProject } = useQuery<any>({
+    queryKey: ['/api/modeling/projects', projectId],
+    enabled: !!projectId,
+  });
+
   const exportLeaseIncome = useCallback((format: 'xlsx' | 'csv', cols?: Set<LeaseExportColumnKey>) => {
     const data = dcfAnalysis?.yearlyLeaseIncome;
     if (!data || data.length === 0) return;
@@ -328,9 +333,14 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Lease Income');
 
-    const filename = `lease-income-breakdown.${format}`;
+    const projectSlug = (dcfProject?.name ?? 'project')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '');
+    const dateStr = new Date().toISOString().slice(0, 10);
+    const filename = `${projectSlug}-lease-income-${dateStr}.${format}`;
     XLSX.writeFile(wb, filename, { bookType: format === 'csv' ? 'csv' : 'xlsx' });
-  }, [dcfAnalysis?.yearlyLeaseIncome, selectedExportColumns]);
+  }, [dcfAnalysis?.yearlyLeaseIncome, selectedExportColumns, dcfProject]);
 
   const { holdPeriod: sharedHoldPeriod, setHoldPeriod: setSharedHoldPeriod } = useHoldPeriod(projectId || '');
 
@@ -339,11 +349,6 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
     enabled: !!projectId,
   });
   const activeScenario = scenarios.find((s: any) => s.scenarioType === 'base' && s.isCurrentVersion);
-
-  const { data: dcfProject } = useQuery<any>({
-    queryKey: ['/api/modeling/projects', projectId],
-    enabled: !!projectId,
-  });
 
   const { data: proFormaData } = useQuery<any>({
     queryKey: ['/api/modeling/projects', projectId, 'pro-forma'],
