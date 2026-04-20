@@ -33,28 +33,14 @@ export async function requireVantageAuth(req: DocketRequest, res: Response, next
       });
     }
 
-    // Find or create linked Docket user (shadow record)
-    let docketUser = await storage.getDocketUserByMarinaUserId(marinaUser.id);
-    
-    if (!docketUser) {
-      // Create shadow Docket user linked to Vantage user
-      docketUser = await storage.createDocketUserFromMarinaUser({
-        marinaUserId: marinaUser.id,
-        orgId: marinaUser.orgId,
-        email: marinaUser.email || null,
-        role: "viewer", // Default role, can be customized
-        subscriptionTier: orgFeature.tier === "docket_pro" ? "pro" : "free",
-        isActive: true,
-      });
-    }
-
-    // Add Docket user to request for downstream handlers
+    // Use the Vantage user directly as the docket user — the legacy
+    // docket_users shadow table was dropped as no longer needed.
     req.docketUser = {
-      id: docketUser.id,
+      id: marinaUser.id,
       marinaUserId: marinaUser.id,
       orgId: marinaUser.orgId,
-      role: docketUser.role,
-      subscriptionTier: docketUser.subscriptionTier,
+      role: (marinaUser as any).role ?? "viewer",
+      subscriptionTier: orgFeature.tier === "docket_pro" ? "pro" : "free",
     };
 
     next();
