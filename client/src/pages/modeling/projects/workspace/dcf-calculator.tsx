@@ -277,6 +277,7 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
   const [selectedExportColumns, setSelectedExportColumns] = useState<Set<LeaseExportColumnKey>>(loadSavedColumns);
   const [exportPresets, setExportPresets] = useState<ExportPreset[]>(loadSavedPresets);
   const [presetNameInput, setPresetNameInput] = useState('');
+  const [selectedPresetName, setSelectedPresetName] = useState('');
 
   const toggleExportColumn = (key: LeaseExportColumnKey) => {
     setSelectedExportColumns(prev => {
@@ -314,6 +315,7 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
     const next = new Set(valid);
     setSelectedExportColumns(next);
     localStorage.setItem(SESSION_KEY, JSON.stringify(Array.from(next)));
+    setSelectedPresetName('');
   };
 
   const deleteExportPreset = (name: string) => {
@@ -2698,7 +2700,13 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <Label className="text-xs text-muted-foreground shrink-0">Load preset:</Label>
-                <Select onValueChange={applyExportPreset}>
+                <Select
+                  value={selectedPresetName}
+                  onValueChange={name => {
+                    setSelectedPresetName(name);
+                    applyExportPreset(name);
+                  }}
+                >
                   <SelectTrigger className="h-8 text-sm flex-1">
                     <SelectValue placeholder="Choose a preset…" />
                   </SelectTrigger>
