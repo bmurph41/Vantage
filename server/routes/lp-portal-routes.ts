@@ -18,16 +18,52 @@ function getUserId(req: Request): string {
   return (req as any).user?.id || '';
 }
 
+type LpScope =
+  | { kind: 'lp'; orgId: string; investorId: string }
+  | { kind: 'gp'; orgId: string };
+
+// LP bearer session (Authorization: Bearer) takes precedence and locks the
+// caller to their own investor_id. Otherwise fall back to the global GP
+// session populated by authenticateUser — GP admins keep full org visibility.
+async function resolveScope(req: Request): Promise<LpScope | null> {
+  const auth = req.headers.authorization;
+  if (auth?.startsWith('Bearer ')) {
+    const user = await lpPortalAuth.validateSession(auth.slice(7));
+    if (!user) return null;
+    return { kind: 'lp', orgId: user.orgId, investorId: user.investorId };
+  }
+  const orgId = getOrgId(req);
+  if (!orgId) return null;
+  return { kind: 'gp', orgId };
+}
+
+function forbidIfLp(scope: LpScope, res: Response): boolean {
+  if (scope.kind === 'lp') {
+    res.status(403).json({ error: 'This endpoint is restricted to GP administrators.' });
+    return true;
+  }
+  return false;
+}
+
+function denyInvestorMismatch(scope: LpScope, investorId: string | undefined, res: Response): boolean {
+  if (scope.kind === 'lp' && investorId && investorId !== scope.investorId) {
+    res.status(403).json({ error: 'Investor scope mismatch.' });
+    return true;
+  }
+  return false;
+}
+
 // ─── LP Authentication ──────────────────────────────────────────────────────
 
 lpPortalRouter.post('/auth/create-user', async (req: Request, res: Response) => {
   try {
-    const orgId = getOrgId(req);
-    if (!orgId) return res.status(401).json({ error: 'Authentication required' });
+    const scope = await resolveScope(req);
+    if (!scope) return res.status(401).json({ error: 'Authentication required' });
+    if (forbidIfLp(scope, res)) return;
     const name = req.body.name
       || [req.body.firstName, req.body.lastName].filter(Boolean).join(' ').trim()
       || req.body.email;
-    const user = await lpPortalAuth.createPortalUser(orgId, {
+    const user = await lpPortalAuth.createPortalUser(scope.orgId, {
       email: req.body.email,
       investorId: req.body.investorId,
       name,
@@ -72,24 +108,27 @@ lpPortalRouter.get('/auth/validate', async (req: Request, res: Response) => {
 
 lpPortalRouter.post('/statements/generate', async (req: Request, res: Response) => {
   try {
-    const orgId = getOrgId(req);
-    if (!orgId) return res.status(401).json({ error: 'Authentication required' });
+    const scope = await resolveScope(req);
+    if (!scope) return res.status(401).json({ error: 'Authentication required' });
+    if (forbidIfLp(scope, res)) return;
     const { fundId, investorId, periodEnd } = req.body;
     if (!fundId || !investorId || !periodEnd) {
       return res.status(400).json({ error: 'fundId, investorId, and periodEnd are required' });
     }
-    const statement = await lpStatements.generateQuarterlyStatement(orgId, fundId, investorId, periodEnd);
+    const statement = await lpStatements.generateQuarterlyStatement(scope.orgId, fundId, investorId, periodEnd);
     res.json(statement);
   } catch (e: any) { res.status(400).json({ error: e.message }); }
 });
 
 lpPortalRouter.get('/statements', async (req: Request, res: Response) => {
   try {
-    const orgId = getOrgId(req);
-    if (!orgId) return res.status(401).json({ error: 'Authentication required' });
-    const statements = await lpStatements.listStatements(orgId, {
+    const scope = await resolveScope(req);
+    if (!scope) return res.status(401).json({ error: 'Authentication required' });
+    const queryInvestorId = req.query.investorId as string | undefined;
+    if (denyInvestorMismatch(scope, queryInvestorId, res)) return;
+    const statements = await lpStatements.listStatements(scope.orgId, {
       fundId: req.query.fundId as string,
-      investorId: req.query.investorId as string,
+      investorId: scope.kind === 'lp' ? scope.investorId : queryInvestorId,
       statementType: req.query.statementType as string,
       limit: parseInt(req.query.limit as string) || 50,
     });
@@ -99,19 +138,28 @@ lpPortalRouter.get('/statements', async (req: Request, res: Response) => {
 
 lpPortalRouter.get('/statements/:id', async (req: Request, res: Response) => {
   try {
-    const orgId = getOrgId(req);
-    if (!orgId) return res.status(401).json({ error: 'Authentication required' });
-    const statement = await lpStatements.getStatement(orgId, req.params.id);
+    const scope = await resolveScope(req);
+    if (!scope) return res.status(401).json({ error: 'Authentication required' });
+    const statement = await lpStatements.getStatement(scope.orgId, req.params.id);
     if (!statement) return res.status(404).json({ error: 'Statement not found' });
+    if (scope.kind === 'lp' && (statement as any).investorId !== scope.investorId) {
+      return res.status(404).json({ error: 'Statement not found' });
+    }
     res.json(statement);
   } catch (e: any) { res.status(500).json({ error: e.message }); }
 });
 
 lpPortalRouter.get('/statements/:id/html', async (req: Request, res: Response) => {
   try {
-    const orgId = getOrgId(req);
-    if (!orgId) return res.status(401).json({ error: 'Authentication required' });
-    const html = await lpStatements.renderStatementHtml(orgId, req.params.id);
+    const scope = await resolveScope(req);
+    if (!scope) return res.status(401).json({ error: 'Authentication required' });
+    if (scope.kind === 'lp') {
+      const statement = await lpStatements.getStatement(scope.orgId, req.params.id);
+      if (!statement || (statement as any).investorId !== scope.investorId) {
+        return res.status(404).json({ error: 'Statement not found' });
+      }
+    }
+    const html = await lpStatements.renderStatementHtml(scope.orgId, req.params.id);
     res.set('Content-Type', 'text/html');
     res.send(html);
   } catch (e: any) { res.status(404).json({ error: e.message }); }
@@ -121,22 +169,24 @@ lpPortalRouter.get('/statements/:id/html', async (req: Request, res: Response) =
 
 lpPortalRouter.post('/k1/generate', async (req: Request, res: Response) => {
   try {
-    const orgId = getOrgId(req);
-    if (!orgId) return res.status(401).json({ error: 'Authentication required' });
+    const scope = await resolveScope(req);
+    if (!scope) return res.status(401).json({ error: 'Authentication required' });
+    if (forbidIfLp(scope, res)) return;
     const { fundId, investorId, taxYear } = req.body;
     if (!fundId || !investorId || !taxYear) {
       return res.status(400).json({ error: 'fundId, investorId, and taxYear are required' });
     }
-    const k1 = await k1Generator.generateK1(orgId, fundId, investorId, parseInt(String(taxYear), 10));
+    const k1 = await k1Generator.generateK1(scope.orgId, fundId, investorId, parseInt(String(taxYear), 10));
     res.json(k1);
   } catch (e: any) { res.status(400).json({ error: e.message }); }
 });
 
 lpPortalRouter.get('/k1/:fundId/:investorId/:taxYear', async (req: Request, res: Response) => {
   try {
-    const orgId = getOrgId(req);
-    if (!orgId) return res.status(401).json({ error: 'Authentication required' });
-    const k1 = await k1Generator.getK1(orgId, req.params.fundId, req.params.investorId, parseInt(req.params.taxYear, 10));
+    const scope = await resolveScope(req);
+    if (!scope) return res.status(401).json({ error: 'Authentication required' });
+    if (denyInvestorMismatch(scope, req.params.investorId, res)) return;
+    const k1 = await k1Generator.getK1(scope.orgId, req.params.fundId, req.params.investorId, parseInt(req.params.taxYear, 10));
     if (!k1) return res.status(404).json({ error: 'K-1 not found' });
     res.json(k1);
   } catch (e: any) { res.status(500).json({ error: e.message }); }
@@ -146,13 +196,14 @@ lpPortalRouter.get('/k1/:fundId/:investorId/:taxYear', async (req: Request, res:
 
 lpPortalRouter.post('/side-letters', async (req: Request, res: Response) => {
   try {
-    const orgId = getOrgId(req);
-    if (!orgId) return res.status(401).json({ error: 'Authentication required' });
+    const scope = await resolveScope(req);
+    if (!scope) return res.status(401).json({ error: 'Authentication required' });
+    if (forbidIfLp(scope, res)) return;
     const { fundId, investorId, investorName, provisions, effectiveDate, expirationDate, documentUrl } = req.body;
     if (!fundId || !investorId || !investorName || !provisions || !effectiveDate) {
       return res.status(400).json({ error: 'fundId, investorId, investorName, provisions, and effectiveDate are required' });
     }
-    const letter = await sideLetters.createSideLetter(orgId, {
+    const letter = await sideLetters.createSideLetter(scope.orgId, {
       fundId, investorId, investorName, provisions, effectiveDate, expirationDate, documentUrl,
     }, getUserId(req));
     res.json(letter);
@@ -161,11 +212,14 @@ lpPortalRouter.post('/side-letters', async (req: Request, res: Response) => {
 
 lpPortalRouter.get('/side-letters/fund/:fundId', async (req: Request, res: Response) => {
   try {
-    const orgId = getOrgId(req);
-    if (!orgId) return res.status(401).json({ error: 'Authentication required' });
-    let letters = await sideLetters.getSideLettersForFund(orgId, req.params.fundId);
-    if (req.query.investorId) {
-      letters = letters.filter(l => l.investorId === req.query.investorId);
+    const scope = await resolveScope(req);
+    if (!scope) return res.status(401).json({ error: 'Authentication required' });
+    const queryInvestorId = req.query.investorId as string | undefined;
+    if (denyInvestorMismatch(scope, queryInvestorId, res)) return;
+    let letters = await sideLetters.getSideLettersForFund(scope.orgId, req.params.fundId);
+    const effectiveInvestorId = scope.kind === 'lp' ? scope.investorId : queryInvestorId;
+    if (effectiveInvestorId) {
+      letters = letters.filter(l => l.investorId === effectiveInvestorId);
     }
     if (req.query.includeExpired !== 'true') {
       const now = Date.now();
@@ -177,9 +231,10 @@ lpPortalRouter.get('/side-letters/fund/:fundId', async (req: Request, res: Respo
 
 lpPortalRouter.get('/side-letters/mfn-analysis/:fundId', async (req: Request, res: Response) => {
   try {
-    const orgId = getOrgId(req);
-    if (!orgId) return res.status(401).json({ error: 'Authentication required' });
-    const analysis = await sideLetters.getMFNAnalysis(orgId, req.params.fundId);
+    const scope = await resolveScope(req);
+    if (!scope) return res.status(401).json({ error: 'Authentication required' });
+    if (forbidIfLp(scope, res)) return; // MFN exposes other investors' terms
+    const analysis = await sideLetters.getMFNAnalysis(scope.orgId, req.params.fundId);
     res.json(analysis);
   } catch (e: any) { res.status(500).json({ error: e.message }); }
 });
@@ -188,18 +243,20 @@ lpPortalRouter.get('/side-letters/mfn-analysis/:fundId', async (req: Request, re
 
 lpPortalRouter.post('/investor-letters/seed-defaults', async (req: Request, res: Response) => {
   try {
-    const orgId = getOrgId(req);
-    if (!orgId) return res.status(401).json({ error: 'Authentication required' });
-    const result = await investorLetters.seedDefaultTemplates(orgId, getUserId(req));
+    const scope = await resolveScope(req);
+    if (!scope) return res.status(401).json({ error: 'Authentication required' });
+    if (forbidIfLp(scope, res)) return;
+    const result = await investorLetters.seedDefaultTemplates(scope.orgId, getUserId(req));
     res.json(result);
   } catch (e: any) { res.status(400).json({ error: e.message }); }
 });
 
 lpPortalRouter.post('/investor-letters/templates', async (req: Request, res: Response) => {
   try {
-    const orgId = getOrgId(req);
-    if (!orgId) return res.status(401).json({ error: 'Authentication required' });
-    const template = await investorLetters.createTemplate(orgId, {
+    const scope = await resolveScope(req);
+    if (!scope) return res.status(401).json({ error: 'Authentication required' });
+    if (forbidIfLp(scope, res)) return;
+    const template = await investorLetters.createTemplate(scope.orgId, {
       name: req.body.name,
       type: req.body.type,
       subject: req.body.subject,
@@ -213,9 +270,10 @@ lpPortalRouter.post('/investor-letters/templates', async (req: Request, res: Res
 
 lpPortalRouter.get('/investor-letters/templates', async (req: Request, res: Response) => {
   try {
-    const orgId = getOrgId(req);
-    if (!orgId) return res.status(401).json({ error: 'Authentication required' });
-    const templates = await investorLetters.listTemplates(orgId, {
+    const scope = await resolveScope(req);
+    if (!scope) return res.status(401).json({ error: 'Authentication required' });
+    if (forbidIfLp(scope, res)) return;
+    const templates = await investorLetters.listTemplates(scope.orgId, {
       type: req.query.type as string,
       category: req.query.category as string,
       limit: parseInt(req.query.limit as string) || 50,
@@ -227,12 +285,13 @@ lpPortalRouter.get('/investor-letters/templates', async (req: Request, res: Resp
 
 lpPortalRouter.post('/investor-letters/render', async (req: Request, res: Response) => {
   try {
-    const orgId = getOrgId(req);
-    if (!orgId) return res.status(401).json({ error: 'Authentication required' });
-    const rendered = await investorLetters.renderTemplate(orgId, {
+    const scope = await resolveScope(req);
+    if (!scope) return res.status(401).json({ error: 'Authentication required' });
+    if (denyInvestorMismatch(scope, req.body.investorId, res)) return;
+    const rendered = await investorLetters.renderTemplate(scope.orgId, {
       templateId: req.body.templateId,
       variables: req.body.variables,
-      investorId: req.body.investorId,
+      investorId: scope.kind === 'lp' ? scope.investorId : req.body.investorId,
       fundId: req.body.fundId,
       format: req.body.format || 'html',
     }, getUserId(req));

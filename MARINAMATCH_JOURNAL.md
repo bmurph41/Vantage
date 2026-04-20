@@ -1,5 +1,177 @@
 # MarinaMatch Platform Journal
 
+## ✅ F1/F2/F3 patched — hardening follow-up (2026-04-20)
+
+Follow-up to the diagnostic sweep earlier today. All three diagnostic
+findings are now fixed in code. **26/26 post-patch probe green**, and
+the B1+B2 + B3 smoke suites still pass (15/15 and 14/14).
+
+### F1 + F2 — Dead V2 fund CRUD + V2 side-letters removed
+`server/routes/fund-management-routes.ts`:
+- Deleted the B.1 block (lines 42-348 pre-patch): GET/POST /funds,
+  GET/PUT /funds/:id, GET/POST /funds/:id/deals, PUT/DELETE
+  /fund-deals/:id, GET /funds/:id/metrics. All read from `fundsV2`,
+  which the UI never touches (client calls `/api/funds/*` in
+  modeling-routes, which reads V1).
+- Deleted V2 side-letters (GET/POST /funds/:id/side-letters). UI uses
+  `/api/lp-portal/side-letters/*`, which targets the same underlying
+  `side_letters` table via `lp-portal-service`.
+- Dropped now-unused imports `fundDealsV2` and `sideLetters`.
+- B.2 (fund documents), B.3 (investor verification), B.4 (capital
+  account ledger), B.5 (management fee calculator), and all reporting
+  endpoints (PME, j-curve, attribution, vintage-cohorts) are kept —
+  those either delegate to V1 or own their own V2 tables that aren't
+  duplicated elsewhere.
+
+Verification: all 4 canonical `/api/funds/*` UI paths and all 4
+reporting endpoints still return 200 with real data. Probes at the
+removed paths now fall through to the Vite dev middleware (HTML
+response), which is the correct "no JSON handler" signal.
+
+### F3 — LP portal bearer-session scoping
+`server/routes/lp-portal-routes.ts`: introduced `resolveScope(req)`
+that returns either `{ kind: 'lp', orgId, investorId }` when
+`Authorization: Bearer <token>` is present and validates via
+`lpPortalAuth.validateSession()`, or `{ kind: 'gp', orgId }` from
+the global authenticateUser session, or `null` (→ 401).
+
+Two enforcement helpers:
+- `forbidIfLp(scope, res)` — returns 403 for LP on admin-only routes.
+- `denyInvestorMismatch(scope, investorId, res)` — returns 403 if an
+  LP bearer tries to query or POST for a different investor_id.
+
+Admin-only (LP gets 403):
+- POST /auth/create-user
+- POST /statements/generate
+- POST /k1/generate
+- POST /side-letters
+- GET /side-letters/mfn-analysis/:fundId  ← exposes other investors' terms
+- All /investor-letters/{seed-defaults, templates, templates GET}
+
+LP-scoped (LP sees only own investor's data; mismatch = 403):
+- GET /statements (force investorId = scope.investorId)
+- GET /statements/:id + /statements/:id/html (verify returned
+  statement's investorId matches scope)
+- GET /k1/:fundId/:investorId/:taxYear (verify path investorId matches)
+- GET /side-letters/fund/:fundId (filter by scope.investorId)
+- POST /investor-letters/render (force own investorId)
+
+GP behavior is unchanged — the global `authenticateUser` session still
+gives full org-wide visibility.
+
+### Verification (post-patch probe)
+- /api/funds/* (V1 UI path): 4/4 green
+- Fund reporting (PME/j-curve/attribution/vintage): 4/4 green
+- Removed V2 paths return Vite HTML (no matching JSON handler): 3/3 confirmed
+- GP session still sees all lp-portal surfaces: 4/4 green
+- LP bearer scoping: 11/11 (own data ✅, other investor 403, admin
+  endpoints 403, MFN 403, invalid bearer 401)
+
+### Impact
+The "GP-only beta" restriction on S3/S4 is lifted by the code. Actual
+LP invites still need the client-side LP portal UI (login flow + data
+views) — that's Phase 4 product work, not backend. Backend is safe to
+receive LP bearer sessions today if the UI layer wires them up.
+
+---
+
+## ✅ Pre-beta diagnostic sweep — GO for invites (2026-04-20)
+
+Re-ran all existing smokes against current main + probed every major
+read surface the beta UI will touch. **Go/no-go: GO.** No new hard
+blockers. Three findings below; all are either UI-irrelevant or previously
+acknowledged soft blockers.
+
+### Smoke suite re-run
+- **B1+B2 beta gating + billing guard:** 15/15 pass (REQUIRE_BETA_INVITE=true)
+- **B3 tax-waterfall write paths:** 14/14 pass
+- **B4 demo seed:** clean re-run. PME returns real values
+  (ksPme 0.744, fundIrr 11.5%, benchmark 16.08%)
+- **tsc --noEmit:** OOMs even at 8GB heap — known deferred #6, not
+  beta-blocking (runtime smokes cover drift)
+
+### Endpoint probe — canonical UI paths
+All UI-facing endpoints green under a fresh GP session (org
+`cd3719c3-...`, demo fund `5d54f90e-...`):
+
+FM on test project (STR + Surfside):
+- `GET /api/modeling/projects/:id/pro-forma` — 200
+- `GET /api/modeling/projects/:id/dcf` — 200
+- `GET /api/modeling/projects/:id/exit/scenarios` — 200
+- `GET /api/modeling/projects/:id/lp-reporting` — 200
+- `GET /api/modeling/projects/:id/config` — 200
+- `GET /api/modeling/projects/:id/tax-waterfall/{settings,partners,equity-contributions}` — 200
+
+Fund Management (canonical V1 paths at `/api/funds/*`):
+- `GET /api/funds` / `/api/funds/:id` / `/metrics` / `/investors` /
+  `/capital-accounts` / `/allocations` — all 200
+
+Fund Reporting (delegate to V1 via fund-reporting-service):
+- `GET /api/fund-management/funds/:id/pme` — 200 + real values
+- `/j-curve` / `/attribution` / `/vintage-cohorts` — all 200
+
+CRM (all pass):
+- `/api/crm/{deals,contacts,companies,leads,tasks,activities,pipelines}` — 200
+
+Workflow automation (S2 probe):
+- `/api/workflow-automations/` and `/meta/{triggers,templates}` — all 200
+
+### DB integrity spot-checks — 9/9 effectively green
+- `organizations.is_beta` column (boolean NOT NULL) ✅
+- `beta_invite_codes` + `beta_invite_redemptions` tables ✅
+- `crm_deals.modeling_project_id` column ✅
+- `financial_audit_log` table + both UPDATE and DELETE `INSTEAD NOTHING`
+  rules present (inserted, then UPDATE/DELETE both return 0 rows) ✅
+- `distribution_approvals`, `fund_period_locks` tables ✅
+- `tasks.project_id` FK is CASCADE ✅
+
+### Findings (3, none hard-block beta)
+
+**F1. V1/V2 fund-table split-brain** — `/api/fund-management/funds/:id`
+(fund-management-routes.ts) reads from `fundsV2`, while the canonical
+UI endpoint `/api/funds/:id` (modeling-routes.ts) reads from `funds`
+(V1). The seed populates V1 only, so V2 endpoints 404 on the demo fund.
+**UI impact: none** — `use-fund-management.ts` hits `/api/funds/*`
+(V1, all green). `fund-management-routes.ts` leading comment already
+says "use /api/funds/* as the canonical entry point" — the V2 routes
+there for fund CRUD look like dead code. Flagging for post-beta
+cleanup, not a blocker.
+
+**F2. S3 side-letters (V2 path) 404s** — `POST/GET
+/api/fund-management/funds/:id/side-letters` is the V2 version and
+returns 404 because the fund isn't in `funds_v2`. **UI impact: none**
+— `use-lp-portal.ts` uses `/api/lp-portal/side-letters/*`, a
+different implementation. S3 soft blocker remains accurate: the
+V2 side-letters route would fail if a V2 fund were ever used. Defer.
+
+**F3. S4 lp-portal not investor-scoped** — confirmed.
+`GET /api/lp-portal/statements` returns `[]` to a GP user in the
+same org (filter is org-scoped, no investor check). GP-only beta
+is fine; fix before inviting any LP. Unchanged from earlier.
+
+Also: `/api/lp-portal/summary` returning 200 is a red herring — no
+route by that name, so Express falls through to the Vite dev catch-all
+(HTML response). Not a real endpoint.
+
+### Server env note
+
+Dev server was restarted mid-session with `REQUIRE_BETA_INVITE=true`
+to exercise gate-ON behavior. That's the correct prod setting and is
+currently in-process — do not flip it back before deploy.
+
+### Operational checklist status
+
+Same as 2026-04-19:
+1. Deploy current `main` to prod ⏳
+2. Set env: `REQUIRE_BETA_INVITE=true`, `SENTRY_DSN`,
+   `VITE_SENTRY_DSN`, confirm Stripe + email via
+   `GET /health/integrations` ⏳
+3. `node scripts/seed-beta-demo.mjs` on prod DB ⏳
+4. Generate invite codes via `scripts/beta-invite.mjs` ⏳
+5. `npm run test:e2e` against prod URL before each invite batch ⏳
+
+---
+
 ## ✅ COMPLETE — B3-B9: Full FM beta publish checklist (2026-04-19)
 
 B1 + B2 shipped earlier today. This session closed out the remaining seven

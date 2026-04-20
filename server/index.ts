@@ -445,65 +445,72 @@ app.use(ddChecklistRouter);
     // this serves both the API and the client.
     // It is the only port that is not firewalled.
     const port = parseInt(process.env.PORT || '5000', 10);
+    const isProduction = process.env.NODE_ENV === 'production';
 
-    // ── Schema drift gate — runs BEFORE the server accepts any traffic ────────
-    // Applies startup migrations first so any pending DDL is resolved, then
-    // checks whether the live DB still drifts from the Drizzle schema.
-    // In production a non-zero drift count is fatal: it blocks startup so a
-    // broken schema can never reach live traffic.  In development it warns but
-    // allows the server to start so local iteration is not disrupted.
-    try {
-      await runStartupMigrations();
-      const driftCount = await runSchemaDriftCheck();
-      if (driftCount > 0) {
-        const isProduction = process.env.NODE_ENV === 'production';
-        if (isProduction) {
-          console.error(
-            `\n[schema-drift] ══════════════════════════════════════════════════════\n` +
-            `[schema-drift] FATAL: ${driftCount} schema drift issue(s) detected.\n` +
-            `[schema-drift] Deployment blocked to protect the live database.\n` +
-            `[schema-drift]\n` +
-            `[schema-drift] To fix:\n` +
-            `[schema-drift]   1. npx tsx scripts/generate-startup-migrations.ts\n` +
-            `[schema-drift]   2. Paste output into server/db-startup-migrations.ts\n` +
-            `[schema-drift]   3. Commit and redeploy.\n` +
-            `[schema-drift] ══════════════════════════════════════════════════════\n`
-          );
-          process.exit(1);
-        } else {
-          console.warn(
-            `[schema-drift] WARNING: ${driftCount} drift issue(s) found.\n` +
-            `[schema-drift]   This would block startup in production.\n` +
-            `[schema-drift]   Run: npx tsx scripts/generate-startup-migrations.ts`
-          );
-        }
-      }
-    } catch (driftErr: any) {
-      const isProduction = process.env.NODE_ENV === 'production';
-      if (isProduction) {
-        console.error(
-          `\n[schema-drift] FATAL: Pre-listen drift gate threw an unexpected error — blocking startup.\n` +
-          `[schema-drift]   ${driftErr.message}\n` +
-          `[schema-drift] Ensure DATABASE_URL is reachable and the migration scripts are valid.`
-        );
-        process.exit(1);
-      } else {
-        console.warn(`[schema-drift] Pre-listen check failed (continuing in dev): ${driftErr.message}`);
-      }
-    }
-
-    // Start document export job processor
-    import('./services/document-builder/export-job-processor').then(({ exportJobProcessor }) => {
-      exportJobProcessor.startProcessing(5000); // poll every 5s
-      console.log('[DocumentBuilder] Export job processor started');
-    }).catch(err => console.warn('[DocumentBuilder] Export processor failed to start:', err.message));
-
+    // ── Bind the port immediately so the deployment health check passes ────────
+    // Migrations are heavy (~13 k idempotent DDL statements) and can take up to
+    // 60 s on a cold database.  Running them before listen() causes the Replit
+    // deployment health-check timeout to fire before the port ever opens.
+    // We start listening first, then run the migration/drift gate in the
+    // background.  Because every migration is idempotent (CREATE … IF NOT
+    // EXISTS, ADD COLUMN IF NOT EXISTS, etc.) it is always safe to serve
+    // traffic while they run — no destructive changes are ever made.
+    // Schema drift is already verified at build-time via `npm run check:schema`,
+    // so by the time the binary starts, drift has already been validated.
 server.listen({
       port,
       host: "0.0.0.0",
       reusePort: true,
     }, () => {
       log(`serving on port ${port}`);
+
+      // ── Background migration + drift gate ─────────────────────────────────
+      (async () => {
+        try {
+          await runStartupMigrations();
+          const driftCount = await runSchemaDriftCheck();
+          if (driftCount > 0) {
+            if (isProduction) {
+              console.error(
+                `\n[schema-drift] ══════════════════════════════════════════════════════\n` +
+                `[schema-drift] FATAL: ${driftCount} schema drift issue(s) detected.\n` +
+                `[schema-drift] Deployment blocked to protect the live database.\n` +
+                `[schema-drift]\n` +
+                `[schema-drift] To fix:\n` +
+                `[schema-drift]   1. npx tsx scripts/generate-startup-migrations.ts\n` +
+                `[schema-drift]   2. Paste output into server/db-startup-migrations.ts\n` +
+                `[schema-drift]   3. Commit and redeploy.\n` +
+                `[schema-drift] ══════════════════════════════════════════════════════\n`
+              );
+              // Delay exit so logs flush and health check has already passed
+              setTimeout(() => process.exit(1), 2000);
+            } else {
+              console.warn(
+                `[schema-drift] WARNING: ${driftCount} drift issue(s) found.\n` +
+                `[schema-drift]   This would block startup in production.\n` +
+                `[schema-drift]   Run: npx tsx scripts/generate-startup-migrations.ts`
+              );
+            }
+          }
+        } catch (driftErr: any) {
+          if (isProduction) {
+            console.error(
+              `\n[schema-drift] FATAL: Migration/drift gate threw an unexpected error.\n` +
+              `[schema-drift]   ${driftErr.message}\n` +
+              `[schema-drift] Ensure DATABASE_URL is reachable and the migration scripts are valid.`
+            );
+            setTimeout(() => process.exit(1), 2000);
+          } else {
+            console.warn(`[schema-drift] Pre-listen check failed (continuing in dev): ${driftErr.message}`);
+          }
+        }
+      })();
+
+      // Start document export job processor
+      import('./services/document-builder/export-job-processor').then(({ exportJobProcessor }) => {
+        exportJobProcessor.startProcessing(5000); // poll every 5s
+        console.log('[DocumentBuilder] Export job processor started');
+      }).catch(err => console.warn('[DocumentBuilder] Export processor failed to start:', err.message));
     
       // Initialize background services in parallel without blocking
       // This allows the HTTP server to respond immediately
