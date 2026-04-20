@@ -232,6 +232,10 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
   const ALL_COLUMN_KEYS = LEASE_EXPORT_COLUMNS.map(c => c.key) as LeaseExportColumnKey[];
 
   const SESSION_KEY = 'leaseExportColumns';
+  const PRESETS_KEY = 'leaseExportPresets';
+
+  type ExportPreset = { name: string; columns: LeaseExportColumnKey[] };
+
   const loadSavedColumns = (): Set<LeaseExportColumnKey> => {
     try {
       const raw = localStorage.getItem(SESSION_KEY);
@@ -248,9 +252,22 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
     return new Set(ALL_COLUMN_KEYS);
   };
 
+  const loadSavedPresets = (): ExportPreset[] => {
+    try {
+      const raw = localStorage.getItem(PRESETS_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch {}
+    return [];
+  };
+
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [exportDialogFormat, setExportDialogFormat] = useState<'xlsx' | 'csv'>('xlsx');
   const [selectedExportColumns, setSelectedExportColumns] = useState<Set<LeaseExportColumnKey>>(loadSavedColumns);
+  const [exportPresets, setExportPresets] = useState<ExportPreset[]>(loadSavedPresets);
+  const [presetNameInput, setPresetNameInput] = useState('');
 
   const toggleExportColumn = (key: LeaseExportColumnKey) => {
     setSelectedExportColumns(prev => {
@@ -264,6 +281,34 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
       localStorage.setItem(SESSION_KEY, JSON.stringify(Array.from(next)));
       return next;
     });
+  };
+
+  const saveExportPreset = () => {
+    const name = presetNameInput.trim();
+    if (!name) return;
+    const preset: ExportPreset = { name, columns: Array.from(selectedExportColumns) };
+    const updated = [...exportPresets.filter(p => p.name !== name), preset];
+    setExportPresets(updated);
+    localStorage.setItem(PRESETS_KEY, JSON.stringify(updated));
+    setPresetNameInput('');
+  };
+
+  const applyExportPreset = (name: string) => {
+    const preset = exportPresets.find(p => p.name === name);
+    if (!preset) return;
+    const valid = preset.columns.filter((k): k is LeaseExportColumnKey =>
+      ALL_COLUMN_KEYS.includes(k as LeaseExportColumnKey)
+    );
+    if (valid.length === 0) return;
+    const next = new Set(valid);
+    setSelectedExportColumns(next);
+    localStorage.setItem(SESSION_KEY, JSON.stringify(Array.from(next)));
+  };
+
+  const deleteExportPreset = (name: string) => {
+    const updated = exportPresets.filter(p => p.name !== name);
+    setExportPresets(updated);
+    localStorage.setItem(PRESETS_KEY, JSON.stringify(updated));
   };
 
   const openExportDialog = (format: 'xlsx' | 'csv') => {
@@ -2624,7 +2669,7 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
 
       {/* Lease Income Export Column Picker */}
       <Dialog open={exportDialogOpen} onOpenChange={setExportDialogOpen}>
-        <DialogContent className="sm:max-w-sm">
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Settings2 className="h-4 w-4" />
@@ -2634,6 +2679,39 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
           <p className="text-sm text-muted-foreground -mt-1">
             Select the columns to include in the {exportDialogFormat === 'xlsx' ? 'Excel' : 'CSV'} export. At least one column must remain selected.
           </p>
+
+          {/* Preset load row */}
+          {exportPresets.length > 0 && (
+            <div className="flex items-center gap-2">
+              <Label className="text-xs text-muted-foreground shrink-0">Load preset:</Label>
+              <Select onValueChange={applyExportPreset}>
+                <SelectTrigger className="h-8 text-sm flex-1">
+                  <SelectValue placeholder="Choose a preset…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {exportPresets.map(p => (
+                    <SelectItem key={p.name} value={p.name}>
+                      {p.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select onValueChange={deleteExportPreset}>
+                <SelectTrigger className="h-8 text-sm w-auto px-2">
+                  <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
+                </SelectTrigger>
+                <SelectContent>
+                  <p className="px-2 py-1 text-xs text-muted-foreground">Delete preset:</p>
+                  {exportPresets.map(p => (
+                    <SelectItem key={p.name} value={p.name} className="text-destructive">
+                      {p.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-3 py-2">
             {LEASE_EXPORT_COLUMNS.map(col => (
               <label
@@ -2649,6 +2727,27 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
               </label>
             ))}
           </div>
+
+          {/* Save preset row */}
+          <div className="flex items-center gap-2 pt-1 border-t">
+            <Input
+              value={presetNameInput}
+              onChange={e => setPresetNameInput(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && saveExportPreset()}
+              placeholder="Name this preset…"
+              className="h-8 text-sm flex-1"
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={saveExportPreset}
+              disabled={!presetNameInput.trim()}
+            >
+              <Plus className="h-3.5 w-3.5 mr-1" />
+              Save
+            </Button>
+          </div>
+
           <DialogFooter className="flex items-center gap-2 pt-2">
             <Button
               variant="ghost"
