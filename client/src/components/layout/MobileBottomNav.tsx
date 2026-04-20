@@ -273,7 +273,7 @@ function MobileTopHeader({ onOpenMore }: { onOpenMore: () => void }) {
         <div className="flex items-center gap-0.5">
           <button
             onClick={() => setLocation("/crm")}
-            className="relative flex items-center justify-center rounded-lg hover:bg-sidebar-accent transition-colors touch-manipulation"
+            className="relative flex items-center justify-center rounded-lg hover:bg-sidebar-accent active:bg-sidebar-accent/70 transition-colors touch-manipulation"
             style={{ minWidth: 44, minHeight: 44 }}
             aria-label="Notifications"
           >
@@ -288,7 +288,7 @@ function MobileTopHeader({ onOpenMore }: { onOpenMore: () => void }) {
           {/* Avatar — tapping opens the More sheet where UserMenu lives */}
           <button
             onClick={onOpenMore}
-            className="flex items-center justify-center rounded-lg hover:bg-sidebar-accent transition-colors touch-manipulation"
+            className="flex items-center justify-center rounded-lg hover:bg-sidebar-accent active:bg-sidebar-accent/70 transition-colors touch-manipulation"
             style={{ minWidth: 44, minHeight: 44 }}
             aria-label="Account and more options"
           >

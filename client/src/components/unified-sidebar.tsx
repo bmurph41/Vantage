@@ -380,8 +380,6 @@ export default function UnifiedSidebar() {
   ];
 
 
-  const handleNavClick = () => {};
-
   const NavLink = ({ item, depth = 0 }: { item: { name: string; href: string; icon?: any; badge?: string; disabled?: boolean }; depth?: number }) => {
     // Check if current location is a child of this nav item's href
     // Parse both location and href to handle query parameters using wouter's location string
@@ -442,7 +440,6 @@ export default function UnifiedSidebar() {
       <Link 
         key={item.name} 
         href={item.href}
-        onClick={handleNavClick}
         style={!sidebarCollapsed && depth > 0 ? { paddingLeft: `${16 + depth * 24}px` } : undefined}
         className={cn(
           "flex items-center min-w-0 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
