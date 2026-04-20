@@ -162,6 +162,10 @@ interface DCFAnalysis {
     totalBaseRentAnnual: number;
     totalRecoveryAnnual: number;
     weightedAvgEscalationRate: number;
+    /** EGI from currently-active leases only (lease_start_date <= today) */
+    inPlaceEGIAnnual?: number;
+    /** EGI from current + pre-leased (future) leases — "stabilized" figure for underwriting */
+    stabilizedEGIAnnual?: number;
   };
   yearlyLeaseIncome?: YearlyLeaseIncome[];
   years?: Array<{
@@ -2098,7 +2102,7 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
               })()}
 
               {/* Summary KPIs */}
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
                 <Card>
                   <CardContent className="pt-6">
                     <p className="text-sm text-muted-foreground">Annual Base Rent</p>
@@ -2113,11 +2117,46 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
                     <p className="text-xs text-muted-foreground mt-1">CAM, taxes, insurance</p>
                   </CardContent>
                 </Card>
-                <Card>
+                <Card className="border-violet-200 dark:border-violet-800">
                   <CardContent className="pt-6">
-                    <p className="text-sm text-muted-foreground">Total EGI</p>
-                    <p className="text-2xl font-bold">{formatCurrency(leaseIncomeData.totalEGIAnnual)}</p>
-                    <p className="text-xs text-muted-foreground mt-1">Effective gross income</p>
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <p className="text-sm text-muted-foreground">In-Place EGI</p>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="max-w-xs text-xs">
+                            EGI from currently-active leases only — leases where the commencement date is on or before today.
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
+                    <p className="text-2xl font-bold text-violet-600 dark:text-violet-400">
+                      {formatCurrency(leaseIncomeData.inPlaceEGIAnnual ?? leaseIncomeData.totalEGIAnnual)}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">Current leases only</p>
+                  </CardContent>
+                </Card>
+                <Card className="border-indigo-200 dark:border-indigo-800">
+                  <CardContent className="pt-6">
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <p className="text-sm text-muted-foreground">Stabilized EGI</p>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="max-w-xs text-xs">
+                            Includes pre-leased space not yet commenced — current leases plus signed future leases, representing stabilized occupancy.
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
+                    <p className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">
+                      {formatCurrency(leaseIncomeData.stabilizedEGIAnnual ?? leaseIncomeData.totalEGIAnnual)}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">Incl. pre-leased space</p>
                   </CardContent>
                 </Card>
                 <Card>
