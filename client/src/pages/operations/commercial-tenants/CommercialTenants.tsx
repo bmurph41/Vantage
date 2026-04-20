@@ -78,6 +78,13 @@ const formatDate = (value: string | null | undefined) => {
   }
 };
 
+const getTodayDateStr = () => new Date().toISOString().slice(0, 10);
+
+const isPreLeased = (commencementDate: string | null | undefined): boolean => {
+  if (!commencementDate) return false;
+  return commencementDate.slice(0, 10) > getTodayDateStr();
+};
+
 const getStatusBadge = (status: string) => {
   const variants: Record<string, { variant: "default" | "secondary" | "destructive" | "outline"; label: string }> = {
     active: { variant: "default", label: "Active" },
@@ -219,7 +226,7 @@ export default function CommercialTenants() {
       </div>
 
       {summary && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4" data-tour="tenants-analytics">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4" data-tour="tenants-analytics">
           <Card>
             <CardContent className="pt-4">
               <div className="flex items-center gap-2">
@@ -264,6 +271,21 @@ export default function CommercialTenants() {
                 <span className="text-sm text-muted-foreground">Expiring 90d</span>
               </div>
               <div className="text-2xl font-bold text-orange-600">{summary.expiringWithin90Days || 0}</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-4">
+              <div className="flex items-center gap-2">
+                <CalendarDays className="h-4 w-4 text-blue-500" />
+                <span className="text-sm text-muted-foreground">Pre-Leased SF</span>
+              </div>
+              <div className="text-2xl font-bold text-blue-600">
+                {(tenants?.filter(t => isPreLeased(t.leaseCommencementDate))
+                  .reduce((sum, t) => sum + (t.squareFootage ? parseFloat(t.squareFootage) : 0), 0) || 0).toLocaleString()}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                {tenants?.filter(t => isPreLeased(t.leaseCommencementDate)).length || 0} future tenant(s)
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -371,7 +393,16 @@ export default function CommercialTenants() {
                         {getExpirationWarning(tenant.leaseExpirationDate)}
                       </div>
                     </TableCell>
-                    <TableCell>{getStatusBadge(tenant.tenantStatus)}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1.5">
+                        {getStatusBadge(tenant.tenantStatus)}
+                        {isPreLeased(tenant.leaseCommencementDate) && (
+                          <Badge className="bg-blue-100 text-blue-700 border-blue-300 hover:bg-blue-100">
+                            Pre-Leased
+                          </Badge>
+                        )}
+                      </div>
+                    </TableCell>
                     <TableCell onClick={(e) => e.stopPropagation()}>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>

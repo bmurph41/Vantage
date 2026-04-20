@@ -77,6 +77,13 @@ const formatDate = (value: string | null | undefined) => {
   }
 };
 
+const getTodayDateStr = () => new Date().toISOString().slice(0, 10);
+
+const isPreLeased = (startDate: string | null | undefined): boolean => {
+  if (!startDate) return false;
+  return startDate.slice(0, 10) > getTodayDateStr();
+};
+
 const getLeaseTypeBadge = (type: string) => {
   const labels: Record<string, string> = {
     retail: "Retail",
@@ -337,9 +344,16 @@ export function UnifiedLeaseList({
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge variant={lease.active ? "default" : "secondary"}>
-                          {lease.active ? "Active" : "Inactive"}
-                        </Badge>
+                        <div className="flex items-center gap-1.5">
+                          <Badge variant={lease.active ? "default" : "secondary"}>
+                            {lease.active ? "Active" : "Inactive"}
+                          </Badge>
+                          {isPreLeased(lease.leaseStartDate) && (
+                            <Badge className="bg-blue-100 text-blue-700 border-blue-300 hover:bg-blue-100">
+                              Pre-Leased
+                            </Badge>
+                          )}
+                        </div>
                       </TableCell>
                       {mode === "valuator" && (
                         <TableCell>

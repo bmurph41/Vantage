@@ -802,9 +802,16 @@ export default function LeasesTable({ onEditLease, locationId }: LeasesTableProp
           !!(lease.slipStatus && lease.slipStatus !== ""),
         ];
         const completenessScore = completenessChecks.filter(Boolean).length * 20;
+        const todayStr = new Date().toISOString().slice(0, 10);
+        const isFutureLease = lease.leaseCommencement && lease.leaseCommencement.slice(0, 10) > todayStr;
         return (
           <div className="flex items-center gap-2">
             <span className="font-medium">{tenant.name || "N/A"}</span>
+            {isFutureLease && (
+              <span className="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold bg-blue-100 text-blue-700">
+                Pre-Leased
+              </span>
+            )}
             <ImportedDataBadge
               integrationSource={lease.integrationSource || tenant.integrationSource}
               externalId={lease.externalId || tenant.externalId}
