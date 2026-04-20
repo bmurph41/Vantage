@@ -816,3 +816,232 @@ describe('computeQuickIRR — delegates to performDCFAnalysis and returns identi
     expect(quickNull.irr).toBeCloseTo(quickFalse.irr, 6);
   });
 });
+
+// ─── computeLeaseIncomeByYear — free-rent concession logic ────────────────────
+//
+// Tests verifying that the freeRentReduction path is correct:
+//   - months before rentCommencementDate earn $0 rent
+//   - freeRentReduction equals the dollar value of the concession window
+//   - SCHEDULE leases honour free-rent even when a step is active
+//   - free-rent windows spanning more than one projection year are handled year by year
+//   - null rentCommencementDate (no free-rent) leaves freeRentReduction at 0
+
+describe('computeLeaseIncomeByYear — free-rent concessions', () => {
+  const acquisitionDate = '2024-01-01';
+
+  // Helper: a plain PERCENT/NONE lease with predictable $1 000/month rent,
+  // used so tests can focus on the free-rent logic without SCHEDULE complexity.
+  function makePlainLease(overrides: Partial<LeaseBreakdownEntry> = {}): LeaseBreakdownEntry {
+    return {
+      leaseId: 'free-rent-lease',
+      tenantName: 'Free Rent Tenant',
+      sf: 1000,
+      leaseType: 'NNN',
+      baseRentAnnual: 12000,   // $1 000/month
+      recoveryAnnual: 0,
+      escalationType: 'NONE',
+      escalationRate: 0,
+      leaseStartDate: '2024-01-01',
+      leaseEndDate: '2030-01-01',
+      rentCommencementDate: '2024-01-01', // no free rent by default
+      freeRentMonths: 0,
+      scheduleJson: null,
+      ...overrides,
+    };
+  }
+
+  // ── 1. Basic 3-month free-rent window ─────────────────────────────────────
+
+  describe('3-month free-rent at lease start', () => {
+    // Lease starts Jan 1, rent commences Apr 1 → Jan / Feb / Mar are rent-free.
+    const lease = makePlainLease({
+      leaseStartDate: '2024-01-01',
+      rentCommencementDate: '2024-04-01',
+      freeRentMonths: 3,
+    });
+
+    it('Year 1 baseRentAnnual reflects only the 9 paying months ($9 000)', () => {
+      const result = computeLeaseIncomeByYear([lease], 1, acquisitionDate);
+      // Jan–Mar: free; Apr–Dec: 9 × $1 000 = $9 000
+      expect(result[0].baseRentAnnual).toBe(9000);
+    });
+
+    it('Year 1 leaseDetail freeRentReduction equals the 3 free months ($3 000)', () => {
+      const result = computeLeaseIncomeByYear([lease], 1, acquisitionDate);
+      expect(result[0].leaseDetail[0].freeRentReduction).toBe(3000);
+    });
+
+    it('Year 2 has no free-rent reduction (commencement is in Year 1)', () => {
+      const result = computeLeaseIncomeByYear([lease], 2, acquisitionDate);
+      expect(result[1].leaseDetail[0].freeRentReduction).toBe(0);
+      // Year 2 earns full 12 months × $1 000 = $12 000
+      expect(result[1].baseRentAnnual).toBe(12000);
+    });
+
+    it('baseRentAnnual + freeRentReduction equals full-year rent ($12 000) in Year 1', () => {
+      const result = computeLeaseIncomeByYear([lease], 1, acquisitionDate);
+      const detail = result[0].leaseDetail[0];
+      expect(detail.baseRent + detail.freeRentReduction).toBe(12000);
+    });
+  });
+
+  // ── 2. No free-rent (rentCommencementDate === leaseStartDate) ──────────────
+
+  describe('no free-rent period when commencement equals lease start', () => {
+    const lease = makePlainLease({
+      leaseStartDate: '2024-01-01',
+      rentCommencementDate: '2024-01-01',
+      freeRentMonths: 0,
+    });
+
+    it('freeRentReduction is 0 in Year 1', () => {
+      const result = computeLeaseIncomeByYear([lease], 1, acquisitionDate);
+      expect(result[0].leaseDetail[0].freeRentReduction).toBe(0);
+    });
+
+    it('full year rent ($12 000) collected in Year 1', () => {
+      const result = computeLeaseIncomeByYear([lease], 1, acquisitionDate);
+      expect(result[0].baseRentAnnual).toBe(12000);
+    });
+  });
+
+  // ── 3. null rentCommencementDate falls back to leaseStartDate → no free-rent
+
+  describe('null rentCommencementDate', () => {
+    const lease = makePlainLease({
+      leaseStartDate: '2024-01-01',
+      rentCommencementDate: null,   // should fall back to leaseStartDate
+      freeRentMonths: 0,
+    });
+
+    it('freeRentReduction is 0 when rentCommencementDate is null', () => {
+      const result = computeLeaseIncomeByYear([lease], 1, acquisitionDate);
+      expect(result[0].leaseDetail[0].freeRentReduction).toBe(0);
+    });
+
+    it('collects full year rent ($12 000) when rentCommencementDate is null', () => {
+      const result = computeLeaseIncomeByYear([lease], 1, acquisitionDate);
+      expect(result[0].baseRentAnnual).toBe(12000);
+    });
+  });
+
+  // ── 4. SCHEDULE-type lease: free-rent overrides active step ───────────────
+  // A step that is already active during the free-rent window must not generate
+  // rent — the isFreePeriod guard must fire even when escalatedMonthlyRent > 0.
+
+  describe('SCHEDULE-type lease during free-rent window', () => {
+    const steps: RentStepEntry[] = [
+      // Step active from Jan 1, 2024 — falls entirely within the free-rent window
+      { effectiveDate: '2024-01-01', value: 2000, unit: 'PER_MONTH' },  // $24 000/yr
+    ];
+    const lease = makeScheduleLease({
+      leaseStartDate: '2024-01-01',
+      rentCommencementDate: '2024-04-01',   // 3 months free
+      freeRentMonths: 3,
+      baseRentAnnual: 24000,                 // fallback (unused since step covers whole year)
+      scheduleJson: steps,
+    });
+
+    it('Year 1 earns only the 9 paying months at the step rate ($18 000)', () => {
+      const result = computeLeaseIncomeByYear([lease], 1, acquisitionDate);
+      // Jan–Mar: step at $2 000/mo but free; Apr–Dec: 9 × $2 000 = $18 000
+      expect(result[0].baseRentAnnual).toBe(18000);
+    });
+
+    it('freeRentReduction equals 3 free months at the active step rate ($6 000)', () => {
+      const result = computeLeaseIncomeByYear([lease], 1, acquisitionDate);
+      expect(result[0].leaseDetail[0].freeRentReduction).toBe(6000);
+    });
+
+    it('baseRent + freeRentReduction equals full-year step rent ($24 000)', () => {
+      const result = computeLeaseIncomeByYear([lease], 1, acquisitionDate);
+      const detail = result[0].leaseDetail[0];
+      expect(detail.baseRent + detail.freeRentReduction).toBe(24000);
+    });
+
+    it('Year 2 has zero free-rent reduction (commencement already passed)', () => {
+      const result = computeLeaseIncomeByYear([lease], 2, acquisitionDate);
+      expect(result[1].leaseDetail[0].freeRentReduction).toBe(0);
+    });
+  });
+
+  // ── 5. Free-rent window spanning two projection years ─────────────────────
+  // rentCommencementDate = 2025-04-01 (15 months after leaseStartDate)
+  //   Year 1 (Jan–Dec 2024): entirely free   → netBaseRent = $0, freeRentReduction = $12 000
+  //   Year 2 (Jan–Dec 2025): Jan/Feb/Mar free, Apr–Dec paying
+  //                          → netBaseRent = $9 000, freeRentReduction = $3 000
+
+  describe('free-rent period spanning two projection years', () => {
+    const lease = makePlainLease({
+      leaseStartDate: '2024-01-01',
+      rentCommencementDate: '2025-04-01',   // 15 months of free rent
+      freeRentMonths: 15,
+    });
+
+    it('Year 1 collects $0 rent (all 12 months are inside the free-rent window)', () => {
+      const result = computeLeaseIncomeByYear([lease], 2, acquisitionDate);
+      expect(result[0].baseRentAnnual).toBe(0);
+    });
+
+    it('Year 1 freeRentReduction equals a full year of rent ($12 000)', () => {
+      const result = computeLeaseIncomeByYear([lease], 2, acquisitionDate);
+      expect(result[0].leaseDetail[0].freeRentReduction).toBe(12000);
+    });
+
+    it('Year 2 collects 9 months of rent ($9 000, Jan–Mar still free)', () => {
+      const result = computeLeaseIncomeByYear([lease], 2, acquisitionDate);
+      expect(result[1].baseRentAnnual).toBe(9000);
+    });
+
+    it('Year 2 freeRentReduction equals the 3 remaining free months ($3 000)', () => {
+      const result = computeLeaseIncomeByYear([lease], 2, acquisitionDate);
+      expect(result[1].leaseDetail[0].freeRentReduction).toBe(3000);
+    });
+
+    it('Year 3 has no free-rent reduction (commencement is in Year 2)', () => {
+      const result = computeLeaseIncomeByYear([lease], 3, acquisitionDate);
+      expect(result[2].leaseDetail[0].freeRentReduction).toBe(0);
+      expect(result[2].baseRentAnnual).toBe(12000);
+    });
+  });
+
+  // ── 6. SCHEDULE-type lease with free-rent spanning multiple years ──────────
+
+  describe('SCHEDULE-type lease with free-rent spanning Year 1 and Year 2', () => {
+    const steps: RentStepEntry[] = [
+      { effectiveDate: '2024-01-01', value: 1000, unit: 'PER_MONTH' },  // $12 000/yr
+      { effectiveDate: '2025-01-01', value: 1500, unit: 'PER_MONTH' },  // $18 000/yr
+    ];
+    // Free-rent: Jan 2024 – Mar 2025 (15 months)
+    // Year 1: all months at $1 000/mo → freeRentReduction = $12 000, netBaseRent = $0
+    // Year 2: Jan $1 500, Feb $1 500, Mar $1 500 (free); Apr–Dec at $1 500 = 9 × $1 500 = $13 500
+    //         freeRentReduction = 3 × $1 500 = $4 500
+    const lease = makeScheduleLease({
+      leaseStartDate: '2024-01-01',
+      rentCommencementDate: '2025-04-01',
+      freeRentMonths: 15,
+      baseRentAnnual: 12000,
+      scheduleJson: steps,
+    });
+
+    it('Year 1 collects $0 rent (all months are inside free-rent window)', () => {
+      const result = computeLeaseIncomeByYear([lease], 2, acquisitionDate);
+      expect(result[0].baseRentAnnual).toBe(0);
+    });
+
+    it('Year 1 freeRentReduction equals 12 months × step-1 rate ($12 000)', () => {
+      const result = computeLeaseIncomeByYear([lease], 2, acquisitionDate);
+      expect(result[0].leaseDetail[0].freeRentReduction).toBe(12000);
+    });
+
+    it('Year 2 collects 9 paying months at step-2 rate ($13 500)', () => {
+      const result = computeLeaseIncomeByYear([lease], 2, acquisitionDate);
+      expect(result[1].baseRentAnnual).toBe(13500);
+    });
+
+    it('Year 2 freeRentReduction equals 3 months × step-2 rate ($4 500)', () => {
+      const result = computeLeaseIncomeByYear([lease], 2, acquisitionDate);
+      expect(result[1].leaseDetail[0].freeRentReduction).toBe(4500);
+    });
+  });
+});
