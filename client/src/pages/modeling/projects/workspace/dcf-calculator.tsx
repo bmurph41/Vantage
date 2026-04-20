@@ -296,28 +296,35 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
     const name = presetNameInput.trim();
     if (!name) return;
     const preset: ExportPreset = { name, columns: Array.from(selectedExportColumns) };
-    const updated = [...exportPresets.filter(p => p.name !== name), preset];
-    setExportPresets(updated);
-    localStorage.setItem(PRESETS_KEY, JSON.stringify(updated));
+    setExportPresets(prev => {
+      const updated = [...prev.filter(p => p.name !== name), preset];
+      localStorage.setItem(PRESETS_KEY, JSON.stringify(updated));
+      return updated;
+    });
     setPresetNameInput('');
   };
 
   const applyExportPreset = (name: string) => {
-    const preset = exportPresets.find(p => p.name === name);
-    if (!preset) return;
-    const valid = preset.columns.filter((k): k is LeaseExportColumnKey =>
-      ALL_COLUMN_KEYS.includes(k as LeaseExportColumnKey)
-    );
-    if (valid.length === 0) return;
-    const next = new Set(valid);
-    setSelectedExportColumns(next);
-    localStorage.setItem(SESSION_KEY, JSON.stringify(Array.from(next)));
+    setExportPresets(prev => {
+      const preset = prev.find(p => p.name === name);
+      if (!preset) return prev;
+      const valid = preset.columns.filter((k): k is LeaseExportColumnKey =>
+        ALL_COLUMN_KEYS.includes(k as LeaseExportColumnKey)
+      );
+      if (valid.length === 0) return prev;
+      const next = new Set(valid);
+      setSelectedExportColumns(next);
+      localStorage.setItem(SESSION_KEY, JSON.stringify(Array.from(next)));
+      return prev;
+    });
   };
 
   const deleteExportPreset = (name: string) => {
-    const updated = exportPresets.filter(p => p.name !== name);
-    setExportPresets(updated);
-    localStorage.setItem(PRESETS_KEY, JSON.stringify(updated));
+    setExportPresets(prev => {
+      const updated = prev.filter(p => p.name !== name);
+      localStorage.setItem(PRESETS_KEY, JSON.stringify(updated));
+      return updated;
+    });
   };
 
   const openExportDialog = (format: 'xlsx' | 'csv') => {
