@@ -119,7 +119,7 @@ export function DashboardPersonaHeader() {
           </div>
 
           {data.metrics.length > 0 && (
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3" data-testid="header-metrics">
+            <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-8 gap-2 sm:gap-3" data-testid="header-metrics">
               {data.metrics.map((metric, idx) => {
                 const IconComponent = metric.icon ? iconMap[metric.icon] : null;
                 const textColor = metric.color ? colorMap[metric.color] : "text-foreground";

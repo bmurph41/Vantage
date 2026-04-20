@@ -1703,8 +1703,8 @@ export default function Dashboard() {
             </p>
           </div>
           <div className="flex flex-row items-center gap-2 sm:gap-3">
-            {/* Desktop-only controls — hidden on mobile where FAB handles quick actions */}
-            <div className="hidden sm:flex items-center gap-2 sm:gap-3">
+            {/* Desktop-only controls — hidden on mobile (<md) where FAB handles quick actions */}
+            <div className="hidden md:flex items-center gap-2 md:gap-3">
               <ExportMenu 
                 timeRange={timeRange}
                 selectedModules={selectedModules}
