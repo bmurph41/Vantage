@@ -177,7 +177,6 @@ export default function UnifiedSidebar() {
   const [expandedSubcats, setExpandedSubcats] = useState<Set<string>>(new Set()); // all start collapsed
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedEntity, setSelectedEntity] = useState<{type: 'contact' | 'company' | 'deal', id: string} | null>(null);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { simplifiedMode } = useDisplayMode();
   const { selectedAssetId: selectedOpsAssetId, setSelectedAsset: setSelectedOpsAsset } = useOpsAssetStore();
   
@@ -382,7 +381,7 @@ export default function UnifiedSidebar() {
 
 
   const handleNavClick = () => {
-    setMobileMenuOpen(false);
+    // Navigation click handler (sidebar is desktop-only; MobileShell handles mobile nav)
   };
 
   const NavLink = ({ item, depth = 0 }: { item: { name: string; href: string; icon?: any; badge?: string; disabled?: boolean }; depth?: number }) => {
@@ -602,16 +601,7 @@ export default function UnifiedSidebar() {
       <>
         {/* Mobile header bar replaced by MobileTopHeader in Router.tsx (md:hidden) */}
 
-        {/* Mobile Overlay */}
-        {mobileMenuOpen && (
-          <div
-            className="fixed inset-0 bg-black/50 z-40 md:hidden transition-opacity backdrop-blur-sm"
-            onClick={() => setMobileMenuOpen(false)}
-            data-testid="mobile-menu-overlay"
-          />
-        )}
-
-        {/* Sidebar */}
+        {/* Sidebar — hidden on mobile (bottom tab bar is the primary mobile nav) */}
         <div
           className={cn(
             "bg-sidebar text-sidebar-foreground shadow-lg flex-shrink-0 flex flex-col h-screen",
@@ -619,9 +609,8 @@ export default function UnifiedSidebar() {
             // so it stays readable when the upgrade modal is open
             "fixed md:relative top-0 left-0 z-50 md:z-[70]",
             "transition-all duration-300 ease-in-out",
-            "md:translate-x-0",
-            mobileMenuOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0",
-            // On mobile, always show full-width sidebar (never collapsed icon mode)
+            // Always hidden on mobile; always visible on md+
+            "-translate-x-full md:translate-x-0",
             sidebarCollapsed ? "w-64 md:w-16" : "w-64"
           )}
           data-testid="unified-sidebar"
@@ -637,17 +626,6 @@ export default function UnifiedSidebar() {
                   {!sidebarCollapsed && <h1 className="text-lg font-bold text-sidebar-foreground truncate">Vantage</h1>}
                 </div>
               </Link>
-              {/* Mobile Close Button */}
-              {!sidebarCollapsed && (
-                <button
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="md:hidden text-sidebar-foreground/70 hover:text-sidebar-foreground transition-colors"
-                  data-testid="button-close-mobile-menu"
-                  aria-label="Close menu"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              )}
             </div>
             {/* Command Palette Trigger */}
             {!sidebarCollapsed ? (
