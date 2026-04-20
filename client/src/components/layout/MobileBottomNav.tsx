@@ -13,8 +13,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { UserMenu } from "@/components/layout/UserMenu";
 
 type BootstrapData = {
-  persona: any;
-  features: any[];
+  persona: { primaryPersona?: string; secondaryPersona?: string } | null;
+  features: string[];
   activePacks: string[];
   pendingCounts: {
     properties: number;
@@ -150,7 +150,8 @@ function MoreSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
             <SheetTitle className="text-base font-semibold">More</SheetTitle>
             <button
               onClick={onClose}
-              className="p-2 rounded-lg hover:bg-accent transition-colors touch-manipulation"
+              className="flex items-center justify-center rounded-lg hover:bg-accent transition-colors touch-manipulation"
+              style={{ minWidth: 44, minHeight: 44 }}
               aria-label="Close"
             >
               <X className="w-4 h-4 text-muted-foreground" />
@@ -241,7 +242,7 @@ function MoreSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
 }
 
 function MobileTopHeader({ onOpenMore }: { onOpenMore: () => void }) {
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
   const { user } = useAuth();
   const pageTitle = usePageTitle(location);
 
@@ -271,6 +272,7 @@ function MobileTopHeader({ onOpenMore }: { onOpenMore: () => void }) {
         {/* Right: notification bell + avatar */}
         <div className="flex items-center gap-0.5">
           <button
+            onClick={() => setLocation("/crm")}
             className="relative flex items-center justify-center rounded-lg hover:bg-sidebar-accent transition-colors touch-manipulation"
             style={{ minWidth: 44, minHeight: 44 }}
             aria-label="Notifications"
