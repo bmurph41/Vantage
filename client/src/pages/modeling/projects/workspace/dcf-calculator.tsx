@@ -1848,6 +1848,84 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
                 </CardContent>
               </Card>
 
+              {/* Major Tenant Expiry Risk Alert — computed from leaseBreakdown, no DCF required */}
+              {(() => {
+                const acquisitionDateStr = dcfAnalysis?.meta?.acquisitionDate;
+                if (!acquisitionDateStr || !leaseIncomeData?.leaseBreakdown?.length) return null;
+                const holdStart = new Date(acquisitionDateStr);
+                const holdPeriod = liveInputs.holdPeriod ?? dcfAnalysis?.holdPeriodYears ?? 5;
+                const holdEnd = new Date(acquisitionDateStr);
+                holdEnd.setFullYear(holdEnd.getFullYear() + holdPeriod);
+                const breakdown = leaseIncomeData.leaseBreakdown as LeaseBreakdownItem[];
+                const totalEGI = leaseIncomeData.totalEGIAnnual as number;
+                const EGI_THRESHOLD = 0.15;
+                const majorAtRisk = breakdown.filter((lease) => {
+                  if (!lease.leaseEndDate) return false;
+                  const endDate = new Date(lease.leaseEndDate);
+                  if (!(endDate > holdStart && endDate < holdEnd)) return false;
+                  const egiShare = totalEGI > 0
+                    ? (lease.baseRentAnnual + lease.recoveryAnnual) / totalEGI
+                    : 0;
+                  return egiShare >= EGI_THRESHOLD;
+                });
+                if (!majorAtRisk.length) return null;
+                return (
+                  <div
+                    className="rounded-lg border border-red-300 bg-red-50 dark:bg-red-950/30 dark:border-red-800 p-4"
+                    data-testid="lease-income-expiry-risk-alert"
+                  >
+                    <div className="flex items-start gap-3">
+                      <AlertCircle className="h-5 w-5 text-red-500 dark:text-red-400 mt-0.5 shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-red-800 dark:text-red-300">
+                          Major tenant{majorAtRisk.length > 1 ? 's' : ''} rolling during hold period
+                        </p>
+                        <p className="text-xs text-red-700 dark:text-red-400 mt-0.5">
+                          {majorAtRisk.length === 1 ? 'This tenant represents' : 'Each of these tenants represents'} a significant share of EGI and
+                          has a lease ending before Year&nbsp;{holdPeriod}. Model a vacancy or downside scenario to stress-test returns.
+                        </p>
+                        <div className="mt-3 flex flex-col gap-1.5">
+                          {majorAtRisk.map((lease) => {
+                            const egi = lease.baseRentAnnual + lease.recoveryAnnual;
+                            const egiPct = totalEGI > 0 ? (egi / totalEGI) * 100 : null;
+                            const expiryDate = lease.leaseEndDate ? new Date(lease.leaseEndDate) : null;
+                            const expiryLabel = expiryDate
+                              ? expiryDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+                              : '—';
+                            return (
+                              <div
+                                key={lease.leaseId}
+                                className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs"
+                              >
+                                <span className="font-semibold text-red-900 dark:text-red-200">
+                                  {lease.tenantName}
+                                </span>
+                                <Badge
+                                  variant="outline"
+                                  className="text-[10px] px-1.5 py-0 h-4 border-red-400 dark:border-red-700 text-red-700 dark:text-red-300"
+                                >
+                                  Expires {expiryLabel}
+                                </Badge>
+                                {egiPct !== null && (
+                                  <span className="text-red-700 dark:text-red-400 font-medium">
+                                    {egiPct.toFixed(1)}% of EGI
+                                  </span>
+                                )}
+                                {egi > 0 && (
+                                  <span className="text-red-600 dark:text-red-500">
+                                    ({formatCurrency(egi)}/yr)
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
               {/* Mid-Hold Lease Expiry Warning */}
               {(() => {
                 const acquisitionDateStr = dcfAnalysis?.meta?.acquisitionDate;
