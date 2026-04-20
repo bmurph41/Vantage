@@ -1,7 +1,7 @@
 // PropertyRecordTabs.tsx — Sales Comps, Rate Comps, Market Intel, Activities, Leases tabs
 
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useLocation } from 'wouter';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -52,7 +52,7 @@ function fmtDate(d: string | null | undefined): string {
 function fmtLabel(str: string): string {
   return str.split(/[_-]/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 }
-function EmptyState({ icon: Icon, title, subtitle, action }: { icon: any; title: string; subtitle?: string; action?: { label: string; href: string } }) {
+function EmptyState({ icon: Icon, title, subtitle, action, actionNode }: { icon: any; title: string; subtitle?: string; action?: { label: string; href: string }; actionNode?: ReactNode }) {
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center">
       <div className="rounded-full bg-gray-100 p-4 mb-4"><Icon className="h-8 w-8 text-gray-400" /></div>
@@ -64,6 +64,7 @@ function EmptyState({ icon: Icon, title, subtitle, action }: { icon: any; title:
           {action.label} →
         </a>
       )}
+      {actionNode && <div className="mt-4">{actionNode}</div>}
     </div>
   );
 }
@@ -2293,6 +2294,15 @@ export function PropertyLeasesTab({ propertyId }: { propertyId: string }) {
           icon={Building2}
           title="No leases on record"
           subtitle="Lease data will appear here once leases are added for this property."
+          actionNode={
+            <Button
+              size="sm"
+              onClick={() => setAddSheetOpen(true)}
+              className="gap-1.5"
+            >
+              <Plus className="h-4 w-4" /> Add Lease
+            </Button>
+          }
         />
       )}
 
