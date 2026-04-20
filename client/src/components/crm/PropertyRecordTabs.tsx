@@ -947,6 +947,9 @@ function LeaseDetailSheet({ leaseId, propertyId, open, onClose }: { leaseId: str
   const [editTerm, setEditTerm] = useState<RentTermFormState | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
 
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
   const [addingTerm, setAddingTerm] = useState(false);
   const [newTerm, setNewTerm] = useState<NewTermForm>(BLANK_TERM);
   const [editingTermId, setEditingTermId] = useState<string | null>(null);
@@ -991,6 +994,7 @@ function LeaseDetailSheet({ leaseId, propertyId, open, onClose }: { leaseId: str
       escalationCycleMonths: term0?.escalationCycleMonths != null ? String(term0.escalationCycleMonths) : '12',
     });
     setSaveError(null);
+    setConfirmingDelete(false);
     setEditing(true);
   }
 
@@ -999,6 +1003,8 @@ function LeaseDetailSheet({ leaseId, propertyId, open, onClose }: { leaseId: str
     setEditForm(null);
     setEditTerm(null);
     setSaveError(null);
+    setConfirmingDelete(false);
+    setDeleteError(null);
   }
 
   const saveMutation = useMutation({
@@ -1041,6 +1047,22 @@ function LeaseDetailSheet({ leaseId, propertyId, open, onClose }: { leaseId: str
     }
     saveMutation.mutate();
   }
+
+  const deleteMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest('DELETE', `/api/commercial-leases/leases/${leaseId}`);
+      if (!res.ok) {
+        const err = await res.json() as { error?: string };
+        throw new Error(err.error || 'Failed to delete lease');
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['property-leases', propertyId] });
+      queryClient.invalidateQueries({ queryKey: ['property-lease-stats', propertyId] });
+      onClose();
+    },
+    onError: (e: Error) => setDeleteError(e.message),
+  });
 
   function invalidateLeaseData() {
     queryClient.invalidateQueries({ queryKey: ['lease-detail', leaseId] });
@@ -1188,10 +1210,48 @@ function LeaseDetailSheet({ leaseId, propertyId, open, onClose }: { leaseId: str
                     </Badge>
                   </SheetDescription>
                 </div>
-                {!editing && (
-                  <Button variant="outline" size="sm" onClick={startEdit} className="shrink-0 h-8 gap-1.5 text-xs">
-                    <Pencil className="h-3 w-3" /> Edit
-                  </Button>
+                {!editing && !confirmingDelete && (
+                  <div className="flex items-center gap-1.5">
+                    <Button variant="outline" size="sm" onClick={startEdit} className="shrink-0 h-8 gap-1.5 text-xs">
+                      <Pencil className="h-3 w-3" /> Edit
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setConfirmingDelete(true)}
+                      className="shrink-0 h-8 gap-1.5 text-xs text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
+                    >
+                      <Trash2 className="h-3 w-3" /> Delete
+                    </Button>
+                  </div>
+                )}
+                {!editing && confirmingDelete && (
+                  <div className="flex flex-col items-end gap-1">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs text-red-600 font-medium">Delete this lease?</span>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => { setDeleteError(null); deleteMutation.mutate(); }}
+                        disabled={deleteMutation.isPending}
+                        className="h-8 text-xs"
+                      >
+                        {deleteMutation.isPending ? 'Deleting…' : 'Confirm'}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => { setConfirmingDelete(false); setDeleteError(null); }}
+                        disabled={deleteMutation.isPending}
+                        className="h-8 text-xs"
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                    {deleteError && (
+                      <p className="text-xs text-red-600">{deleteError}</p>
+                    )}
+                  </div>
                 )}
               </div>
             </SheetHeader>
