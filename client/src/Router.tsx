@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { PageLoader } from "@/components/PageLoader";
 import { PageErrorBoundary } from "@/components/ErrorBoundary";
 import { MobileShell } from "@/components/layout/MobileBottomNav";
+import { DesktopOnlyGate } from "@/components/DesktopOnlyGate";
 
 const Dashboard = lazy(() => import("@/pages/dashboard"));
 const CRMDashboard = lazy(() => import("@/pages/crm-dashboard"));
@@ -785,7 +786,9 @@ function Router() {
       <Route path="/analysis/predictive">
         {() => (
           <GatedLayout pack="analysis">
-            <PredictiveAnalyticsPage />
+            <DesktopOnlyGate featureName="Predictive Analytics">
+              <PredictiveAnalyticsPage />
+            </DesktopOnlyGate>
           </GatedLayout>
         )}
       </Route>
@@ -904,21 +907,27 @@ function Router() {
       <Route path="/vdr">
         {() => (
           <UnifiedLayout>
-            <VDRDashboard />
+            <DesktopOnlyGate featureName="The Virtual Data Room">
+              <VDRDashboard />
+            </DesktopOnlyGate>
           </UnifiedLayout>
         )}
       </Route>
       <Route path="/vdr/projects/:id">
         {() => (
           <UnifiedLayout>
-            <ProjectVDR />
+            <DesktopOnlyGate featureName="The Virtual Data Room">
+              <ProjectVDR />
+            </DesktopOnlyGate>
           </UnifiedLayout>
         )}
       </Route>
       <Route path="/vdr/:projectId/data-request">
         {() => (
           <UnifiedLayout>
-            <DataRequest />
+            <DesktopOnlyGate featureName="The Virtual Data Room">
+              <DataRequest />
+            </DesktopOnlyGate>
           </UnifiedLayout>
         )}
       </Route>
@@ -2128,7 +2137,9 @@ function Router() {
       <Route path="/analysis/sales-comps">
         {() => (
           <GatedLayout pack="analysis">
-            <SalesCompsIndex />
+            <DesktopOnlyGate featureName="Sales Comps">
+              <SalesCompsIndex />
+            </DesktopOnlyGate>
           </GatedLayout>
         )}
       </Route>
@@ -2226,7 +2237,9 @@ function Router() {
       <Route path="/analysis/rate-comps">
         {() => (
           <GatedLayout pack="analysis">
-            <RateCompsIndex />
+            <DesktopOnlyGate featureName="Rate Comps">
+              <RateCompsIndex />
+            </DesktopOnlyGate>
           </GatedLayout>
         )}
       </Route>
@@ -2303,7 +2316,9 @@ function Router() {
       <Route path="/analysis/demographics">
         {() => (
           <GatedLayout pack="analysis">
-            <DemographicsIndex />
+            <DesktopOnlyGate featureName="Demographics Analysis">
+              <DemographicsIndex />
+            </DesktopOnlyGate>
           </GatedLayout>
         )}
       </Route>
@@ -2317,14 +2332,18 @@ function Router() {
       <Route path="/analysis/capital-markets">
         {() => (
           <GatedLayout pack="analysis">
-            <CapitalMarketsIndex />
+            <DesktopOnlyGate featureName="Capital Markets Analysis">
+              <CapitalMarketsIndex />
+            </DesktopOnlyGate>
           </GatedLayout>
         )}
       </Route>
       <Route path="/analysis/hub">
         {() => (
           <GatedLayout pack="analysis">
-            <AnalysisHub />
+            <DesktopOnlyGate featureName="Analysis Hub">
+              <AnalysisHub />
+            </DesktopOnlyGate>
           </GatedLayout>
         )}
       </Route>
@@ -2459,7 +2478,9 @@ function Router() {
       <Route path="/modeling/projects/:projectId">
         {(params) => (
           <GatedLayout pack="modeling_tools">
-            <ProjectWorkspace {...params} />
+            <DesktopOnlyGate featureName="Financial Modeling Workspace">
+              <ProjectWorkspace {...params} />
+            </DesktopOnlyGate>
           </GatedLayout>
         )}
       </Route>

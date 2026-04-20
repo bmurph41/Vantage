@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { DesktopOnlyGate } from "@/components/DesktopOnlyGate";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -1464,6 +1465,7 @@ export default function LeasesTable({ onEditLease, locationId }: LeasesTableProp
   }
 
   return (
+    <DesktopOnlyGate featureName="Rent Roll Editor">
     <Card data-testid="leases-table">
       <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-4 space-y-0 pb-4">
         <div className="flex items-center gap-3">
@@ -2184,5 +2186,6 @@ export default function LeasesTable({ onEditLease, locationId }: LeasesTableProp
         boatLength={cashFlowBoatLength}
       />
     </Card>
+    </DesktopOnlyGate>
   );
 }
