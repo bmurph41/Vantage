@@ -74,6 +74,10 @@ import {
   dealCommissions,
   insertDealCommissionSchema,
   crmPipelineStages,
+  ownedAssets,
+  assetPerformanceSnapshots,
+  rentRolls,
+  rentRollEntries,
 } from "@shared/schema";
 import {
   salesCompCreateSchema,
