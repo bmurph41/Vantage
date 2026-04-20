@@ -193,6 +193,12 @@ export default function UnifiedSidebar() {
   useEffect(() => {
     localStorage.setItem('sidebar-collapsed', String(sidebarCollapsed));
   }, [sidebarCollapsed]);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    root.style.setProperty('--sidebar-w', sidebarCollapsed ? '4rem' : '16rem');
+    return () => { root.style.removeProperty('--sidebar-w'); };
+  }, [sidebarCollapsed]);
   
   const toggleSidebarCollapse = () => {
     setSidebarCollapsed(!sidebarCollapsed);
