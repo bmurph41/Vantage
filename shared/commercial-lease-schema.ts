@@ -30,12 +30,20 @@ import { relations } from "drizzle-orm";
 
 // ─── ENUMS ────────────────────────────────────────────────────────────────────
 
-export const leaseTypeEnum = pgEnum("cl_lease_type", [
+export const LEASE_TYPE_VALUES = [
   "retail",
   "office",
   "industrial",
+  "ground",
+  "commercial",
+  "residential",
+  "storage",
   "other",
-]);
+] as const;
+
+export type OpsLeaseType = typeof LEASE_TYPE_VALUES[number];
+
+export const leaseTypeEnum = pgEnum("cl_lease_type", [...LEASE_TYPE_VALUES]);
 
 export const baseRentModeEnum = pgEnum("base_rent_mode", [
   "PER_SF_YEAR",

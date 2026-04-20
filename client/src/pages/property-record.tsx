@@ -363,7 +363,7 @@ export default function PropertyRecordPage() {
         {
           value: 'leases',
           label: 'Leases',
-          content: <PropertyLeasesTab propertyId={id} />,
+          content: <PropertyLeasesTab propertyId={id} propertyCategory={property.type} />,
         },
       ] : []}
 

@@ -11,6 +11,8 @@ import {
   commercialLeases,
   leaseTerms,
   leaseMonthlyCashflows,
+  LEASE_TYPE_VALUES,
+  type OpsLeaseType,
 } from "@shared/commercial-lease-schema";
 import type {
   OperationsLeaseListParams,
@@ -30,6 +32,7 @@ export async function listOperationsLeases(
     propertyId,
     search,
     status = "all",
+    leaseType,
     limit = 25,
     offset = 0,
     sortBy = "tenantName",
@@ -50,6 +53,12 @@ export async function listOperationsLeases(
     conditions.push(eq(commercialLeases.active, true));
   } else if (status === "inactive") {
     conditions.push(eq(commercialLeases.active, false));
+  }
+
+  if (leaseType && leaseType !== "all") {
+    if ((LEASE_TYPE_VALUES as readonly string[]).includes(leaseType)) {
+      conditions.push(eq(commercialLeases.leaseType, leaseType as OpsLeaseType));
+    }
   }
 
   if (search && search.trim()) {

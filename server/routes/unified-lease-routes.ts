@@ -52,12 +52,13 @@ async function requireProjectInOrg(projectId: string, orgId: string): Promise<bo
 router.get("/operations/leases", async (req: Request, res: Response) => {
   try {
     const orgId = getOrgId(req);
-    const { propertyId, search, status, limit, offset, sortBy, sortDir } = req.query;
+    const { propertyId, search, status, leaseType, limit, offset, sortBy, sortDir } = req.query;
 
     const result = await listOperationsLeases(db, orgId, {
       propertyId: propertyId as string,
       search: search as string,
       status: (status as any) || "all",
+      leaseType: leaseType as string,
       limit: limit ? parseInt(limit as string) : 25,
       offset: offset ? parseInt(offset as string) : 0,
       sortBy: sortBy as string,

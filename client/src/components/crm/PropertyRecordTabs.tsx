@@ -541,7 +541,37 @@ const leaseTypeColors: Record<string, string> = {
   retail: 'bg-pink-50 text-pink-700 border-pink-200',
   office: 'bg-cyan-50 text-cyan-700 border-cyan-200',
   industrial: 'bg-gray-50 text-gray-700 border-gray-200',
+  ground: 'bg-green-50 text-green-700 border-green-200',
+  commercial: 'bg-blue-50 text-blue-700 border-blue-200',
+  residential: 'bg-yellow-50 text-yellow-700 border-yellow-200',
+  storage: 'bg-orange-50 text-orange-700 border-orange-200',
   other: 'bg-purple-50 text-purple-700 border-purple-200',
+};
+
+const LEASE_TYPE_OPTIONS = [
+  { value: 'retail', label: 'Retail' },
+  { value: 'office', label: 'Office' },
+  { value: 'industrial', label: 'Industrial' },
+  { value: 'ground', label: 'Ground Lease' },
+  { value: 'commercial', label: 'Commercial' },
+  { value: 'residential', label: 'Residential' },
+  { value: 'storage', label: 'Storage' },
+  { value: 'other', label: 'Other' },
+];
+
+const PROPERTY_CATEGORY_LEASE_HINT: Record<string, string> = {
+  marina: 'storage',
+  'boat storage': 'storage',
+  boat_storage: 'storage',
+  rv_park: 'storage',
+  'rv park': 'storage',
+  storage: 'storage',
+  commercial: 'commercial',
+  retail: 'retail',
+  office: 'office',
+  industrial: 'industrial',
+  residential: 'residential',
+  ground: 'ground',
 };
 
 // ── Lease form type definitions ───────────────────────────────────────────────
@@ -713,10 +743,9 @@ function AddLeaseSheet({ propertyId, open, onClose }: AddLeaseSheetProps) {
                 <Select value={form.leaseType} onValueChange={(v) => setForm(f => ({ ...f, leaseType: v }))}>
                   <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="retail">Retail</SelectItem>
-                    <SelectItem value="office">Office</SelectItem>
-                    <SelectItem value="industrial">Industrial</SelectItem>
-                    <SelectItem value="other">Other</SelectItem>
+                    {LEASE_TYPE_OPTIONS.map(opt => (
+                      <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -1293,10 +1322,9 @@ function LeaseDetailSheet({ leaseId, propertyId, open, onClose }: { leaseId: str
                       <Select value={editForm.leaseType} onValueChange={(v) => setEditForm((f) => f ? { ...f, leaseType: v } : f)}>
                         <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="retail">Retail</SelectItem>
-                          <SelectItem value="office">Office</SelectItem>
-                          <SelectItem value="industrial">Industrial</SelectItem>
-                          <SelectItem value="other">Other</SelectItem>
+                          {LEASE_TYPE_OPTIONS.map(opt => (
+                            <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
@@ -2159,13 +2187,18 @@ function LeaseDetailSheet({ leaseId, propertyId, open, onClose }: { leaseId: str
   );
 }
 
-export function PropertyLeasesTab({ propertyId }: { propertyId: string }) {
+export function PropertyLeasesTab({ propertyId, propertyCategory }: { propertyId: string; propertyCategory?: string }) {
   const [selectedLeaseId, setSelectedLeaseId] = useState<string | null>(null);
   const [showInactive, setShowInactive] = useState(false);
   const [addSheetOpen, setAddSheetOpen] = useState(false);
+  const [leaseTypeFilter, setLeaseTypeFilter] = useState<string>('all');
+
+  const suggestedLeaseType = propertyCategory
+    ? PROPERTY_CATEGORY_LEASE_HINT[propertyCategory.toLowerCase()] || null
+    : null;
 
   const { data, isLoading } = useQuery<{ data: any[]; total: number }>({
-    queryKey: ['property-leases', propertyId, showInactive],
+    queryKey: ['property-leases', propertyId, showInactive, leaseTypeFilter],
     queryFn: async () => {
       const params = new URLSearchParams({
         propertyId,
@@ -2173,6 +2206,7 @@ export function PropertyLeasesTab({ propertyId }: { propertyId: string }) {
         sortBy: 'tenantName',
         sortDir: 'asc',
         ...(showInactive ? {} : { status: 'active' }),
+        ...(leaseTypeFilter !== 'all' ? { leaseType: leaseTypeFilter } : {}),
       });
       const res = await apiRequest('GET', `/api/commercial-leases/operations/leases?${params}`);
       return res.json();
@@ -2250,7 +2284,7 @@ export function PropertyLeasesTab({ propertyId }: { propertyId: string }) {
       )}
 
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-2">
           <Users className="h-4 w-4 text-gray-400" />
           <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -2260,7 +2294,18 @@ export function PropertyLeasesTab({ propertyId }: { propertyId: string }) {
             <Badge variant="secondary" className="text-[10px] h-4 px-1.5">{data.total}</Badge>
           )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <Select value={leaseTypeFilter} onValueChange={setLeaseTypeFilter}>
+            <SelectTrigger className="h-7 text-xs w-36">
+              <SelectValue placeholder="All types" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All types</SelectItem>
+              {LEASE_TYPE_OPTIONS.map(opt => (
+                <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <Button
             variant="ghost"
             size="sm"
@@ -2292,8 +2337,14 @@ export function PropertyLeasesTab({ propertyId }: { propertyId: string }) {
       {!isLoading && leases.length === 0 && (
         <EmptyState
           icon={Building2}
-          title="No leases on record"
-          subtitle="Lease data will appear here once leases are added for this property."
+          title={leaseTypeFilter !== 'all' ? `No ${LEASE_TYPE_OPTIONS.find(o => o.value === leaseTypeFilter)?.label.toLowerCase() || leaseTypeFilter} leases` : 'No leases on record'}
+          subtitle={
+            leaseTypeFilter !== 'all'
+              ? `Try clearing the filter to see all leases, or add a new ${LEASE_TYPE_OPTIONS.find(o => o.value === leaseTypeFilter)?.label.toLowerCase() || leaseTypeFilter} lease.`
+              : suggestedLeaseType
+                ? `Lease data will appear here once leases are added. For this property type, consider adding a ${LEASE_TYPE_OPTIONS.find(o => o.value === suggestedLeaseType)?.label.toLowerCase() || suggestedLeaseType} lease.`
+                : 'Lease data will appear here once leases are added for this property.'
+          }
           actionNode={
             <Button
               size="sm"

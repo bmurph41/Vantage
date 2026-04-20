@@ -14,6 +14,7 @@ export interface OperationsLeaseListParams {
   propertyId?: string;
   search?: string;
   status?: 'active' | 'inactive' | 'all';
+  leaseType?: string;
   limit?: number;
   offset?: number;
   sortBy?: string;
