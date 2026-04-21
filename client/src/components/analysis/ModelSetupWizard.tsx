@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useLocation } from 'wouter';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -180,12 +180,27 @@ export default function ModelSetupWizard({ open, onOpenChange, onProjectCreated 
     []
   );
 
+  // When entitlements load, auto-correct the default property type if it's locked.
+  useEffect(() => {
+    if (!entitlements) return;
+    const currentKey = PROPERTY_TYPE_TO_ASSET_CLASS[data.propertyType];
+    const isCurrentLocked = currentKey != null && !entitlements.assetClasses.includes(currentKey);
+    if (!isCurrentLocked) return;
+    const firstUnlocked = PROPERTY_TYPES.find((t) => {
+      const k = PROPERTY_TYPE_TO_ASSET_CLASS[t.value];
+      return k === null || k === undefined || entitlements.assetClasses.includes(k);
+    });
+    if (firstUnlocked) {
+      updateField('propertyType', firstUnlocked.value);
+    }
+  }, [entitlements]);
+
   const progress = ((step + 1) / STEPS.length) * 100;
 
   const canProceed = (() => {
     switch (step) {
       case 0:
-        return data.name.trim().length > 0;
+        return data.name.trim().length > 0 && !isPropertyTypeLocked(data.propertyType);
       case 1:
         return parseNum(data.purchasePrice) > 0;
       case 2:
