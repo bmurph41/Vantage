@@ -309,4 +309,59 @@ router.post("/:orgId/packs/revoke", async (req, res) => {
   }
 });
 
+// ─── Asset Class Audit ────────────────────────────────────────────────────────
+// GET /asset-class-audit — paginated list of asset_classes_updated events with org context
+router.get("/asset-class-audit", async (req, res) => {
+  try {
+    const { page = "1", pageSize = "50", orgId: filterOrgId } = req.query as Record<string, string>;
+    const pageNum = Math.max(1, parseInt(page || "1", 10));
+    const size = Math.max(1, Math.min(100, parseInt(pageSize || "50", 10)));
+    const offset = (pageNum - 1) * size;
+
+    const rows = await db.execute(sql`
+      SELECT
+        a.id,
+        a.created_at,
+        a.admin_user_id,
+        u.name  AS user_name,
+        u.email AS user_email,
+        a.metadata_json,
+        o.id    AS org_id,
+        o.name  AS org_name
+      FROM admin_audit_log a
+      LEFT JOIN users         u ON u.id = a.admin_user_id
+      LEFT JOIN organizations o ON o.id = (a.metadata_json->>'orgId')
+      WHERE a.action = 'asset_classes_updated'
+      ${filterOrgId ? sql`AND (a.metadata_json->>'orgId') = ${filterOrgId}` : sql``}
+      ORDER BY a.created_at DESC
+      LIMIT ${size} OFFSET ${offset}
+    `);
+
+    const [totalResult] = await db
+      .select({ total: count() })
+      .from(adminAuditLog)
+      .where(
+        filterOrgId
+          ? and(
+              eq(adminAuditLog.action, "asset_classes_updated"),
+              sql`(${adminAuditLog.metadataJson}->>'orgId') = ${filterOrgId}`
+            )
+          : eq(adminAuditLog.action, "asset_classes_updated")
+      );
+
+    res.json({
+      rows: rows.rows,
+      pagination: {
+        page: pageNum,
+        pageSize: size,
+        totalPages: Math.ceil(Number(totalResult?.total ?? 0) / size),
+        total: Number(totalResult?.total ?? 0),
+      },
+    });
+  } catch (error) {
+    logger.error({ error }, "Error fetching asset class audit");
+    res.status(500).json({ error: "Failed to fetch asset class audit" });
+  }
+});
+
 export default router;
