@@ -73,6 +73,8 @@ interface AssetClassPickerProps {
   onUpgradeRequest?: (key: string) => void;
   /** Classes that are permanently disabled (e.g. already selected at org level). */
   disabledKeys?: string[];
+  /** When provided, only classes whose key is in this list are rendered. */
+  allowedKeys?: string[];
 }
 
 export function AssetClassPicker({
@@ -82,6 +84,7 @@ export function AssetClassPicker({
   entitledKeys,
   onUpgradeRequest,
   disabledKeys = [],
+  allowedKeys,
 }: AssetClassPickerProps) {
   const toggle = (key: string) => {
     if (disabledKeys.includes(key)) return;
@@ -90,18 +93,29 @@ export function AssetClassPicker({
       return;
     }
     if (selected.includes(key)) {
+      // Deselect (unless maxSelections=1 — require at least one)
+      if (maxSelections === 1) return;
       onChange(selected.filter((k) => k !== key));
     } else {
-      if (maxSelections && selected.length >= maxSelections) return;
-      onChange([...selected, key]);
+      if (maxSelections === 1) {
+        onChange([key]); // single-select: replace current selection
+      } else {
+        if (maxSelections && selected.length >= maxSelections) return;
+        onChange([...selected, key]);
+      }
     }
   };
+
+  const visibleList = allowedKeys
+    ? ASSET_CLASS_LIST.filter((a) => allowedKeys.includes(a.key))
+    : ASSET_CLASS_LIST;
+  const visibleGroups = Array.from(new Set(visibleList.map((a) => a.group)));
 
   return (
     <TooltipProvider delayDuration={150}>
       <div className="space-y-5">
-        {GROUPS.map((group) => {
-          const items = ASSET_CLASS_LIST.filter((a) => a.group === group);
+        {visibleGroups.map((group) => {
+          const items = visibleList.filter((a) => a.group === group);
           return (
             <div key={group}>
               <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
@@ -168,7 +182,7 @@ export function AssetClassPicker({
           <div className="pt-2 border-t flex flex-wrap gap-1.5">
             <span className="text-xs text-muted-foreground self-center mr-1">Selected:</span>
             {selected.map((key) => {
-              const entry = ASSET_CLASS_LIST.find((a) => a.key === key);
+              const entry = visibleList.find((a) => a.key === key);
               if (!entry) return null;
               const isDisabled = disabledKeys.includes(key);
               return (

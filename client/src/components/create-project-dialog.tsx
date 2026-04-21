@@ -48,6 +48,7 @@ import type { CrmDeal, CrmProperty } from "@shared/schema";
 import DealFormModal from "@/components/modals/deal-form-modal";
 import PropertyFormModal from "@/components/modals/property-form-modal";
 import { AssetClassUpgradeModal } from "@/components/billing/AssetClassUpgradeModal";
+import { AssetClassPicker } from "@/components/AssetClassPicker";
 
 interface PortfolioProperty {
   id: string;
@@ -95,6 +96,7 @@ export function CreateProjectDialog({ trigger }: CreateProjectDialogProps) {
   const [showCreateProperty, setShowCreateProperty] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [upgradeModalKey, setUpgradeModalKey] = useState<string>("");
+  const [projectAssetClass, setProjectAssetClass] = useState<string[]>([]);
 
   const generatePropertyId = () => `prop_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
@@ -420,6 +422,23 @@ export function CreateProjectDialog({ trigger }: CreateProjectDialogProps) {
                 </FormItem>
               )}
             />
+
+            <div>
+              <Label className="mb-1.5 block">
+                Asset Class
+                <span className="ml-1 text-muted-foreground font-normal text-xs">(optional)</span>
+              </Label>
+              <AssetClassPicker
+                selected={projectAssetClass}
+                onChange={setProjectAssetClass}
+                entitledKeys={entitlements ? (entitlements.assetClasses ?? []) : undefined}
+                onUpgradeRequest={(key) => {
+                  setUpgradeModalKey(key);
+                  setShowUpgradeModal(true);
+                }}
+                maxSelections={1}
+              />
+            </div>
 
             {watchedProjectType === "single" && (
               <>

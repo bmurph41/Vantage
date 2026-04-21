@@ -7,15 +7,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
 import { Switch } from '@/components/ui/switch';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
 import {
   ArrowLeft,
   ArrowRight,
@@ -27,12 +20,12 @@ import {
   Target,
   CheckCircle2,
   Loader2,
-  Lock,
 } from 'lucide-react';
 import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { formatCurrency } from '@/lib/utils';
 import { AssetClassUpgradeModal } from '@/components/billing/AssetClassUpgradeModal';
+import { AssetClassPicker } from '@/components/AssetClassPicker';
 
 interface ModelSetupWizardProps {
   open: boolean;
@@ -64,6 +57,18 @@ const PROPERTY_TYPE_TO_ASSET_CLASS: Record<string, string | null> = {
   MOBILE_HOME_PARK: 'mobile_home',
   OTHER: null, // always unlocked
 };
+
+/** Reverse mapping: AssetClassPicker key → PROPERTY_TYPES value. */
+const ASSET_CLASS_TO_PROPERTY_TYPE: Record<string, string> = Object.fromEntries(
+  Object.entries(PROPERTY_TYPE_TO_ASSET_CLASS)
+    .filter(([, v]) => v !== null)
+    .map(([k, v]) => [v as string, k])
+);
+
+/** Asset class keys available for wizard selection (excludes null-mapped types). */
+const WIZARD_ALLOWED_ASSET_KEYS = Object.values(PROPERTY_TYPE_TO_ASSET_CLASS).filter(
+  (v): v is string => v !== null
+);
 
 interface OrgEntitlements {
   assetClasses: string[];
@@ -307,50 +312,30 @@ export default function ModelSetupWizard({ open, onOpenChange, onProjectCreated 
               </div>
             </div>
             <div>
-              <Label>Property Type</Label>
-              {!entitlements && (
-                <Skeleton className="h-9 mt-1 rounded-md" />
-              )}
-              {entitlements && (
-                <TooltipProvider delayDuration={150}>
-                  <Select
-                    value={data.propertyType}
-                    onValueChange={(v) => {
-                      const assetKey = PROPERTY_TYPE_TO_ASSET_CLASS[v];
-                      if (assetKey && isPropertyTypeLocked(v)) {
-                        setUpgradeModalKey(assetKey);
-                        setShowUpgradeModal(true);
-                        return;
-                      }
-                      updateField('propertyType', v);
-                    }}
-                  >
-                    <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {PROPERTY_TYPES.map((t) => {
-                        const locked = isPropertyTypeLocked(t.value);
-                        return (
-                          <SelectItem
-                            key={t.value}
-                            value={t.value}
-                            className={locked ? 'opacity-60' : ''}
-                          >
-                            <span className="flex items-center gap-2">
-                              {t.label}
-                              {locked && <Lock className="h-3 w-3 text-muted-foreground" />}
-                            </span>
-                          </SelectItem>
-                        );
-                      })}
-                    </SelectContent>
-                  </Select>
-                </TooltipProvider>
-              )}
-              {entitlements && entitledKeys.length > 0 && PROPERTY_TYPES.some((t) => isPropertyTypeLocked(t.value)) && (
-                <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-                  <Lock className="h-3 w-3" />
-                  Some types require a higher asset class tier — click them to upgrade.
-                </p>
+              <Label className="mb-2 block">Property Type</Label>
+              {!entitlements ? (
+                <Skeleton className="h-32 rounded-md" />
+              ) : (
+                <AssetClassPicker
+                  selected={
+                    PROPERTY_TYPE_TO_ASSET_CLASS[data.propertyType]
+                      ? [PROPERTY_TYPE_TO_ASSET_CLASS[data.propertyType] as string]
+                      : []
+                  }
+                  onChange={(keys) => {
+                    const key = keys[0];
+                    if (key && ASSET_CLASS_TO_PROPERTY_TYPE[key]) {
+                      updateField('propertyType', ASSET_CLASS_TO_PROPERTY_TYPE[key]);
+                    }
+                  }}
+                  entitledKeys={entitlements ? entitledKeys : undefined}
+                  onUpgradeRequest={(key) => {
+                    setUpgradeModalKey(key);
+                    setShowUpgradeModal(true);
+                  }}
+                  maxSelections={1}
+                  allowedKeys={WIZARD_ALLOWED_ASSET_KEYS}
+                />
               )}
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
