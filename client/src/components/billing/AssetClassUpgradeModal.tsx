@@ -62,7 +62,11 @@ export function AssetClassUpgradeModal({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/orgs/me/entitlements"] });
       queryClient.invalidateQueries({ queryKey: ["/api/org-settings/entitlements"] });
-      toast({ title: "Asset classes updated", description: "Your new asset classes are now active." });
+      queryClient.invalidateQueries({ queryKey: ["/api/orgs/me"] });
+      toast({
+        title: `Upgraded to ${newTier.name}`,
+        description: `${mergedClasses.length} asset class${mergedClasses.length !== 1 ? "es" : ""} are now active on your account.`,
+      });
       onOpenChange(false);
     },
     onError: (e: Error) => {
