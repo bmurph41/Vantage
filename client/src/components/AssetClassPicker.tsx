@@ -151,7 +151,7 @@ export function AssetClassPicker({
                       <Tooltip key={asset.key}>
                         <TooltipTrigger asChild>{btn}</TooltipTrigger>
                         <TooltipContent side="top">
-                          Upgrade to unlock {asset.label}
+                          Upgrade your plan to unlock {asset.label}
                         </TooltipContent>
                       </Tooltip>
                     );
