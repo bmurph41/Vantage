@@ -8026,7 +8026,8 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
         .limit(1);
       
       if (!prefs) {
-        return res.status(404).json({ error: 'No KPI preferences found' });
+        // No preferences saved yet — return empty default so the UI falls back gracefully
+        return res.json({ pageKey, kpiConfig: null });
       }
       
       res.json(prefs);
