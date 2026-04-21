@@ -2230,28 +2230,36 @@ export function PropertyLeasesTab({ propertyId, propertyCategory }: { propertyId
 
   const bulkDeleteMutation = useMutation({
     mutationFn: async (ids: string[]) => {
-      await Promise.all(
-        ids.map(id => apiRequest('DELETE', `/api/commercial-leases/leases/${id}`).then(res => {
-          if (!res.ok) throw new Error(`Failed to delete lease ${id}`);
-        }))
+      const results = await Promise.allSettled(
+        ids.map(id =>
+          apiRequest('DELETE', `/api/commercial-leases/leases/${id}`).then(res => {
+            if (!res.ok) throw new Error(`Failed to delete lease ${id}`);
+            return id;
+          })
+        )
       );
-      return ids;
+      const succeeded = results
+        .filter((r): r is PromiseFulfilledResult<string> => r.status === 'fulfilled')
+        .map(r => r.value);
+      const failed = results.filter(r => r.status === 'rejected').length;
+      return { succeeded, failed };
     },
-    onSuccess: (ids) => {
+    onSuccess: ({ succeeded, failed }) => {
       setCheckedLeaseIds(new Set());
+      if (succeeded.length === 0) {
+        toast({ title: 'Failed to delete leases', variant: 'destructive' });
+        return;
+      }
       toast({
-        title: `${ids.length} lease${ids.length !== 1 ? 's' : ''} deleted`,
+        title: `${succeeded.length} lease${succeeded.length !== 1 ? 's' : ''} deleted${failed > 0 ? ` (${failed} failed)` : ''}`,
         description: 'Click Undo within 8 seconds to restore them.',
         duration: 8000,
         action: (
-          <ToastAction altText="Undo delete" onClick={() => undoRestoreMutation.mutate(ids)}>
+          <ToastAction altText="Undo delete" onClick={() => undoRestoreMutation.mutate(succeeded)}>
             Undo
           </ToastAction>
         ),
       });
-    },
-    onError: () => {
-      toast({ title: 'Failed to delete some leases', variant: 'destructive' });
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['property-leases', propertyId] });

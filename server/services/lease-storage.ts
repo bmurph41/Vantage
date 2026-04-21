@@ -190,7 +190,7 @@ export async function deleteLease(db: DB, leaseId: string) {
   return updateLease(db, leaseId, { active: false } as any);
 }
 
-export async function restoreLeases(db: DB, ids: string[], orgId: string, windowSeconds = 30) {
+export async function restoreLeases(db: DB, ids: string[], orgId: string, windowSeconds = 10) {
   if (!ids.length) return [];
   const cutoff = new Date(Date.now() - windowSeconds * 1000);
   const rows = await db
