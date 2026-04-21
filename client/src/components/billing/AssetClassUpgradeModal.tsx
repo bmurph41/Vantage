@@ -63,6 +63,7 @@ export function AssetClassUpgradeModal({
       queryClient.invalidateQueries({ queryKey: ["/api/orgs/me/entitlements"] });
       queryClient.invalidateQueries({ queryKey: ["/api/org-settings/entitlements"] });
       queryClient.invalidateQueries({ queryKey: ["/api/orgs/me"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/operations-context/modules"] });
       toast({
         title: `Upgraded to ${newTier.name}`,
         description: `${mergedClasses.length} asset class${mergedClasses.length !== 1 ? "es" : ""} are now active on your account.`,
