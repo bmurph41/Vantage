@@ -297,7 +297,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
 
   // Get valuator project context to determine if this is an owned marina or acquisition
   const { data: projectContext } = useQuery<{ projectType?: string; marinaId?: string }>({
-    queryKey: [`/api/operations/projects/${projectId}/context`],
+    queryKey: [`/api/operations-context/projects/${projectId}/context`],
   });
 
   // Only show Sync Operations button for owned marinas, not acquisitions/broker listings
