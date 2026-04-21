@@ -21,6 +21,41 @@ import type {
 
 type DB = any; // Use your actual Drizzle db type
 
+// ─── List Lease IDs only (for "select all matching" — no pagination, no enrichment) ──
+
+export async function listOperationsLeaseIds(
+  db: DB,
+  orgId: string,
+  params: Pick<OperationsLeaseListParams, "propertyId" | "status" | "leaseType" | "search">
+): Promise<{ ids: string[]; total: number }> {
+  const { propertyId, search, status = "all", leaseType } = params;
+
+  const conditions: any[] = [
+    eq(commercialLeases.orgId, orgId),
+    eq(commercialLeases.leaseContext, "operations"),
+  ];
+
+  if (propertyId) conditions.push(eq(commercialLeases.propertyId, propertyId));
+  if (status === "active") conditions.push(eq(commercialLeases.active, true));
+  else if (status === "inactive") conditions.push(eq(commercialLeases.active, false));
+  if (leaseType && leaseType !== "all" && (LEASE_TYPE_VALUES as readonly string[]).includes(leaseType)) {
+    conditions.push(eq(commercialLeases.leaseType, leaseType as OpsLeaseType));
+  }
+  if (search && search.trim()) {
+    const pattern = `%${search.trim()}%`;
+    conditions.push(or(ilike(commercialLeases.tenantName, pattern), ilike(commercialLeases.suite, pattern))!);
+  }
+
+  const where = and(...conditions);
+  const rows = await db
+    .select({ id: commercialLeases.id })
+    .from(commercialLeases)
+    .where(where)
+    .orderBy(asc(commercialLeases.tenantName));
+
+  return { ids: rows.map((r: { id: string }) => r.id), total: rows.length };
+}
+
 // ─── List Leases (Operations) ─────────────────────────────────────────────────
 
 export async function listOperationsLeases(

@@ -34,7 +34,7 @@ import {
   ChevronRight, Phone, Mail, Calendar, FileText, BarChart3,
   Newspaper, CheckCircle2, Circle, AlertCircle, MessageSquare,
   Anchor, Building2, ArrowUpRight, Scale, Home, Building, Users,
-  RefreshCw, Tag, Layers, Plus, Pencil, X, Save, Trash2,
+  RefreshCw, Tag, Layers, Plus, Pencil, X, Save, Trash2, Loader2,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { apiRequest, queryClient } from '@/lib/queryClient';
@@ -2204,6 +2204,8 @@ export function PropertyLeasesTab({ propertyId, propertyCategory }: { propertyId
   const [leaseTypeFilter, setLeaseTypeFilter] = useState<string>('all');
   const [checkedLeaseIds, setCheckedLeaseIds] = useState<Set<string>>(new Set());
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
+  const [selectAllMatchingMode, setSelectAllMatchingMode] = useState(false);
+  const [fetchingAllIds, setFetchingAllIds] = useState(false);
 
   const suggestedLeaseType = propertyCategory
     ? PROPERTY_CATEGORY_LEASE_HINT[propertyCategory.toLowerCase()] || null
@@ -2303,6 +2305,7 @@ export function PropertyLeasesTab({ propertyId, propertyCategory }: { propertyId
   const someChecked = !allChecked && leases.some((l: any) => checkedLeaseIds.has(l.id));
 
   function toggleAll() {
+    setSelectAllMatchingMode(false);
     if (allChecked) {
       setCheckedLeaseIds(new Set());
     } else {
@@ -2311,11 +2314,36 @@ export function PropertyLeasesTab({ propertyId, propertyCategory }: { propertyId
   }
 
   function toggleOne(id: string, checked: boolean | 'indeterminate') {
+    setSelectAllMatchingMode(false);
     setCheckedLeaseIds(prev => {
       const next = new Set(prev);
       if (checked === true) next.add(id); else next.delete(id);
       return next;
     });
+  }
+
+  const showSelectAllBanner = allChecked && !!data && data.total > leases.length;
+
+  async function handleSelectAllMatching() {
+    setFetchingAllIds(true);
+    try {
+      const params = new URLSearchParams({
+        propertyId,
+        sortBy: 'tenantName',
+        sortDir: 'asc',
+        ...(showInactive ? {} : { status: 'active' }),
+        ...(leaseTypeFilter !== 'all' ? { leaseType: leaseTypeFilter } : {}),
+      });
+      const res = await apiRequest('GET', `/api/commercial-leases/operations/leases/ids?${params}`);
+      if (!res.ok) throw new Error('Failed to fetch matching IDs');
+      const { ids } = await res.json();
+      setCheckedLeaseIds(new Set(ids));
+      setSelectAllMatchingMode(true);
+    } catch {
+      toast({ title: 'Failed to select all matching leases', variant: 'destructive' });
+    } finally {
+      setFetchingAllIds(false);
+    }
   }
 
   const occupancyPct = stats && stats.totalLeases > 0
@@ -2395,7 +2423,11 @@ export function PropertyLeasesTab({ propertyId, propertyCategory }: { propertyId
               Delete selected ({checkedLeaseIds.size})
             </Button>
           )}
-          <Select value={leaseTypeFilter} onValueChange={setLeaseTypeFilter}>
+          <Select value={leaseTypeFilter} onValueChange={(val) => {
+            setLeaseTypeFilter(val);
+            setSelectAllMatchingMode(false);
+            setCheckedLeaseIds(new Set());
+          }}>
             <SelectTrigger className="h-7 text-xs w-36">
               <SelectValue placeholder="All types" />
             </SelectTrigger>
@@ -2409,7 +2441,11 @@ export function PropertyLeasesTab({ propertyId, propertyCategory }: { propertyId
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => setShowInactive(!showInactive)}
+            onClick={() => {
+              setShowInactive(!showInactive);
+              setSelectAllMatchingMode(false);
+              setCheckedLeaseIds(new Set());
+            }}
             className="text-xs text-gray-500 h-7"
           >
             {showInactive ? 'Hide inactive' : 'Show all'}
@@ -2423,6 +2459,54 @@ export function PropertyLeasesTab({ propertyId, propertyCategory }: { propertyId
           </Button>
         </div>
       </div>
+
+      {/* Select-all-matching banner (Gmail-style) */}
+      {(showSelectAllBanner || (selectAllMatchingMode && checkedLeaseIds.size > leases.length)) && (
+        <div className="flex items-center justify-between gap-3 px-3 py-2 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 rounded-md text-xs text-blue-800 dark:text-blue-200">
+          {selectAllMatchingMode
+            ? (
+              <span>
+                All <strong>{checkedLeaseIds.size}</strong> matching leases are selected.
+              </span>
+            )
+            : (
+              <span>
+                All <strong>{leases.length}</strong> leases on this page are selected.{' '}
+                <strong>{data!.total}</strong> total match this filter.
+              </span>
+            )
+          }
+          {selectAllMatchingMode
+            ? (
+              <Button
+                variant="link"
+                size="sm"
+                className="h-auto p-0 text-xs font-medium text-blue-700 dark:text-blue-300"
+                onClick={() => {
+                  setCheckedLeaseIds(new Set());
+                  setSelectAllMatchingMode(false);
+                }}
+              >
+                Clear selection
+              </Button>
+            )
+            : (
+              <Button
+                variant="link"
+                size="sm"
+                className="h-auto p-0 text-xs font-medium text-blue-700 dark:text-blue-300 shrink-0"
+                onClick={handleSelectAllMatching}
+                disabled={fetchingAllIds}
+              >
+                {fetchingAllIds
+                  ? <><Loader2 className="h-3 w-3 animate-spin inline mr-1" />Loading…</>
+                  : `Select all ${data!.total} matching leases`
+                }
+              </Button>
+            )
+          }
+        </div>
+      )}
 
       {/* Loading */}
       {isLoading && (

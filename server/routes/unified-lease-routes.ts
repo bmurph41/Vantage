@@ -17,6 +17,7 @@ import { commercialLeases, leaseTerms } from "@shared/commercial-lease-schema";
 import { modelingProjects } from "@shared/schema";
 import {
   listOperationsLeases,
+  listOperationsLeaseIds,
   getOperationsStats,
   getAvailableForImport,
 } from "../services/lease-ops-storage";
@@ -82,6 +83,24 @@ router.get("/operations/stats", async (req: Request, res: Response) => {
     res.json(stats);
   } catch (error: any) {
     console.error("[UnifiedLeases] Error getting operations stats:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /operations/leases/ids — Return all matching IDs for "select all matching" (no pagination)
+router.get("/operations/leases/ids", async (req: Request, res: Response) => {
+  try {
+    const orgId = getOrgId(req);
+    const { propertyId, search, status, leaseType } = req.query;
+    const result = await listOperationsLeaseIds(db, orgId, {
+      propertyId: propertyId as string,
+      search: search as string,
+      status: (status as any) || "all",
+      leaseType: leaseType as string,
+    });
+    res.json(result);
+  } catch (error: any) {
+    console.error("[UnifiedLeases] Error fetching matching lease IDs:", error);
     res.status(500).json({ error: error.message });
   }
 });
