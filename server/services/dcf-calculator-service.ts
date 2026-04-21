@@ -712,6 +712,8 @@ export interface LeaseYearIncome {
     leaseStartDate?: string | null;
     /** True when the lease has not yet started in this specific projection year (income is $0 pre-commencement) */
     notYetStarted?: boolean;
+    /** Escalation rate for this lease (decimal e.g. 0.035 = 3.5%) — populated for CPI and CPI_CAP_FLOOR types */
+    escalationRate?: number;
   }>;
 }
 
@@ -989,6 +991,7 @@ export function computeLeaseIncomeByYear(
         vacancyDeduction: Math.round(vacancyDeduction),
         tiLcCost: Math.round(tiLcCost),
         escalationType: lease.escalationType,
+        escalationRate: lease.escalationRate,
         activeStepRentAnnual,
         isFuture: lease.isFuture ?? false,
         leaseStartDate: lease.leaseStartDate,

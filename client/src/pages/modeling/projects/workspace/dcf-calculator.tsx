@@ -94,6 +94,7 @@ interface LeaseYearDetail {
   vacancyDeduction: number;
   tiLcCost: number;
   escalationType?: string;
+  escalationRate?: number;
   activeStepRentAnnual?: number | null;
   isFuture?: boolean;
   leaseStartDate?: string | null;
@@ -1689,6 +1690,7 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
                                       const hasVacancy = (ld.vacancyDeduction ?? 0) > 0;
                                       const hasTiLc = (ld.tiLcCost ?? 0) > 0;
                                       const isSchedule = ld.escalationType === 'SCHEDULE';
+                                      const isCpi = (ld.escalationType === 'CPI' || ld.escalationType === 'CPI_CAP_FLOOR') && ld.escalationRate != null;
                                       return (
                                         <tr key={ld.leaseId} className="border-b border-border/40 last:border-0">
                                           <td className="py-1 pr-4 font-medium">
@@ -1703,6 +1705,22 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
                                                 <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 text-blue-600 dark:text-blue-400 border-blue-300 dark:border-blue-800">
                                                   Step
                                                 </Badge>
+                                              )}
+                                              {isCpi && !ld.isExpired && (
+                                                <TooltipProvider>
+                                                  <Tooltip>
+                                                    <TooltipTrigger asChild>
+                                                      <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 text-orange-600 dark:text-orange-400 border-orange-300 dark:border-orange-700 cursor-default">
+                                                        CPI {((ld.escalationRate ?? 0) * 100).toFixed(1)}%
+                                                      </Badge>
+                                                    </TooltipTrigger>
+                                                    <TooltipContent side="top" className="text-xs">
+                                                      {ld.escalationType === 'CPI_CAP_FLOOR'
+                                                        ? `CPI-linked escalation at ${((ld.escalationRate ?? 0) * 100).toFixed(1)}% with cap/floor applied`
+                                                        : `CPI-linked escalation at ${((ld.escalationRate ?? 0) * 100).toFixed(1)}% per year`}
+                                                    </TooltipContent>
+                                                  </Tooltip>
+                                                </TooltipProvider>
                                               )}
                                             </div>
                                           </td>
@@ -2462,6 +2480,7 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
                                           const isSchedule = ld.escalationType === 'SCHEDULE';
                                           const isPreCommencement = !!ld.isFuture && !ld.isExpired
                                             && ld.baseRent === 0 && ld.freeRentReduction === 0;
+                                          const isCpi = (ld.escalationType === 'CPI' || ld.escalationType === 'CPI_CAP_FLOOR') && ld.escalationRate != null;
                                           const leaseStartFormatted = ld.leaseStartDate
                                             ? new Date(ld.leaseStartDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
                                             : null;
@@ -2495,6 +2514,22 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
                                                     <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 text-blue-600 dark:text-blue-400 border-blue-300 dark:border-blue-800">
                                                       Step
                                                     </Badge>
+                                                  )}
+                                                  {isCpi && !ld.isExpired && (
+                                                    <TooltipProvider>
+                                                      <Tooltip>
+                                                        <TooltipTrigger asChild>
+                                                          <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 text-orange-600 dark:text-orange-400 border-orange-300 dark:border-orange-700 cursor-default">
+                                                            CPI {((ld.escalationRate ?? 0) * 100).toFixed(1)}%
+                                                          </Badge>
+                                                        </TooltipTrigger>
+                                                        <TooltipContent side="top" className="text-xs">
+                                                          {ld.escalationType === 'CPI_CAP_FLOOR'
+                                                            ? `CPI-linked escalation at ${((ld.escalationRate ?? 0) * 100).toFixed(1)}% with cap/floor applied`
+                                                            : `CPI-linked escalation at ${((ld.escalationRate ?? 0) * 100).toFixed(1)}% per year`}
+                                                        </TooltipContent>
+                                                      </Tooltip>
+                                                    </TooltipProvider>
                                                   )}
                                                 </div>
                                               </td>
