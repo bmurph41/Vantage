@@ -1,9 +1,10 @@
 import { useMemo } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { SortableKanban } from '@/components/dnd/SortableKanban';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { DollarSign, Calendar, AlertTriangle, Clock } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { DollarSign, Calendar, AlertTriangle, Clock, Target, Phone, Timer } from 'lucide-react';
 import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import ComparisonToggle from '@/components/comparison/ComparisonToggle';
@@ -13,22 +14,45 @@ import { formatCurrency } from '@/lib/utils';
 
 type DealWithRelations = Deal & { contact?: Contact | null; company?: Company | null };
 
+type FollowUpInfo = {
+  taskId: string;
+  title: string;
+  type: string;
+  dueDate: string;
+  status: string;
+};
+
 interface DealKanbanBoardProps {
   deals: DealWithRelations[];
   stages: PipelineStage[];
   onDealClick: (deal: DealWithRelations) => void;
 }
 
-function DealCard({ deal, onDealClick }: { deal: DealWithRelations; onDealClick: (deal: DealWithRelations) => void }) {
-  const daysInStage = deal.currentStageEnteredAt 
-    ? differenceInDays(new Date(), new Date(deal.currentStageEnteredAt))
+function DealCard({
+  deal,
+  onDealClick,
+  followUp,
+}: {
+  deal: DealWithRelations;
+  onDealClick: (deal: DealWithRelations) => void;
+  followUp?: FollowUpInfo | null;
+}) {
+  const now = new Date();
+  const daysInStage = deal.currentStageEnteredAt
+    ? differenceInDays(now, new Date(deal.currentStageEnteredAt))
     : 0;
-  
+  const dealAge = deal.createdAt ? differenceInDays(now, new Date(deal.createdAt)) : 0;
+
   const isStale = daysInStage > 14;
-  const isOverdue = deal.expectedCloseDate && new Date(deal.expectedCloseDate) < new Date();
+  const closeDate = deal.expectedCloseDate ? new Date(deal.expectedCloseDate) : null;
+  const isOverdue = closeDate && closeDate < now;
+  const ddDate = (deal as any).ddExpirationDate ? new Date((deal as any).ddExpirationDate) : null;
+  const isDdOverdue = ddDate && ddDate < now;
+  const followUpDate = followUp?.dueDate ? new Date(followUp.dueDate) : null;
+  const isFollowUpOverdue = followUpDate && followUpDate < now;
 
   return (
-    <Card 
+    <Card
       className="w-full shadow-sm hover:shadow-md transition-all cursor-pointer group"
       onClick={() => onDealClick(deal)}
       data-testid={`kanban-deal-${deal.id}`}
@@ -62,19 +86,68 @@ function DealCard({ deal, onDealClick }: { deal: DealWithRelations; onDealClick:
           {formatCurrency(Number(deal.amount) || 0)}
         </div>
 
-        <div className="flex items-center justify-between text-xs text-gray-500">
-          {deal.expectedCloseDate && (
-            <div className={`flex items-center gap-1 ${isOverdue ? 'text-red-600' : ''}`}>
+        {/* Key Dates Section — matches pipeline.tsx canonical surface */}
+        <div className="space-y-1 bg-gray-50 rounded-md px-2 py-1.5">
+          {/* Days in stage + age */}
+          <div className="flex items-center justify-between text-[11px] text-gray-500">
+            <div className="flex items-center gap-1">
+              <Clock className="h-3 w-3" />
+              <span className={isStale ? 'text-amber-600 font-medium' : ''}>
+                {daysInStage}d in stage
+              </span>
+            </div>
+            {deal.createdAt && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="flex items-center gap-1 text-gray-400">
+                      <Timer className="h-3 w-3" />
+                      <span>{dealAge}d old</span>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">
+                    <p className="text-xs">Created {format(new Date(deal.createdAt), 'MMM d, yyyy')}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+          </div>
+
+          {/* Expected close */}
+          {closeDate && (
+            <div className={`flex items-center gap-1 text-[11px] ${isOverdue ? 'text-red-600 font-medium' : 'text-blue-600'}`}>
               <Calendar className="h-3 w-3" />
-              {format(new Date(deal.expectedCloseDate), 'MMM d')}
-              {isOverdue && <AlertTriangle className="h-3 w-3" />}
+              <span>Close: {format(closeDate, 'MMM d')}</span>
+              {isOverdue && <AlertTriangle className="h-3 w-3 ml-auto" />}
             </div>
           )}
-          
-          <div className={`flex items-center gap-1 ${isStale ? 'text-amber-600' : ''}`}>
-            <Clock className="h-3 w-3" />
-            {daysInStage}d
-          </div>
+
+          {/* DD expiration */}
+          {ddDate && (
+            <div className={`flex items-center gap-1 text-[11px] ${isDdOverdue ? 'text-red-600 font-medium' : 'text-amber-600'}`}>
+              <Target className="h-3 w-3" />
+              <span>DD: {format(ddDate, 'MMM d')}</span>
+              {isDdOverdue && <AlertTriangle className="h-3 w-3 ml-auto" />}
+            </div>
+          )}
+
+          {/* Next follow-up task */}
+          {followUp && followUpDate && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className={`flex items-center gap-1 text-[11px] ${isFollowUpOverdue ? 'text-red-600 font-medium' : 'text-teal-600'}`}>
+                    <Phone className="h-3 w-3" />
+                    <span className="truncate">Follow-up: {format(followUpDate, 'MMM d')}</span>
+                    {isFollowUpOverdue && <AlertTriangle className="h-3 w-3 ml-auto flex-shrink-0" />}
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="top">
+                  <p className="text-xs">{followUp.title}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
         </div>
 
         {deal.contact && (
@@ -95,6 +168,13 @@ function DealCard({ deal, onDealClick }: { deal: DealWithRelations; onDealClick:
 export function DealKanbanBoard({ deals, stages, onDealClick }: DealKanbanBoardProps) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+
+  // Batch-fetch the soonest pending task per deal so each card can show
+  // its next follow-up date. Cached 60s — cheap enough to refetch on focus.
+  const { data: followUps = {} } = useQuery<Record<string, FollowUpInfo>>({
+    queryKey: ['/api/crm/pipeline-enhancements/deals/next-follow-ups'],
+    staleTime: 60_000,
+  });
 
   const updateDealsMutation = useMutation({
     mutationFn: async (updates: Array<{ id: string; stageId: string; stageOrder: number }>) => {
@@ -195,10 +275,11 @@ export function DealKanbanBoard({ deals, stages, onDealClick }: DealKanbanBoardP
               <div className="p-2 min-h-[300px] max-h-[calc(100dvh-320px)] overflow-y-auto">
                 <div className="space-y-2">
                   {column.items.map((item) => (
-                    <DealCard 
+                    <DealCard
                       key={item.id}
                       deal={(item as any).deal}
                       onDealClick={onDealClick}
+                      followUp={followUps[(item as any).deal.id] ?? null}
                     />
                   ))}
                   {column.items.length === 0 && (
