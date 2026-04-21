@@ -229,6 +229,44 @@ function formatLimitValue(v: number): string {
   return v === -1 ? "Unlimited" : v.toLocaleString();
 }
 
+const PLAN_FEATURE_LABELS: Record<string, string> = {
+  deal_workspace: "Deal workspace",
+  crm_basic: "Basic CRM",
+  financial_model: "Financial modeling",
+  document_vault: "Document vault",
+  dd_checklist: "DD checklist",
+  basic_reporting: "Basic reporting",
+  lp_portal: "LP Portal",
+  capital_calls: "Capital calls",
+  distributions: "Distributions",
+  workflow_automation: "Workflow automation",
+  gantt_view: "Gantt view",
+  ai_narratives: "AI narratives",
+  lease_abstractor: "Lease abstractor",
+  email_integration: "Email integration",
+  sms_alerts: "SMS alerts",
+  vendor_management: "Vendor management",
+  work_orders: "Work orders",
+  portfolio_dashboard: "Portfolio dashboard",
+  benchmark_engine: "Benchmark engine",
+  stress_testing: "Stress testing",
+  fund_accounting: "Fund accounting",
+  kyc_aml: "KYC / AML compliance",
+  capital_account_ledger: "Capital account ledger",
+  construction_module: "Construction module",
+  custom_report_builder: "Custom report builder",
+  performance_attribution: "Performance attribution",
+  ai_underwriting: "AI underwriting",
+  document_intelligence: "Document intelligence",
+  sso: "SSO",
+  audit_trail: "Audit trail",
+  white_label: "White label",
+  api_access: "API access",
+  custom_deal_stages: "Custom deal stages",
+  waterfall_engine: "Waterfall engine",
+  everything: "All features",
+};
+
 interface LimitDiff {
   label: string;
   current: number;
@@ -249,15 +287,21 @@ function PlanChangeDiff({
 
   if (!currentTierDef || !pendingTierDef) return null;
 
-  const currentLabels = (TIER_FEATURE_LABELS[currentTierKey ?? ""] ?? []).filter(
-    (f) => !f.startsWith("Everything in")
-  );
-  const pendingLabels = (TIER_FEATURE_LABELS[pendingTierKey] ?? []).filter(
-    (f) => !f.startsWith("Everything in")
-  );
+  const currentFeatures: string[] = currentTierDef.features ?? [];
+  const pendingFeatures: string[] = pendingTierDef.features ?? [];
 
-  const featuresLost = currentLabels.filter((f) => !pendingLabels.includes(f));
-  const featuresGained = pendingLabels.filter((f) => !currentLabels.includes(f));
+  const isDowngrade =
+    TIER_ORDER.indexOf(pendingTierKey) < TIER_ORDER.indexOf(currentTierKey ?? "");
+
+  const featuresLost = isDowngrade
+    ? currentFeatures.filter((f) => !pendingFeatures.includes(f))
+    : [];
+  const featuresGained = !isDowngrade
+    ? pendingFeatures.filter((f) => !currentFeatures.includes(f))
+    : [];
+
+  const labelFor = (key: string) =>
+    PLAN_FEATURE_LABELS[key] ?? key.replace(/_/g, " ");
 
   const limitDiffs: LimitDiff[] = [];
   const maybeDiff = (label: string, cur: number | undefined, pend: number | undefined) => {
@@ -269,7 +313,10 @@ function PlanChangeDiff({
   maybeDiff("Seats", currentTierDef.limits.seats, pendingTierDef.limits.seats);
   maybeDiff("Storage (GB)", currentTierDef.limits.storageGb, pendingTierDef.limits.storageGb);
   maybeDiff("AI Queries", currentTierDef.limits.aiQueries, pendingTierDef.limits.aiQueries);
-  if (currentTierDef.limits.lpInvestors !== undefined && pendingTierDef.limits.lpInvestors !== undefined) {
+  if (
+    currentTierDef.limits.lpInvestors !== undefined &&
+    pendingTierDef.limits.lpInvestors !== undefined
+  ) {
     maybeDiff("LP Investors", currentTierDef.limits.lpInvestors, pendingTierDef.limits.lpInvestors);
   }
 
@@ -288,7 +335,7 @@ function PlanChangeDiff({
             {featuresLost.map((f) => (
               <li key={f} className="flex items-center gap-2 text-muted-foreground">
                 <X className="h-3 w-3 text-destructive flex-shrink-0" />
-                <span className="line-through">{f}</span>
+                <span className="line-through">{labelFor(f)}</span>
               </li>
             ))}
           </ul>
@@ -304,7 +351,7 @@ function PlanChangeDiff({
             {featuresGained.map((f) => (
               <li key={f} className="flex items-center gap-2 text-green-700 dark:text-green-400">
                 <Check className="h-3 w-3 flex-shrink-0" />
-                {f}
+                {labelFor(f)}
               </li>
             ))}
           </ul>
