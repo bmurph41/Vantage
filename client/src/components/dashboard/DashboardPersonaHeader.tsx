@@ -111,7 +111,7 @@ export function DashboardPersonaHeader() {
     <Card className="mb-6 border-l-4 border-l-primary" data-testid="dashboard-persona-header">
       <CardContent className="p-6">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-          <div>
+          <div className="flex-shrink-0">
             <h2 className="text-xl font-semibold text-foreground" data-testid="header-title">
               {data.title}
             </h2>
@@ -121,7 +121,7 @@ export function DashboardPersonaHeader() {
           </div>
 
           {data.metrics.length > 0 && (
-            <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-8 gap-2 sm:gap-3" data-testid="header-metrics">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 flex-1" data-testid="header-metrics">
               {data.metrics.map((metric, idx) => {
                 const IconComponent = metric.icon ? iconMap[metric.icon] : null;
                 const textColor = metric.color ? colorMap[metric.color] : "text-foreground";
