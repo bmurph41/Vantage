@@ -20,6 +20,7 @@ import {
 import { eq, and, desc, sql, count } from "drizzle-orm";
 import { sendInviteEmail } from "../services/email-service";
 import { enterpriseAuthService } from "../services/enterprise-auth-service";
+import { getAssetClassTier } from "@shared/billing-constants";
 
 export const onboardingRouter = Router();
 
@@ -223,6 +224,7 @@ onboardingRouter.post("/set-asset-classes", async (req: Request, res: Response) 
 
     // Audit log
     try {
+      const newTier = getAssetClassTier(assetClasses.length);
       await db.insert(adminAuditLog).values({
         adminUserId: userId,
         action: "asset_classes_updated",
@@ -231,6 +233,8 @@ onboardingRouter.post("/set-asset-classes", async (req: Request, res: Response) 
           orgId,
           previousClasses,
           newClasses: assetClasses,
+          newTier: newTier.key,
+          newTierName: newTier.name,
         },
       });
     } catch (_auditErr) {

@@ -295,49 +295,48 @@ export default function ModelSetupWizard({ open, onOpenChange, onProjectCreated 
             </div>
             <div>
               <Label>Property Type</Label>
-              <TooltipProvider delayDuration={150}>
-                <Select
-                  value={data.propertyType}
-                  onValueChange={(v) => {
-                    if (isPropertyTypeLocked(v)) return;
-                    updateField('propertyType', v);
-                  }}
-                >
-                  <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {PROPERTY_TYPES.map((t) => {
-                      const locked = isPropertyTypeLocked(t.value);
-                      return (
-                        <SelectItem
-                          key={t.value}
-                          value={t.value}
-                          disabled={locked}
-                          className={locked ? 'opacity-50' : ''}
-                        >
-                          <span className="flex items-center gap-2">
-                            {t.label}
-                            {locked && <Lock className="h-3 w-3 text-muted-foreground" />}
-                          </span>
-                        </SelectItem>
-                      );
-                    })}
-                  </SelectContent>
-                </Select>
-              </TooltipProvider>
+              {!entitlements && (
+                <Skeleton className="h-9 mt-1 rounded-md" />
+              )}
+              {entitlements && (
+                <TooltipProvider delayDuration={150}>
+                  <Select
+                    value={data.propertyType}
+                    onValueChange={(v) => {
+                      const assetKey = PROPERTY_TYPE_TO_ASSET_CLASS[v];
+                      if (assetKey && isPropertyTypeLocked(v)) {
+                        setUpgradeModalKey(assetKey);
+                        setShowUpgradeModal(true);
+                        return;
+                      }
+                      updateField('propertyType', v);
+                    }}
+                  >
+                    <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {PROPERTY_TYPES.map((t) => {
+                        const locked = isPropertyTypeLocked(t.value);
+                        return (
+                          <SelectItem
+                            key={t.value}
+                            value={t.value}
+                            className={locked ? 'opacity-60' : ''}
+                          >
+                            <span className="flex items-center gap-2">
+                              {t.label}
+                              {locked && <Lock className="h-3 w-3 text-muted-foreground" />}
+                            </span>
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectContent>
+                  </Select>
+                </TooltipProvider>
+              )}
               {entitlements && entitledKeys.length > 0 && PROPERTY_TYPES.some((t) => isPropertyTypeLocked(t.value)) && (
                 <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
                   <Lock className="h-3 w-3" />
-                  Some types require upgrading your asset class tier.
-                  <button
-                    type="button"
-                    className="text-primary underline underline-offset-2 ml-0.5"
-                    onClick={() => {
-                      setUpgradeModalKey(PROPERTY_TYPE_TO_ASSET_CLASS[data.propertyType] ?? '');
-                      setShowUpgradeModal(true);
-                    }}
-                  >
-                    Upgrade
-                  </button>
+                  Some types require a higher asset class tier — click them to upgrade.
                 </p>
               )}
             </div>

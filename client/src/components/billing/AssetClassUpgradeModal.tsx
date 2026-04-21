@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -44,18 +43,19 @@ export function AssetClassUpgradeModal({
 }: AssetClassUpgradeModalProps) {
   const { toast } = useToast();
 
-  const { data: entitlements, isLoading } = useQuery<OrgEntitlements>({
+  const { data: entitlements, isLoading, isError } = useQuery<OrgEntitlements>({
     queryKey: ["/api/orgs/me/entitlements"],
     enabled: open,
   });
 
   const confirmUpgrade = useMutation({
     mutationFn: async () => {
-      const currentClasses = entitlements?.assetClasses ?? [];
+      if (!entitlements) throw new Error("Entitlements not loaded — please try again.");
+      const currentClasses = entitlements.assetClasses;
       const merged = Array.from(new Set([...currentClasses, ...pendingKeys]));
       const res = await apiRequest("POST", "/api/onboarding/set-asset-classes", {
         assetClasses: merged,
-        userRole: entitlements?.userRole ?? undefined,
+        userRole: entitlements.userRole ?? undefined,
       });
       return res.json();
     },
@@ -65,7 +65,7 @@ export function AssetClassUpgradeModal({
       toast({ title: "Asset classes updated", description: "Your new asset classes are now active." });
       onOpenChange(false);
     },
-    onError: (e: any) => {
+    onError: (e: Error) => {
       toast({ title: "Upgrade failed", description: e.message, variant: "destructive" });
     },
   });
@@ -204,7 +204,7 @@ export function AssetClassUpgradeModal({
           </Button>
           <Button
             onClick={() => confirmUpgrade.mutate()}
-            disabled={confirmUpgrade.isPending || isLoading || pendingKeys.length === 0}
+            disabled={confirmUpgrade.isPending || isLoading || isError || !entitlements || pendingKeys.length === 0}
           >
             {confirmUpgrade.isPending ? (
               <>

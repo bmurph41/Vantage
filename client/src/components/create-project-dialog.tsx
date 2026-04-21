@@ -4,8 +4,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, Building2, Briefcase, Trash2, MapPin, Anchor, PlusCircle } from "lucide-react";
+import { Plus, Building2, Briefcase, Trash2, MapPin, Anchor, PlusCircle, Layers } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
@@ -141,6 +142,15 @@ export function CreateProjectDialog({ trigger }: CreateProjectDialogProps) {
     enabled: open,
   });
   const properties = propertiesResponse?.properties || [];
+
+  const { data: entitlements } = useQuery<{
+    assetClasses: string[];
+    assetClassTierName: string;
+    assetClassCount: number;
+  }>({
+    queryKey: ["/api/orgs/me/entitlements"],
+    enabled: open,
+  });
 
   const form = useForm<CreateProjectFormValues>({
     resolver: zodResolver(createProjectSchema),
@@ -287,7 +297,15 @@ export function CreateProjectDialog({ trigger }: CreateProjectDialogProps) {
       </DialogTrigger>
       <DialogContent className="sm:max-w-[550px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Create Due Diligence Project</DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            Create Due Diligence Project
+            {entitlements && (
+              <Badge variant="secondary" className="text-xs font-normal ml-1 flex items-center gap-1">
+                <Layers className="h-3 w-3" />
+                {entitlements.assetClassTierName}
+              </Badge>
+            )}
+          </DialogTitle>
           <DialogDescription>
             Start a new due diligence project. You can link it to an existing deal or property, or enter a new address.
           </DialogDescription>
