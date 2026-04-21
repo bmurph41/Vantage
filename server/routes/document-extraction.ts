@@ -442,6 +442,19 @@ router.post('/:jobId/populate-proforma', async (req: any, res: any) => {
     }
   }
 
+  // ─── Post-sync validation ────────────────────────────────────────────────
+  // Sum back what we just wrote and compare to source extraction. Catches:
+  //   - mapping table bugs (wrong subcategory)
+  //   - cumulative rounding drift from value/12 monthly spreads
+  //   - silently dropped fields (in actualsMap but no INSERT happened)
+  // Validation is NON-BLOCKING — surfaces warnings without failing the sync,
+  // so users can investigate but data still lands. Mirrors the math-engine
+  // boundary-check pattern.
+  const validation = await validatePostSync(
+    pool, orgId, projectId, fiscalYear, jobId,
+    fields.rows, actualsMap, isRentRoll
+  );
+
   // Mark job as confirmed
   await pool.query(`
     UPDATE document_extraction_jobs
@@ -455,8 +468,104 @@ router.post('/:jobId/populate-proforma', async (req: any, res: any) => {
     totalsSkipped: skippedTotals,
     fiscalYear,
     errors: errors.length > 0 ? errors : undefined,
+    validation,
   });
 });
+
+// ─── Post-sync validation helper ────────────────────────────────────────────
+// Sums modeling_actuals by (category, subcategory) for the synced job and
+// compares against the source extraction values. Returns per-field round-trip
+// diffs and overall pass/fail counts. Tolerance: ±$1 absolute or ±0.5% relative
+// (whichever is larger), to account for value/12 rounding drift across months.
+async function validatePostSync(
+  pool: any,
+  orgId: string,
+  projectId: string,
+  fiscalYear: number,
+  jobId: string,
+  sourceFields: any[],
+  actualsMap: Record<string, ActualsMapping>,
+  isRentRoll: boolean
+): Promise<{
+  passed: number;
+  failed: number;
+  warnings: number;
+  fieldRoundtrips: Array<{
+    schemaKey: string;
+    expected: number;
+    actual: number;
+    diff: number;
+    pass: boolean;
+    severity: 'pass' | 'warning' | 'error';
+  }>;
+}> {
+  const TOLERANCE_ABS = 1.0;   // $1 absolute (covers 12-month rounding drift)
+  const TOLERANCE_REL = 0.005; // 0.5% relative
+
+  // Pull what we just wrote, summed back to annual per (category, subcategory)
+  const summed = await pool.query(`
+    SELECT category, subcategory, SUM(amount::numeric)::numeric as annual_total
+    FROM modeling_actuals
+    WHERE modeling_project_id=$1 AND org_id=$2 AND year=$3
+      AND data_source='doc_intel' AND source_record_id=$4
+    GROUP BY category, subcategory
+  `, [projectId, orgId, fiscalYear, jobId]);
+
+  // Build a lookup: "category::subcategory" → annual sum
+  const actualByKey = new Map<string, number>();
+  for (const r of summed.rows) {
+    const k = `${r.category}::${r.subcategory}`;
+    actualByKey.set(k, parseFloat(r.annual_total));
+  }
+
+  const fieldRoundtrips: Array<{
+    schemaKey: string;
+    expected: number;
+    actual: number;
+    diff: number;
+    pass: boolean;
+    severity: 'pass' | 'warning' | 'error';
+  }> = [];
+
+  let passed = 0, failed = 0, warnings = 0;
+
+  for (const row of sourceFields) {
+    const schemaKey = row.schema_key as string;
+    if (schemaKey.startsWith('monthly.') || schemaKey.startsWith('unit.')) continue;
+
+    const expected = parseFloat(row.final_value);
+    if (!isFinite(expected)) continue;
+
+    const mapping = actualsMap[schemaKey];
+    if (!mapping) continue;
+    if (mapping.isTotal) continue; // computed totals aren't written, no round-trip to validate
+
+    const lookupKey = `${mapping.category}::${mapping.subcategory}`;
+    const actual = actualByKey.get(lookupKey) ?? 0;
+
+    const diff = actual - expected;
+    const absDiff = Math.abs(diff);
+    const relDiff = expected !== 0 ? absDiff / Math.abs(expected) : absDiff;
+    const tolerance = Math.max(TOLERANCE_ABS, Math.abs(expected) * TOLERANCE_REL);
+    const pass = absDiff <= tolerance;
+
+    let severity: 'pass' | 'warning' | 'error';
+    if (pass) { severity = 'pass'; passed++; }
+    else if (relDiff > 0.05) { severity = 'error'; failed++; }
+    else { severity = 'warning'; warnings++; }
+
+    fieldRoundtrips.push({
+      schemaKey,
+      expected: Math.round(expected * 100) / 100,
+      actual: Math.round(actual * 100) / 100,
+      diff: Math.round(diff * 100) / 100,
+      pass,
+      severity,
+    });
+  }
+
+  return { passed, failed, warnings, fieldRoundtrips };
+}
 
 // ─── GET /history — list past jobs for org ───────────────────────────────────
 router.get('/history', async (req: any, res: any) => {
