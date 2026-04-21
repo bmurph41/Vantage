@@ -1,5 +1,5 @@
 import * as XLSX from 'xlsx';
-import { db } from '../db';
+import { db, pool } from '../db';
 import { 
   modelingProjects, 
   modelingCases, 
@@ -8,6 +8,7 @@ import {
   modelingAddbackValues
 } from '@shared/schema';
 import { eq, and } from 'drizzle-orm';
+import { loadLeaseIncomeForProject } from './dcf-calculator-service';
 
 interface ExportOptions {
   caseId?: string;
@@ -289,6 +290,63 @@ export async function exportModelingProjectToExcel(
     }
   }
 
+  // Sheet: Lease Income Summary (EGI — in-place vs. stabilized)
+  try {
+    const leaseIncome = await loadLeaseIncomeForProject(pool, projectId);
+    if (leaseIncome.hasLeases) {
+      const pct = (v: number) => `${(v * 100).toFixed(2)}%`;
+      const leaseSheetData: any[][] = [
+        ['LEASE INCOME SUMMARY'],
+        [''],
+        ['EGI Overview', '', 'Annual Amount'],
+        ['In-Place EGI (active leases only)', '', formatCurrency(leaseIncome.inPlaceEGIAnnual)],
+        ['Stabilized EGI (incl. pre-leased)', '', formatCurrency(leaseIncome.stabilizedEGIAnnual)],
+        [''],
+        ['Detail', '', ''],
+        ['Total Base Rent (Annual)', '', formatCurrency(leaseIncome.totalBaseRentAnnual)],
+        ['Total Recovery Income (Annual)', '', formatCurrency(leaseIncome.totalRecoveryAnnual)],
+        ['Lease Count', '', leaseIncome.leaseCount],
+        ['Wtd. Avg. Escalation Rate', '', pct(leaseIncome.weightedAvgEscalationRate)],
+        [''],
+        ['Note: In-Place EGI includes only leases with a start date on or before today.'],
+        ['Stabilized EGI adds pre-leased (future) spaces whose leases are already signed.'],
+      ];
+
+      if (leaseIncome.leaseBreakdown.length > 0) {
+        leaseSheetData.push(['']);
+        leaseSheetData.push(['LEASE BREAKDOWN']);
+        leaseSheetData.push([
+          'Tenant',
+          'SF',
+          'Lease Type',
+          'Base Rent (Annual)',
+          'Recovery (Annual)',
+          'Total EGI (Annual)',
+          'Status',
+        ]);
+        for (const lease of leaseIncome.leaseBreakdown) {
+          leaseSheetData.push([
+            lease.tenantName || 'Unknown',
+            lease.sf ?? '',
+            lease.leaseType || '',
+            formatCurrency(lease.baseRentAnnual),
+            formatCurrency(lease.recoveryAnnual),
+            formatCurrency(lease.baseRentAnnual + lease.recoveryAnnual),
+            lease.isFuture ? 'Pre-Leased (Future)' : 'In-Place',
+          ]);
+        }
+      }
+
+      const leaseSheet = XLSX.utils.aoa_to_sheet(leaseSheetData);
+      leaseSheet['!cols'] = [
+        { wch: 38 }, { wch: 10 }, { wch: 20 }, { wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 22 },
+      ];
+      XLSX.utils.book_append_sheet(workbook, leaseSheet, 'Lease Income (EGI)');
+    }
+  } catch (leaseErr) {
+    console.error('[Export] Lease income sheet generation failed:', leaseErr);
+  }
+
   return Buffer.from(XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' }));
 }
 
@@ -439,8 +497,23 @@ export async function exportCaseComparisonToExcel(
         ['Net Sale Proceeds', projection.exit.netSaleProceeds],
       ];
 
+      // Append lease EGI section to DCF sheet if lease data exists
+      try {
+        const leaseIncome = await loadLeaseIncomeForProject(pool, projectId);
+        if (leaseIncome.hasLeases) {
+          dcfData.push([]);
+          dcfData.push(['Lease Income (EGI)']);
+          dcfData.push(['In-Place EGI (active leases only)', leaseIncome.inPlaceEGIAnnual]);
+          dcfData.push(['Stabilized EGI (incl. pre-leased)', leaseIncome.stabilizedEGIAnnual]);
+          dcfData.push(['Lease Count', leaseIncome.leaseCount]);
+          dcfData.push(['Wtd. Avg. Escalation Rate', `${(leaseIncome.weightedAvgEscalationRate * 100).toFixed(2)}%`]);
+        }
+      } catch {
+        // Non-fatal — DCF sheet continues without lease EGI rows
+      }
+
       const dcfSheet = XLSX.utils.aoa_to_sheet(dcfData);
-      dcfSheet['!cols'] = [{ wch: 20 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }];
+      dcfSheet['!cols'] = [{ wch: 35 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }];
       XLSX.utils.book_append_sheet(workbook, dcfSheet, 'DCF Analysis');
     }
   } catch (dcfErr) {

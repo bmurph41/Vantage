@@ -1,4 +1,4 @@
-import { db } from '../db';
+import { db, pool } from '../db';
 import { 
   modelingProjects,
   modelingScenarioVersions,
@@ -6,6 +6,7 @@ import {
   modelingAuditLog
 } from '@shared/schema';
 import { eq, and, desc, inArray } from 'drizzle-orm';
+import { loadLeaseIncomeForProject } from './dcf-calculator-service';
 
 export interface ICMemoData {
   project: {
@@ -42,6 +43,9 @@ export interface ICMemoData {
     capRate: number;
     revenueByCategory: Record<string, number>;
     expensesByCategory: Record<string, number>;
+    inPlaceEGIAnnual?: number;
+    stabilizedEGIAnnual?: number;
+    leaseCount?: number;
   };
   projections: {
     years: number[];
@@ -160,6 +164,21 @@ export class ICMemoService {
       scenarioData.value = scenarioData.noi.map(noi => Math.round(noi / exitCap));
     }
 
+    // Load lease EGI data (non-fatal if unavailable)
+    let inPlaceEGIAnnual: number | undefined;
+    let stabilizedEGIAnnual: number | undefined;
+    let leaseCount: number | undefined;
+    try {
+      const leaseIncome = await loadLeaseIncomeForProject(pool, projectId);
+      if (leaseIncome.hasLeases) {
+        inPlaceEGIAnnual = leaseIncome.inPlaceEGIAnnual;
+        stabilizedEGIAnnual = leaseIncome.stabilizedEGIAnnual;
+        leaseCount = leaseIncome.leaseCount;
+      }
+    } catch (leaseErr) {
+      console.warn('[ICMemo] Failed to load lease EGI for project', projectId, leaseErr);
+    }
+
     return {
       project: {
         id: project.id,
@@ -194,7 +213,10 @@ export class ICMemoService {
         noi,
         capRate,
         revenueByCategory,
-        expensesByCategory
+        expensesByCategory,
+        inPlaceEGIAnnual,
+        stabilizedEGIAnnual,
+        leaseCount,
       },
       projections: {
         years,
@@ -250,6 +272,11 @@ Trailing 12-Month Performance:
   Total Expenses:   ${formatCurrency(data.financials.totalExpenses)}
   Net Operating Income: ${formatCurrency(data.financials.noi)}
   Implied Cap Rate: ${formatPercent(data.financials.capRate)}
+${data.financials.inPlaceEGIAnnual !== undefined ? `
+Lease EGI Summary (${data.financials.leaseCount ?? 0} lease${(data.financials.leaseCount ?? 0) !== 1 ? 's' : ''}):
+  In-Place EGI (Annual):           ${formatCurrency(data.financials.inPlaceEGIAnnual)}
+  Stabilized EGI (incl. pre-leased): ${formatCurrency(data.financials.stabilizedEGIAnnual ?? data.financials.inPlaceEGIAnnual)}
+  (Stabilized figure includes signed leases not yet commenced)` : ''}
 
 Revenue Breakdown:
 ${Object.entries(data.financials.revenueByCategory)
