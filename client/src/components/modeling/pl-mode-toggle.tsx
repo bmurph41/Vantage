@@ -169,12 +169,15 @@ export function PLModeToggle({ project, onModeChange }: PLModeToggleProps) {
 
   const handleSelectMode = useCallback(
     (mode: ModelInputMode) => {
-      if (displayMode === mode) return; // already selected
+      // Only skip if the DB already has this exact mode explicitly persisted.
+      // When rawMode is 'auto' the visual default may already match a button,
+      // but the selection was never saved — allow the click so it persists.
+      if (rawMode !== 'auto' && rawMode === mode) return;
       setOptimisticMode(mode);
       updateModeMutation.mutate(mode);
       onModeChange?.(mode);
     },
-    [displayMode, updateModeMutation, onModeChange],
+    [rawMode, updateModeMutation, onModeChange],
   );
 
   return (

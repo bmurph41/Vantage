@@ -46,7 +46,7 @@ import {
   Settings2, Sun, TrendingUp, TrendingDown, DollarSign, Percent, ChevronDown,
   ChevronRight, Save, Plus, Trash2, Calculator, RefreshCw, Eye, EyeOff,
   Store, Anchor, Home, Building2, Warehouse, Bed, Wrench, Users, Zap,
-  Shield, Receipt, BarChart3, Globe, ArrowUp, Hash, Info, Brain,
+  Shield, Receipt, BarChart3, Globe, ArrowUp, Hash, Info, Brain, Upload,
   type LucideIcon
 } from 'lucide-react';
 import { Link } from 'wouter';
@@ -57,7 +57,7 @@ import type {
   AssetClassModelConfig, InputSectionConfig, InputFieldDef,
   GrowthCategoryConfig, UnitMixTypeConfig
 } from '@shared/asset-class-model-config';
-import { PLModeToggle, FinancialSourceBadge } from '@/components/modeling/pl-mode-toggle';
+import { PLModeToggle, FinancialSourceBadge, getDefaultMode } from '@/components/modeling/pl-mode-toggle';
 import type { ModelInputMode } from '@/components/modeling/pl-mode-toggle';
 import { getCOAFields, getCOAFieldsGrouped, type COAFieldDef, type COACustomLine } from '@shared/direct-input-coa';
 import { apiRequest } from '@/lib/queryClient';
@@ -742,12 +742,21 @@ export default function InputsAssumptions({ project }: InputsAssumptionsProps) {
   const assetClass = project?.assetClass ?? 'marina';
   const projectId = project?.id;
 
-  // Current financial data mode
-  const currentMode: ModelInputMode =
-    ((project as any)?.modelInputMode as ModelInputMode) ?? 'auto';
-  const hasUploadedActuals = !!((project as any)?.hasActuals || (project as any)?.actualsCount > 0);
-  const showDirectInput = currentMode === 'direct_input' || currentMode === 'hybrid' ||
-    (currentMode === 'auto' && !hasUploadedActuals);
+  // Current financial data mode — read raw DB value then coerce 'auto' to the
+  // asset-class default (same logic as PLModeToggle so both components agree).
+  const rawMode: ModelInputMode = ((project as any)?.modelInputMode as ModelInputMode) ?? 'auto';
+  const effectiveMode: ModelInputMode =
+    (rawMode && rawMode !== 'auto') ? rawMode : getDefaultMode(assetClass);
+
+  // Derive hasUploadedActuals from the documents query (same key as PLModeToggle)
+  const { data: documents = [] } = useQuery<any[]>({
+    queryKey: ['/api/modeling/projects', projectId, 'documents'],
+    enabled: !!projectId,
+    staleTime: 30_000,
+  });
+  const hasUploadedActuals = documents.length > 0;
+
+  const showDirectInput = effectiveMode === 'direct_input' || effectiveMode === 'hybrid';
 
   // ─── Generic Config Inputs (deal structure, etc.) ──────────────
   const [configInputs, setConfigInputs] = useState<Record<string, string>>({});
@@ -1177,28 +1186,43 @@ export default function InputsAssumptions({ project }: InputsAssumptionsProps) {
           noi={noi}
           isDirty={isDirty}
           isSaving={saveMutation.isPending}
-          source={showDirectInput ? 'direct_input' : 'none'}
+          source={effectiveMode === 'hybrid' ? 'hybrid' : 'direct_input'}
           noiOverride={noiOverrideValue}
           onNoiOverrideChange={handleNoiOverrideChange}
         />
       )}
 
       {/* ─── Upload Mode Message ───────────────────────────────── */}
-      {currentMode === 'upload' && (
-        <Card className="border-blue-200 bg-blue-50/50 dark:bg-blue-950/20">
+      {effectiveMode === 'upload' && (
+        <Card className={hasUploadedActuals
+          ? "border-blue-200 bg-blue-50/50 dark:bg-blue-950/20"
+          : "border-amber-200 bg-amber-50/50 dark:bg-amber-950/20"}>
           <CardContent className="py-4 px-4">
             <div className="flex items-start gap-3">
-              <Info className="h-5 w-5 text-blue-500 shrink-0 mt-0.5" />
+              <Info className={`h-5 w-5 shrink-0 mt-0.5 ${hasUploadedActuals ? 'text-blue-500' : 'text-amber-500'}`} />
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium">Upload Mode Active</p>
+                <p className="text-sm font-medium">
+                  {hasUploadedActuals ? 'P&L Upload Mode Active' : 'No Documents Uploaded Yet'}
+                </p>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Financial data comes from your uploaded P&L statements. After uploading a document on the <strong>Uploads</strong> tab, open <strong>Document Intelligence</strong> to run AI parsing, review extracted line items, and approve them before they populate the model.
+                  {hasUploadedActuals
+                    ? `${documents.length} document${documents.length !== 1 ? 's' : ''} uploaded. Open Document Intelligence to run AI parsing, review extracted line items, and approve them before they populate the model.`
+                    : 'Upload a P&L statement on the Uploads tab, then run Document Intelligence to extract and approve financials that will drive the model.'
+                  }
                 </p>
                 <div className="flex gap-2 mt-2">
-                  <Link href={`/modeling/projects/${projectId}/doc-intel`}>
-                    <Button size="sm" variant="default" className="gap-1.5 h-7 text-xs">
-                      <Brain className="h-3.5 w-3.5" />
-                      Open Document Intelligence
+                  {hasUploadedActuals && (
+                    <Link href={`/modeling/projects/${projectId}/doc-intel`}>
+                      <Button size="sm" variant="default" className="gap-1.5 h-7 text-xs">
+                        <Brain className="h-3.5 w-3.5" />
+                        Open Document Intelligence
+                      </Button>
+                    </Link>
+                  )}
+                  <Link href={`/modeling/projects/${projectId}?tab=uploads`}>
+                    <Button size="sm" variant={hasUploadedActuals ? "outline" : "default"} className="gap-1.5 h-7 text-xs">
+                      <Upload className="h-3.5 w-3.5" />
+                      {hasUploadedActuals ? 'Manage Uploads' : 'Upload P&L'}
                     </Button>
                   </Link>
                 </div>
