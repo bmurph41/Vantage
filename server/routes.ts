@@ -871,8 +871,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (!uploadId) return res.status(400).json({ error: 'uploadId is required' });
 
         // Resolve the file from doc_intel_uploads
+        // (column is storage_path; file_path was a stale alias — caused every
+        // rent-roll-sync click to 500 with `column "file_path" does not exist`.)
         const fileRes = await pool.query(
-          `SELECT file_path, original_name FROM doc_intel_uploads WHERE id = $1 AND org_id = $2`,
+          `SELECT storage_path, original_name FROM doc_intel_uploads WHERE id = $1 AND org_id = $2`,
           [uploadId, orgId],
         );
         if (fileRes.rowCount === 0) return res.status(404).json({ error: 'Upload not found' });
@@ -881,7 +883,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Parse the rent roll document
         const { RentRollDocumentParser } = await import('./services/rent-roll-document-parser');
         const fs = await import('fs');
-        const buffer = fs.readFileSync(upload.file_path);
+        const buffer = fs.readFileSync(upload.storage_path);
         const parser = new RentRollDocumentParser();
         const parsed = await parser.parseDocument(buffer, upload.original_name);
 
