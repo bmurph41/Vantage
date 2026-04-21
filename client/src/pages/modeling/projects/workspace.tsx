@@ -701,7 +701,25 @@ export default function ProjectWorkspace() {
                 <h1 className="text-[15px] font-bold tracking-tight leading-none truncate" data-testid="text-project-name">
                   {project.marinaName}
                 </h1>
-                <ProjectTypeBadge project={project} />
+                {(project as any).dealId ? (
+                  <button
+                    onClick={() => navigate(`/crm/deals/${(project as any).dealId}`)}
+                    className="focus:outline-none focus:ring-1 focus:ring-primary/50 rounded"
+                    title="Open linked CRM deal"
+                  >
+                    <ProjectTypeBadge project={project} />
+                  </button>
+                ) : (project as any).propertyId ? (
+                  <button
+                    onClick={() => navigate(`/properties/${(project as any).propertyId}`)}
+                    className="focus:outline-none focus:ring-1 focus:ring-primary/50 rounded"
+                    title="Open linked property"
+                  >
+                    <ProjectTypeBadge project={project} />
+                  </button>
+                ) : (
+                  <ProjectTypeBadge project={project} />
+                )}
                 {(project as any).assetClass && (
                   <Badge variant="outline" className="text-[10px] capitalize px-1.5 py-0">
                     {(project as any).assetClass.replace(/_/g, " ")}
@@ -738,10 +756,17 @@ export default function ProjectWorkspace() {
             </div>
             <Select
               value={(project as any).uwStage || "not_started"}
-              onValueChange={(val) => uwStageMutation.mutate({ uwStage: val, uwSubStatus: undefined })}
+              onValueChange={(val) => uwStageMutation.isPending ? undefined : uwStageMutation.mutate({ uwStage: val, uwSubStatus: "" })}
             >
-              <SelectTrigger className="h-7 w-[140px] text-xs border border-border/60 bg-background font-medium shadow-sm hover:border-primary/40 transition-colors">
-                <SelectValue />
+              <SelectTrigger disabled={uwStageMutation.isPending} className="h-7 w-[140px] text-xs border border-border/60 bg-background font-medium shadow-sm hover:border-primary/40 transition-colors disabled:opacity-60">
+                {uwStageMutation.isPending ? (
+                  <span className="flex items-center gap-1.5">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    <span>Saving…</span>
+                  </span>
+                ) : (
+                  <SelectValue />
+                )}
               </SelectTrigger>
               <SelectContent>
                 {Object.entries(uwStageLabels).map(([value, label]) => (
@@ -752,9 +777,9 @@ export default function ProjectWorkspace() {
             {uwSubStatuses[(project as any).uwStage || "not_started"]?.length > 0 && (
               <Select
                 value={(project as any).uwSubStatus || ""}
-                onValueChange={(val) => uwStageMutation.mutate({ uwSubStatus: val })}
+                onValueChange={(val) => uwStageMutation.isPending ? undefined : uwStageMutation.mutate({ uwSubStatus: val })}
               >
-                <SelectTrigger className="h-7 w-[145px] text-xs border border-border/60 bg-background shadow-sm hover:border-primary/40 transition-colors">
+                <SelectTrigger disabled={uwStageMutation.isPending} className="h-7 w-[145px] text-xs border border-border/60 bg-background shadow-sm hover:border-primary/40 transition-colors disabled:opacity-60">
                   <SelectValue placeholder="Sub-status..." />
                 </SelectTrigger>
                 <SelectContent>
