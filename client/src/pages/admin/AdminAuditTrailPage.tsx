@@ -421,9 +421,9 @@ function AssetClassChangesTab() {
                         <ClassList classes={meta.newClasses} />
                       </TableCell>
                       <TableCell>
-                        {meta.newTierName ? (
+                        {(meta.newTierName ?? meta.newTier) ? (
                           <Badge className="bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-400 border-0 text-xs">
-                            {meta.newTierName}
+                            {meta.newTierName ?? meta.newTier}
                           </Badge>
                         ) : (
                           <span className="text-muted-foreground text-sm">—</span>
