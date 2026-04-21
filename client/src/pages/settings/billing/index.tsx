@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { ToastAction } from "@/components/ui/toast";
 import {
   Dialog,
   DialogContent,
@@ -226,6 +227,7 @@ function UsageBar({
 export default function BillingSettingsPage() {
   const { toast } = useToast();
   const [pendingTier, setPendingTier] = useState<string | null>(null);
+  const previousPlanTier = useRef<string | undefined>(undefined);
   const [showChangePlanDialog, setShowChangePlanDialog] = useState(false);
   const [showAddClassesDialog, setShowAddClassesDialog] = useState(false);
   const [pendingAddClasses, setPendingAddClasses] = useState<string[]>([]);
@@ -278,19 +280,56 @@ export default function BillingSettingsPage() {
     },
   });
 
+  const isUndoPlanMutation = useRef(false);
+
   const changePlan = useMutation({
     mutationFn: async (newTier: string) => {
       const res = await apiRequest("POST", "/api/billing/change-plan", { newTier });
       return res.json();
     },
-    onSuccess: () => {
-      toast({ title: "Plan updated", description: "Your subscription has been updated." });
+    onSuccess: (_data, newTier: string) => {
       queryClient.invalidateQueries({ queryKey: ["/api/billing/subscription"] });
       queryClient.invalidateQueries({ queryKey: ["/api/billing/plans"] });
       setShowChangePlanDialog(false);
+
+      const wasUndo = isUndoPlanMutation.current;
+      isUndoPlanMutation.current = false;
+
+      const prev = previousPlanTier.current;
+      const isDowngrade = !wasUndo && prev !== undefined && getTierIndex(newTier) < getTierIndex(prev);
+
+      if (isDowngrade && prev) {
+        const restoredTier = prev;
+        const { dismiss } = toast({
+          title: "Plan downgraded",
+          description: `You have switched to the ${planFeatureMap[newTier]?.name ?? newTier} plan.`,
+          action: (
+            <ToastAction
+              altText="Undo downgrade"
+              onClick={() => {
+                isUndoPlanMutation.current = true;
+                previousPlanTier.current = newTier;
+                changePlan.mutate(restoredTier);
+                dismiss();
+              }}
+            >
+              Undo
+            </ToastAction>
+          ),
+        });
+        setTimeout(dismiss, 8000);
+      } else {
+        toast({
+          title: wasUndo ? "Plan restored" : "Plan updated",
+          description: wasUndo
+            ? `You have been restored to the ${planFeatureMap[newTier]?.name ?? newTier} plan.`
+            : "Your subscription has been updated.",
+        });
+      }
       setPendingTier(null);
     },
     onError: (err: Error) => {
+      isUndoPlanMutation.current = false;
       toast({ title: "Plan change failed", description: err.message, variant: "destructive" });
     },
   });
@@ -1058,7 +1097,10 @@ export default function BillingSettingsPage() {
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
-                if (pendingTier) changePlan.mutate(pendingTier);
+                if (pendingTier) {
+                  previousPlanTier.current = currentTier;
+                  changePlan.mutate(pendingTier);
+                }
               }}
               disabled={changePlan.isPending}
             >
