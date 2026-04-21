@@ -1845,18 +1845,35 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
                       When enabled, tenant lease schedules (base rent + recoveries + escalations) override
                       the pro-forma revenue estimate in the DCF model. Disable to use manual pro-forma inputs only.
                     </p>
-                    {leaseIncomeData?.hasLeases && (
-                      <div className="flex items-center gap-1.5 mt-2">
-                        <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium ${
-                          dcfAnalysis?.meta?.leaseIncomeInjected
-                            ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300'
-                            : 'bg-muted text-muted-foreground'
-                        }`}>
-                          <Info className="h-3 w-3" />
-                          {dcfAnalysis?.meta?.leaseIncomeInjected
-                            ? 'Lease income is active in the current DCF'
-                            : 'Lease income is not used in the current DCF'}
-                        </span>
+                    {(leaseIncomeData?.hasLeases || typeof (activeScenario?.assumptions as Record<string, unknown>)?.cpiRate === 'number') && (
+                      <div className="flex items-center flex-wrap gap-1.5 mt-2">
+                        {leaseIncomeData?.hasLeases && (
+                          <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium ${
+                            dcfAnalysis?.meta?.leaseIncomeInjected
+                              ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300'
+                              : 'bg-muted text-muted-foreground'
+                          }`}>
+                            <Info className="h-3 w-3" />
+                            {dcfAnalysis?.meta?.leaseIncomeInjected
+                              ? 'Lease income is active in the current DCF'
+                              : 'Lease income is not used in the current DCF'}
+                          </span>
+                        )}
+                        {typeof (activeScenario?.assumptions as Record<string, unknown>)?.cpiRate === 'number' && (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium bg-orange-100 dark:bg-orange-950 text-orange-700 dark:text-orange-300 cursor-default">
+                                  <TrendingUp className="h-3 w-3" />
+                                  CPI Assumption: {(((activeScenario?.assumptions as Record<string, unknown>)?.cpiRate as number) * 100).toFixed(1)}%
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent side="top" className="text-xs max-w-xs">
+                                Assumed annual CPI inflation rate for CPI-linked leases in this scenario. Adjust it on the Assumptions tab.
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        )}
                       </div>
                     )}
                   </div>
