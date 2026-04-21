@@ -16,7 +16,7 @@ import {
   adminAuditLog,
 } from "@shared/schema";
 import { eq, and, desc, sql, count } from "drizzle-orm";
-import { ASSET_CLASS_TIERS, getAssetClassTier, getMaxAssetClasses } from "@shared/billing-constants";
+import { getAssetClassTier, getMaxAssetClasses } from "@shared/billing-constants";
 import { sendInviteEmail } from "../services/email-service";
 import { enterpriseAuthService } from "../services/enterprise-auth-service";
 
