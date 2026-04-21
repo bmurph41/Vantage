@@ -105,17 +105,21 @@ export function AssetClassDowngradeModal({
       let secondsLeft = UNDO_SECONDS;
       const intervalRef = { current: null as ReturnType<typeof setInterval> | null };
       const dismissRef = { current: () => {} };
-      const dismissedRef = { current: false };
 
-      const stopAndDismiss = () => {
+      // Stop only the countdown. Does NOT call dismiss — use this when the toast
+      // is already being closed externally (e.g. user clicked X or swipe).
+      const clearCountdown = () => {
         if (intervalRef.current) {
           clearInterval(intervalRef.current);
           intervalRef.current = null;
         }
-        if (!dismissedRef.current) {
-          dismissedRef.current = true;
-          dismissRef.current();
-        }
+      };
+
+      // Stop the countdown AND programmatically close the toast. Use this when
+      // the action originates from within the component (Undo button, timer expiry).
+      const stopAndDismiss = () => {
+        clearCountdown();
+        dismissRef.current();
       };
 
       const makeAction = (secs: number) => (
@@ -134,8 +138,10 @@ export function AssetClassDowngradeModal({
         title: "Asset classes removed",
         description: `${remaining.length} asset class${remaining.length !== 1 ? "es" : ""} active — now on ${newTier.name} tier.`,
         action: makeAction(secondsLeft),
+        // use-toast.ts already calls dismiss() before this callback fires,
+        // so we only need to cancel the interval here — no second dismiss.
         onOpenChange: (open) => {
-          if (!open) stopAndDismiss();
+          if (!open) clearCountdown();
         },
       });
 

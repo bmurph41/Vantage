@@ -463,6 +463,7 @@ export default function BillingSettingsPage() {
 
       if (isDowngrade && prev) {
         const restoredTier = prev;
+        const autoCloseTimeout = { current: null as ReturnType<typeof setTimeout> | null };
         const { dismiss } = toast({
           title: "Plan downgraded",
           description: `You have switched to the ${planFeatureMap[newTier]?.name ?? newTier} plan.`,
@@ -470,6 +471,10 @@ export default function BillingSettingsPage() {
             <ToastAction
               altText="Undo downgrade"
               onClick={() => {
+                if (autoCloseTimeout.current) {
+                  clearTimeout(autoCloseTimeout.current);
+                  autoCloseTimeout.current = null;
+                }
                 isUndoPlanMutation.current = true;
                 previousPlanTier.current = newTier;
                 changePlan.mutate(restoredTier);
@@ -479,8 +484,15 @@ export default function BillingSettingsPage() {
               Undo
             </ToastAction>
           ),
+          // use-toast.ts calls dismiss() before this fires, so only cancel the timer.
+          onOpenChange: (open) => {
+            if (!open && autoCloseTimeout.current) {
+              clearTimeout(autoCloseTimeout.current);
+              autoCloseTimeout.current = null;
+            }
+          },
         });
-        setTimeout(dismiss, 8000);
+        autoCloseTimeout.current = setTimeout(dismiss, 8000);
       } else {
         toast({
           title: wasUndo ? "Plan restored" : "Plan updated",
