@@ -15,6 +15,7 @@ import {
   crmNotifications,
   crmDeals,
   organizationPacks,
+  adminAuditLog,
 } from "@shared/schema";
 import { eq, and, desc, sql, count } from "drizzle-orm";
 import { sendInviteEmail } from "../services/email-service";
@@ -190,6 +191,14 @@ onboardingRouter.post("/set-asset-classes", async (req: Request, res: Response) 
       updatePayload.userRole = userRole;
     }
 
+    // Fetch current org for audit comparison
+    const [currentOrg] = await db
+      .select()
+      .from(organizations)
+      .where(eq(organizations.id, orgId));
+
+    const previousClasses: string[] = (currentOrg?.assetClasses as string[]) ?? [];
+
     const [updated] = await db
       .update(organizations)
       .set(updatePayload)
@@ -210,6 +219,22 @@ onboardingRouter.post("/set-asset-classes", async (req: Request, res: Response) 
           .set({ completedSteps: steps, updatedAt: new Date() })
           .where(eq(userOnboarding.id, onboarding.id));
       }
+    }
+
+    // Audit log
+    try {
+      await db.insert(adminAuditLog).values({
+        adminUserId: userId,
+        action: "asset_classes_updated",
+        targetUserId: userId,
+        metadataJson: {
+          orgId,
+          previousClasses,
+          newClasses: assetClasses,
+        },
+      });
+    } catch (_auditErr) {
+      // Non-fatal: audit failure should not block the response
     }
 
     res.json({ org: updated, step: "asset_classes" });

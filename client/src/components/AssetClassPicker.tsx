@@ -1,4 +1,6 @@
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export interface AssetClassEntry {
@@ -65,10 +67,28 @@ interface AssetClassPickerProps {
   selected: string[];
   onChange: (keys: string[]) => void;
   maxSelections?: number;
+  /** When provided, classes not in this list are rendered locked. */
+  entitledKeys?: string[];
+  /** Called when user clicks a locked (non-entitled) class. */
+  onUpgradeRequest?: (key: string) => void;
+  /** Classes that are permanently disabled (e.g. already selected at org level). */
+  disabledKeys?: string[];
 }
 
-export function AssetClassPicker({ selected, onChange, maxSelections }: AssetClassPickerProps) {
+export function AssetClassPicker({
+  selected,
+  onChange,
+  maxSelections,
+  entitledKeys,
+  onUpgradeRequest,
+  disabledKeys = [],
+}: AssetClassPickerProps) {
   const toggle = (key: string) => {
+    if (disabledKeys.includes(key)) return;
+    if (entitledKeys && !entitledKeys.includes(key)) {
+      onUpgradeRequest?.(key);
+      return;
+    }
     if (selected.includes(key)) {
       onChange(selected.filter((k) => k !== key));
     } else {
@@ -78,60 +98,99 @@ export function AssetClassPicker({ selected, onChange, maxSelections }: AssetCla
   };
 
   return (
-    <div className="space-y-5">
-      {GROUPS.map((group) => {
-        const items = ASSET_CLASS_LIST.filter((a) => a.group === group);
-        return (
-          <div key={group}>
-            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
-              {group}
-            </p>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
-              {items.map((asset) => {
-                const isSelected = selected.includes(asset.key);
-                return (
-                  <button
-                    key={asset.key}
-                    type="button"
-                    onClick={() => toggle(asset.key)}
-                    className={cn(
-                      "flex items-center gap-2 px-3 py-2 rounded-lg border text-sm font-medium transition-all text-left",
-                      isSelected
-                        ? "border-transparent text-white shadow-md"
-                        : "border-border bg-background hover:bg-muted text-foreground"
-                    )}
-                    style={isSelected ? { backgroundColor: asset.color, borderColor: asset.color } : {}}
-                  >
-                    <span className="text-base leading-none flex-shrink-0">{asset.icon}</span>
-                    <span className="truncate leading-tight">{asset.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        );
-      })}
+    <TooltipProvider delayDuration={150}>
+      <div className="space-y-5">
+        {GROUPS.map((group) => {
+          const items = ASSET_CLASS_LIST.filter((a) => a.group === group);
+          return (
+            <div key={group}>
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+                {group}
+              </p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+                {items.map((asset) => {
+                  const isSelected = selected.includes(asset.key);
+                  const isDisabled = disabledKeys.includes(asset.key);
+                  const isLocked =
+                    !isDisabled &&
+                    entitledKeys !== undefined &&
+                    !entitledKeys.includes(asset.key);
 
-      {selected.length > 0 && (
-        <div className="pt-2 border-t flex flex-wrap gap-1.5">
-          <span className="text-xs text-muted-foreground self-center mr-1">Selected:</span>
-          {selected.map((key) => {
-            const entry = ASSET_CLASS_LIST.find((a) => a.key === key);
-            if (!entry) return null;
-            return (
-              <Badge
-                key={key}
-                variant="secondary"
-                className="cursor-pointer hover:bg-destructive/20 transition-colors"
-                onClick={() => toggle(key)}
-                style={{ borderLeft: `3px solid ${entry.color}` }}
-              >
-                {entry.icon} {entry.label} ×
-              </Badge>
-            );
-          })}
-        </div>
-      )}
-    </div>
+                  const btn = (
+                    <button
+                      key={asset.key}
+                      type="button"
+                      onClick={() => toggle(asset.key)}
+                      disabled={isDisabled}
+                      className={cn(
+                        "relative flex items-center gap-2 px-3 py-2 rounded-lg border text-sm font-medium transition-all text-left w-full",
+                        isDisabled
+                          ? "border-border bg-muted/30 text-muted-foreground opacity-50 cursor-not-allowed"
+                          : isLocked
+                          ? "border-border bg-muted/30 text-muted-foreground opacity-60 cursor-pointer hover:opacity-80"
+                          : isSelected
+                          ? "border-transparent text-white shadow-md"
+                          : "border-border bg-background hover:bg-muted text-foreground"
+                      )}
+                      style={
+                        isSelected && !isLocked && !isDisabled
+                          ? { backgroundColor: asset.color, borderColor: asset.color }
+                          : {}
+                      }
+                    >
+                      <span className="text-base leading-none flex-shrink-0">{asset.icon}</span>
+                      <span className="truncate leading-tight">{asset.label}</span>
+                      {isLocked && (
+                        <Lock className="h-3 w-3 ml-auto flex-shrink-0 text-muted-foreground" />
+                      )}
+                    </button>
+                  );
+
+                  if (isLocked) {
+                    return (
+                      <Tooltip key={asset.key}>
+                        <TooltipTrigger asChild>{btn}</TooltipTrigger>
+                        <TooltipContent side="top">
+                          Upgrade to unlock {asset.label}
+                        </TooltipContent>
+                      </Tooltip>
+                    );
+                  }
+
+                  return btn;
+                })}
+              </div>
+            </div>
+          );
+        })}
+
+        {selected.length > 0 && (
+          <div className="pt-2 border-t flex flex-wrap gap-1.5">
+            <span className="text-xs text-muted-foreground self-center mr-1">Selected:</span>
+            {selected.map((key) => {
+              const entry = ASSET_CLASS_LIST.find((a) => a.key === key);
+              if (!entry) return null;
+              const isDisabled = disabledKeys.includes(key);
+              return (
+                <Badge
+                  key={key}
+                  variant="secondary"
+                  className={cn(
+                    "transition-colors",
+                    isDisabled
+                      ? "opacity-60 cursor-default"
+                      : "cursor-pointer hover:bg-destructive/20"
+                  )}
+                  onClick={() => !isDisabled && toggle(key)}
+                  style={{ borderLeft: `3px solid ${entry.color}` }}
+                >
+                  {entry.icon} {entry.label} {!isDisabled && "×"}
+                </Badge>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </TooltipProvider>
   );
 }

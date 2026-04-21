@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { useLocation } from 'wouter';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,6 +10,13 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Badge } from '@/components/ui/badge';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import {
   ArrowLeft,
   ArrowRight,
@@ -21,10 +28,13 @@ import {
   Target,
   CheckCircle2,
   Loader2,
+  Lock,
+  Zap,
 } from 'lucide-react';
 import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { formatCurrency } from '@/lib/utils';
+import { AssetClassUpgradeModal } from '@/components/billing/AssetClassUpgradeModal';
 
 interface ModelSetupWizardProps {
   open: boolean;
@@ -43,6 +53,26 @@ const PROPERTY_TYPES = [
   { value: 'MOBILE_HOME_PARK', label: 'Mobile Home Park' },
   { value: 'OTHER', label: 'Other' },
 ];
+
+/** Maps wizard PROPERTY_TYPES values to AssetClassPicker keys for entitlement checks. */
+const PROPERTY_TYPE_TO_ASSET_CLASS: Record<string, string | null> = {
+  MARINA: 'marina',
+  RV_PARK: 'rv_park',
+  MULTIFAMILY: 'multifamily',
+  RETAIL: 'retail',
+  INDUSTRIAL: 'industrial',
+  MIXED_USE: null, // no direct mapping — always unlocked
+  SELF_STORAGE: 'self_storage',
+  MOBILE_HOME_PARK: 'mobile_home',
+  OTHER: null, // always unlocked
+};
+
+interface OrgEntitlements {
+  assetClasses: string[];
+  assetClassTier: string;
+  assetClassTierName: string;
+  assetClassCount: number;
+}
 
 const STEPS = [
   { id: 'basics', label: 'Property Basics', icon: Building2 },
@@ -126,6 +156,22 @@ export default function ModelSetupWizard({ open, onOpenChange, onProjectCreated 
   const [data, setData] = useState<WizardData>({ ...defaultData });
   const [, navigate] = useLocation();
   const { toast } = useToast();
+  const [upgradeModalKey, setUpgradeModalKey] = useState<string | null>(null);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+
+  const { data: entitlements } = useQuery<OrgEntitlements>({
+    queryKey: ['/api/orgs/me/entitlements'],
+    enabled: open,
+  });
+
+  const entitledKeys = entitlements?.assetClasses ?? [];
+
+  const isPropertyTypeLocked = (typeValue: string): boolean => {
+    if (!entitlements || entitledKeys.length === 0) return false;
+    const assetKey = PROPERTY_TYPE_TO_ASSET_CLASS[typeValue];
+    if (assetKey === null || assetKey === undefined) return false;
+    return !entitledKeys.includes(assetKey);
+  };
 
   const updateField = useCallback(
     <K extends keyof WizardData>(field: K, value: WizardData[K]) => {
@@ -249,14 +295,51 @@ export default function ModelSetupWizard({ open, onOpenChange, onProjectCreated 
             </div>
             <div>
               <Label>Property Type</Label>
-              <Select value={data.propertyType} onValueChange={(v) => updateField('propertyType', v)}>
-                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {PROPERTY_TYPES.map((t) => (
-                    <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <TooltipProvider delayDuration={150}>
+                <Select
+                  value={data.propertyType}
+                  onValueChange={(v) => {
+                    if (isPropertyTypeLocked(v)) return;
+                    updateField('propertyType', v);
+                  }}
+                >
+                  <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {PROPERTY_TYPES.map((t) => {
+                      const locked = isPropertyTypeLocked(t.value);
+                      return (
+                        <SelectItem
+                          key={t.value}
+                          value={t.value}
+                          disabled={locked}
+                          className={locked ? 'opacity-50' : ''}
+                        >
+                          <span className="flex items-center gap-2">
+                            {t.label}
+                            {locked && <Lock className="h-3 w-3 text-muted-foreground" />}
+                          </span>
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+              </TooltipProvider>
+              {entitlements && entitledKeys.length > 0 && PROPERTY_TYPES.some((t) => isPropertyTypeLocked(t.value)) && (
+                <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                  <Lock className="h-3 w-3" />
+                  Some types require upgrading your asset class tier.
+                  <button
+                    type="button"
+                    className="text-primary underline underline-offset-2 ml-0.5"
+                    onClick={() => {
+                      setUpgradeModalKey(PROPERTY_TYPE_TO_ASSET_CLASS[data.propertyType] ?? '');
+                      setShowUpgradeModal(true);
+                    }}
+                  >
+                    Upgrade
+                  </button>
+                </p>
+              )}
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
@@ -592,7 +675,7 @@ export default function ModelSetupWizard({ open, onOpenChange, onProjectCreated 
 
   const StepIcon = STEPS[step].icon;
 
-  return (
+  return (<>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
@@ -659,5 +742,12 @@ export default function ModelSetupWizard({ open, onOpenChange, onProjectCreated 
         </div>
       </DialogContent>
     </Dialog>
-  );
+
+    {/* Upgrade modal for locked asset class types */}
+    <AssetClassUpgradeModal
+      open={showUpgradeModal}
+      onOpenChange={setShowUpgradeModal}
+      pendingKeys={upgradeModalKey ? [upgradeModalKey] : []}
+    />
+  </>);
 }

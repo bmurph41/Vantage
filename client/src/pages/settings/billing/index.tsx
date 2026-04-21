@@ -3,6 +3,16 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { AssetClassPicker } from "@/components/AssetClassPicker";
+import { AssetClassUpgradeModal } from "@/components/billing/AssetClassUpgradeModal";
+import {
   Card,
   CardContent,
   CardHeader,
@@ -43,6 +53,7 @@ import {
   Home,
   Tag,
   ArrowRight,
+  Plus,
 } from "lucide-react";
 import { ASSET_CLASS_TIERS } from "@shared/billing-constants";
 import { cn } from "@/lib/utils";
@@ -214,6 +225,9 @@ export default function BillingSettingsPage() {
   const { toast } = useToast();
   const [pendingTier, setPendingTier] = useState<string | null>(null);
   const [showChangePlanDialog, setShowChangePlanDialog] = useState(false);
+  const [showAddClassesDialog, setShowAddClassesDialog] = useState(false);
+  const [pendingAddClasses, setPendingAddClasses] = useState<string[]>([]);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
   const {
     data: subData,
@@ -547,14 +561,24 @@ export default function BillingSettingsPage() {
                     <p className="text-sm text-green-600 font-medium mt-1">Included in your subscription</p>
                   )}
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap">
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      setPendingAddClasses([]);
+                      setShowAddClassesDialog(true);
+                    }}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add asset classes
+                  </Button>
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => window.location.href = "/onboarding"}
                   >
                     <Layers className="h-4 w-4 mr-2" />
-                    Manage Asset Classes
+                    Manage
                     <ArrowRight className="h-3 w-3 ml-1" />
                   </Button>
                 </div>
@@ -607,6 +631,73 @@ export default function BillingSettingsPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* ─── Add Asset Classes Dialog ─── */}
+      <Dialog
+        open={showAddClassesDialog}
+        onOpenChange={(v) => {
+          setShowAddClassesDialog(v);
+          if (!v) setPendingAddClasses([]);
+        }}
+      >
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Plus className="h-5 w-5" />
+              Add Asset Classes
+            </DialogTitle>
+            <DialogDescription>
+              Your current classes are shown pre-selected and locked. Select additional classes to add.
+              {entitlements && entitlements.assetClassCount > 0 && (
+                <span className="block mt-1 text-xs">
+                  Currently: {entitlements.assetClasses.map((k) => k.replace(/_/g, " ")).join(", ")}
+                </span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-2">
+            <AssetClassPicker
+              selected={[...(entitlements?.assetClasses ?? []), ...pendingAddClasses]}
+              onChange={(keys) => {
+                const existing = entitlements?.assetClasses ?? [];
+                const newlySelected = keys.filter((k) => !existing.includes(k));
+                setPendingAddClasses(newlySelected);
+              }}
+              disabledKeys={entitlements?.assetClasses ?? []}
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowAddClassesDialog(false);
+                setPendingAddClasses([]);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              disabled={pendingAddClasses.length === 0}
+              onClick={() => {
+                setShowAddClassesDialog(false);
+                setShowUpgradeModal(true);
+              }}
+            >
+              Review upgrade ({pendingAddClasses.length} new)
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Asset Class Upgrade Modal ─── */}
+      <AssetClassUpgradeModal
+        open={showUpgradeModal}
+        onOpenChange={(v) => {
+          setShowUpgradeModal(v);
+          if (!v) setPendingAddClasses([]);
+        }}
+        pendingKeys={pendingAddClasses}
+      />
 
       {/* ─── Plan Comparison / Upgrade-Downgrade ─── */}
       <div>
