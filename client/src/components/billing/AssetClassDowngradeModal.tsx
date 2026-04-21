@@ -1,6 +1,7 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { ToastAction } from "@/components/ui/toast";
 import {
   Dialog,
   DialogContent,
@@ -47,6 +48,26 @@ export function AssetClassDowngradeModal({
     enabled: open,
   });
 
+  const undoRemoval = useMutation({
+    mutationFn: async (originalClasses: string[]) => {
+      const res = await apiRequest("POST", "/api/onboarding/set-asset-classes", {
+        assetClasses: originalClasses,
+        userRole: entitlements?.userRole ?? undefined,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/orgs/me/entitlements"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/org-settings/entitlements"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/orgs/me"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/operations-context/modules"] });
+      toast({ title: "Removal undone", description: "Your asset classes have been restored." });
+    },
+    onError: (e: Error) => {
+      toast({ title: "Undo failed", description: e.message, variant: "destructive" });
+    },
+  });
+
   const confirmDowngrade = useMutation({
     mutationFn: async () => {
       if (!entitlements) throw new Error("Entitlements not loaded — please try again.");
@@ -62,12 +83,25 @@ export function AssetClassDowngradeModal({
       queryClient.invalidateQueries({ queryKey: ["/api/org-settings/entitlements"] });
       queryClient.invalidateQueries({ queryKey: ["/api/orgs/me"] });
       queryClient.invalidateQueries({ queryKey: ["/api/operations-context/modules"] });
-      const remaining = (entitlements?.assetClasses ?? []).filter((k) => !keysToRemove.includes(k));
+      const originalClasses = entitlements?.assetClasses ?? [];
+      const remaining = originalClasses.filter((k) => !keysToRemove.includes(k));
       const newTier = getAssetClassTier(remaining.length);
-      toast({
+      const { dismiss } = toast({
         title: "Asset classes removed",
         description: `${remaining.length} asset class${remaining.length !== 1 ? "es" : ""} active — now on ${newTier.name} tier.`,
+        action: (
+          <ToastAction
+            altText="Undo removal"
+            onClick={() => {
+              undoRemoval.mutate(originalClasses);
+              dismiss();
+            }}
+          >
+            Undo
+          </ToastAction>
+        ),
       });
+      setTimeout(dismiss, 8000);
       onOpenChange(false);
     },
     onError: (e: Error) => {
