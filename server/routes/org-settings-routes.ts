@@ -16,7 +16,7 @@ import {
   adminAuditLog,
 } from "@shared/schema";
 import { eq, and, desc, sql, count } from "drizzle-orm";
-import { getAssetClassTier, getMaxAssetClasses } from "@shared/billing-constants";
+import { ASSET_CLASS_TIERS, getAssetClassTier, getMaxAssetClasses } from "@shared/billing-constants";
 import { sendInviteEmail } from "../services/email-service";
 import { enterpriseAuthService } from "../services/enterprise-auth-service";
 
@@ -386,18 +386,20 @@ orgSettingsRouter.get("/entitlements", async (req: Request, res: Response) => {
     const userRole: string | null = org.userRole ?? null;
     const count = assetClasses.length;
 
-    const tier = count === 0 ? null : getAssetClassTier(count);
-    const maxAssetClasses = tier ? getMaxAssetClasses(tier.key) : 2;
+    // Always resolve to a valid tier — getAssetClassTier falls back to essentials for 0 classes
+    const tier = getAssetClassTier(count);
+    const rawMax = getMaxAssetClasses(tier.key);
+    const maxAssetClasses = rawMax === Infinity ? 9999 : rawMax;
 
     res.json({
       assetClasses,
       userRole,
-      assetClassTier: tier?.key ?? null,
-      assetClassTierName: tier?.name ?? null,
+      assetClassTier: tier.key,
+      assetClassTierName: tier.name,
       assetClassCount: count,
-      maxAssetClasses: maxAssetClasses === Infinity ? 9999 : maxAssetClasses,
-      priceMonthly: tier?.priceMonthly ?? 0,
-      priceAnnual: tier?.priceAnnual ?? 0,
+      maxAssetClasses,
+      priceMonthly: tier.priceMonthly,
+      priceAnnual: tier.priceAnnual,
     });
   } catch (error: any) {
     res.status(500).json({ error: error.message });

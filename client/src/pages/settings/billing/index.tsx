@@ -50,8 +50,8 @@ import { cn } from "@/lib/utils";
 interface OrgEntitlements {
   assetClasses: string[];
   userRole: string | null;
-  assetClassTier: string | null;
-  assetClassTierName: string | null;
+  assetClassTier: string;
+  assetClassTierName: string;
   assetClassCount: number;
   maxAssetClasses: number;
   priceMonthly: number;
@@ -517,7 +517,7 @@ export default function BillingSettingsPage() {
                 <div>
                   <div className="flex items-center gap-2 mb-1">
                     <p className="text-xl font-bold">
-                      {entitlements.assetClassTierName ?? "No tier set"}
+                      {entitlements.assetClassTierName}
                     </p>
                     <Badge variant="secondary">
                       {entitlements.assetClassCount} {entitlements.assetClassCount === 1 ? "class" : "classes"}

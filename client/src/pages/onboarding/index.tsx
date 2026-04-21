@@ -316,7 +316,11 @@ export default function OnboardingWizardPage() {
               )}
 
               <div className="flex justify-end gap-2 pt-2">
-                <Button variant="outline" onClick={() => setStep(2)} disabled={!selectedRole}>Skip</Button>
+                <Button
+                  variant="outline"
+                  disabled={!selectedRole || saveAssetClasses.isPending}
+                  onClick={() => saveAssetClasses.mutate({ assetClasses: [], userRole: selectedRole })}
+                >Skip</Button>
                 <Button
                   onClick={() => saveAssetClasses.mutate({ assetClasses: selectedAssetClasses, userRole: selectedRole })}
                   disabled={saveAssetClasses.isPending || !canContinueStep1}
