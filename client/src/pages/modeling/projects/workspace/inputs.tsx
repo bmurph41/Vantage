@@ -978,6 +978,34 @@ export default function InputsAssumptions({ project }: InputsAssumptionsProps) {
     staleTime: 2000,
   });
 
+  // ─── Partial-year actuals coverage ────────────────────────────
+  const { data: actualsCoverage } = useQuery<{
+    monthsWithData: number;
+    coveredMonths: number[];
+    latestYear: number | null;
+    annualizationFactor: number;
+    annualizeEnabled: boolean;
+  }>({
+    queryKey: ['/api/modeling/projects', projectId, 'actuals-coverage'],
+    enabled: !!projectId && (effectiveMode === 'upload' || effectiveMode === 'hybrid'),
+    staleTime: 30_000,
+  });
+
+  const annualizeMutation = useMutation({
+    mutationFn: async (enabled: boolean) => {
+      const existingMetrics = (project?.customMetrics as any) ?? {};
+      return apiRequest('PATCH', `/api/modeling/projects/${projectId}`, {
+        customMetrics: { ...existingMetrics, annualizePartialYear: enabled },
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'actuals-coverage'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'pro-forma'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'deal-pricing'] });
+    },
+  });
+
   // Unit mix revenue (client-side)
   const unitMixMonthlyRevenue = useMemo(() => {
     return unitRows.filter(r => r.enabled).reduce(
@@ -1231,6 +1259,84 @@ export default function InputsAssumptions({ project }: InputsAssumptionsProps) {
           </CardContent>
         </Card>
       )}
+
+      {/* ─── Partial-Year Annualization Card ──────────────────────── */}
+      {(effectiveMode === 'upload' || effectiveMode === 'hybrid') &&
+        actualsCoverage && actualsCoverage.monthsWithData > 0 && actualsCoverage.monthsWithData < 12 && (() => {
+          const MONTH_ABBR = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+          const coveredSet = new Set(actualsCoverage.coveredMonths);
+          const factor = actualsCoverage.annualizationFactor;
+          const isEnabled = actualsCoverage.annualizeEnabled;
+          return (
+            <Card className={`border-2 transition-colors ${isEnabled ? 'border-amber-400 bg-amber-50/60 dark:bg-amber-950/20' : 'border-dashed border-muted-foreground/30'}`}>
+              <CardContent className="py-4 px-5">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <TrendingUp className="h-4 w-4 text-amber-600 shrink-0" />
+                      <p className="text-sm font-semibold">
+                        Partial-Year Data Detected
+                      </p>
+                      <Badge variant="outline" className="text-xs bg-amber-100 text-amber-700 border-amber-300">
+                        {actualsCoverage.monthsWithData} of 12 months
+                      </Badge>
+                      {actualsCoverage.latestYear && (
+                        <span className="text-xs text-muted-foreground">{actualsCoverage.latestYear}</span>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground mb-3">
+                      {isEnabled
+                        ? `Annualizing by ×${factor.toFixed(2)} — monthly run-rate extrapolated to full year.`
+                        : 'Enable annualization to project the run-rate across 12 months for a full-year baseline.'}
+                    </p>
+                    {/* Month grid */}
+                    <div className="flex gap-1 flex-wrap">
+                      {MONTH_ABBR.map((abbr, i) => {
+                        const hasData = coveredSet.has(i + 1);
+                        return (
+                          <div
+                            key={abbr}
+                            title={hasData ? `${abbr}: actual data` : `${abbr}: ${isEnabled ? 'projected (annualized)' : 'no data'}`}
+                            className={[
+                              'flex items-center justify-center w-9 h-7 rounded text-[10px] font-medium border transition-colors',
+                              hasData
+                                ? 'bg-blue-600 border-blue-600 text-white'
+                                : isEnabled
+                                  ? 'bg-amber-100 border-amber-300 text-amber-700'
+                                  : 'bg-muted/30 border-border text-muted-foreground',
+                            ].join(' ')}
+                          >
+                            {abbr}
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {isEnabled && (
+                      <div className="flex items-center gap-2 mt-2 text-xs text-amber-700 dark:text-amber-400">
+                        <TrendingUp className="h-3 w-3" />
+                        <span>All pro-forma figures scaled by ×{factor.toFixed(2)} ({actualsCoverage.monthsWithData}→12 months)</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex flex-col items-end gap-1 shrink-0 pt-0.5">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-medium text-muted-foreground">Annualize</span>
+                      <Switch
+                        checked={isEnabled}
+                        onCheckedChange={(checked) => annualizeMutation.mutate(checked)}
+                        disabled={annualizeMutation.isPending}
+                        className="data-[state=checked]:bg-amber-500"
+                      />
+                    </div>
+                    {isEnabled && (
+                      <span className="text-[10px] text-amber-600 font-semibold">×{factor.toFixed(2)} scale</span>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })()}
 
       {/* ═══════════════════════════════════════════════════════════
            REVENUE SECTION (Direct Input / Hybrid)

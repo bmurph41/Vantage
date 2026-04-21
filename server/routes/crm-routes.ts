@@ -13712,6 +13712,28 @@ export function registerCRMRoutes(
     }
   });
 
+  // Get actuals coverage for partial-year annualization
+  app.get('/api/modeling/projects/:id/actuals-coverage', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { loadCanonicalActuals } = await import('../services/canonical-actuals-loader');
+      const { coverage, latestYear } = await loadCanonicalActuals(req.params.id, orgId);
+      const project = await storage.getModelingProject(req.params.id, orgId);
+      if (!project) return res.status(404).json({ error: 'Project not found' });
+      const annualizeEnabled = !!(project.customMetrics as any)?.annualizePartialYear;
+      res.json({
+        monthsWithData: coverage.monthsWithData,
+        coveredMonths: coverage.coveredMonths,
+        latestYear: latestYear,
+        annualizationFactor: coverage.annualizationFactor,
+        annualizeEnabled,
+      });
+    } catch (error: any) {
+      console.error('Failed to fetch actuals coverage:', error);
+      res.status(500).json({ error: 'Failed to fetch actuals coverage' });
+    }
+  });
+
   // Get modeling projects by broker
   app.get('/api/modeling/projects/broker/:brokerId', authenticateUser, async (req: any, res) => {
     try {

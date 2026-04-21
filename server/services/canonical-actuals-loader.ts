@@ -85,6 +85,17 @@ export function normalizeCategory(rawCategory: string): string {
  * Both getHistoricalPL() and generateProForma() MUST use this function
  * to ensure identical data for the same year.
  */
+export interface ActualsCoverage {
+  /** How many distinct months have at least one non-zero entry */
+  monthsWithData: number;
+  /** Which month numbers (1-12) have data */
+  coveredMonths: number[];
+  /** The calendar year these months belong to */
+  year: number | null;
+  /** Factor to multiply all amounts to annualize (12 / monthsWithData), or 1 if full year */
+  annualizationFactor: number;
+}
+
 export async function loadCanonicalActuals(
   projectId: string,
   orgId: string,
@@ -96,6 +107,8 @@ export async function loadCanonicalActuals(
   availableYears: number[];
   /** The latest historical year */
   latestYear: number | null;
+  /** Partial-year coverage information */
+  coverage: ActualsCoverage;
 }> {
   // 1. Load PNL overrides
   const pnlOverrides = await db.select()
@@ -211,7 +224,20 @@ export async function loadCanonicalActuals(
   const totalExpenses = expenseItems.reduce((sum, item) => sum + item.total, 0);
   const grossProfit = totalRevenue - totalCOGS;
   const noi = grossProfit - totalExpenses;
-  
+
+  // Build partial-year coverage: which months have at least one non-zero entry
+  const coveredMonthSet = new Set<number>();
+  for (const item of items) {
+    for (const [monthStr, amount] of Object.entries(item.monthlyAmounts)) {
+      if (amount !== 0) coveredMonthSet.add(Number(monthStr));
+    }
+  }
+  const coveredMonths = Array.from(coveredMonthSet).sort((a, b) => a - b);
+  const monthsWithData = coveredMonths.length;
+  const annualizationFactor = monthsWithData > 0 && monthsWithData < 12
+    ? 12 / monthsWithData
+    : 1;
+
   return {
     items,
     categorized: {
@@ -226,5 +252,11 @@ export async function loadCanonicalActuals(
     },
     availableYears,
     latestYear,
+    coverage: {
+      monthsWithData,
+      coveredMonths,
+      year: year ?? latestYear,
+      annualizationFactor,
+    },
   };
 }

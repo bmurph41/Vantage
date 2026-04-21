@@ -446,11 +446,22 @@ export class ProFormaEngineService {
 
     // FIX: Use shared canonical actuals loader for baseline aggregation.
     // Guarantees identical category/department as getHistoricalPL().
-    const { items: baselineItems } = await loadCanonicalActuals(projectId, orgId, latestHistoricalYear);
-    
+    const { items: baselineItems, coverage } = await loadCanonicalActuals(projectId, orgId, latestHistoricalYear);
+
+    // ── Partial-year annualization ────────────────────────────────
+    // If the user uploaded only N months of data (e.g. 2) and has enabled
+    // annualization, scale every amount by 12/N before seeding the baseline.
+    // The historical P&L view always shows raw actuals; only the pro-forma
+    // baseline uses the annualized figure.
+    const annualizeEnabled = !!(project.customMetrics as any)?.annualizePartialYear;
+    const annualizationFactor =
+      annualizeEnabled && coverage.monthsWithData > 0 && coverage.monthsWithData < 12
+        ? 12 / coverage.monthsWithData
+        : 1;
+
     for (const item of baselineItems) {
       const entry: ActualEntry = {
-        amount: item.total,
+        amount: item.total * annualizationFactor,
         category: item.category,
         subcategory: item.key,
         department: item.department,
