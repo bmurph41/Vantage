@@ -12,7 +12,6 @@
  * automatically whenever it is executed.
  */
 
-
 export * from "./schema-accounting";
 export * from "./schema-commercial-tenants";
 export * from "./schema-lp-portal";

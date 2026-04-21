@@ -1,3 +1,5 @@
+import { calculateXIRR as canonicalXIRR } from '../finance/xirr';
+
 export interface CashFlow {
   period: number;
   date?: Date;
@@ -71,56 +73,31 @@ export function calculateNPV(values: number[], rate: number, periods?: number[])
   }, 0);
 }
 
+/**
+ * Legacy XIRR — delegates to the canonical implementation in shared/finance/xirr.ts
+ * to ensure ONE underlying engine across the codebase. Preserves the original
+ * decimal-format API contract (e.g. 0.1449 for 14.49%) for existing callers.
+ */
 export function calculateXIRR(
   cashFlows: { date: Date; amount: number }[],
-  guess: number = 0.1,
-  maxIterations: number = 1000,
-  tolerance: number = 0.0000001
+  _guess: number = 0.1,
+  _maxIterations: number = 1000,
+  _tolerance: number = 0.0000001
 ): number | null {
   if (cashFlows.length < 2) return null;
-
-  const sorted = [...cashFlows].sort((a, b) => a.date.getTime() - b.date.getTime());
-  const startDate = sorted[0].date;
-
-  const hasPositive = sorted.some(cf => cf.amount > 0);
-  const hasNegative = sorted.some(cf => cf.amount < 0);
+  const hasPositive = cashFlows.some(cf => cf.amount > 0);
+  const hasNegative = cashFlows.some(cf => cf.amount < 0);
   if (!hasPositive || !hasNegative) return null;
 
-  let rate = guess;
-
-  for (let i = 0; i < maxIterations; i++) {
-    let npv = 0;
-    let dnpv = 0;
-
-    for (const cf of sorted) {
-      const years = (cf.date.getTime() - startDate.getTime()) / (365.25 * 24 * 60 * 60 * 1000);
-      const discountFactor = Math.pow(1 + rate, years);
-      npv += cf.amount / discountFactor;
-      dnpv -= (years * cf.amount) / (discountFactor * (1 + rate));
-    }
-
-    if (Math.abs(npv) < tolerance) {
-      return rate;
-    }
-
-    if (Math.abs(dnpv) < tolerance) {
-      return null;
-    }
-
-    const newRate = rate - npv / dnpv;
-
-    if (Math.abs(newRate - rate) < tolerance) {
-      return newRate;
-    }
-
-    rate = newRate;
-
-    if (rate < -0.99 || rate > 100) {
-      return null;
-    }
-  }
-
-  return null;
+  // Convert Date objects to ISO strings; canonical XIRR parses them as UTC.
+  const flows = cashFlows.map(cf => ({
+    date: cf.date.toISOString(),
+    amount: cf.amount,
+  }));
+  const result = canonicalXIRR(flows, _guess);
+  if (!result.converged && !isFinite(result.irr)) return null;
+  // Canonical returns percent; legacy contract is decimal.
+  return result.irr / 100;
 }
 
 export function calculateMOIC(

@@ -62,9 +62,22 @@ export function calculateXIRR(flows: DatedCashFlow[], guess: number = 0.1): XIRR
   // Year fractions from first date
   const yearFracs = dates.map(d => (d - d0) / (DAYS_PER_YEAR * 86400000));
 
-  let rate = guess;
+  // Pure NPV at rate (decimal) using yearFracs already computed.
+  const npvAt = (r: number): number => {
+    let s = 0;
+    for (let i = 0; i < amounts.length; i++) {
+      const factor = Math.pow(1 + r, yearFracs[i]);
+      if (!isFinite(factor)) return Number.NaN;
+      s += amounts[i] / factor;
+    }
+    return s;
+  };
 
+  // ── Pass 1: Newton-Raphson with damping ─────────────────────────────────
+  let rate = guess;
+  let nrIters = 0;
   for (let iter = 0; iter < MAX_ITERATIONS; iter++) {
+    nrIters = iter + 1;
     let npv = 0;
     let dnpv = 0;
 
@@ -72,7 +85,6 @@ export function calculateXIRR(flows: DatedCashFlow[], guess: number = 0.1): XIRR
       const t = yearFracs[i];
       const factor = Math.pow(1 + rate, t);
       if (!isFinite(factor) || factor === 0) {
-        // Rate too extreme, reset
         rate = 0.1;
         continue;
       }
@@ -81,29 +93,73 @@ export function calculateXIRR(flows: DatedCashFlow[], guess: number = 0.1): XIRR
     }
 
     if (Math.abs(npv) < TOLERANCE) {
-      return { irr: rate * 100, converged: true, iterations: iter + 1 };
+      return { irr: rate * 100, converged: true, iterations: nrIters };
     }
 
-    if (Math.abs(dnpv) < 1e-20) {
-      // Derivative too small, try bisection nudge
-      rate += 0.001;
-      continue;
-    }
+    if (Math.abs(dnpv) < 1e-20) break; // bail to bisection
 
     const newRate = rate - npv / dnpv;
 
-    // Clamp to prevent wild divergence
+    // Clamp + damp to prevent wild divergence
     if (newRate < -0.99) {
-      rate = -0.99;
+      rate = (rate + (-0.99)) / 2; // halve the step toward the lower bound
     } else if (newRate > 10) {
-      rate = 10;
+      rate = (rate + 10) / 2;
     } else {
       rate = newRate;
     }
   }
 
-  // Did not converge — return best estimate
-  return { irr: rate * 100, converged: false, iterations: MAX_ITERATIONS };
+  // ── Pass 2: Bisection fallback ──────────────────────────────────────────
+  // Newton-Raphson can oscillate on j-curve flows (multiple capital calls
+  // before a single large exit). Bisection is slower but always converges
+  // when a sign change exists in the bracket.
+  let lo = -0.999;
+  let hi = 10.0;
+  let fLo = npvAt(lo);
+  let fHi = npvAt(hi);
+
+  // Try to widen if we don't have a sign bracket
+  if (!isFinite(fLo) || !isFinite(fHi) || fLo * fHi > 0) {
+    const candidates = [-0.95, -0.5, 0, 0.05, 0.1, 0.25, 0.5, 1, 2, 5];
+    let prevR = lo;
+    let prevF = fLo;
+    let bracketed = false;
+    for (const r of candidates) {
+      const f = npvAt(r);
+      if (isFinite(f) && isFinite(prevF) && prevF * f < 0) {
+        lo = prevR;
+        hi = r;
+        fLo = prevF;
+        fHi = f;
+        bracketed = true;
+        break;
+      }
+      prevR = r;
+      prevF = f;
+    }
+    if (!bracketed) {
+      return { irr: rate * 100, converged: false, iterations: nrIters };
+    }
+  }
+
+  for (let i = 0; i < 200; i++) {
+    const mid = (lo + hi) / 2;
+    const f = npvAt(mid);
+    if (Math.abs(f) < TOLERANCE || (hi - lo) < 1e-12) {
+      return { irr: mid * 100, converged: true, iterations: nrIters + i + 1 };
+    }
+    if (fLo * f < 0) {
+      hi = mid;
+      fHi = f;
+    } else {
+      lo = mid;
+      fLo = f;
+    }
+  }
+
+  // Bisection didn't converge tightly — return midpoint as best estimate
+  return { irr: ((lo + hi) / 2) * 100, converged: false, iterations: nrIters + 200 };
 }
 
 /**

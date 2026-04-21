@@ -608,9 +608,11 @@ function computeLine(
       const val = num(inputs[key]);
       if (val > 0) return { amount: val };
     }
-    // Check monthly variants
+    // Check monthly variants derived from this line's own input keys
+    // (e.g. annualUtilities → monthlyUtilities). Do NOT add unrelated fallbacks
+    // like monthlyRent — they cross-contaminate other lines (e.g. utilities
+    // line picking up SFR rent when annualUtilities = 0).
     const monthlyKeys = line.inputKeys.map(k => k.replace('annual', 'monthly').replace('Annual', 'Monthly'));
-    monthlyKeys.push('monthlyUtilities', 'monthlyRent');
     for (const key of monthlyKeys) {
       const val = num(inputs[key]);
       if (val > 0) {

@@ -211,6 +211,11 @@ function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
+// Rate fields (CAGR, growth %) need finer precision so 3.74% doesn't round to 4.00%.
+function round4(n: number): number {
+  return Math.round(n * 10000) / 10000;
+}
+
 function fmtC(n: number): string {
   return n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 }
@@ -432,7 +437,7 @@ function buildProjectedYear(
 
   // ── NOI delta ─────────────────────────────────────────────────────────────
   const noiChange = round2(newNOI - prevYear.noi);
-  const noiChangePct = prevYear.noi !== 0 ? round2(noiChange / Math.abs(prevYear.noi)) : null;
+  const noiChangePct = prevYear.noi !== 0 ? round4(noiChange / Math.abs(prevYear.noi)) : null;
 
   return {
     year: yearNum,
@@ -552,7 +557,7 @@ export function computeMultiYearProjection(
   const lastNOI = years[years.length - 1].noi;
   const noiCAGR =
     firstNOI > 0 && years.length > 1
-      ? round2(Math.pow(lastNOI / firstNOI, 1 / (years.length - 1)) - 1)
+      ? round4(Math.pow(lastNOI / firstNOI, 1 / (years.length - 1)) - 1)
       : null;
 
   const noiWaterfall = years.map(y => ({

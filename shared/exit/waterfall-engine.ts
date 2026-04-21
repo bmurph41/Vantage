@@ -97,27 +97,40 @@ export function calculateWaterfall(input: WaterfallInput): WaterfallResult {
   let cumulativeLp = 0;
   let cumulativeGp = 0;
 
+  // ── LP / GP capital split ─────────────────────────────────────────────────
+  // gpCommitmentPct defaults to 2% (institutional norm). LP capital is the
+  // remainder. The pref accrues on LP capital ONLY — pref is LP's hurdle, not
+  // a return on the GP's own commitment (industry standard).
+  const gpCommitmentPct = input.gpCommitmentPct ?? 0.02;
+  const lpCapital = input.totalCapitalContributed * (1 - gpCommitmentPct);
+  const gpCapital = input.totalCapitalContributed * gpCommitmentPct;
+
   const preferredReturnRequired = calculatePreferredReturn(
-    input.totalCapitalContributed,
+    lpCapital,
     input.preferredReturn,
     input.holdingPeriodYears,
     input.preferredReturnCompounding,
     input.prefReturnAccrualPeriod
   );
 
-  const returnOfCapital = Math.min(remainingProceeds, input.totalCapitalContributed);
-  if (returnOfCapital > 0) {
-    cumulativeLp += returnOfCapital;
+  // ── Tier 1: Return of Capital — pari-passu split LP/GP by commitment ─────
+  const totalRocAvailable = Math.min(remainingProceeds, input.totalCapitalContributed);
+  if (totalRocAvailable > 0) {
+    const lpRoc = Math.min(totalRocAvailable, lpCapital);
+    const gpRoc = Math.max(0, Math.min(totalRocAvailable - lpRoc, gpCapital));
+    cumulativeLp += lpRoc;
+    cumulativeGp += gpRoc;
     distributions.push({
       tier: 'Return of Capital',
-      lpAmount: returnOfCapital,
-      gpAmount: 0,
-      totalAmount: returnOfCapital,
+      lpAmount: lpRoc,
+      gpAmount: gpRoc,
+      totalAmount: lpRoc + gpRoc,
       cumulativeLpAmount: cumulativeLp,
       cumulativeGpAmount: cumulativeGp,
     });
-    remainingProceeds -= returnOfCapital;
+    remainingProceeds -= (lpRoc + gpRoc);
   }
+  const returnOfCapital = totalRocAvailable; // total ROC (used in summaries below)
 
   const prefReturnPaid = Math.min(remainingProceeds, preferredReturnRequired);
   if (prefReturnPaid > 0) {
@@ -135,8 +148,11 @@ export function calculateWaterfall(input: WaterfallInput): WaterfallResult {
 
   let catchUpPaid = 0;
   if (remainingProceeds > 0 && input.catchUpPercentage > 0) {
-    const totalLpPaid = returnOfCapital + prefReturnPaid;
-    const targetGpShare = totalLpPaid * (input.catchUpTarget / (1 - input.catchUpTarget));
+    // Catch-up base is the LP profit paid (preferred return) — NOT including
+    // return of capital, which is principal, not profit. After catch-up the
+    // GP holds catchUpTarget share of profits distributed so far.
+    //   GP target = prefReturnPaid * (catchUpTarget / (1 - catchUpTarget))
+    const targetGpShare = prefReturnPaid * (input.catchUpTarget / (1 - input.catchUpTarget));
     const catchUpNeeded = targetGpShare;
     catchUpPaid = Math.min(remainingProceeds * input.catchUpPercentage, catchUpNeeded);
     
@@ -198,31 +214,31 @@ export function calculateWaterfall(input: WaterfallInput): WaterfallResult {
     }
   }
 
-  const lpMoic = input.totalCapitalContributed > 0 
-    ? cumulativeLp / input.totalCapitalContributed 
+  // MOIC denominators: LP MOIC uses LP capital; GP MOIC uses GP capital.
+  // (gpCommitmentPct, lpCapital, gpCapital were resolved above before pref accrual.)
+  const lpMoic = lpCapital > 0
+    ? cumulativeLp / lpCapital
     : 0;
-  
-  // GP contribution: configurable percentage, defaults to 2% if not specified
-  const gpCommitmentPct = input.gpCommitmentPct ?? 0.02;
-  const gpContribution = input.totalCapitalContributed * gpCommitmentPct;
+
+  const gpContribution = gpCapital;
   const gpMoic = gpContribution > 0
     ? cumulativeGp / gpContribution
     : 0;
 
   // European clawback: calculated on PROFIT basis (institutional standard)
-  // GP clawback = GP distributions received - target GP share of profit
+  // GP clawback = GP distributions received - target GP share of (profit + own capital)
   let gpClawback = 0;
   if (input.structureType === 'european' && carriedInterestPaid > 0) {
     const totalProfit = input.totalProceeds - input.totalCapitalContributed;
     if (totalProfit > 0) {
-      // GP's target share = carry % of profit + return of GP's own capital
-      const targetGpShare = (totalProfit * input.carriedInterest) + (input.totalCapitalContributed * gpCommitmentPct);
+      // Target = GP's share of profit (carry %) + return of GP's own capital
+      const targetGpShare = (totalProfit * input.carriedInterest) + gpCapital;
       if (cumulativeGp > targetGpShare) {
         gpClawback = cumulativeGp - targetGpShare;
       }
     } else {
       // No profit = GP should only receive return of their own capital
-      const gpCapitalReturn = Math.min(cumulativeGp, input.totalCapitalContributed * gpCommitmentPct);
+      const gpCapitalReturn = Math.min(cumulativeGp, gpCapital);
       if (cumulativeGp > gpCapitalReturn) {
         gpClawback = cumulativeGp - gpCapitalReturn;
       }
@@ -236,8 +252,7 @@ export function calculateWaterfall(input: WaterfallInput): WaterfallResult {
   const exitDateMs = investmentDateMs + input.holdingPeriodYears * 365.25 * 86400000;
   const exitDate = new Date(exitDateMs).toISOString().split('T')[0];
 
-  // LP contribution is (1 - gpCommitmentPct) of total capital; GP is the rest
-  const lpContribution = input.totalCapitalContributed * (1 - gpCommitmentPct);
+  const lpContribution = lpCapital;
 
   // LP cash flows: negative outflow at investment, positive distributions at exit
   const lpCashFlows: DatedCashFlow[] = [

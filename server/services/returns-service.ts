@@ -1,6 +1,7 @@
 import { db } from "../db";
 import { returnsLedger, returnsValuation, loanBalanceTimeline } from "@shared/schema";
 import { eq, and, gte, lte, inArray, sql } from "drizzle-orm";
+import { calculateXIRR as canonicalXIRR } from "@shared/finance/xirr";
 
 export type ReturnView = 'levered' | 'unlevered';
 export type SpendToggle = 'equity' | 'all_in';
@@ -72,6 +73,11 @@ const LEVERED_BUCKETS = [
   'SALE_PROCEEDS', 'SALE_COSTS', 'LOAN_PAYOFF', 'FEES_OTHER'
 ];
 
+/**
+ * Returns IRR as a DECIMAL (e.g. 0.1449 for 14.49%), rounded to 4 decimal places.
+ * Delegates to the canonical XIRR implementation to ensure consistency and
+ * TZ-safe (UTC) date parsing across the codebase.
+ */
 export function computeXIRR(cashflows: CashflowPoint[]): number | null {
   if (cashflows.length < 2) return null;
 
@@ -79,69 +85,10 @@ export function computeXIRR(cashflows: CashflowPoint[]): number | null {
   const hasNegative = cashflows.some(cf => cf.amount < 0);
   if (!hasPositive || !hasNegative) return null;
 
-  const dates = cashflows.map(cf => new Date(cf.date).getTime());
-  const amounts = cashflows.map(cf => cf.amount);
-  const baseDate = dates[0];
-
-  function yearFrac(d: number): number {
-    return (d - baseDate) / (365.25 * 24 * 60 * 60 * 1000);
-  }
-
-  function npv(rate: number): number {
-    let sum = 0;
-    for (let i = 0; i < amounts.length; i++) {
-      const t = yearFrac(dates[i]);
-      sum += amounts[i] / Math.pow(1 + rate, t);
-    }
-    return sum;
-  }
-
-  function dnpv(rate: number): number {
-    let sum = 0;
-    for (let i = 0; i < amounts.length; i++) {
-      const t = yearFrac(dates[i]);
-      if (t === 0) continue;
-      sum -= t * amounts[i] / Math.pow(1 + rate, t + 1);
-    }
-    return sum;
-  }
-
-  let rate = 0.1;
-  const maxIterations = 100;
-  const tolerance = 1e-7;
-
-  for (let i = 0; i < maxIterations; i++) {
-    const f = npv(rate);
-    const df = dnpv(rate);
-
-    if (Math.abs(df) < 1e-12) break;
-
-    const newRate = rate - f / df;
-
-    if (newRate <= -1) {
-      rate = (rate + (-0.99)) / 2;
-      continue;
-    }
-
-    if (Math.abs(newRate - rate) < tolerance) {
-      return Math.round(newRate * 10000) / 10000;
-    }
-
-    rate = newRate;
-  }
-
-  let lo = -0.99, hi = 10.0;
-  for (let i = 0; i < 200; i++) {
-    const mid = (lo + hi) / 2;
-    const val = npv(mid);
-    if (Math.abs(val) < tolerance) {
-      return Math.round(mid * 10000) / 10000;
-    }
-    if (val > 0) lo = mid;
-    else hi = mid;
-  }
-
-  return null;
+  const result = canonicalXIRR(cashflows);
+  if (!result.converged || !isFinite(result.irr)) return null;
+  // Canonical returns percent (e.g. 14.49); convert to decimal for this API.
+  return Math.round((result.irr / 100) * 10000) / 10000;
 }
 
 function buildMonthlyDates(start: string, end: string): string[] {
@@ -492,7 +439,8 @@ export async function computeFundReturns(
     const totalCashOut = cashflows.filter(cf => cf.amount > 0).reduce((s, cf) => s + cf.amount, 0);
     const moic = totalCashIn > 0 ? totalCashOut / totalCashIn : null;
 
-    aggregate.metrics.irr = irr !== null ? irr * 100 : null;
+    // computeXIRR returns DECIMAL (matches the rest of the file + UI formatPercent which multiplies by 100).
+    aggregate.metrics.irr = irr;
     aggregate.metrics.moic = moic;
   }
 
