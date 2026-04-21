@@ -724,6 +724,10 @@ export interface LeaseYearIncome {
     notYetStarted?: boolean;
     /** Escalation rate for this lease (decimal e.g. 0.035 = 3.5%) — populated for CPI and CPI_CAP_FLOOR types */
     escalationRate?: number;
+    /** For CPI_CAP_FLOOR leases only: configured cap ceiling (decimal, e.g. 0.04 = 4%) */
+    capValue?: number;
+    /** For CPI_CAP_FLOOR leases only: configured floor minimum (decimal, e.g. 0.02 = 2%) */
+    floorValue?: number;
   }>;
 }
 
@@ -1002,6 +1006,8 @@ export function computeLeaseIncomeByYear(
         tiLcCost: Math.round(tiLcCost),
         escalationType: lease.escalationType,
         escalationRate: lease.escalationRate,
+        capValue: lease.capValue,
+        floorValue: lease.floorValue,
         activeStepRentAnnual,
         isFuture: lease.isFuture ?? false,
         leaseStartDate: lease.leaseStartDate,

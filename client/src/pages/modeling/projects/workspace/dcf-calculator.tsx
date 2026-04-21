@@ -95,6 +95,10 @@ interface LeaseYearDetail {
   tiLcCost: number;
   escalationType?: string;
   escalationRate?: number;
+  /** For CPI_CAP_FLOOR leases only: configured cap ceiling (decimal) */
+  capValue?: number;
+  /** For CPI_CAP_FLOOR leases only: configured floor minimum (decimal) */
+  floorValue?: number;
   activeStepRentAnnual?: number | null;
   isFuture?: boolean;
   leaseStartDate?: string | null;
@@ -1721,10 +1725,29 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
                                                         CPI {((ld.escalationRate ?? 0) * 100).toFixed(1)}%
                                                       </Badge>
                                                     </TooltipTrigger>
-                                                    <TooltipContent side="top" className="text-xs">
-                                                      {ld.escalationType === 'CPI_CAP_FLOOR'
-                                                        ? `CPI-linked escalation at ${((ld.escalationRate ?? 0) * 100).toFixed(1)}% with cap/floor applied`
-                                                        : `CPI-linked escalation at ${((ld.escalationRate ?? 0) * 100).toFixed(1)}% per year`}
+                                                    <TooltipContent side="top" className="text-xs max-w-xs p-3">
+                                                      {ld.escalationType === 'CPI_CAP_FLOOR' ? (
+                                                        <div className="space-y-1">
+                                                          <div className="font-semibold mb-1">CPI Cap / Floor</div>
+                                                          {(ld.capValue != null || ld.floorValue != null) && (
+                                                            <div className="flex justify-between gap-4 pb-1 border-b border-border/40">
+                                                              <span className="text-muted-foreground">Limits</span>
+                                                              <span className="font-medium tabular-nums">
+                                                                {[
+                                                                  ld.capValue != null && `Cap: ${(ld.capValue * 100).toFixed(1)}%`,
+                                                                  ld.floorValue != null && `Floor: ${(ld.floorValue * 100).toFixed(1)}%`,
+                                                                ].filter(Boolean).join(' / ')}
+                                                              </span>
+                                                            </div>
+                                                          )}
+                                                          <div className="flex justify-between gap-4">
+                                                            <span className="text-muted-foreground">Applied rate</span>
+                                                            <span className="font-medium tabular-nums">{((ld.escalationRate ?? 0) * 100).toFixed(1)}%</span>
+                                                          </div>
+                                                        </div>
+                                                      ) : (
+                                                        `CPI-linked escalation at ${((ld.escalationRate ?? 0) * 100).toFixed(1)}% per year`
+                                                      )}
                                                     </TooltipContent>
                                                   </Tooltip>
                                                 </TooltipProvider>
@@ -2552,10 +2575,29 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
                                                             CPI {((ld.escalationRate ?? 0) * 100).toFixed(1)}%
                                                           </Badge>
                                                         </TooltipTrigger>
-                                                        <TooltipContent side="top" className="text-xs">
-                                                          {ld.escalationType === 'CPI_CAP_FLOOR'
-                                                            ? `CPI-linked escalation at ${((ld.escalationRate ?? 0) * 100).toFixed(1)}% with cap/floor applied`
-                                                            : `CPI-linked escalation at ${((ld.escalationRate ?? 0) * 100).toFixed(1)}% per year`}
+                                                        <TooltipContent side="top" className="text-xs max-w-xs p-3">
+                                                          {ld.escalationType === 'CPI_CAP_FLOOR' ? (
+                                                            <div className="space-y-1">
+                                                              <div className="font-semibold mb-1">CPI Cap / Floor</div>
+                                                              {(ld.capValue != null || ld.floorValue != null) && (
+                                                                <div className="flex justify-between gap-4 pb-1 border-b border-border/40">
+                                                                  <span className="text-muted-foreground">Limits</span>
+                                                                  <span className="font-medium tabular-nums">
+                                                                    {[
+                                                                      ld.capValue != null && `Cap: ${(ld.capValue * 100).toFixed(1)}%`,
+                                                                      ld.floorValue != null && `Floor: ${(ld.floorValue * 100).toFixed(1)}%`,
+                                                                    ].filter(Boolean).join(' / ')}
+                                                                  </span>
+                                                                </div>
+                                                              )}
+                                                              <div className="flex justify-between gap-4">
+                                                                <span className="text-muted-foreground">Applied rate</span>
+                                                                <span className="font-medium tabular-nums">{((ld.escalationRate ?? 0) * 100).toFixed(1)}%</span>
+                                                              </div>
+                                                            </div>
+                                                          ) : (
+                                                            `CPI-linked escalation at ${((ld.escalationRate ?? 0) * 100).toFixed(1)}% per year`
+                                                          )}
                                                         </TooltipContent>
                                                       </Tooltip>
                                                     </TooltipProvider>
