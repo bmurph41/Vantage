@@ -12,6 +12,51 @@ async function throwIfResNotOk(res: Response) {
   }
 }
 
+/**
+ * Error type that carries the HTTP status code and parsed JSON body alongside the message.
+ * Thrown by `postJson` on non-2xx responses, enabling callers to branch on specific status
+ * codes (e.g. 403 entitlement failures) without parsing string-encoded error messages.
+ */
+export interface TypedFetchError extends Error {
+  status: number;
+  body: Record<string, unknown>;
+}
+
+/**
+ * POST JSON to `url` using the same credentials/CSRF header setup as `apiRequest`.
+ * Unlike `apiRequest`, this helper parses the response body on error and throws a
+ * `TypedFetchError` — making it easy to branch on structured error payloads (e.g. 403).
+ *
+ * Note: both the success and error paths parse the response as JSON.  Use only with
+ * endpoints that return `application/json` for all status codes; non-JSON bodies will
+ * silently resolve to `{}`.
+ */
+export async function postJson(
+  url: string,
+  payload: Record<string, unknown>,
+): Promise<Record<string, unknown>> {
+  const csrfToken = getCsrfToken();
+  const res = await fetch(url, {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
+    },
+    body: JSON.stringify(payload),
+  });
+  const body = await res.json().catch(() => ({})) as Record<string, unknown>;
+  if (!res.ok) {
+    const err = new Error(
+      typeof body.message === 'string' ? body.message : `Request failed with status ${res.status}`,
+    ) as TypedFetchError;
+    err.status = res.status;
+    err.body = body;
+    throw err;
+  }
+  return body;
+}
+
 export async function apiRequest(
   method: string,
   url: string,

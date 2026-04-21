@@ -73,6 +73,66 @@ export function getMaxAssetClasses(tierKey: string): number {
   return tier?.maxClasses ?? Infinity;
 }
 
+/**
+ * Canonical mapping from wizard property-type values (uppercase) and raw asset-class keys
+ * (lowercase) to the entitled asset-class key stored in organizations.assetClasses.
+ *
+ * A value of `null` means the type has no asset-class gate and is always permitted.
+ * Any key not present in this map is considered unknown and is rejected by the backend guard.
+ */
+export const PROPERTY_TYPE_TO_ASSET_CLASS_KEY: Record<string, string | null> = {
+  // Wizard uppercase values
+  MARINA: 'marina',
+  RV_PARK: 'rv_park',
+  MULTIFAMILY: 'multifamily',
+  RETAIL: 'retail',
+  INDUSTRIAL: 'industrial',
+  MIXED_USE: null,
+  SELF_STORAGE: 'self_storage',
+  MOBILE_HOME_PARK: 'mobile_home',
+  HOTEL: 'hotel',
+  OTHER: null,
+  // Canonical lowercase keys for the wizard's 9 property types (so resolveAssetClassKey
+  // handles "marina" and "MARINA" identically).  Other lowercase keys (e.g. "dry_stack",
+  // "warehouse") are NOT in this map and are returned as-is by resolveAssetClassKey —
+  // meaning entitlement check governs them rather than a 400 rejection.
+  marina: 'marina',
+  rv_park: 'rv_park',
+  multifamily: 'multifamily',
+  retail: 'retail',
+  industrial: 'industrial',
+  mixed_use: null,
+  self_storage: 'self_storage',
+  mobile_home: 'mobile_home',
+  hotel: 'hotel',
+  other: null,
+};
+
+/**
+ * Resolve an incoming assetClass value to a canonical lowercase key.
+ *
+ * Return values:
+ *   - `string`    — canonical asset-class key to compare against `org.assetClasses`.
+ *                   Returned for: all known alias entries (e.g. "MARINA" → "marina") and
+ *                   for any purely-lowercase value not found in the alias table (treated as a
+ *                   direct key, e.g. "dry_stack", "warehouse"). The caller is responsible for
+ *                   the entitlement check (`orgAssetClasses.includes(key)`).
+ *   - `null`      — gating-exempt type (e.g. "MIXED_USE", "OTHER"); always allowed, skip check.
+ *   - `undefined` — unrecognised uppercase/mixed-case alias (not in the table); indicates a
+ *                   malformed input that the caller should reject with HTTP 400.
+ */
+export function resolveAssetClassKey(value: string): string | null | undefined {
+  if (value in PROPERTY_TYPE_TO_ASSET_CLASS_KEY) {
+    return PROPERTY_TYPE_TO_ASSET_CLASS_KEY[value];
+  }
+  // Uppercase/mixed-case values that aren't in the known alias map look like a bad alias
+  if (value !== value.toLowerCase()) {
+    return undefined; // unrecognised wizard alias → caller should return 400
+  }
+  // Lowercase values are treated as direct asset-class keys (e.g. from AssetClassPicker)
+  return value;
+}
+
 export const USER_ROLES = [
   { key: "owner", label: "Owner / Operator", description: "I own or operate the asset(s) directly" },
   { key: "broker", label: "Broker", description: "I facilitate the buying, selling, or leasing of assets" },

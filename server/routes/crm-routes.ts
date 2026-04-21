@@ -71,6 +71,7 @@ import {
   marketTargets,
   insertMarketTargetSchema,
   insertModelingProjectSchema,
+  organizations,
   dealCommissions,
   insertDealCommissionSchema,
   crmPipelineStages,
@@ -87,6 +88,7 @@ import {
   compColumnUpdateSchema,
   compFiltersSchema,
 } from "../utils/salescomps-zod-schemas";
+import { resolveAssetClassKey } from "@shared/billing-constants";
 
 const filterBuilder = new FilterBuilder();
 
@@ -13729,7 +13731,38 @@ export function registerCRMRoutes(
       const userId = req.user.id;
       
       const data = insertModelingProjectSchema.parse(req.body);
-      
+
+      // Mandatory entitlement check: always resolve an effective asset class and verify it.
+      // Falls back to the DB column default ("marina") when the caller omits assetClass,
+      // so the guard cannot be bypassed by simply not sending the field.
+      // Also normalises the value to its canonical lowercase key before persisting.
+      const rawAssetClass: string = data.assetClass ?? 'marina';
+      const canonicalAssetClass = resolveAssetClassKey(rawAssetClass);
+      if (canonicalAssetClass === undefined) {
+        // Unrecognised value — reject rather than silently allow
+        return res.status(400).json({
+          error: 'Invalid asset class',
+          message: `"${rawAssetClass}" is not a recognised asset class.`,
+        });
+      }
+      if (canonicalAssetClass !== null) {
+        const [orgRow] = await db
+          .select({ assetClasses: organizations.assetClasses })
+          .from(organizations)
+          .where(eq(organizations.id, orgId));
+        const orgAssetClasses: string[] = orgRow?.assetClasses ?? [];
+        if (!orgAssetClasses.includes(canonicalAssetClass)) {
+          return res.status(403).json({
+            error: 'Asset class not in your plan',
+            message: `Your current plan does not include "${canonicalAssetClass.replace(/_/g, ' ')}" projects. Please upgrade your plan to add this asset class.`,
+            assetClass: canonicalAssetClass,
+          });
+        }
+      }
+      // Override with canonical key so the DB always stores a normalised lowercase value
+      // (e.g. wizard sends "MARINA" → stored as "marina")
+      const normalizedAssetClass = canonicalAssetClass ?? rawAssetClass.toLowerCase();
+
       // Use database transaction to ensure atomicity
       const result = await db.transaction(async (tx) => {
         let dealIdToUse = data.dealId;
@@ -13770,12 +13803,14 @@ export function registerCRMRoutes(
           dealIdToUse = deal.id;
         }
         
-        // Create the modeling project and link it to the deal
-        const [project] = await tx.insert(modelingProjects).values({ 
-          ...data as any, 
-          orgId, 
+        // Create the modeling project and link it to the deal.
+        // normalizedAssetClass overrides data.assetClass with the canonical lowercase key.
+        const [project] = await tx.insert(modelingProjects).values({
+          ...data as any,
+          assetClass: normalizedAssetClass,
+          orgId,
           createdBy: userId,
-          dealId: dealIdToUse 
+          dealId: dealIdToUse,
         }).returning();
         
         return project;

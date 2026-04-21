@@ -41,14 +41,13 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
-import { ddClient } from "@/lib/ddClient";
-import { apiRequest } from "@/lib/queryClient";
 import { toStateAbbr } from "@/lib/state-utils";
 import type { CrmDeal, CrmProperty } from "@shared/schema";
 import DealFormModal from "@/components/modals/deal-form-modal";
 import PropertyFormModal from "@/components/modals/property-form-modal";
 import { AssetClassUpgradeModal } from "@/components/billing/AssetClassUpgradeModal";
 import { AssetClassPicker } from "@/components/AssetClassPicker";
+import { postJson, type TypedFetchError } from "@/lib/queryClient";
 
 interface PortfolioProperty {
   id: string;
@@ -251,7 +250,7 @@ export function CreateProjectDialog({ trigger }: CreateProjectDialogProps) {
           }))
         : undefined;
 
-      const response = await apiRequest("POST", "/api/dd/projects", {
+      return postJson('/api/dd/projects', {
         name: values.name,
         description: values.description || undefined,
         projectType: values.projectType as "single" | "portfolio",
@@ -265,8 +264,8 @@ export function CreateProjectDialog({ trigger }: CreateProjectDialogProps) {
         placeId: values.placeId || undefined,
         coordinates,
         portfolioProperties: portfolioPropertiesPayload,
+        assetClass: projectAssetClass[0] || undefined,
       });
-      return response.json();
     },
     onSuccess: (project) => {
       queryClient.invalidateQueries({ queryKey: ["/api/dd/projects"] });
@@ -283,12 +282,28 @@ export function CreateProjectDialog({ trigger }: CreateProjectDialogProps) {
       form.reset();
       setAddressInputValue("");
       setPortfolioProperties([]);
-      navigate(`/dd/projects/${project.id}`);
+      navigate(`/dd/projects/${project.id as string}`);
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
+      const apiErr = error as Partial<TypedFetchError>;
+      if (apiErr.status === 403 && apiErr.body) {
+        const key = typeof apiErr.body.assetClass === 'string' ? apiErr.body.assetClass : '';
+        if (key) {
+          setUpgradeModalKey(key);
+          setShowUpgradeModal(true);
+        }
+        toast({
+          title: "Asset Class Not In Your Plan",
+          description: typeof apiErr.body.message === 'string'
+            ? apiErr.body.message
+            : "Upgrade your plan to create projects of this type.",
+          variant: "destructive",
+        });
+        return;
+      }
       toast({
         title: "Error creating project",
-        description: error.message || "Something went wrong",
+        description: (error instanceof Error ? error.message : undefined) || "Something went wrong",
         variant: "destructive",
       });
     },

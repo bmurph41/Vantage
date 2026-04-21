@@ -21,11 +21,13 @@ import {
   CheckCircle2,
   Loader2,
 } from 'lucide-react';
-import { apiRequest } from '@/lib/queryClient';
+
 import { useToast } from '@/hooks/use-toast';
 import { formatCurrency } from '@/lib/utils';
 import { AssetClassUpgradeModal } from '@/components/billing/AssetClassUpgradeModal';
 import { AssetClassPicker } from '@/components/AssetClassPicker';
+import { PROPERTY_TYPE_TO_ASSET_CLASS_KEY, resolveAssetClassKey } from '@shared/billing-constants';
+import { postJson, type TypedFetchError } from '@/lib/queryClient';
 
 interface ModelSetupWizardProps {
   open: boolean;
@@ -45,30 +47,25 @@ const PROPERTY_TYPES = [
   { value: 'OTHER', label: 'Other' },
 ];
 
-/** Maps wizard PROPERTY_TYPES values to AssetClassPicker keys for entitlement checks. */
-const PROPERTY_TYPE_TO_ASSET_CLASS: Record<string, string | null> = {
-  MARINA: 'marina',
-  RV_PARK: 'rv_park',
-  MULTIFAMILY: 'multifamily',
-  RETAIL: 'retail',
-  INDUSTRIAL: 'industrial',
-  MIXED_USE: null, // no direct mapping — always unlocked
-  SELF_STORAGE: 'self_storage',
-  MOBILE_HOME_PARK: 'mobile_home',
-  OTHER: null, // always unlocked
-};
+/**
+ * Wizard property-type values — drives the picker options shown to the user.
+ * PROPERTY_TYPE_TO_ASSET_CLASS_KEY (from shared billing-constants) is the canonical
+ * mapping from these values to their entitled asset-class key; use it instead of a
+ * local copy to avoid drift between client and server.
+ */
+const WIZARD_PROPERTY_TYPE_VALUES = PROPERTY_TYPES.map((t) => t.value);
 
-/** Reverse mapping: AssetClassPicker key → PROPERTY_TYPES value. */
+/** Reverse mapping: asset-class key → wizard PROPERTY_TYPES value (uppercase). */
 const ASSET_CLASS_TO_PROPERTY_TYPE: Record<string, string> = Object.fromEntries(
-  Object.entries(PROPERTY_TYPE_TO_ASSET_CLASS)
-    .filter(([, v]) => v !== null)
-    .map(([k, v]) => [v as string, k])
+  WIZARD_PROPERTY_TYPE_VALUES
+    .map((v) => [PROPERTY_TYPE_TO_ASSET_CLASS_KEY[v], v] as [string | null | undefined, string])
+    .filter((pair): pair is [string, string] => pair[0] !== null && pair[0] !== undefined)
 );
 
-/** Asset class keys available for wizard selection (excludes null-mapped types). */
-const WIZARD_ALLOWED_ASSET_KEYS = Object.values(PROPERTY_TYPE_TO_ASSET_CLASS).filter(
-  (v): v is string => v !== null
-);
+/** Asset class keys available for wizard selection (excludes null/undefined-mapped types). */
+const WIZARD_ALLOWED_ASSET_KEYS = WIZARD_PROPERTY_TYPE_VALUES
+  .map((v) => PROPERTY_TYPE_TO_ASSET_CLASS_KEY[v])
+  .filter((v): v is string => v !== null && v !== undefined);
 
 interface OrgEntitlements {
   assetClasses: string[];
@@ -171,9 +168,10 @@ export default function ModelSetupWizard({ open, onOpenChange, onProjectCreated 
 
   const isPropertyTypeLocked = (typeValue: string): boolean => {
     if (!entitlements) return false; // still loading — optimistic unlock
-    const assetKey = PROPERTY_TYPE_TO_ASSET_CLASS[typeValue];
-    if (assetKey === null || assetKey === undefined) return false; // no mapping → always unlocked
-    return !entitledKeys.includes(assetKey); // locked when not in entitlement list (including empty list)
+    const assetKey = resolveAssetClassKey(typeValue);
+    if (assetKey === null) return false; // gating-exempt type (e.g. MIXED_USE) — always allowed
+    if (assetKey === undefined) return true; // unrecognised alias — pre-emptively lock to avoid a backend 400
+    return !entitledKeys.includes(assetKey);
   };
 
   const updateField = useCallback(
@@ -186,11 +184,11 @@ export default function ModelSetupWizard({ open, onOpenChange, onProjectCreated 
   // When entitlements load, auto-correct the default property type if it's locked.
   useEffect(() => {
     if (!entitlements) return;
-    const currentKey = PROPERTY_TYPE_TO_ASSET_CLASS[data.propertyType];
+    const currentKey = resolveAssetClassKey(data.propertyType);
     const isCurrentLocked = currentKey != null && !entitlements.assetClasses.includes(currentKey);
     if (!isCurrentLocked) return;
     const firstUnlocked = PROPERTY_TYPES.find((t) => {
-      const k = PROPERTY_TYPE_TO_ASSET_CLASS[t.value];
+      const k = resolveAssetClassKey(t.value);
       return k === null || k === undefined || entitlements.assetClasses.includes(k);
     });
     if (firstUnlocked) {
@@ -239,7 +237,7 @@ export default function ModelSetupWizard({ open, onOpenChange, onProjectCreated 
         ? pp * (parseNum(data.loanAmountOrLtv) / 100)
         : parseNum(data.loanAmountOrLtv);
 
-      const body = {
+      return postJson('/api/modeling/projects', {
         marinaName: data.name.trim(),
         address: data.address || undefined,
         city: data.city || undefined,
@@ -267,23 +265,37 @@ export default function ModelSetupWizard({ open, onOpenChange, onProjectCreated 
           revenueGrowthRate: parseNum(data.revenueGrowthRate),
           createdVia: 'simplified_wizard',
         },
-      };
-
-      return apiRequest('POST', '/api/modeling/projects', body);
+      });
     },
-    onSuccess: (result: any) => {
+    onSuccess: (result) => {
       toast({ title: 'Model Created', description: `${data.name} has been created.` });
       onOpenChange(false);
       setStep(0);
       setData({ ...defaultData });
-      const projectId = result?.id ?? result?.projectId;
+      const projectId = (result?.id ?? result?.projectId) as string | undefined;
       if (projectId && onProjectCreated) {
         onProjectCreated(projectId);
       } else if (projectId) {
         navigate(`/modeling/projects/${projectId}`);
       }
     },
-    onError: () => {
+    onError: (error: unknown) => {
+      const apiErr = error as Partial<TypedFetchError>;
+      if (apiErr.status === 403 && apiErr.body) {
+        const key = typeof apiErr.body.assetClass === 'string' ? apiErr.body.assetClass : '';
+        if (key) {
+          setUpgradeModalKey(key);
+          setShowUpgradeModal(true);
+        }
+        toast({
+          title: 'Asset Class Not In Your Plan',
+          description: typeof apiErr.body.message === 'string'
+            ? apiErr.body.message
+            : 'Upgrade your plan to create projects of this type.',
+          variant: 'destructive',
+        });
+        return;
+      }
       toast({ title: 'Error', description: 'Failed to create model. Please try again.', variant: 'destructive' });
     },
   });
@@ -317,11 +329,10 @@ export default function ModelSetupWizard({ open, onOpenChange, onProjectCreated 
                 <Skeleton className="h-32 rounded-md" />
               ) : (
                 <AssetClassPicker
-                  selected={
-                    PROPERTY_TYPE_TO_ASSET_CLASS[data.propertyType]
-                      ? [PROPERTY_TYPE_TO_ASSET_CLASS[data.propertyType] as string]
-                      : []
-                  }
+                  selected={(() => {
+                    const key = resolveAssetClassKey(data.propertyType);
+                    return key ? [key] : [];
+                  })()}
                   onChange={(keys) => {
                     const key = keys[0];
                     if (key && ASSET_CLASS_TO_PROPERTY_TYPE[key]) {
