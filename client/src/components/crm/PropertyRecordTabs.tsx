@@ -1,6 +1,7 @@
 // PropertyRecordTabs.tsx — Sales Comps, Rate Comps, Market Intel, Activities, Leases tabs
 
 import { useQuery, useMutation } from '@tanstack/react-query';
+import { useToast } from '@/hooks/use-toast';
 import { useState, type ReactNode } from 'react';
 import { useLocation } from 'wouter';
 import { Badge } from '@/components/ui/badge';
@@ -972,6 +973,7 @@ const BLANK_ABATEMENT: NewAbatementForm = {
 };
 
 function LeaseDetailSheet({ leaseId, propertyId, open, onClose }: { leaseId: string; propertyId: string; open: boolean; onClose: () => void }) {
+  const { toast } = useToast();
   const [editing, setEditing] = useState(false);
   const [editForm, setEditForm] = useState<LeaseFormState | null>(null);
   const [editTerm, setEditTerm] = useState<RentTermFormState | null>(null);
@@ -1090,6 +1092,7 @@ function LeaseDetailSheet({ leaseId, propertyId, open, onClose }: { leaseId: str
       queryClient.invalidateQueries({ queryKey: ['property-leases', propertyId] });
       queryClient.invalidateQueries({ queryKey: ['property-lease-stats', propertyId] });
       onClose();
+      toast({ title: 'Lease deleted successfully' });
     },
     onError: (e: Error) => setDeleteError(e.message),
   });
