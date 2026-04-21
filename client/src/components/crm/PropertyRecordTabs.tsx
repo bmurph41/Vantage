@@ -2213,10 +2213,11 @@ export function PropertyLeasesTab({ propertyId, propertyCategory }: { propertyId
     mutationFn: async (ids: string[]) => {
       const res = await apiRequest('POST', '/api/commercial-leases/leases/restore', { ids });
       if (!res.ok) throw new Error('Failed to restore leases');
-      return ids;
+      const data: { restored: number } = await res.json();
+      return data.restored;
     },
-    onSuccess: (ids) => {
-      toast({ title: `${ids.length} lease${ids.length !== 1 ? 's' : ''} restored` });
+    onSuccess: (restored) => {
+      toast({ title: `${restored} lease${restored !== 1 ? 's' : ''} restored` });
     },
     onError: () => {
       toast({ title: 'Failed to undo deletion', variant: 'destructive' });

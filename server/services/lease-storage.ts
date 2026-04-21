@@ -190,12 +190,22 @@ export async function deleteLease(db: DB, leaseId: string) {
   return updateLease(db, leaseId, { active: false } as any);
 }
 
-export async function restoreLeases(db: DB, ids: string[]) {
+export async function restoreLeases(db: DB, ids: string[], orgId: string, windowSeconds = 30) {
   if (!ids.length) return [];
+  const cutoff = new Date(Date.now() - windowSeconds * 1000);
   const rows = await db
     .update(commercialLeases)
     .set({ active: true, updatedAt: new Date() } as any)
-    .where(inArray(commercialLeases.id, ids))
+    .where(
+      and(
+        inArray(commercialLeases.id, ids),
+        eq(commercialLeases.active, false),
+        gte(commercialLeases.updatedAt as any, cutoff),
+        sql`(${commercialLeases.orgId} = ${orgId} OR ${commercialLeases.projectId} IN (
+          SELECT id FROM modeling_projects WHERE org_id = ${orgId}
+        ))`
+      )
+    )
     .returning();
   return rows;
 }
