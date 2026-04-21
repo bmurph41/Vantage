@@ -101,22 +101,55 @@ export function AssetClassDowngradeModal({
       const originalClasses = entitlements?.assetClasses ?? [];
       const remaining = originalClasses.filter((k) => !keysToRemove.includes(k));
       const newTier = getAssetClassTier(remaining.length);
-      const { dismiss } = toast({
+      const UNDO_SECONDS = 8;
+      let secondsLeft = UNDO_SECONDS;
+      const intervalRef = { current: null as ReturnType<typeof setInterval> | null };
+      const dismissRef = { current: () => {} };
+      const dismissedRef = { current: false };
+
+      const stopAndDismiss = () => {
+        if (intervalRef.current) {
+          clearInterval(intervalRef.current);
+          intervalRef.current = null;
+        }
+        if (!dismissedRef.current) {
+          dismissedRef.current = true;
+          dismissRef.current();
+        }
+      };
+
+      const makeAction = (secs: number) => (
+        <ToastAction
+          altText="Undo removal"
+          onClick={() => {
+            undoRemoval.mutate(originalClasses);
+            stopAndDismiss();
+          }}
+        >
+          Undo ({secs}s)
+        </ToastAction>
+      );
+
+      const { dismiss, update } = toast({
         title: "Asset classes removed",
         description: `${remaining.length} asset class${remaining.length !== 1 ? "es" : ""} active — now on ${newTier.name} tier.`,
-        action: (
-          <ToastAction
-            altText="Undo removal"
-            onClick={() => {
-              undoRemoval.mutate(originalClasses);
-              dismiss();
-            }}
-          >
-            Undo
-          </ToastAction>
-        ),
+        action: makeAction(secondsLeft),
+        onOpenChange: (open) => {
+          if (!open) stopAndDismiss();
+        },
       });
-      setTimeout(dismiss, 8000);
+
+      dismissRef.current = dismiss;
+
+      intervalRef.current = setInterval(() => {
+        secondsLeft -= 1;
+        if (secondsLeft <= 0) {
+          stopAndDismiss();
+        } else {
+          update({ action: makeAction(secondsLeft) });
+        }
+      }, 1000);
+
       onOpenChange(false);
     },
     onError: (e: Error) => {
