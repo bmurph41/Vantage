@@ -170,20 +170,29 @@ onboardingRouter.post("/setup-org", async (req: Request, res: Response) => {
   }
 });
 
-// POST /set-asset-classes — save the org's target asset classes and mark step complete
+// POST /set-asset-classes — save the org's target asset classes (and optional role) and mark step complete
 onboardingRouter.post("/set-asset-classes", async (req: Request, res: Response) => {
   try {
     const orgId = (req as any).user.orgId;
     const userId = (req as any).user.id;
-    const { assetClasses } = req.body;
+    const { assetClasses, userRole } = req.body;
 
     if (!Array.isArray(assetClasses)) {
       return res.status(400).json({ error: "assetClasses must be an array" });
     }
 
+    const updatePayload: Record<string, any> = { assetClasses };
+    if (userRole !== undefined) {
+      const validRoles = ["owner", "broker", "investor"];
+      if (!validRoles.includes(userRole)) {
+        return res.status(400).json({ error: "userRole must be one of: owner, broker, investor" });
+      }
+      updatePayload.userRole = userRole;
+    }
+
     const [updated] = await db
       .update(organizations)
-      .set({ assetClasses })
+      .set(updatePayload)
       .where(eq(organizations.id, orgId))
       .returning();
 

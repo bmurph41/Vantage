@@ -39,7 +39,24 @@ import {
   Database,
   ChevronUp,
   ChevronDown,
+  Layers,
+  Home,
+  Tag,
+  ArrowRight,
 } from "lucide-react";
+import { ASSET_CLASS_TIERS } from "@shared/billing-constants";
+import { cn } from "@/lib/utils";
+
+interface OrgEntitlements {
+  assetClasses: string[];
+  userRole: string | null;
+  assetClassTier: string | null;
+  assetClassTierName: string | null;
+  assetClassCount: number;
+  maxAssetClasses: number | null;
+  priceMonthly: number;
+  priceAnnual: number;
+}
 
 interface TierDef {
   name: string;
@@ -203,6 +220,10 @@ export default function BillingSettingsPage() {
     isLoading: subLoading,
   } = useQuery<{ subscription: BillingSubscription | null; usage: UsageData }>({
     queryKey: ["/api/billing/subscription"],
+  });
+
+  const { data: entitlements, isLoading: entitlementsLoading } = useQuery<OrgEntitlements>({
+    queryKey: ["/api/org-settings/entitlements"],
   });
 
   const { data: plans, isLoading: plansLoading } = useQuery<Record<string, TierDef>>({
@@ -466,6 +487,122 @@ export default function BillingSettingsPage() {
               <p className="text-sm text-muted-foreground">
                 Choose a plan below to get started.
               </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* ─── Asset Class Tier Card ─── */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Layers className="h-5 w-5" />
+            Asset Class Tier
+          </CardTitle>
+          <CardDescription>
+            Your subscription includes access to the asset classes your organization selected during setup.
+            Add more to unlock deeper tools and templates for each class.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {entitlementsLoading ? (
+            <div className="space-y-2">
+              <Skeleton className="h-6 w-48" />
+              <Skeleton className="h-4 w-64" />
+            </div>
+          ) : entitlements ? (
+            <div className="space-y-4">
+              {/* Tier + count summary */}
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <p className="text-xl font-bold">
+                      {entitlements.assetClassTierName ?? "No tier set"}
+                    </p>
+                    <Badge variant="secondary">
+                      {entitlements.assetClassCount} {entitlements.assetClassCount === 1 ? "class" : "classes"}
+                    </Badge>
+                    {entitlements.userRole && (
+                      <Badge variant="outline" className="capitalize flex items-center gap-1">
+                        {entitlements.userRole === "owner" && <Home className="h-3 w-3" />}
+                        {entitlements.userRole === "broker" && <Tag className="h-3 w-3" />}
+                        {entitlements.userRole === "investor" && <TrendingUp className="h-3 w-3" />}
+                        {entitlements.userRole}
+                      </Badge>
+                    )}
+                  </div>
+                  {entitlements.assetClasses.length > 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                      {entitlements.assetClasses.join(", ").replace(/_/g, " ")}
+                    </p>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No asset classes selected yet.</p>
+                  )}
+                  {entitlements.priceMonthly > 0 && (
+                    <p className="text-sm font-medium mt-1">
+                      +${entitlements.priceMonthly}/mo <span className="text-muted-foreground font-normal">(${entitlements.priceAnnual}/mo billed annually)</span>
+                    </p>
+                  )}
+                  {entitlements.priceMonthly === 0 && entitlements.assetClassCount > 0 && (
+                    <p className="text-sm text-green-600 font-medium mt-1">Included in your subscription</p>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => window.location.href = "/onboarding"}
+                  >
+                    <Layers className="h-4 w-4 mr-2" />
+                    Manage Asset Classes
+                    <ArrowRight className="h-3 w-3 ml-1" />
+                  </Button>
+                </div>
+              </div>
+
+              {/* Tier progression bar */}
+              <Separator />
+              <div>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">Asset Class Tiers</p>
+                <div className="grid grid-cols-3 gap-3">
+                  {ASSET_CLASS_TIERS.map((t) => {
+                    const isCurrent = t.key === entitlements.assetClassTier;
+                    return (
+                      <div
+                        key={t.key}
+                        className={cn(
+                          "rounded-lg border p-3 text-center transition-all",
+                          isCurrent ? "border-primary bg-primary/5 shadow-sm" : "border-border opacity-60"
+                        )}
+                      >
+                        {isCurrent && (
+                          <div className="text-xs font-semibold text-primary mb-1">Current</div>
+                        )}
+                        <p className="text-sm font-bold">{t.name}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">{t.minClasses}–{t.maxClasses ?? "∞"} classes</p>
+                        <p className="text-xs font-medium mt-1">
+                          {t.priceMonthly === 0 ? "Included" : `+$${t.priceMonthly}/mo`}
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
+                <p className="text-xs text-muted-foreground mt-3 flex items-center gap-1">
+                  <Zap className="h-3 w-3" />
+                  Upgrade to add more asset classes and unlock specialized tools, dashboards, and templates for each class.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="text-center py-6">
+              <Layers className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
+              <p className="text-muted-foreground mb-1">No asset classes configured</p>
+              <p className="text-sm text-muted-foreground mb-3">
+                Select your asset classes during onboarding to tailor your platform experience.
+              </p>
+              <Button variant="outline" size="sm" onClick={() => window.location.href = "/onboarding"}>
+                Configure asset classes
+              </Button>
             </div>
           )}
         </CardContent>

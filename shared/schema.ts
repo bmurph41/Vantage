@@ -239,6 +239,8 @@ export const organizations = pgTable("organizations", {
   name: text("name").notNull(),
   // Asset class focus: list of asset class keys the org operates in
   assetClasses: text("asset_classes").array().default(sql`'{}'`),
+  // Primary role of the org's users (owner / broker / investor)
+  userRole: text("user_role"),
   // SSO settings
   ssoEnabled: boolean("sso_enabled").notNull().default(false),
   ssoEnforced: boolean("sso_enforced").notNull().default(false), // Require SSO for all users

@@ -8,16 +8,24 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle, Circle, ArrowRight, Building2, Users, Briefcase, Settings, BarChart3, Upload, Sparkles, X, Layers } from "lucide-react";
+import { CheckCircle, Circle, ArrowRight, Building2, Users, Briefcase, Settings, BarChart3, Upload, Sparkles, X, Layers, TrendingUp, Home, Tag } from "lucide-react";
 import { AssetClassPicker } from "@/components/AssetClassPicker";
+import { ASSET_CLASS_TIERS, USER_ROLES, getAssetClassTier } from "@shared/billing-constants";
+import { cn } from "@/lib/utils";
 
-// Steps: 0 = Org Name, 1 = Asset Classes, 2 = Invite Team, 3 = Checklist
+// Steps: 0 = Org Name, 1 = Asset Classes + Role, 2 = Invite Team, 3 = Checklist
 const WIZARD_STEPS = [
   { label: "Organization", icon: Building2 },
   { label: "Asset Focus",  icon: Layers },
   { label: "Team",         icon: Users },
   { label: "Get Started",  icon: Sparkles },
 ];
+
+const ROLE_ICONS: Record<string, React.ElementType> = {
+  owner: Home,
+  broker: Tag,
+  investor: TrendingUp,
+};
 
 export default function OnboardingWizardPage() {
   const { toast } = useToast();
@@ -26,6 +34,7 @@ export default function OnboardingWizardPage() {
   const [step, setStep] = useState(0);
   const [orgName, setOrgName] = useState("");
   const [selectedAssetClasses, setSelectedAssetClasses] = useState<string[]>([]);
+  const [selectedRole, setSelectedRole] = useState<string>("");
   const [invites, setInvites] = useState([{ email: "", role: "editor" }]);
 
   const { data: status, isLoading } = useQuery<any>({
@@ -49,12 +58,13 @@ export default function OnboardingWizardPage() {
   });
 
   const saveAssetClasses = useMutation({
-    mutationFn: async (data: { assetClasses: string[] }) => {
+    mutationFn: async (data: { assetClasses: string[]; userRole: string }) => {
       const res = await apiRequest("POST", "/api/onboarding/set-asset-classes", data);
       return res.json();
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["/api/onboarding"] });
+      qc.invalidateQueries({ queryKey: ["/api/org-settings/entitlements"] });
       setStep(2);
       toast({ title: "Asset focus saved" });
     },
@@ -111,6 +121,12 @@ export default function OnboardingWizardPage() {
     activate_pack: "/settings/packs", explore_modeling: "/modeling/projects",
     upload_comps: "/analysis/sales-comps",
   };
+
+  // Compute current pricing tier from selection
+  const assetCount = selectedAssetClasses.length;
+  const currentTierDef = assetCount > 0 ? getAssetClassTier(assetCount) : null;
+
+  const canContinueStep1 = selectedRole !== "" && selectedAssetClasses.length > 0;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-slate-900 dark:to-slate-800 flex items-center justify-center p-4">
@@ -183,29 +199,127 @@ export default function OnboardingWizardPage() {
           </Card>
         )}
 
-        {/* Step 1: Asset Class Selection */}
+        {/* Step 1: Role + Asset Class Selection */}
         {step === 1 && (
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2"><Layers className="h-5 w-5" />What asset classes do you work with?</CardTitle>
+              <CardTitle className="flex items-center gap-2"><Layers className="h-5 w-5" />Your focus areas</CardTitle>
               <CardDescription>
-                Select all that apply — your platform, data, and tools will be tailored to your focus areas.
-                You can always update this in your organization settings.
+                Tell us your role and the asset classes you work with. This tailors your platform,
+                tools, and financial templates — and determines your subscription tier. You can add more at any time.
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <AssetClassPicker
-                selected={selectedAssetClasses}
-                onChange={setSelectedAssetClasses}
-              />
-              {selectedAssetClasses.length === 0 && (
+            <CardContent className="space-y-6">
+              {/* Role selector */}
+              <div>
+                <p className="text-sm font-medium mb-3">What best describes your primary role?</p>
+                <div className="grid grid-cols-3 gap-3">
+                  {USER_ROLES.map((role) => {
+                    const Icon = ROLE_ICONS[role.key] ?? Briefcase;
+                    const isSelected = selectedRole === role.key;
+                    return (
+                      <button
+                        key={role.key}
+                        type="button"
+                        onClick={() => setSelectedRole(role.key)}
+                        className={cn(
+                          "flex flex-col items-center gap-2 p-4 rounded-xl border-2 text-center transition-all",
+                          isSelected
+                            ? "border-blue-600 bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 shadow-sm"
+                            : "border-border bg-background hover:bg-muted hover:border-muted-foreground/30"
+                        )}
+                      >
+                        <Icon className={cn("h-6 w-6", isSelected ? "text-blue-600" : "text-muted-foreground")} />
+                        <div>
+                          <p className="text-sm font-semibold leading-tight">{role.label}</p>
+                          <p className="text-xs text-muted-foreground mt-0.5 leading-tight">{role.description}</p>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+                {!selectedRole && (
+                  <p className="text-xs text-muted-foreground mt-2">Select your role to continue</p>
+                )}
+              </div>
+
+              {/* Asset class grid */}
+              <div>
+                <p className="text-sm font-medium mb-3">Which asset classes do you work with?</p>
+                <AssetClassPicker
+                  selected={selectedAssetClasses}
+                  onChange={setSelectedAssetClasses}
+                />
+              </div>
+
+              {/* Live pricing summary */}
+              {assetCount > 0 && currentTierDef && (
+                <div className={cn(
+                  "rounded-lg border-2 p-4 transition-all",
+                  currentTierDef.key === "essentials" && "border-blue-200 bg-blue-50 dark:bg-blue-950/20 dark:border-blue-800",
+                  currentTierDef.key === "professional" && "border-purple-200 bg-purple-50 dark:bg-purple-950/20 dark:border-purple-800",
+                  currentTierDef.key === "enterprise" && "border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800",
+                )}>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-sm font-bold">{assetCount} {assetCount === 1 ? "class" : "classes"} selected</span>
+                        <Badge
+                          variant="secondary"
+                          className={cn(
+                            "text-xs",
+                            currentTierDef.key === "essentials" && "bg-blue-100 text-blue-700",
+                            currentTierDef.key === "professional" && "bg-purple-100 text-purple-700",
+                            currentTierDef.key === "enterprise" && "bg-amber-100 text-amber-700",
+                          )}
+                        >
+                          {currentTierDef.name} tier
+                        </Badge>
+                      </div>
+                      <p className="text-xs text-muted-foreground">{currentTierDef.description}</p>
+                    </div>
+                    <div className="text-right">
+                      {currentTierDef.priceMonthly === 0 ? (
+                        <p className="text-lg font-bold text-green-600">Included</p>
+                      ) : (
+                        <>
+                          <p className="text-lg font-bold">+${currentTierDef.priceMonthly}<span className="text-sm font-normal text-muted-foreground">/mo</span></p>
+                          <p className="text-xs text-muted-foreground">${currentTierDef.priceAnnual}/mo billed annually</p>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  {/* Tier progression hint */}
+                  <div className="mt-3 pt-3 border-t border-current/10 flex gap-2">
+                    {ASSET_CLASS_TIERS.map((t) => (
+                      <div key={t.key} className={cn(
+                        "flex-1 h-1.5 rounded-full transition-all",
+                        t.key === currentTierDef.key ? "bg-current opacity-70" : "bg-current opacity-20",
+                      )} />
+                    ))}
+                  </div>
+                  <div className="flex justify-between mt-1">
+                    {ASSET_CLASS_TIERS.map((t) => (
+                      <p key={t.key} className={cn(
+                        "text-xs",
+                        t.key === currentTierDef.key ? "font-semibold" : "text-muted-foreground opacity-60"
+                      )}>
+                        {t.name}
+                      </p>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {assetCount === 0 && (
                 <p className="text-sm text-muted-foreground">Select at least one asset class to continue, or skip to use the full platform.</p>
               )}
+
               <div className="flex justify-end gap-2 pt-2">
                 <Button variant="outline" onClick={() => setStep(2)}>Skip</Button>
                 <Button
-                  onClick={() => saveAssetClasses.mutate({ assetClasses: selectedAssetClasses })}
-                  disabled={saveAssetClasses.isPending || selectedAssetClasses.length === 0}
+                  onClick={() => saveAssetClasses.mutate({ assetClasses: selectedAssetClasses, userRole: selectedRole })}
+                  disabled={saveAssetClasses.isPending || !canContinueStep1}
                 >
                   {saveAssetClasses.isPending ? "Saving…" : "Continue"}
                   <ArrowRight className="h-4 w-4 ml-1" />

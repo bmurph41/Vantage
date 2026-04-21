@@ -16,6 +16,7 @@ import {
   adminAuditLog,
 } from "@shared/schema";
 import { eq, and, desc, sql, count } from "drizzle-orm";
+import { getAssetClassTier, getMaxAssetClasses } from "@shared/billing-constants";
 import { sendInviteEmail } from "../services/email-service";
 import { enterpriseAuthService } from "../services/enterprise-auth-service";
 
@@ -362,6 +363,42 @@ orgSettingsRouter.get("/team/audit", async (req: Request, res: Response) => {
     `);
 
     res.json(entries.rows);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ── Asset Class Entitlements ─────────────────────────────────────────────────
+
+// GET /entitlements — return org's entitled asset classes, role, and tier info
+orgSettingsRouter.get("/entitlements", async (req: Request, res: Response) => {
+  try {
+    const orgId = (req as any).user.orgId;
+
+    const [org] = await db
+      .select({ assetClasses: organizations.assetClasses, userRole: organizations.userRole })
+      .from(organizations)
+      .where(eq(organizations.id, orgId));
+
+    if (!org) return res.status(404).json({ error: "Organization not found" });
+
+    const assetClasses: string[] = org.assetClasses ?? [];
+    const userRole: string | null = org.userRole ?? null;
+    const count = assetClasses.length;
+
+    const tier = count === 0 ? null : getAssetClassTier(count);
+    const maxAssetClasses = tier ? getMaxAssetClasses(tier.key) : 2;
+
+    res.json({
+      assetClasses,
+      userRole,
+      assetClassTier: tier?.key ?? null,
+      assetClassTierName: tier?.name ?? null,
+      assetClassCount: count,
+      maxAssetClasses: maxAssetClasses === Infinity ? null : maxAssetClasses,
+      priceMonthly: tier?.priceMonthly ?? 0,
+      priceAnnual: tier?.priceAnnual ?? 0,
+    });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
