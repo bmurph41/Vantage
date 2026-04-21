@@ -225,6 +225,121 @@ function UsageBar({
   );
 }
 
+function formatLimitValue(v: number): string {
+  return v === -1 ? "Unlimited" : v.toLocaleString();
+}
+
+interface LimitDiff {
+  label: string;
+  current: number;
+  pending: number;
+}
+
+function PlanChangeDiff({
+  currentTierKey,
+  pendingTierKey,
+  planFeatureMap,
+}: {
+  currentTierKey: string | undefined;
+  pendingTierKey: string;
+  planFeatureMap: Record<string, TierDef>;
+}) {
+  const currentTierDef = currentTierKey ? planFeatureMap[currentTierKey] : undefined;
+  const pendingTierDef = planFeatureMap[pendingTierKey];
+
+  if (!currentTierDef || !pendingTierDef) return null;
+
+  const currentLabels = (TIER_FEATURE_LABELS[currentTierKey ?? ""] ?? []).filter(
+    (f) => !f.startsWith("Everything in")
+  );
+  const pendingLabels = (TIER_FEATURE_LABELS[pendingTierKey] ?? []).filter(
+    (f) => !f.startsWith("Everything in")
+  );
+
+  const featuresLost = currentLabels.filter((f) => !pendingLabels.includes(f));
+  const featuresGained = pendingLabels.filter((f) => !currentLabels.includes(f));
+
+  const limitDiffs: LimitDiff[] = [];
+  const maybeDiff = (label: string, cur: number | undefined, pend: number | undefined) => {
+    if (cur !== undefined && pend !== undefined && cur !== pend) {
+      limitDiffs.push({ label, current: cur, pending: pend });
+    }
+  };
+  maybeDiff("Deals", currentTierDef.limits.deals, pendingTierDef.limits.deals);
+  maybeDiff("Seats", currentTierDef.limits.seats, pendingTierDef.limits.seats);
+  maybeDiff("Storage (GB)", currentTierDef.limits.storageGb, pendingTierDef.limits.storageGb);
+  maybeDiff("AI Queries", currentTierDef.limits.aiQueries, pendingTierDef.limits.aiQueries);
+  if (currentTierDef.limits.lpInvestors !== undefined && pendingTierDef.limits.lpInvestors !== undefined) {
+    maybeDiff("LP Investors", currentTierDef.limits.lpInvestors, pendingTierDef.limits.lpInvestors);
+  }
+
+  if (featuresLost.length === 0 && featuresGained.length === 0 && limitDiffs.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="mt-3 space-y-3 text-sm border rounded-lg p-3 bg-muted/30">
+      {featuresLost.length > 0 && (
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-destructive mb-1.5">
+            Features you'll lose
+          </p>
+          <ul className="space-y-1">
+            {featuresLost.map((f) => (
+              <li key={f} className="flex items-center gap-2 text-muted-foreground">
+                <X className="h-3 w-3 text-destructive flex-shrink-0" />
+                <span className="line-through">{f}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {featuresGained.length > 0 && (
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-green-700 dark:text-green-400 mb-1.5">
+            Features you'll gain
+          </p>
+          <ul className="space-y-1">
+            {featuresGained.map((f) => (
+              <li key={f} className="flex items-center gap-2 text-green-700 dark:text-green-400">
+                <Check className="h-3 w-3 flex-shrink-0" />
+                {f}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {limitDiffs.length > 0 && (
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">
+            Limit changes
+          </p>
+          <div className="space-y-1.5">
+            {limitDiffs.map(({ label, current, pending }) => {
+              const isReduction =
+                pending !== -1 && (current === -1 || pending < current);
+              return (
+                <div key={label} className="flex items-center justify-between gap-2 text-xs">
+                  <span className="text-muted-foreground">{label}</span>
+                  <div className="flex items-center gap-1.5 font-medium">
+                    <span className="text-muted-foreground">{formatLimitValue(current)}</span>
+                    <ArrowRight className="h-3 w-3 text-muted-foreground" />
+                    <span className={isReduction ? "text-destructive" : "text-green-600 dark:text-green-400"}>
+                      {formatLimitValue(pending)}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function BillingSettingsPage() {
   const { toast } = useToast();
   const [pendingTier, setPendingTier] = useState<string | null>(null);
@@ -1065,26 +1180,27 @@ export default function BillingSettingsPage() {
                 ? "Upgrade Plan"
                 : "Downgrade Plan"}
             </AlertDialogTitle>
-            <AlertDialogDescription>
-              {pendingTier && (
-                <>
-                  You are about to switch from{" "}
-                  <strong className="capitalize">
-                    {planFeatureMap[currentTier ?? ""]?.name ?? currentTier ?? "your current plan"}
-                  </strong>{" "}
-                  to{" "}
-                  <strong className="capitalize">
-                    {planFeatureMap[pendingTier]?.name ?? pendingTier}
-                  </strong>
-                  .
-                  {getTierIndex(pendingTier) < getTierIndex(currentTier ?? "") && (
-                    <span className="block mt-2 text-amber-600">
-                      Downgrading may remove access to features in your current
-                      plan.
-                    </span>
-                  )}
-                </>
-              )}
+            <AlertDialogDescription asChild>
+              <div>
+                {pendingTier && (
+                  <>
+                    You are about to switch from{" "}
+                    <strong className="capitalize">
+                      {planFeatureMap[currentTier ?? ""]?.name ?? currentTier ?? "your current plan"}
+                    </strong>{" "}
+                    to{" "}
+                    <strong className="capitalize">
+                      {planFeatureMap[pendingTier]?.name ?? pendingTier}
+                    </strong>
+                    .
+                    <PlanChangeDiff
+                      currentTierKey={currentTier}
+                      pendingTierKey={pendingTier}
+                      planFeatureMap={planFeatureMap}
+                    />
+                  </>
+                )}
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
