@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { AssetClassPicker } from "@/components/AssetClassPicker";
 import { AssetClassUpgradeModal } from "@/components/billing/AssetClassUpgradeModal";
+import { AssetClassDowngradeModal } from "@/components/billing/AssetClassDowngradeModal";
 import {
   Card,
   CardContent,
@@ -54,6 +55,7 @@ import {
   Tag,
   ArrowRight,
   Plus,
+  Minus,
 } from "lucide-react";
 import { ASSET_CLASS_TIERS } from "@shared/billing-constants";
 import { cn } from "@/lib/utils";
@@ -228,6 +230,9 @@ export default function BillingSettingsPage() {
   const [showAddClassesDialog, setShowAddClassesDialog] = useState(false);
   const [pendingAddClasses, setPendingAddClasses] = useState<string[]>([]);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [showRemoveClassesDialog, setShowRemoveClassesDialog] = useState(false);
+  const [selectedAfterRemoval, setSelectedAfterRemoval] = useState<string[]>([]);
+  const [showDowngradeModal, setShowDowngradeModal] = useState(false);
 
   const {
     data: subData,
@@ -572,6 +577,19 @@ export default function BillingSettingsPage() {
                     <Plus className="h-4 w-4 mr-2" />
                     Add asset classes
                   </Button>
+                  {entitlements.assetClasses.length > 0 && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setSelectedAfterRemoval(entitlements.assetClasses);
+                        setShowRemoveClassesDialog(true);
+                      }}
+                    >
+                      <Minus className="h-4 w-4 mr-2" />
+                      Remove classes
+                    </Button>
+                  )}
                   <Button
                     variant="outline"
                     size="sm"
@@ -697,6 +715,73 @@ export default function BillingSettingsPage() {
           if (!v) setPendingAddClasses([]);
         }}
         pendingKeys={pendingAddClasses}
+      />
+
+      {/* ─── Remove Asset Classes Dialog ─── */}
+      <Dialog
+        open={showRemoveClassesDialog}
+        onOpenChange={(v) => {
+          setShowRemoveClassesDialog(v);
+          if (!v) setSelectedAfterRemoval(entitlements?.assetClasses ?? []);
+        }}
+      >
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Minus className="h-5 w-5" />
+              Remove Asset Classes
+            </DialogTitle>
+            <DialogDescription>
+              Deselect the classes you want to remove. Your remaining selection will stay active.
+              {entitlements && entitlements.assetClassCount > 0 && (
+                <span className="block mt-1 text-xs">
+                  Currently active: {entitlements.assetClasses.map((k) => k.replace(/_/g, " ")).join(", ")}
+                </span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-2">
+            <AssetClassPicker
+              selected={selectedAfterRemoval}
+              onChange={setSelectedAfterRemoval}
+              allowedKeys={entitlements?.assetClasses}
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowRemoveClassesDialog(false);
+                setSelectedAfterRemoval(entitlements?.assetClasses ?? []);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={
+                selectedAfterRemoval.length === (entitlements?.assetClasses ?? []).length
+              }
+              onClick={() => {
+                setShowRemoveClassesDialog(false);
+                setShowDowngradeModal(true);
+              }}
+            >
+              Review removal (
+              {(entitlements?.assetClasses ?? []).filter((k) => !selectedAfterRemoval.includes(k)).length} to remove)
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Asset Class Downgrade Modal ─── */}
+      <AssetClassDowngradeModal
+        open={showDowngradeModal}
+        onOpenChange={(v) => {
+          setShowDowngradeModal(v);
+          if (!v) setSelectedAfterRemoval(entitlements?.assetClasses ?? []);
+        }}
+        keysToRemove={(entitlements?.assetClasses ?? []).filter((k) => !selectedAfterRemoval.includes(k))}
       />
 
       {/* ─── Plan Comparison / Upgrade-Downgrade ─── */}
