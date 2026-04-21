@@ -648,6 +648,10 @@ export interface LeaseBreakdownEntry {
    * Undefined for all other escalation types.
    */
   nominalCpiRate?: number;
+  /** For CPI_CAP_FLOOR leases only: the configured cap ceiling (decimal, e.g. 0.04 = 4%). */
+  capValue?: number;
+  /** For CPI_CAP_FLOOR leases only: the configured floor minimum (decimal, e.g. 0.02 = 2%). */
+  floorValue?: number;
   leaseEndDate: string;
   /** ISO date string when the lease starts (used to anchor free-rent timing relative to acquisition) */
   leaseStartDate: string | null;
@@ -1220,6 +1224,8 @@ export async function loadLeaseIncomeForProject(
       // For CPI_CAP_FLOOR leases, record the raw (pre-clamping) CPI rate so the UI
       // can show "Nominal X.X% → Capped/Floored at Y.Y%" comparisons.
       nominalCpiRate: escalationType === 'CPI_CAP_FLOOR' ? cpiRate : undefined,
+      capValue: escalationType === 'CPI_CAP_FLOOR' ? cpiCap : undefined,
+      floorValue: escalationType === 'CPI_CAP_FLOOR' ? cpiFloor : undefined,
       leaseEndDate: lease.lease_end_date,
       leaseStartDate: lease.lease_start_date ?? null,
       rentCommencementDate: lease.rent_commencement_date ?? null,

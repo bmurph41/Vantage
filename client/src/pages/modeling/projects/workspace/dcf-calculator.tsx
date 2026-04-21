@@ -119,6 +119,10 @@ interface LeaseBreakdownItem {
   escalationRate: number;
   /** For CPI_CAP_FLOOR leases: the raw scenario CPI rate before cap/floor clamping */
   nominalCpiRate?: number;
+  /** For CPI_CAP_FLOOR leases: the configured cap ceiling (as a decimal, e.g. 0.04) */
+  capValue?: number;
+  /** For CPI_CAP_FLOOR leases: the configured floor minimum (as a decimal, e.g. 0.02) */
+  floorValue?: number;
   scheduleJson?: RentStepEntryFE[] | null;
 }
 
@@ -2763,24 +2767,32 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
                                       <TooltipContent side="top" className="max-w-xs p-3">
                                         <div className="text-xs space-y-1">
                                           <div className="font-semibold mb-1.5">CPI Cap / Floor</div>
+                                          {(lease.capValue != null || lease.floorValue != null) && (
+                                            <div className="flex justify-between gap-6 pb-1 border-b border-border">
+                                              <span className="text-muted-foreground">Limits</span>
+                                              <span className="font-medium tabular-nums">
+                                                {lease.capValue != null ? `Cap: ${(lease.capValue * 100).toFixed(1)}%` : ''}
+                                                {lease.capValue != null && lease.floorValue != null ? ' / ' : ''}
+                                                {lease.floorValue != null ? `Floor: ${(lease.floorValue * 100).toFixed(1)}%` : ''}
+                                              </span>
+                                            </div>
+                                          )}
                                           <div className="flex justify-between gap-6">
                                             <span className="text-muted-foreground">Nominal CPI</span>
-                                            <span className="font-medium tabular-nums">{nominalPct.toFixed(1)}%</span>
+                                            <span className="font-medium tabular-nums">
+                                              {nominalPct.toFixed(1)}%
+                                              {isCapped && (
+                                                <span className="ml-1 text-amber-600 dark:text-amber-400">
+                                                  → Capped at {effectivePct.toFixed(1)}%
+                                                </span>
+                                              )}
+                                              {isFloored && (
+                                                <span className="ml-1 text-blue-600 dark:text-blue-400">
+                                                  → Floored at {effectivePct.toFixed(1)}%
+                                                </span>
+                                              )}
+                                            </span>
                                           </div>
-                                          <div className="flex justify-between gap-6">
-                                            <span className="text-muted-foreground">Applied rate</span>
-                                            <span className="font-medium tabular-nums">{effectivePct.toFixed(1)}%</span>
-                                          </div>
-                                          {isCapped && (
-                                            <div className="mt-1 text-amber-600 dark:text-amber-400">
-                                              ↓ Cap constraint — nominal exceeded ceiling
-                                            </div>
-                                          )}
-                                          {isFloored && (
-                                            <div className="mt-1 text-blue-600 dark:text-blue-400">
-                                              ↑ Floor constraint — nominal below minimum
-                                            </div>
-                                          )}
                                           {withinBounds && (
                                             <div className="mt-1 text-muted-foreground">
                                               Within cap/floor bounds — no constraint applied
