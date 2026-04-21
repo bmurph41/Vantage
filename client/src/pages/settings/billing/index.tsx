@@ -444,56 +444,84 @@ export default function BillingSettingsPage() {
   });
 
   const isUndoPlanMutation = useRef(false);
+  const isUndoRequest = useRef(false);
+  const preChangeInvoiceId = useRef<string | null>(null);
 
   const changePlan = useMutation({
     mutationFn: async (newTier: string) => {
-      const res = await apiRequest("POST", "/api/billing/change-plan", { newTier });
+      const res = await apiRequest("POST", "/api/billing/change-plan", {
+        newTier,
+        isUndo: isUndoRequest.current,
+        ...(isUndoRequest.current && preChangeInvoiceId.current
+          ? { preChangeInvoiceId: preChangeInvoiceId.current }
+          : {}),
+      });
       return res.json();
     },
-    onSuccess: (_data, newTier: string) => {
+    onSuccess: (
+      data: { paymentProcessed?: boolean; paymentCheckFailed?: boolean; preChangeInvoiceId?: string | null },
+      newTier: string,
+    ) => {
       queryClient.invalidateQueries({ queryKey: ["/api/billing/subscription"] });
       queryClient.invalidateQueries({ queryKey: ["/api/billing/plans"] });
       setShowChangePlanDialog(false);
 
       const wasUndo = isUndoPlanMutation.current;
       isUndoPlanMutation.current = false;
+      isUndoRequest.current = false;
 
       const prev = previousPlanTier.current;
       const isDowngrade = !wasUndo && prev !== undefined && getTierIndex(newTier) < getTierIndex(prev);
 
       if (isDowngrade && prev) {
         const restoredTier = prev;
-        const autoCloseTimeout = { current: null as ReturnType<typeof setTimeout> | null };
-        const { dismiss } = toast({
-          title: "Plan downgraded",
-          description: `You have switched to the ${planFeatureMap[newTier]?.name ?? newTier} plan.`,
-          action: (
-            <ToastAction
-              altText="Undo downgrade"
-              onClick={() => {
-                if (autoCloseTimeout.current) {
-                  clearTimeout(autoCloseTimeout.current);
-                  autoCloseTimeout.current = null;
-                }
-                isUndoPlanMutation.current = true;
-                previousPlanTier.current = newTier;
-                changePlan.mutate(restoredTier);
-                dismiss();
-              }}
-            >
-              Undo
-            </ToastAction>
-          ),
-          // use-toast.ts calls dismiss() before this fires, so only cancel the timer.
-          onOpenChange: (open) => {
-            if (!open && autoCloseTimeout.current) {
-              clearTimeout(autoCloseTimeout.current);
-              autoCloseTimeout.current = null;
-            }
-          },
-        });
-        autoCloseTimeout.current = setTimeout(dismiss, 8000);
+        const undoBlocked = !!data?.paymentProcessed || !!data?.paymentCheckFailed;
+
+        // Store the pre-change invoice ID so the undo request can echo it back
+        // to the server as a baseline for payment detection.
+        preChangeInvoiceId.current = data?.preChangeInvoiceId ?? null;
+
+        if (undoBlocked) {
+          preChangeInvoiceId.current = null;
+          toast({
+            title: "Plan downgraded",
+            description: `You have switched to the ${planFeatureMap[newTier]?.name ?? newTier} plan. Payment processed — undo unavailable.`,
+          });
+        } else {
+          const autoCloseTimeout = { current: null as ReturnType<typeof setTimeout> | null };
+          const { dismiss } = toast({
+            title: "Plan downgraded",
+            description: `You have switched to the ${planFeatureMap[newTier]?.name ?? newTier} plan.`,
+            action: (
+              <ToastAction
+                altText="Undo downgrade"
+                onClick={() => {
+                  if (autoCloseTimeout.current) {
+                    clearTimeout(autoCloseTimeout.current);
+                    autoCloseTimeout.current = null;
+                  }
+                  isUndoPlanMutation.current = true;
+                  isUndoRequest.current = true;
+                  previousPlanTier.current = newTier;
+                  changePlan.mutate(restoredTier);
+                  dismiss();
+                }}
+              >
+                Undo
+              </ToastAction>
+            ),
+            // use-toast.ts calls dismiss() before this fires, so only cancel the timer.
+            onOpenChange: (open) => {
+              if (!open && autoCloseTimeout.current) {
+                clearTimeout(autoCloseTimeout.current);
+                autoCloseTimeout.current = null;
+              }
+            },
+          });
+          autoCloseTimeout.current = setTimeout(dismiss, 8000);
+        }
       } else {
+        preChangeInvoiceId.current = null;
         toast({
           title: wasUndo ? "Plan restored" : "Plan updated",
           description: wasUndo
@@ -505,7 +533,16 @@ export default function BillingSettingsPage() {
     },
     onError: (err: Error) => {
       isUndoPlanMutation.current = false;
-      toast({ title: "Plan change failed", description: err.message, variant: "destructive" });
+      isUndoRequest.current = false;
+      preChangeInvoiceId.current = null;
+      if (err.message.startsWith('409')) {
+        toast({
+          title: "Undo unavailable",
+          description: "Payment processed — undo is no longer available.",
+        });
+      } else {
+        toast({ title: "Plan change failed", description: err.message, variant: "destructive" });
+      }
     },
   });
 

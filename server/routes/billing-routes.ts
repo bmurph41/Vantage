@@ -169,10 +169,29 @@ router.post('/checkout', requireNotBeta, async (req: Request, res: Response, nex
 router.post('/change-plan', requireNotBeta, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const orgId = getOrgId(req);
-    const { newTier } = req.body;
+    const { newTier, isUndo, preChangeInvoiceId } = req.body;
 
     if (!newTier) {
       return res.status(400).json({ error: 'newTier is required' });
+    }
+
+    // When this request is an undo of a previous downgrade, perform a fresh
+    // payment check before executing the plan restoration.  This closes the
+    // race window between when the downgrade toast was shown and when the user
+    // clicks Undo — if a payment event occurred in the interim, block undo.
+    // preChangeInvoiceId is the invoice ID captured before the downgrade was
+    // applied; when present it gives detectPaymentEvent a correct baseline so
+    // only genuinely new post-downgrade invoices are considered.
+    if (isUndo) {
+      const baseline = typeof preChangeInvoiceId === 'string' ? preChangeInvoiceId : null;
+      const { paymentProcessed, paymentCheckFailed } =
+        await billingService.checkRecentPaymentEvent(orgId, baseline);
+      if (paymentProcessed || paymentCheckFailed) {
+        return res.status(409).json({
+          error: 'Payment already processed — undo is no longer available',
+          paymentProcessed: true,
+        });
+      }
     }
 
     const updated = await billingService.changePlan(orgId, newTier);
