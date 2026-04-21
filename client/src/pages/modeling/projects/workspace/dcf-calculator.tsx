@@ -117,6 +117,8 @@ interface LeaseBreakdownItem {
   sf: number;
   escalationType: string;
   escalationRate: number;
+  /** For CPI_CAP_FLOOR leases: the raw scenario CPI rate before cap/floor clamping */
+  nominalCpiRate?: number;
   scheduleJson?: RentStepEntryFE[] | null;
 }
 
@@ -2689,14 +2691,25 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
                           const pct = leaseIncomeData.totalEGIAnnual > 0
                             ? ((lease.baseRentAnnual + lease.recoveryAnnual) / leaseIncomeData.totalEGIAnnual) * 100
                             : 0;
+                          const hasSchedule = lease.escalationType === 'SCHEDULE' && lease.scheduleJson && lease.scheduleJson.length > 0;
+                          const hasCpiCapFloor = lease.escalationType === 'CPI_CAP_FLOOR';
+                          // Determine if cap/floor clamping is actually constraining the rate
+                          const nominalPct = Number.isFinite(lease.nominalCpiRate) ? (lease.nominalCpiRate! * 100) : null;
+                          const effectivePct = (lease.escalationRate * 100);
+                          const isCapped = hasCpiCapFloor && nominalPct !== null && nominalPct > effectivePct + 0.001;
+                          const isFloored = hasCpiCapFloor && nominalPct !== null && nominalPct < effectivePct - 0.001;
+                          const withinBounds = hasCpiCapFloor && nominalPct !== null && !isCapped && !isFloored;
                           const escalationLabel =
-                            lease.escalationType === 'PERCENT' ? `${(lease.escalationRate * 100).toFixed(2)}%/yr`
-                            : lease.escalationType === 'CPI' ? `CPI @ ${(lease.escalationRate * 100).toFixed(1)}%`
-                            : lease.escalationType === 'CPI_CAP_FLOOR' ? `CPI @ ${(lease.escalationRate * 100).toFixed(1)}% (capped)`
+                            lease.escalationType === 'PERCENT' ? `${effectivePct.toFixed(2)}%/yr`
+                            : lease.escalationType === 'CPI' ? `CPI @ ${effectivePct.toFixed(1)}%`
+                            : hasCpiCapFloor ? (
+                                isCapped ? `CPI @ ${effectivePct.toFixed(1)}% ↓ capped`
+                                : isFloored ? `CPI @ ${effectivePct.toFixed(1)}% ↑ floored`
+                                : `CPI @ ${effectivePct.toFixed(1)}% ± cap/floor`
+                              )
                             : lease.escalationType === 'SCHEDULE' ? 'Scheduled'
                             : lease.escalationType === 'FIXED_DOLLAR' ? 'Fixed $'
                             : 'Flat';
-                          const hasSchedule = lease.escalationType === 'SCHEDULE' && lease.scheduleJson && lease.scheduleJson.length > 0;
                           return (
                             <TableRow key={lease.leaseId}>
                               <TableCell className="font-medium">{lease.tenantName}</TableCell>
@@ -2730,6 +2743,49 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
                                               </span>
                                             </div>
                                           ))}
+                                        </div>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
+                                ) : hasCpiCapFloor && nominalPct !== null ? (
+                                  <TooltipProvider>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <span className={`flex items-center gap-1 cursor-default whitespace-nowrap ${
+                                          isCapped ? 'text-amber-600 dark:text-amber-400'
+                                          : isFloored ? 'text-blue-600 dark:text-blue-400'
+                                          : ''
+                                        }`}>
+                                          {escalationLabel}
+                                          <Info className="h-3 w-3 shrink-0 opacity-60" />
+                                        </span>
+                                      </TooltipTrigger>
+                                      <TooltipContent side="top" className="max-w-xs p-3">
+                                        <div className="text-xs space-y-1">
+                                          <div className="font-semibold mb-1.5">CPI Cap / Floor</div>
+                                          <div className="flex justify-between gap-6">
+                                            <span className="text-muted-foreground">Nominal CPI</span>
+                                            <span className="font-medium tabular-nums">{nominalPct.toFixed(1)}%</span>
+                                          </div>
+                                          <div className="flex justify-between gap-6">
+                                            <span className="text-muted-foreground">Applied rate</span>
+                                            <span className="font-medium tabular-nums">{effectivePct.toFixed(1)}%</span>
+                                          </div>
+                                          {isCapped && (
+                                            <div className="mt-1 text-amber-600 dark:text-amber-400">
+                                              ↓ Cap constraint — nominal exceeded ceiling
+                                            </div>
+                                          )}
+                                          {isFloored && (
+                                            <div className="mt-1 text-blue-600 dark:text-blue-400">
+                                              ↑ Floor constraint — nominal below minimum
+                                            </div>
+                                          )}
+                                          {withinBounds && (
+                                            <div className="mt-1 text-muted-foreground">
+                                              Within cap/floor bounds — no constraint applied
+                                            </div>
+                                          )}
                                         </div>
                                       </TooltipContent>
                                     </Tooltip>

@@ -642,6 +642,12 @@ export interface LeaseBreakdownEntry {
   recoveryAnnual: number;
   escalationType: string;
   escalationRate: number;              // annual pct (decimal); ignored for SCHEDULE type
+  /**
+   * For CPI_CAP_FLOOR leases only: the raw scenario CPI rate before cap/floor clamping is applied.
+   * Allows UI to display "Nominal X.X% → Capped/Floored at Y.Y%".
+   * Undefined for all other escalation types.
+   */
+  nominalCpiRate?: number;
   leaseEndDate: string;
   /** ISO date string when the lease starts (used to anchor free-rent timing relative to acquisition) */
   leaseStartDate: string | null;
@@ -1211,6 +1217,9 @@ export async function loadLeaseIncomeForProject(
       recoveryAnnual,
       escalationType,
       escalationRate,
+      // For CPI_CAP_FLOOR leases, record the raw (pre-clamping) CPI rate so the UI
+      // can show "Nominal X.X% → Capped/Floored at Y.Y%" comparisons.
+      nominalCpiRate: escalationType === 'CPI_CAP_FLOOR' ? cpiRate : undefined,
       leaseEndDate: lease.lease_end_date,
       leaseStartDate: lease.lease_start_date ?? null,
       rentCommencementDate: lease.rent_commencement_date ?? null,
