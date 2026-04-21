@@ -1135,8 +1135,10 @@ export default function InputsAssumptions({ project }: InputsAssumptionsProps) {
     setIsDirty(true);
   };
 
-  const handleModeChange = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: [`/api/modeling/projects/${projectId}`] });
+  const handleModeChange = useCallback((_mode?: ModelInputMode) => {
+    queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId] });
+    queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'pro-forma'] });
+    queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'deal-pricing'] });
   }, [queryClient, projectId]);
 
 

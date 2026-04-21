@@ -2,12 +2,9 @@ import { formatCurrency } from '@/lib/utils';
 // =============================================================================
 // P&L MODE TOGGLE + P&L BUILDER
 // File: client/src/components/modeling/pl-mode-toggle.tsx
-//
-// Drop this into the top of historical-pl.tsx
-// Usage: <PLModeToggle project={project} onModeChange={handleModeChange} />
 // =============================================================================
 
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -17,8 +14,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { Upload, Calculator, Layers, Info, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { Upload, Calculator, Layers, Info, RefreshCw, ChevronDown, ChevronUp, CheckCircle2 } from 'lucide-react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
 import { getModelConfig } from '@shared/asset-class-model-config';
 
@@ -110,35 +107,73 @@ function getDefaultMode(assetClass: string): ModelInputMode {
 export function PLModeToggle({ project, onModeChange }: PLModeToggleProps) {
   const queryClient = useQueryClient();
   const assetClass = project?.assetClass ?? 'marina';
+  const projectId = project?.id;
+
   const currentMode: ModelInputMode =
     (project?.modelInputMode as ModelInputMode) ?? getDefaultMode(assetClass);
 
   const [optimisticMode, setOptimisticMode] = useState<ModelInputMode | null>(null);
   const displayMode: ModelInputMode = optimisticMode ?? currentMode;
 
+  // Detect whether any P&L documents have been uploaded for this project
+  const { data: documents = [] } = useQuery<any[]>({
+    queryKey: ['/api/modeling/projects', projectId, 'documents'],
+    enabled: !!projectId,
+    staleTime: 30_000,
+  });
+  const hasPnlDocuments = documents.length > 0;
+  const hasDirectInputData = !!(project?.customMetrics as any)?.inputAssumptions &&
+    Object.keys((project?.customMetrics as any)?.inputAssumptions ?? {}).length > 0;
+
+  // Auto-promote to 'upload' mode when documents exist and mode has never been set
+  const hasAutoPromotedRef = useRef(false);
+  useEffect(() => {
+    if (
+      !hasAutoPromotedRef.current &&
+      hasPnlDocuments &&
+      (currentMode === 'auto' || !project?.modelInputMode)
+    ) {
+      hasAutoPromotedRef.current = true;
+      // Fire-and-forget: set mode to upload without blocking the render
+      apiRequest('PATCH', `/api/modeling/projects/${projectId}`, { modelInputMode: 'upload' })
+        .then(() => {
+          queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId] });
+          queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'pro-forma'] });
+          queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'deal-pricing'] });
+          onModeChange?.('upload');
+        })
+        .catch(() => { hasAutoPromotedRef.current = false; });
+    }
+  }, [hasPnlDocuments, currentMode, project?.modelInputMode, projectId, queryClient, onModeChange]);
+
   const updateModeMutation = useMutation({
     mutationFn: async (mode: ModelInputMode) => {
-      return apiRequest('PATCH', `/api/modeling/projects/${project.id}`, {
+      return apiRequest('PATCH', `/api/modeling/projects/${projectId}`, {
         modelInputMode: mode,
       });
     },
     onSuccess: () => {
       setOptimisticMode(null);
-      queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', project.id] });
+      // Refresh project + model data so the UI reflects the new source immediately
+      queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId] });
       queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'pro-forma'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'deal-pricing'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'deal-pricing', 'inputs'] });
     },
     onError: () => {
-      setOptimisticMode(null); // revert on error
+      setOptimisticMode(null);
     },
   });
 
   const handleSelectMode = useCallback(
     (mode: ModelInputMode) => {
+      if (displayMode === mode) return; // already selected
       setOptimisticMode(mode);
       updateModeMutation.mutate(mode);
       onModeChange?.(mode);
     },
-    [updateModeMutation, onModeChange],
+    [displayMode, updateModeMutation, onModeChange],
   );
 
   return (
@@ -150,12 +185,22 @@ export function PLModeToggle({ project, onModeChange }: PLModeToggleProps) {
         <Badge variant="outline" className="text-xs">
           {assetClass.replace(/_/g, ' ').toUpperCase()}
         </Badge>
+        {hasPnlDocuments && hasDirectInputData && (
+          <Badge className="text-xs bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300 border-0">
+            Both sources available
+          </Badge>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         {MODE_OPTIONS.map((opt) => {
           const isActive = displayMode === opt.value;
           const Icon = opt.icon;
+
+          // Context-aware status indicators
+          const showPnlFound = opt.value === 'upload' && hasPnlDocuments;
+          const showInputsFound = opt.value === 'direct_input' && hasDirectInputData;
+          const showHybridRecommended = opt.value === 'hybrid' && hasPnlDocuments && hasDirectInputData;
 
           return (
             <button
@@ -164,27 +209,63 @@ export function PLModeToggle({ project, onModeChange }: PLModeToggleProps) {
               disabled={updateModeMutation.isPending}
               className={[
                 'relative p-4 rounded-xl border-2 text-left transition-all duration-200 w-full',
-                isActive ? opt.activeClass + ' scale-[1.01]' : 'border-border bg-card hover:border-muted-foreground/40 hover:bg-muted/20',
+                isActive
+                  ? opt.activeClass + ' scale-[1.01]'
+                  : 'border-border bg-card hover:border-muted-foreground/40 hover:bg-muted/20',
                 updateModeMutation.isPending ? 'opacity-50 cursor-wait' : 'cursor-pointer',
               ].join(' ')}
             >
+              {/* Selection indicator (radio dot) */}
               <div className={[
                 'absolute top-2.5 right-2.5 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-200',
-                isActive ? opt.dotClass + ' border-transparent text-white shadow-sm' : 'border-muted-foreground/20 text-transparent',
+                isActive
+                  ? opt.dotClass + ' border-transparent text-white shadow-sm'
+                  : 'border-muted-foreground/20 text-transparent',
               ].join(' ')}>
-                <svg viewBox="0 0 10 8" className="w-2.5 h-2.5 fill-none stroke-current stroke-[2.5]"><polyline points="1,4 3.5,6.5 9,1" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                <svg viewBox="0 0 10 8" className="w-2.5 h-2.5 fill-none stroke-current stroke-[2.5]">
+                  <polyline points="1,4 3.5,6.5 9,1" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
               </div>
+
               <div className="flex items-start gap-3">
-                <div className={[' mt-0.5 p-1.5 rounded-lg flex-shrink-0 transition-colors', isActive ? opt.iconActiveClass + ' bg-white/70' : 'text-muted-foreground bg-muted/40'].join(' ')}>
+                <div className={[
+                  'mt-0.5 p-1.5 rounded-lg flex-shrink-0 transition-colors',
+                  isActive ? opt.iconActiveClass + ' bg-white/70' : 'text-muted-foreground bg-muted/40',
+                ].join(' ')}>
                   <Icon className="h-5 w-5" />
                 </div>
-                <div>
+                <div className="flex-1 min-w-0">
                   <div className={['font-semibold text-sm', isActive ? opt.iconActiveClass : 'text-foreground'].join(' ')}>
                     {opt.label}
                   </div>
                   <div className="text-xs text-muted-foreground mt-1 leading-relaxed">
                     {opt.description}
                   </div>
+                  {/* Data-availability badges shown below description */}
+                  {showPnlFound && (
+                    <div className="flex items-center gap-1 mt-2">
+                      <CheckCircle2 className="h-3 w-3 text-blue-500 flex-shrink-0" />
+                      <span className="text-[10px] font-medium text-blue-600 dark:text-blue-400">
+                        {documents.length} document{documents.length !== 1 ? 's' : ''} uploaded
+                      </span>
+                    </div>
+                  )}
+                  {showInputsFound && (
+                    <div className="flex items-center gap-1 mt-2">
+                      <CheckCircle2 className="h-3 w-3 text-emerald-500 flex-shrink-0" />
+                      <span className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
+                        Assumptions entered
+                      </span>
+                    </div>
+                  )}
+                  {showHybridRecommended && (
+                    <div className="flex items-center gap-1 mt-2">
+                      <CheckCircle2 className="h-3 w-3 text-purple-500 flex-shrink-0" />
+                      <span className="text-[10px] font-medium text-purple-600 dark:text-purple-400">
+                        Actuals + assumptions ready
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
             </button>
