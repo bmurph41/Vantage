@@ -2322,7 +2322,9 @@ export function PropertyLeasesTab({ propertyId, propertyCategory }: { propertyId
     });
   }
 
-  const showSelectAllBanner = allChecked && !!data && data.total > leases.length;
+  const filtersActive = leaseTypeFilter !== 'all' || showInactive;
+  const hasMoreMatchingThanLoaded = !!data && data.total > leases.length;
+  const showSelectAllBanner = !selectAllMatchingMode && checkedLeaseIds.size > 0 && (filtersActive || hasMoreMatchingThanLoaded);
 
   async function handleSelectAllMatching() {
     setFetchingAllIds(true);
@@ -2461,7 +2463,7 @@ export function PropertyLeasesTab({ propertyId, propertyCategory }: { propertyId
       </div>
 
       {/* Select-all-matching banner (Gmail-style) */}
-      {(showSelectAllBanner || (selectAllMatchingMode && checkedLeaseIds.size > leases.length)) && (
+      {(showSelectAllBanner || selectAllMatchingMode) && checkedLeaseIds.size > 0 && (
         <div className="flex items-center justify-between gap-3 px-3 py-2 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 rounded-md text-xs text-blue-800 dark:text-blue-200">
           {selectAllMatchingMode
             ? (
@@ -2471,8 +2473,11 @@ export function PropertyLeasesTab({ propertyId, propertyCategory }: { propertyId
             )
             : (
               <span>
-                All <strong>{leases.length}</strong> leases on this page are selected.{' '}
-                <strong>{data!.total}</strong> total match this filter.
+                <strong>{checkedLeaseIds.size}</strong> lease{checkedLeaseIds.size !== 1 ? 's' : ''} selected.{' '}
+                {data && data.total > checkedLeaseIds.size
+                  ? <><strong>{data.total}</strong> total match this filter.</>
+                  : null
+                }
               </span>
             )
           }
@@ -2481,7 +2486,7 @@ export function PropertyLeasesTab({ propertyId, propertyCategory }: { propertyId
               <Button
                 variant="link"
                 size="sm"
-                className="h-auto p-0 text-xs font-medium text-blue-700 dark:text-blue-300"
+                className="h-auto p-0 text-xs font-medium text-blue-700 dark:text-blue-300 shrink-0"
                 onClick={() => {
                   setCheckedLeaseIds(new Set());
                   setSelectAllMatchingMode(false);
@@ -2500,7 +2505,7 @@ export function PropertyLeasesTab({ propertyId, propertyCategory }: { propertyId
               >
                 {fetchingAllIds
                   ? <><Loader2 className="h-3 w-3 animate-spin inline mr-1" />Loading…</>
-                  : `Select all ${data!.total} matching leases`
+                  : `Select all ${data?.total ?? '?'} matching leases`
                 }
               </Button>
             )
