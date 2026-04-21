@@ -57,6 +57,7 @@ import {
   ArrowRight,
   Plus,
   Minus,
+  X,
 } from "lucide-react";
 import { ASSET_CLASS_TIERS } from "@shared/billing-constants";
 import { cn } from "@/lib/utils";
