@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, Building2, Briefcase, Trash2, MapPin, Anchor, PlusCircle, Layers } from "lucide-react";
+import { Plus, Building2, Briefcase, Trash2, MapPin, Anchor, PlusCircle, Layers, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -47,6 +47,7 @@ import { toStateAbbr } from "@/lib/state-utils";
 import type { CrmDeal, CrmProperty } from "@shared/schema";
 import DealFormModal from "@/components/modals/deal-form-modal";
 import PropertyFormModal from "@/components/modals/property-form-modal";
+import { AssetClassUpgradeModal } from "@/components/billing/AssetClassUpgradeModal";
 
 interface PortfolioProperty {
   id: string;
@@ -92,6 +93,8 @@ export function CreateProjectDialog({ trigger }: CreateProjectDialogProps) {
   const [portfolioProperties, setPortfolioProperties] = useState<PortfolioProperty[]>([]);
   const [showCreateDeal, setShowCreateDeal] = useState(false);
   const [showCreateProperty, setShowCreateProperty] = useState(false);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [upgradeModalKey, setUpgradeModalKey] = useState<string>("");
 
   const generatePropertyId = () => `prop_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
@@ -172,6 +175,16 @@ export function CreateProjectDialog({ trigger }: CreateProjectDialogProps) {
   const watchedDealId = form.watch("linkedDealId");
   const watchedPropertyId = form.watch("linkedPropertyId");
   const watchedProjectType = form.watch("projectType");
+
+  const selectedDeal = watchedDealId && watchedDealId !== "_none"
+    ? deals.find((d) => d.id === watchedDealId) ?? null
+    : null;
+  const dealAssetKey = selectedDeal?.assetClass ?? null;
+  const isDealAssetClassLocked =
+    dealAssetKey !== null &&
+    entitlements !== undefined &&
+    entitlements.assetClasses.length > 0 &&
+    !entitlements.assetClasses.includes(dealAssetKey);
 
   useEffect(() => {
     if (watchedDealId && watchedDealId !== "_none") {
@@ -450,6 +463,24 @@ export function CreateProjectDialog({ trigger }: CreateProjectDialogProps) {
                         Link to a CRM deal to auto-populate address
                       </FormDescription>
                       <FormMessage />
+                      {isDealAssetClassLocked && dealAssetKey && (
+                        <div className="mt-2 flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-900 px-3 py-2 text-sm">
+                          <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+                          <span className="text-amber-800 dark:text-amber-300">
+                            This deal's asset class (<strong>{dealAssetKey.replace(/_/g, " ")}</strong>) is not in your current plan.{" "}
+                            <button
+                              type="button"
+                              className="underline underline-offset-2 font-medium"
+                              onClick={() => {
+                                setUpgradeModalKey(dealAssetKey);
+                                setShowUpgradeModal(true);
+                              }}
+                            >
+                              Unlock it
+                            </button>
+                          </span>
+                        </div>
+                      )}
                     </FormItem>
                   )}
                 />
@@ -666,13 +697,23 @@ export function CreateProjectDialog({ trigger }: CreateProjectDialogProps) {
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={createProjectMutation.isPending}>
+              <Button type="submit" disabled={createProjectMutation.isPending || !!isDealAssetClassLocked}>
                 {createProjectMutation.isPending ? "Creating..." : "Create Project"}
               </Button>
             </DialogFooter>
           </form>
         </Form>
       </DialogContent>
+
+      {/* Asset class upgrade modal triggered from locked deal warning */}
+      <AssetClassUpgradeModal
+        open={showUpgradeModal}
+        onOpenChange={(v) => {
+          setShowUpgradeModal(v);
+          if (!v) setUpgradeModalKey("");
+        }}
+        pendingKeys={upgradeModalKey ? [upgradeModalKey] : []}
+      />
 
       {/* Inline Deal Creation Modal */}
       <DealFormModal

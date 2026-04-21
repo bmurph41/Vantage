@@ -167,10 +167,10 @@ export default function ModelSetupWizard({ open, onOpenChange, onProjectCreated 
   const entitledKeys = entitlements?.assetClasses ?? [];
 
   const isPropertyTypeLocked = (typeValue: string): boolean => {
-    if (!entitlements || entitledKeys.length === 0) return false;
+    if (!entitlements) return false; // still loading — optimistic unlock
     const assetKey = PROPERTY_TYPE_TO_ASSET_CLASS[typeValue];
-    if (assetKey === null || assetKey === undefined) return false;
-    return !entitledKeys.includes(assetKey);
+    if (assetKey === null || assetKey === undefined) return false; // no mapping → always unlocked
+    return !entitledKeys.includes(assetKey); // locked when not in entitlement list (including empty list)
   };
 
   const updateField = useCallback(
