@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
-import { AlertTriangle, ArrowRight, Layers, Loader2, Minus } from "lucide-react";
+import { AlertTriangle, ArrowRight, Loader2, Minus } from "lucide-react";
 import { ASSET_CLASS_LIST } from "@/components/AssetClassPicker";
 import { ASSET_CLASS_TIERS, getAssetClassTier } from "@shared/billing-constants";
 
