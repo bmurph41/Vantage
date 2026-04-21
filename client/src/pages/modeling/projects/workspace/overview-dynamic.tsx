@@ -137,7 +137,7 @@ export function OverviewDynamic({ project, pricingData, financials, onTabChange 
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between px-6">
         <div className="flex items-center gap-2">
           <Building2 className="h-4 w-4 text-muted-foreground" />
           <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
@@ -155,7 +155,7 @@ export function OverviewDynamic({ project, pricingData, financials, onTabChange 
       </div>
 
       {/* KPI Grid — always rendered; null values show "—" */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 px-6">
         {kpiValues.map((kpi) => (
           <KPICard
             key={kpi.key}

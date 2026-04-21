@@ -847,9 +847,9 @@ export default function ProjectWorkspace() {
         </div>
       </div>
 
-      <div className="flex flex-1 overflow-hidden">
-      <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-0 flex-1 min-w-0">
-        <div className="ws-nav-strip sticky top-[56px] z-20 -mx-6 px-6 border-b-2 border-border shadow-[0_3px_12px_-2px_rgba(0,0,0,0.10)]" style={{background:'hsl(221,50%,98%)'}}>
+      <div className="flex flex-1 min-w-0">
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-0 flex-1 min-w-0 overflow-x-clip">
+        <div className="ws-nav-strip sticky top-[72px] z-20 px-6 border-b-2 border-border shadow-[0_3px_12px_-2px_rgba(0,0,0,0.10)]" style={{background:'hsl(221,50%,98%)'}}>
           {/* ── Group Rail ── */}
           <div className="flex items-center gap-1 overflow-x-auto pt-1.5 pb-0 px-0" data-testid="tab-groups">
             {TAB_GROUPS.map((group) => {
@@ -913,11 +913,11 @@ export default function ProjectWorkspace() {
           {projectId && <BrokerFeedbackPanel targetType="modeling-project" targetId={projectId} />}
         </TabsContent>
 
-        <TabsContent value="inputs" className="space-y-6" data-tour="valuator-inputs">
+        <TabsContent value="inputs" className="mt-4 space-y-4" data-tour="valuator-inputs">
           <InputsAssumptions project={project!} />
         </TabsContent>
 
-        <TabsContent value="cases" className="space-y-6" data-tour="valuator-scenarios">
+        <TabsContent value="cases" className="mt-4 space-y-4" data-tour="valuator-scenarios">
           <CaseConfiguration projectId={projectId!} onTabChange={handleTabChange} />
         </TabsContent>
 
@@ -934,7 +934,7 @@ export default function ProjectWorkspace() {
           <PropertyTaxTab projectId={projectId!} onTabChange={handleTabChange} />
         </TabsContent>
 
-        <TabsContent value="analytics" className="space-y-6" data-tour="valuator-analysis">
+        <TabsContent value="analytics" className="mt-4 space-y-4" data-tour="valuator-analysis">
           <AnalyticsNormalization projectId={projectId!} />
         </TabsContent>
 
@@ -946,7 +946,7 @@ export default function ProjectWorkspace() {
           <DealPricing projectId={projectId!} onTabChange={handleTabChange} />
         </TabsContent>
 
-        <TabsContent value="summary" className="space-y-6" data-tour="valuator-export">
+        <TabsContent value="summary" className="mt-4 space-y-4" data-tour="valuator-export">
           <ExecutiveSummaryDynamic projectId={projectId!} pricingData={pricingData} financials={financials} onTabChange={handleTabChange} />
         </TabsContent>
 
@@ -958,7 +958,7 @@ export default function ProjectWorkspace() {
           <CapitalStackWorkspace projectId={projectId!} onTabChange={handleTabChange} />
         </TabsContent>
 
-        <TabsContent value="exit" className="space-y-6" data-tour="valuator-exit">
+        <TabsContent value="exit" className="mt-4 space-y-4" data-tour="valuator-exit">
           <WorkspaceExitStrategy projectId={projectId!} onTabChange={handleTabChange} />
         </TabsContent>
 
@@ -967,7 +967,7 @@ export default function ProjectWorkspace() {
           <AuditTrailViewer projectId={projectId!} />
         </TabsContent>
 
-        <TabsContent value="investment-materials" className="mt-4">
+        <TabsContent value="investment-materials" className="mt-4 space-y-4">
           <InvestmentMaterialsTab
             projectId={projectId!}
             dealId={project?.dealId}

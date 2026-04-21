@@ -177,7 +177,7 @@ function NOISummaryBar({
   const effectiveNoi = overrideActive && noiOverride ? noiOverride : noi;
 
   return (
-    <div className="sticky top-0 z-20 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 border border-blue-200 dark:border-blue-800 rounded-lg shadow-sm">
+    <div className="sticky top-[140px] z-10 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 border border-blue-200 dark:border-blue-800 rounded-lg shadow-sm">
       <div className="px-4 py-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-6">
@@ -1149,7 +1149,7 @@ export default function InputsAssumptions({ project }: InputsAssumptionsProps) {
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between px-6">
         <div>
           <h2 className="text-lg font-semibold">Inputs & Assumptions</h2>
           <p className="text-sm text-muted-foreground">
