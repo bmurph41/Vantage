@@ -96,15 +96,15 @@ router.get("/", async (req, res) => {
   }
 });
 
-// ─── Asset Class Audit ────────────────────────────────────────────────────────
-// GET /asset-class-audit — paginated list of asset_classes_updated events with org context
-// NOTE: must be declared BEFORE /:orgId to avoid the wildcard swallowing it.
+// GET /asset-class-audit — paginated asset_classes_updated events with org context.
+// Must be declared BEFORE /:orgId to avoid the wildcard param swallowing it.
 router.get("/asset-class-audit", async (req, res) => {
   try {
-    const { page = "1", pageSize = "50", orgId: filterOrgId } = req.query as Record<string, string>;
+    const { page = "1", pageSize = "50", q } = req.query as Record<string, string>;
     const pageNum = Math.max(1, parseInt(page || "1", 10));
     const size = Math.max(1, Math.min(100, parseInt(pageSize || "50", 10)));
     const offset = (pageNum - 1) * size;
+    const orgSearch = q?.trim() ?? "";
 
     const rows = await db.execute(sql`
       SELECT
@@ -120,30 +120,27 @@ router.get("/asset-class-audit", async (req, res) => {
       LEFT JOIN users         u ON u.id = a.admin_user_id
       LEFT JOIN organizations o ON o.id = (a.metadata_json->>'orgId')
       WHERE a.action = 'asset_classes_updated'
-      ${filterOrgId ? sql`AND (a.metadata_json->>'orgId') = ${filterOrgId}` : sql``}
+      ${orgSearch ? sql`AND o.name ILIKE ${"%" + orgSearch + "%"}` : sql``}
       ORDER BY a.created_at DESC
       LIMIT ${size} OFFSET ${offset}
     `);
 
-    const [totalResult] = await db
-      .select({ total: count() })
-      .from(adminAuditLog)
-      .where(
-        filterOrgId
-          ? and(
-              eq(adminAuditLog.action, "asset_classes_updated"),
-              sql`(${adminAuditLog.metadataJson}->>'orgId') = ${filterOrgId}`
-            )
-          : eq(adminAuditLog.action, "asset_classes_updated")
-      );
+    const totalRows = await db.execute(sql`
+      SELECT count(*) AS total
+      FROM admin_audit_log a
+      LEFT JOIN organizations o ON o.id = (a.metadata_json->>'orgId')
+      WHERE a.action = 'asset_classes_updated'
+      ${orgSearch ? sql`AND o.name ILIKE ${"%" + orgSearch + "%"}` : sql``}
+    `);
+    const total = Number((totalRows.rows[0] as any)?.total ?? 0);
 
     res.json({
       rows: rows.rows,
       pagination: {
         page: pageNum,
         pageSize: size,
-        totalPages: Math.ceil(Number(totalResult?.total ?? 0) / size),
-        total: Number(totalResult?.total ?? 0),
+        totalPages: Math.ceil(total / size),
+        total,
       },
     });
   } catch (error) {

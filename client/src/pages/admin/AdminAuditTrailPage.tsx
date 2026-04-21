@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Input } from "@/components/ui/input";
 import {
   Table, TableHeader, TableBody, TableRow, TableHead, TableCell,
 } from "@/components/ui/table";
@@ -11,10 +12,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  ChevronLeft, ChevronRight, Shield, Clock, Layers, Building2,
+  ChevronLeft, ChevronRight, Shield, Clock, Layers, Building2, Search,
 } from "lucide-react";
-
-// ─── Shared types ────────────────────────────────────────────────────────────
 
 interface Pagination {
   page: number;
@@ -71,8 +70,6 @@ function PaginationBar({
     </div>
   );
 }
-
-// ─── All-activity tab ────────────────────────────────────────────────────────
 
 interface AuditRow {
   id: string;
@@ -272,8 +269,6 @@ function AllActivityTab() {
   );
 }
 
-// ─── Asset class changes tab ─────────────────────────────────────────────────
-
 interface AssetClassAuditRow {
   id: string;
   created_at: string;
@@ -311,14 +306,24 @@ function ClassList({ classes }: { classes: string[] | null | undefined }) {
 
 function AssetClassChangesTab() {
   const [page, setPage] = useState(1);
+  const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const pageSize = 50;
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 350);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  useEffect(() => { setPage(1); }, [debouncedSearch]);
 
   const buildQs = useCallback(() => {
     const p = new URLSearchParams();
     p.set("page", String(page));
     p.set("pageSize", String(pageSize));
+    if (debouncedSearch) p.set("q", debouncedSearch);
     return p.toString();
-  }, [page]);
+  }, [page, debouncedSearch]);
 
   const { data, isLoading } = useQuery<AssetClassAuditResponse>({
     queryKey: [`/api/admin/organizations/asset-class-audit?${buildQs()}`],
@@ -329,11 +334,22 @@ function AssetClassChangesTab() {
 
   return (
     <div className="space-y-4">
-      {pagination && (
-        <div className="flex justify-end">
-          <span className="text-sm text-muted-foreground">{pagination.total} total changes</span>
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative w-[260px]">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+          <Input
+            placeholder="Filter by org name…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-8"
+          />
         </div>
-      )}
+        {pagination && (
+          <span className="text-sm text-muted-foreground ml-auto">
+            {pagination.total} total changes
+          </span>
+        )}
+      </div>
 
       <div className="bg-white dark:bg-gray-800 border rounded-lg shadow-sm overflow-hidden">
         <div className="overflow-x-auto w-full">
@@ -425,8 +441,6 @@ function AssetClassChangesTab() {
     </div>
   );
 }
-
-// ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function AdminAuditTrailPage() {
   return (
