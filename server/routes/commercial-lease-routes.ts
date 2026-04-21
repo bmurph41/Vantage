@@ -121,6 +121,19 @@ router.delete("/leases/:leaseId", async (req: Request, res: Response) => {
   }
 });
 
+router.post("/leases/restore", async (req: Request, res: Response) => {
+  try {
+    const { ids } = req.body as { ids: string[] };
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ error: 'ids must be a non-empty array' });
+    }
+    const restored = await storage.restoreLeases(db, ids);
+    res.json({ restored: restored.length });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // ============================================================================
 // TERMS CRUD
 // ============================================================================

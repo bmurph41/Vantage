@@ -2,6 +2,7 @@
 
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
+import { ToastAction } from '@/components/ui/toast';
 import { useState, type ReactNode } from 'react';
 import { useLocation } from 'wouter';
 import { Badge } from '@/components/ui/badge';
@@ -2208,6 +2209,24 @@ export function PropertyLeasesTab({ propertyId, propertyCategory }: { propertyId
     ? PROPERTY_CATEGORY_LEASE_HINT[propertyCategory.toLowerCase()] || null
     : null;
 
+  const undoRestoreMutation = useMutation({
+    mutationFn: async (ids: string[]) => {
+      const res = await apiRequest('POST', '/api/commercial-leases/leases/restore', { ids });
+      if (!res.ok) throw new Error('Failed to restore leases');
+      return ids;
+    },
+    onSuccess: (ids) => {
+      toast({ title: `${ids.length} lease${ids.length !== 1 ? 's' : ''} restored` });
+    },
+    onError: () => {
+      toast({ title: 'Failed to undo deletion', variant: 'destructive' });
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['property-leases', propertyId] });
+      queryClient.invalidateQueries({ queryKey: ['property-lease-stats', propertyId] });
+    },
+  });
+
   const bulkDeleteMutation = useMutation({
     mutationFn: async (ids: string[]) => {
       await Promise.all(
@@ -2219,7 +2238,16 @@ export function PropertyLeasesTab({ propertyId, propertyCategory }: { propertyId
     },
     onSuccess: (ids) => {
       setCheckedLeaseIds(new Set());
-      toast({ title: `${ids.length} lease${ids.length !== 1 ? 's' : ''} deleted` });
+      toast({
+        title: `${ids.length} lease${ids.length !== 1 ? 's' : ''} deleted`,
+        description: 'Click Undo within 8 seconds to restore them.',
+        duration: 8000,
+        action: (
+          <ToastAction altText="Undo delete" onClick={() => undoRestoreMutation.mutate(ids)}>
+            Undo
+          </ToastAction>
+        ),
+      });
     },
     onError: () => {
       toast({ title: 'Failed to delete some leases', variant: 'destructive' });

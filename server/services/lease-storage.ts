@@ -190,6 +190,16 @@ export async function deleteLease(db: DB, leaseId: string) {
   return updateLease(db, leaseId, { active: false } as any);
 }
 
+export async function restoreLeases(db: DB, ids: string[]) {
+  if (!ids.length) return [];
+  const rows = await db
+    .update(commercialLeases)
+    .set({ active: true, updatedAt: new Date() } as any)
+    .where(inArray(commercialLeases.id, ids))
+    .returning();
+  return rows;
+}
+
 // ─── TERMS CRUD ──────────────────────────────────────────────────────────────
 
 export async function upsertTerm(db: DB, data: Partial<LeaseTerm> & { leaseId: string }) {
