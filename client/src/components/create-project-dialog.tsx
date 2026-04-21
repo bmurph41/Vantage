@@ -180,10 +180,11 @@ export function CreateProjectDialog({ trigger }: CreateProjectDialogProps) {
     ? deals.find((d) => d.id === watchedDealId) ?? null
     : null;
   const dealAssetKey = selectedDeal?.assetClass ?? null;
+  // Lock if entitlements loaded AND the deal's asset class is not in the entitled list.
+  // Note: when entitlements.assetClasses is [] (org with no classes), all mapped types are locked.
   const isDealAssetClassLocked =
     dealAssetKey !== null &&
     entitlements !== undefined &&
-    entitlements.assetClasses.length > 0 &&
     !entitlements.assetClasses.includes(dealAssetKey);
 
   useEffect(() => {
@@ -697,7 +698,14 @@ export function CreateProjectDialog({ trigger }: CreateProjectDialogProps) {
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={createProjectMutation.isPending || !!isDealAssetClassLocked}>
+              <Button
+                type="submit"
+                disabled={
+                  createProjectMutation.isPending ||
+                  !!isDealAssetClassLocked ||
+                  (!!selectedDeal && entitlements === undefined)
+                }
+              >
                 {createProjectMutation.isPending ? "Creating..." : "Create Project"}
               </Button>
             </DialogFooter>
