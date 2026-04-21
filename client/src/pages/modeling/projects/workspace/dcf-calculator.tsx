@@ -99,9 +99,12 @@ interface LeaseYearDetail {
   capValue?: number;
   /** For CPI_CAP_FLOOR leases only: configured floor minimum (decimal) */
   floorValue?: number;
+  /** For CPI_CAP_FLOOR leases: the raw scenario CPI rate before cap/floor clamping */
+  nominalCpiRate?: number;
   activeStepRentAnnual?: number | null;
   isFuture?: boolean;
   leaseStartDate?: string | null;
+  notYetStarted?: boolean;
 }
 
 interface RentStepEntryFE {
@@ -242,6 +245,8 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
     { key: 'tiLcCost', label: 'TI/LC Cost' },
     { key: 'netEgi', label: 'Net EGI' },
     { key: 'status', label: 'Status' },
+    { key: 'escalationRate', label: 'Escalation Rate (%)' },
+    { key: 'nominalCpi', label: 'Nominal CPI (%)' },
   ] as const;
 
   type LeaseExportColumnKey = typeof LEASE_EXPORT_COLUMNS[number]['key'];
@@ -403,6 +408,20 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
           if (detail.isExpired) return 'Expired';
           if (detail.notYetStarted) return 'Pre-Leased (pre-commencement)';
           return 'Active';
+        }
+        case 'escalationRate': {
+          if (isTotal) return '';
+          if (detail.isExpired) return '';
+          if (detail.escalationType === 'SCHEDULE' || detail.escalationType === 'NONE') return '';
+          const rate = detail.escalationRate;
+          return Number.isFinite(rate) ? parseFloat((rate * 100).toFixed(4)) : '';
+        }
+        case 'nominalCpi': {
+          if (isTotal) return '';
+          if (detail.isExpired) return '';
+          if (detail.escalationType !== 'CPI_CAP_FLOOR') return '';
+          const nominal = detail.nominalCpiRate;
+          return Number.isFinite(nominal) ? parseFloat((nominal * 100).toFixed(4)) : '';
         }
         default: return '';
       }
