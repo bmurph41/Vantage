@@ -14,8 +14,10 @@ import {
   organizationPacks,
   organizationUserRoles,
   adminAuditLog,
+  crmDeals,
+  modelingProjects,
 } from "@shared/schema";
-import { eq, and, desc, sql, count } from "drizzle-orm";
+import { eq, and, desc, sql, count, inArray, ne } from "drizzle-orm";
 import { getAssetClassTier, getMaxAssetClasses } from "@shared/billing-constants";
 import { sendInviteEmail } from "../services/email-service";
 import { enterpriseAuthService } from "../services/enterprise-auth-service";
@@ -401,6 +403,62 @@ orgSettingsRouter.get("/entitlements", async (req: Request, res: Response) => {
       priceMonthly: tier.priceMonthly,
       priceAnnual: tier.priceAnnual,
     });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /asset-class-impact — return counts of deals and modeling projects per asset class
+// Query param: classes=marina,hotel (comma-separated list of asset class keys to check)
+orgSettingsRouter.get("/asset-class-impact", async (req: Request, res: Response) => {
+  try {
+    const orgId = (req as any).user.orgId;
+    const rawClasses = (req.query.classes as string) ?? "";
+    const classKeys = rawClasses
+      .split(",")
+      .map((k) => k.trim())
+      .filter(Boolean);
+
+    if (classKeys.length === 0) {
+      return res.json({});
+    }
+
+    const [dealRows, projectRows] = await Promise.all([
+      db
+        .select({ assetClass: crmDeals.assetClass, cnt: count() })
+        .from(crmDeals)
+        .where(
+          and(
+            eq(crmDeals.orgId, orgId),
+            inArray(crmDeals.assetClass, classKeys),
+            ne(crmDeals.isClosed, true)
+          )
+        )
+        .groupBy(crmDeals.assetClass),
+      db
+        .select({ assetClass: modelingProjects.assetClass, cnt: count() })
+        .from(modelingProjects)
+        .where(
+          and(
+            eq(modelingProjects.orgId, orgId),
+            inArray(modelingProjects.assetClass, classKeys),
+            eq(modelingProjects.dealOutcome, "active")
+          )
+        )
+        .groupBy(modelingProjects.assetClass),
+    ]);
+
+    const impact: Record<string, { deals: number; projects: number; total: number }> = {};
+    for (const key of classKeys) {
+      const deals = Number(dealRows.find((r) => r.assetClass === key)?.cnt ?? 0);
+      const projects = Number(projectRows.find((r) => r.assetClass === key)?.cnt ?? 0);
+      const total = deals + projects;
+      if (total > 0) {
+        impact[key] = { deals, projects, total };
+      }
+    }
+
+    res.json(impact);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }

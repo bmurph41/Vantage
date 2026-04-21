@@ -29,6 +29,10 @@ interface OrgEntitlements {
   priceAnnual: number;
 }
 
+interface AssetClassImpact {
+  [assetClass: string]: { deals: number; projects: number; total: number };
+}
+
 interface AssetClassDowngradeModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -46,6 +50,17 @@ export function AssetClassDowngradeModal({
   const { data: entitlements, isLoading, isError } = useQuery<OrgEntitlements>({
     queryKey: ["/api/orgs/me/entitlements"],
     enabled: open,
+  });
+
+  const { data: impact } = useQuery<AssetClassImpact>({
+    queryKey: ["/api/orgs/me/asset-class-impact", keysToRemove.join(",")],
+    queryFn: async () => {
+      const params = new URLSearchParams({ classes: keysToRemove.join(",") });
+      const res = await fetch(`/api/orgs/me/asset-class-impact?${params}`);
+      if (!res.ok) throw new Error("Failed to load impact data");
+      return res.json();
+    },
+    enabled: open && keysToRemove.length > 0,
   });
 
   const undoRemoval = useMutation({
@@ -159,15 +174,22 @@ export function AssetClassDowngradeModal({
               <div className="flex flex-wrap gap-1.5">
                 {keysToRemove.map((key) => {
                   const entry = ASSET_CLASS_LIST.find((a) => a.key === key);
+                  const classImpact = impact?.[key];
                   return (
-                    <Badge
-                      key={key}
-                      variant="secondary"
-                      className="flex items-center gap-1 opacity-60 line-through"
-                      style={entry ? { borderLeft: `3px solid ${entry.color}` } : {}}
-                    >
-                      {entry?.icon} {labelFor(key)}
-                    </Badge>
+                    <div key={key} className="flex items-center gap-1">
+                      <Badge
+                        variant="secondary"
+                        className="flex items-center gap-1 opacity-60 line-through"
+                        style={entry ? { borderLeft: `3px solid ${entry.color}` } : {}}
+                      >
+                        {entry?.icon} {labelFor(key)}
+                      </Badge>
+                      {classImpact && classImpact.total > 0 && (
+                        <span className="text-xs font-medium text-amber-700 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/40 px-1.5 py-0.5 rounded">
+                          {classImpact.total} active {classImpact.total === 1 ? "deal/project" : "deals/projects"}
+                        </span>
+                      )}
+                    </div>
                   );
                 })}
               </div>
