@@ -23,6 +23,11 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
+import { Checkbox } from '@/components/ui/checkbox';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import {
   MapPin, DollarSign, TrendingUp, Activity, Clock, ExternalLink,
   ChevronRight, Phone, Mail, Calendar, FileText, BarChart3,
@@ -2191,14 +2196,39 @@ function LeaseDetailSheet({ leaseId, propertyId, open, onClose }: { leaseId: str
 }
 
 export function PropertyLeasesTab({ propertyId, propertyCategory }: { propertyId: string; propertyCategory?: string }) {
+  const { toast } = useToast();
   const [selectedLeaseId, setSelectedLeaseId] = useState<string | null>(null);
   const [showInactive, setShowInactive] = useState(false);
   const [addSheetOpen, setAddSheetOpen] = useState(false);
   const [leaseTypeFilter, setLeaseTypeFilter] = useState<string>('all');
+  const [checkedLeaseIds, setCheckedLeaseIds] = useState<Set<string>>(new Set());
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
 
   const suggestedLeaseType = propertyCategory
     ? PROPERTY_CATEGORY_LEASE_HINT[propertyCategory.toLowerCase()] || null
     : null;
+
+  const bulkDeleteMutation = useMutation({
+    mutationFn: async (ids: string[]) => {
+      await Promise.all(
+        ids.map(id => apiRequest('DELETE', `/api/commercial-leases/leases/${id}`).then(res => {
+          if (!res.ok) throw new Error(`Failed to delete lease ${id}`);
+        }))
+      );
+      return ids;
+    },
+    onSuccess: (ids) => {
+      setCheckedLeaseIds(new Set());
+      toast({ title: `${ids.length} lease${ids.length !== 1 ? 's' : ''} deleted` });
+    },
+    onError: () => {
+      toast({ title: 'Failed to delete some leases', variant: 'destructive' });
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['property-leases', propertyId] });
+      queryClient.invalidateQueries({ queryKey: ['property-lease-stats', propertyId] });
+    },
+  });
 
   const { data, isLoading } = useQuery<{ data: any[]; total: number }>({
     queryKey: ['property-leases', propertyId, showInactive, leaseTypeFilter],
@@ -2232,6 +2262,24 @@ export function PropertyLeasesTab({ propertyId, propertyCategory }: { propertyId
   });
 
   const leases = data?.data || [];
+  const allChecked = leases.length > 0 && leases.every((l: any) => checkedLeaseIds.has(l.id));
+  const someChecked = !allChecked && leases.some((l: any) => checkedLeaseIds.has(l.id));
+
+  function toggleAll() {
+    if (allChecked) {
+      setCheckedLeaseIds(new Set());
+    } else {
+      setCheckedLeaseIds(new Set(leases.map((l: any) => l.id)));
+    }
+  }
+
+  function toggleOne(id: string, checked: boolean | 'indeterminate') {
+    setCheckedLeaseIds(prev => {
+      const next = new Set(prev);
+      if (checked === true) next.add(id); else next.delete(id);
+      return next;
+    });
+  }
 
   const occupancyPct = stats && stats.totalLeases > 0
     ? Math.round((stats.activeLeases / stats.totalLeases) * 100)
@@ -2298,6 +2346,18 @@ export function PropertyLeasesTab({ propertyId, propertyCategory }: { propertyId
           )}
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          {checkedLeaseIds.size > 0 && (
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => setConfirmBulkDelete(true)}
+              disabled={bulkDeleteMutation.isPending}
+              className="h-7 gap-1.5 text-xs"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              Delete selected ({checkedLeaseIds.size})
+            </Button>
+          )}
           <Select value={leaseTypeFilter} onValueChange={setLeaseTypeFilter}>
             <SelectTrigger className="h-7 text-xs w-36">
               <SelectValue placeholder="All types" />
@@ -2366,6 +2426,13 @@ export function PropertyLeasesTab({ propertyId, propertyCategory }: { propertyId
           <Table>
             <TableHeader>
               <TableRow className="bg-gray-50 dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800">
+                <TableHead className="w-8 pl-3">
+                  <Checkbox
+                    checked={allChecked ? true : someChecked ? 'indeterminate' : false}
+                    onCheckedChange={toggleAll}
+                    aria-label="Select all leases"
+                  />
+                </TableHead>
                 <TableHead className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Tenant</TableHead>
                 <TableHead className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Suite</TableHead>
                 <TableHead className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">SF</TableHead>
@@ -2379,9 +2446,19 @@ export function PropertyLeasesTab({ propertyId, propertyCategory }: { propertyId
               {leases.map((lease: any) => (
                 <TableRow
                   key={lease.id}
-                  className="cursor-pointer hover:bg-blue-50/50 dark:hover:bg-blue-900/10 transition-colors"
+                  className={cn(
+                    'cursor-pointer hover:bg-blue-50/50 dark:hover:bg-blue-900/10 transition-colors',
+                    checkedLeaseIds.has(lease.id) && 'bg-blue-50/30 dark:bg-blue-900/10',
+                  )}
                   onClick={() => setSelectedLeaseId(lease.id)}
                 >
+                  <TableCell className="w-8 pl-3 py-2.5" onClick={e => e.stopPropagation()}>
+                    <Checkbox
+                      checked={checkedLeaseIds.has(lease.id)}
+                      onCheckedChange={(checked) => toggleOne(lease.id, checked)}
+                      aria-label={`Select ${lease.tenantName}`}
+                    />
+                  </TableCell>
                   <TableCell className="font-medium text-sm py-2.5">{lease.tenantName}</TableCell>
                   <TableCell className="text-xs text-gray-500 py-2.5">{lease.suite || '—'}</TableCell>
                   <TableCell className="text-xs py-2.5">{fmtSf(lease.sf)}</TableCell>
@@ -2432,6 +2509,31 @@ export function PropertyLeasesTab({ propertyId, propertyCategory }: { propertyId
           onClose={() => setSelectedLeaseId(null)}
         />
       )}
+
+      {/* Bulk Delete Confirmation */}
+      <AlertDialog open={confirmBulkDelete} onOpenChange={setConfirmBulkDelete}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {checkedLeaseIds.size} lease{checkedLeaseIds.size !== 1 ? 's' : ''}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently remove {checkedLeaseIds.size === 1 ? 'this lease' : `these ${checkedLeaseIds.size} leases`} and all associated data. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={bulkDeleteMutation.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700 text-white"
+              disabled={bulkDeleteMutation.isPending}
+              onClick={() => {
+                setConfirmBulkDelete(false);
+                bulkDeleteMutation.mutate(Array.from(checkedLeaseIds));
+              }}
+            >
+              {bulkDeleteMutation.isPending ? 'Deleting…' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
