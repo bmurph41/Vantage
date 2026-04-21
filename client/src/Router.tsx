@@ -380,7 +380,7 @@ function UnifiedLayout({ children }: { children: React.ReactNode }) {
       <Suspense fallback={<SidebarLoader />}>
         <UnifiedSidebar />
       </Suspense>
-      <div className="flex-1 flex flex-col overflow-hidden pt-12 md:pt-0 min-w-0">
+      <div className="flex-1 flex flex-col overflow-hidden pt-12 md:pt-0 min-w-0 md:border-l md:border-border/30 md:pl-1">
         <Suspense fallback={<div className="h-10" />}>
           <PendingNotificationsBanner />
         </Suspense>
