@@ -109,8 +109,9 @@ export function PLModeToggle({ project, onModeChange }: PLModeToggleProps) {
   const assetClass = project?.assetClass ?? 'marina';
   const projectId = project?.id;
 
+  const rawMode = project?.modelInputMode as ModelInputMode | undefined;
   const currentMode: ModelInputMode =
-    (project?.modelInputMode as ModelInputMode) ?? getDefaultMode(assetClass);
+    (rawMode && rawMode !== 'auto') ? rawMode : getDefaultMode(assetClass);
 
   const [optimisticMode, setOptimisticMode] = useState<ModelInputMode | null>(null);
   const displayMode: ModelInputMode = optimisticMode ?? currentMode;
@@ -131,7 +132,7 @@ export function PLModeToggle({ project, onModeChange }: PLModeToggleProps) {
     if (
       !hasAutoPromotedRef.current &&
       hasPnlDocuments &&
-      (currentMode === 'auto' || !project?.modelInputMode)
+      (!rawMode || rawMode === 'auto')
     ) {
       hasAutoPromotedRef.current = true;
       // Fire-and-forget: set mode to upload without blocking the render

@@ -9,7 +9,7 @@ import { formatCurrency, formatPercent } from '@/lib/utils';
 // =============================================================================
 
 import { useMemo } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import {
   Tooltip,
@@ -132,8 +132,7 @@ export function OverviewDynamic({ project, pricingData, financials, onTabChange 
     }));
   }, [kpis, project, pricingData, financials]);
 
-  // Filter out KPIs with no value
-  const activeKPIs = kpiValues.filter((k) => k.value !== null);
+  const hasAnyValue = kpiValues.some((k) => k.value !== null);
 
   return (
     <div className="space-y-4">
@@ -147,32 +146,26 @@ export function OverviewDynamic({ project, pricingData, financials, onTabChange 
           <Badge variant="outline" className="text-xs">
             {config.label}
           </Badge>
+          {!hasAnyValue && (
+            <span className="text-xs text-muted-foreground italic">
+              Enter assumptions or upload a P&amp;L to populate
+            </span>
+          )}
         </div>
       </div>
 
-      {/* KPI Grid */}
-      {activeKPIs.length > 0 ? (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-          {activeKPIs.map((kpi) => (
-            <KPICard
-              key={kpi.key}
-              label={kpi.label}
-              value={kpi.value!}
-              format={kpi.format}
-              description={kpi.description}
-            />
-          ))}
-        </div>
-      ) : (
-        <Card>
-          <CardContent className="py-8 text-center text-muted-foreground">
-            <p className="text-sm">No metrics available yet.</p>
-            <p className="text-xs mt-1">
-              Enter your assumptions or upload a P&L to see {config.label} KPIs.
-            </p>
-          </CardContent>
-        </Card>
-      )}
+      {/* KPI Grid — always rendered; null values show "—" */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+        {kpiValues.map((kpi) => (
+          <KPICard
+            key={kpi.key}
+            label={kpi.label}
+            value={kpi.value}
+            format={kpi.format}
+            description={kpi.description}
+          />
+        ))}
+      </div>
     </div>
   );
 }
@@ -188,11 +181,11 @@ function KPICard({
   description,
 }: {
   label: string;
-  value: number;
+  value: number | null;
   format: string;
   description?: string;
 }) {
-  const isGood = getKPIHealth(label, value);
+  const isGood = value !== null ? getKPIHealth(label, value) : 'neutral';
   const healthColor =
     isGood === 'good'
       ? 'text-emerald-600 dark:text-emerald-400'
@@ -220,7 +213,7 @@ function KPICard({
             </TooltipProvider>
           )}
         </div>
-        <div className={`text-xl font-bold tabular-nums ${healthColor}`}>
+        <div className={`text-xl font-bold tabular-nums ${value === null ? 'text-muted-foreground/40' : healthColor}`}>
           {formatKPIValue(value, format)}
         </div>
       </CardContent>
