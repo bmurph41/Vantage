@@ -840,15 +840,6 @@ export default function Pipeline() {
   const [selectedDeal, setSelectedDeal] = useState<DealWithRelations | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  // Stage entry requirements: { [stageId]: string[] } — loaded from stage config
-  const stageRequirements: Record<string, string[]> = useMemo(() => {
-    if (!stages) return {};
-    return Object.fromEntries(
-      stages
-        .filter(s => (s as any).requiredFields?.length > 0)
-        .map(s => [s.id, (s as any).requiredFields as string[]])
-    );
-  }, [stages]);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [activeAssetClass, setActiveAssetClass] = useState<string>("all");
   const [activeSavedView, setActiveSavedView] = useState<string>("all_deals");
@@ -885,6 +876,16 @@ export default function Pipeline() {
       .filter(stage => stage.pipelineId === selectedPipelineId || (!stage.pipelineId && selectedPipelineId === ""))
       .sort((a, b) => (a.stageOrder || 0) - (b.stageOrder || 0));
   }, [allStages, selectedPipelineId]);
+
+  // Stage entry requirements: { [stageId]: string[] } — loaded from stage config
+  const stageRequirements: Record<string, string[]> = useMemo(() => {
+    if (!stages) return {};
+    return Object.fromEntries(
+      stages
+        .filter(s => (s as any).requiredFields?.length > 0)
+        .map(s => [s.id, (s as any).requiredFields as string[]])
+    );
+  }, [stages]);
 
   const { data: deals = [], isLoading } = useQuery<DealWithRelations[]>({ queryKey: ["/api/deals"] });
 
