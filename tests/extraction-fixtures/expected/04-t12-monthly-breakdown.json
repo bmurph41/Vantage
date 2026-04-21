@@ -1,0 +1,10 @@
+{
+  "id": "04-t12-monthly-breakdown",
+  "docClass": "t12",
+  "expected": {
+    "effective_gross_income": 2400000,
+    "total_operating_expenses": 1200000,
+    "net_operating_income": 1200000,
+    "monthly_breakdown_count": 12
+  }
+}

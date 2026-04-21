@@ -1,0 +1,11 @@
+{
+  "id": "05-rent-roll-small",
+  "docClass": "rent_roll",
+  "expected": {
+    "property_name": "Maple Apartments",
+    "total_units": 8,
+    "occupied_units": 6,
+    "vacant_units": 2,
+    "total_potential_rent": 12800
+  }
+}

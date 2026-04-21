@@ -1,0 +1,32 @@
+{
+  "id": "01-multifamily-pl-clean",
+  "docClass": "pl",
+  "expected": {
+    "property_name": "Lakeside Apartments",
+    "reporting_period": "TTM ending 12/31/2025",
+    "gross_potential_rent": 5280000,
+    "vacancy_loss": 316800,
+    "concessions": 79200,
+    "bad_debt": 52800,
+    "effective_gross_income": 4831200,
+    "parking_income": 145000,
+    "laundry_income": 62000,
+    "late_fees": 28500,
+    "pet_fees": 48000,
+    "utility_reimbursements": 380000,
+    "total_other_income": 663500,
+    "total_revenue": 5494700,
+    "management_fees": 219788,
+    "payroll": 720000,
+    "repairs_maintenance": 425000,
+    "contract_services": 165000,
+    "utilities": 285000,
+    "insurance": 195000,
+    "real_estate_taxes": 685000,
+    "landscaping": 48000,
+    "administrative": 85000,
+    "advertising_marketing": 95000,
+    "total_operating_expenses": 2922788,
+    "net_operating_income": 2571912
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "id": "02-multifamily-pl-aliased",
+  "docClass": "pl",
+  "expected": {
+    "gross_potential_rent": 3600000,
+    "vacancy_loss": 180000,
+    "concessions": 36000,
+    "bad_debt": 18000,
+    "effective_gross_income": 3366000,
+    "total_other_income": 240000,
+    "total_revenue": 3606000,
+    "management_fees": 144240,
+    "payroll": 480000,
+    "repairs_maintenance": 280000,
+    "utilities": 195000,
+    "insurance": 125000,
+    "real_estate_taxes": 425000,
+    "landscaping": 32000,
+    "administrative": 65000,
+    "advertising_marketing": 48000,
+    "total_operating_expenses": 1794240,
+    "net_operating_income": 1811760
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "id": "03-pl-parenthesized-negatives",
+  "docClass": "pl",
+  "expected": {
+    "gross_potential_rent": 2400000,
+    "vacancy_loss": 120000,
+    "concessions": 24000,
+    "bad_debt": 12000,
+    "effective_gross_income": 2244000,
+    "total_other_income": 180000,
+    "total_revenue": 2424000,
+    "management_fees": 96960,
+    "total_operating_expenses": 1200000,
+    "net_operating_income": 1224000
+  }
+}
