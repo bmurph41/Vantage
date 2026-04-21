@@ -55,6 +55,44 @@ interface ComparisonMetric {
   higherIsBetter: boolean;
 }
 
+// Shape returned by POST /api/deals/compare-full per deal.
+interface CompareFullDeal {
+  dealId: string;
+  dealName: string;
+  modelingProjectId: string | null;
+  proForma: {
+    purchasePrice: number;
+    noi: number[];
+    totalRevenue: number[];
+    totalExpenses: number[];
+    capRate: number;
+    indicatedValue: number;
+  } | null;
+  returns: {
+    irr: number;
+    equityMultiple: number;
+    cashOnCash: number;
+    indicatedValue: number;
+  } | null;
+  capitalStack: {
+    totalCapitalization: number;
+    totalDebt: number;
+    totalEquity: number;
+    ltv: number;
+    blendedDebtRate: number;
+    debtYield: number;
+    holdPeriodYears: number;
+    exitCapRate: number;
+  } | null;
+  exitStrategy: {
+    scenarioType: string;
+    holdingPeriodYears: number;
+    projectedSalePrice: number;
+    irr: number;
+    moic: number;
+  } | null;
+}
+
 // ─── Core fields always shown ─────────────────────────────────────
 
 const CORE_FIELDS: { key: string; label: string; group: string; type: ComparisonMetric["type"]; higherIsBetter?: boolean }[] = [
@@ -131,6 +169,27 @@ export default function DealComparisonPage() {
     enabled: selectedDealIds.length > 0,
   });
 
+  // Fetch RICH financial-model data per deal (pro forma, returns, capital stack,
+  // exit strategy) via the consolidated /api/deals/compare-full endpoint. This
+  // adds NOI/IRR/EM/cap rate/LTV rows to the comparison — fields the page
+  // previously couldn't show because they aren't on the Deal record itself.
+  // Requires >= 2 deals (server enforces).
+  const { data: compareFullData } = useQuery<{ deals: CompareFullDeal[] }>({
+    queryKey: ["/api/deals/compare-full", selectedDealIds],
+    queryFn: async () => {
+      if (selectedDealIds.length < 2) return { deals: [] };
+      const response = await fetch('/api/deals/compare-full', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ dealIds: selectedDealIds.slice(0, 6) }),
+      });
+      if (!response.ok) return { deals: [] };
+      return response.json();
+    },
+    enabled: selectedDealIds.length >= 2,
+    staleTime: 30_000,
+  });
+
   // Update URL when selection changes
   useEffect(() => {
     if (selectedDealIds.length > 0) {
@@ -157,8 +216,15 @@ export default function DealComparisonPage() {
     setSelectedDealIds(selectedDealIds.filter((d) => d !== id));
   };
 
-  // Build comparison metrics
-  const metrics = useMemo(() => buildComparisonMetrics(comparisonDeals), [comparisonDeals]);
+  // Build comparison metrics — base CRM/asset-class fields, then layer in
+  // the financial-model rows from compare-full when present.
+  const metrics = useMemo(() => {
+    const base = buildComparisonMetrics(comparisonDeals);
+    const fmRows = compareFullData?.deals?.length
+      ? buildFinancialModelMetrics(comparisonDeals, compareFullData.deals)
+      : [];
+    return [...base, ...fmRows];
+  }, [comparisonDeals, compareFullData]);
 
   const groupedMetrics = useMemo(() => {
     const groups: Record<string, ComparisonMetric[]> = {};
@@ -624,6 +690,92 @@ function AddDealCard({
 }
 
 // ─── Build Comparison Metrics ─────────────────────────────────────
+
+// Build pro-forma / returns / capital-stack / exit metric rows from the
+// /compare-full server response. Order of values matches `comparisonDeals`
+// order (which is the user's selected order). When a deal has no modeling
+// project, that cell is null and renders as "—".
+function buildFinancialModelMetrics(
+  deals: Deal[],
+  fmData: CompareFullDeal[],
+): ComparisonMetric[] {
+  if (deals.length === 0 || fmData.length === 0) return [];
+
+  const fmByDealId = new Map(fmData.map((d) => [d.dealId, d]));
+  const orderedFm = deals.map((d) => fmByDealId.get(d.id) ?? null);
+
+  // Skip groups entirely if no deal has the data — keeps the table tight
+  const hasAnyProForma = orderedFm.some((d) => d?.proForma);
+  const hasAnyReturns = orderedFm.some((d) => d?.returns);
+  const hasAnyCapStack = orderedFm.some((d) => d?.capitalStack);
+  const hasAnyExit = orderedFm.some((d) => d?.exitStrategy);
+
+  const rows: ComparisonMetric[] = [];
+  const pushRow = (
+    key: string, label: string, group: string,
+    type: ComparisonMetric["type"], higherIsBetter: boolean,
+    values: (string | number | null)[],
+  ) => {
+    rows.push({
+      key, label, group, type, values, higherIsBetter,
+      ...computeBestWorst(values, type, higherIsBetter),
+    });
+  };
+
+  if (hasAnyProForma) {
+    pushRow('proforma_year1_noi', 'Year 1 NOI', 'Pro Forma', 'currency', true,
+      orderedFm.map((d) => d?.proForma?.noi?.[0] ?? null));
+    pushRow('proforma_year1_revenue', 'Year 1 Revenue', 'Pro Forma', 'currency', true,
+      orderedFm.map((d) => d?.proForma?.totalRevenue?.[0] ?? null));
+    pushRow('proforma_year1_opex', 'Year 1 OpEx', 'Pro Forma', 'currency', false,
+      orderedFm.map((d) => d?.proForma?.totalExpenses?.[0] ?? null));
+    pushRow('proforma_cap_rate', 'Going-In Cap Rate', 'Pro Forma', 'percent', true,
+      orderedFm.map((d) => d?.proForma?.capRate ?? null));
+    pushRow('proforma_indicated_value', 'Indicated Value', 'Pro Forma', 'currency', true,
+      orderedFm.map((d) => d?.proForma?.indicatedValue ?? null));
+  }
+
+  if (hasAnyReturns) {
+    pushRow('returns_irr', 'IRR', 'Returns', 'percent', true,
+      orderedFm.map((d) => d?.returns?.irr ?? null));
+    pushRow('returns_em', 'Equity Multiple', 'Returns', 'number', true,
+      orderedFm.map((d) => d?.returns?.equityMultiple ?? null));
+    pushRow('returns_coc', 'Cash-on-Cash', 'Returns', 'percent', true,
+      orderedFm.map((d) => d?.returns?.cashOnCash ?? null));
+  }
+
+  if (hasAnyCapStack) {
+    pushRow('cs_total_cap', 'Total Capitalization', 'Capital Stack', 'currency', true,
+      orderedFm.map((d) => d?.capitalStack?.totalCapitalization ?? null));
+    pushRow('cs_total_debt', 'Total Debt', 'Capital Stack', 'currency', false,
+      orderedFm.map((d) => d?.capitalStack?.totalDebt ?? null));
+    pushRow('cs_total_equity', 'Total Equity', 'Capital Stack', 'currency', false,
+      orderedFm.map((d) => d?.capitalStack?.totalEquity ?? null));
+    pushRow('cs_ltv', 'LTV', 'Capital Stack', 'percent', false,
+      orderedFm.map((d) => d?.capitalStack?.ltv ?? null));
+    pushRow('cs_blended_rate', 'Blended Debt Rate', 'Capital Stack', 'percent', false,
+      orderedFm.map((d) => d?.capitalStack?.blendedDebtRate ?? null));
+    pushRow('cs_debt_yield', 'Debt Yield', 'Capital Stack', 'percent', true,
+      orderedFm.map((d) => d?.capitalStack?.debtYield ?? null));
+    pushRow('cs_hold', 'Hold Period (yrs)', 'Capital Stack', 'number', true,
+      orderedFm.map((d) => d?.capitalStack?.holdPeriodYears ?? null));
+    pushRow('cs_exit_cap', 'Exit Cap Rate', 'Capital Stack', 'percent', false,
+      orderedFm.map((d) => d?.capitalStack?.exitCapRate ?? null));
+  }
+
+  if (hasAnyExit) {
+    pushRow('exit_scenario', 'Exit Scenario', 'Exit Strategy', 'text', true,
+      orderedFm.map((d) => d?.exitStrategy?.scenarioType ?? null));
+    pushRow('exit_sale_price', 'Projected Sale Price', 'Exit Strategy', 'currency', true,
+      orderedFm.map((d) => d?.exitStrategy?.projectedSalePrice ?? null));
+    pushRow('exit_irr', 'Exit IRR', 'Exit Strategy', 'percent', true,
+      orderedFm.map((d) => d?.exitStrategy?.irr ?? null));
+    pushRow('exit_moic', 'Exit MOIC', 'Exit Strategy', 'number', true,
+      orderedFm.map((d) => d?.exitStrategy?.moic ?? null));
+  }
+
+  return rows;
+}
 
 function buildComparisonMetrics(deals: Deal[]): ComparisonMetric[] {
   if (deals.length === 0) return [];
