@@ -135,6 +135,14 @@ export default function DocumentIntelligence() {
     processingPnlDocuments.length === 0 && 
     parsedPnlDocuments.length === pnlDocuments.length;
 
+  const REVIEWABLE_STATUSES = ["parsed", "reviewing", "completed"];
+  const reviewablePnlDocuments = pnlDocuments.filter(
+    (doc) => REVIEWABLE_STATUSES.includes(doc.status ?? "")
+  );
+  const selectedReviewableDocs = pnlDocuments.filter(
+    (doc) => selectedIds.has(doc.id) && REVIEWABLE_STATUSES.includes(doc.status ?? "")
+  );
+
   const initMutation = useMutation({
     mutationFn: async () => {
       return apiRequest("POST", "/api/modeling/doc-intel/init");
@@ -321,17 +329,34 @@ export default function DocumentIntelligence() {
                   </CardDescription>
                 </div>
                 <div className="flex items-center gap-2">
-                  {selectedIds.size > 0 && (
-                    <Button variant="destructive" size="sm" onClick={handleBatchDelete}>
-                      <Trash2 className="h-4 w-4 mr-1" />
-                      Delete ({selectedIds.size})
-                    </Button>
-                  )}
-                  {allPnlReady && parsedPnlDocuments.length > 0 && (
-                    <Button onClick={handleStartReview} size="lg">
-                      <Brain className="h-4 w-4 mr-2" />
-                      Review Documents ({parsedPnlDocuments.length})
-                    </Button>
+                  {selectedIds.size > 0 ? (
+                    <>
+                      {selectedReviewableDocs.length > 0 && (
+                        <Button
+                          size="sm"
+                          onClick={() => handleReviewDocuments(selectedReviewableDocs.map((d) => d.id))}
+                        >
+                          <Eye className="h-4 w-4 mr-1" />
+                          {selectedReviewableDocs.length === 1
+                            ? "Review Document"
+                            : `Review Documents (${selectedReviewableDocs.length})`}
+                        </Button>
+                      )}
+                      <Button variant="destructive" size="sm" onClick={handleBatchDelete}>
+                        <Trash2 className="h-4 w-4 mr-1" />
+                        Delete ({selectedIds.size})
+                      </Button>
+                    </>
+                  ) : (
+                    reviewablePnlDocuments.length > 0 && (
+                      <Button
+                        onClick={() => handleReviewDocuments(reviewablePnlDocuments.map((d) => d.id))}
+                        size="lg"
+                      >
+                        <Brain className="h-4 w-4 mr-2" />
+                        Review Documents ({reviewablePnlDocuments.length})
+                      </Button>
+                    )
                   )}
                 </div>
               </div>
@@ -404,6 +429,12 @@ export default function DocumentIntelligence() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
+                            {REVIEWABLE_STATUSES.includes(doc.status ?? "") && (
+                              <DropdownMenuItem onClick={() => handleReviewDocuments([doc.id])}>
+                                <Eye className="h-4 w-4 mr-2" />
+                                Review Document
+                              </DropdownMenuItem>
+                            )}
                             {(doc.status === "uploaded" || doc.status === "processing" || doc.status === "error") && (
                               <DropdownMenuItem 
                                 onClick={() => retryParseMutation.mutate(doc.id)}
