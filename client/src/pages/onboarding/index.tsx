@@ -64,7 +64,7 @@ export default function OnboardingWizardPage() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["/api/onboarding"] });
-      qc.invalidateQueries({ queryKey: ["/api/org-settings/entitlements"] });
+      qc.invalidateQueries({ queryKey: ["/api/orgs/me/entitlements"] });
       setStep(2);
       toast({ title: "Asset focus saved" });
     },
@@ -316,7 +316,7 @@ export default function OnboardingWizardPage() {
               )}
 
               <div className="flex justify-end gap-2 pt-2">
-                <Button variant="outline" onClick={() => setStep(2)}>Skip</Button>
+                <Button variant="outline" onClick={() => setStep(2)} disabled={!selectedRole}>Skip</Button>
                 <Button
                   onClick={() => saveAssetClasses.mutate({ assetClasses: selectedAssetClasses, userRole: selectedRole })}
                   disabled={saveAssetClasses.isPending || !canContinueStep1}

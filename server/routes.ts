@@ -652,8 +652,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/modeling-enhanced", authenticateUser, enforceTenant, modelingEnhancementsRouter);
   // Onboarding Wizard + Notification Center
   app.use("/api/onboarding", authenticateUser, enforceTenant, onboardingRouter);
-  // Organization Settings (user-facing)
+  // Organization Settings (user-facing) — also aliased at canonical /api/orgs/me path
   app.use("/api/org-settings", authenticateUser, enforceTenant, orgSettingsRouter);
+  app.use("/api/orgs/me", authenticateUser, enforceTenant, orgSettingsRouter);
   // Integrations Marketplace
   app.use("/api/integrations-marketplace", authenticateUser, enforceTenant, integrationsMarketplaceRouter);
   // Integrations Sync Monitor

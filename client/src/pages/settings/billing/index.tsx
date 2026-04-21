@@ -53,7 +53,7 @@ interface OrgEntitlements {
   assetClassTier: string | null;
   assetClassTierName: string | null;
   assetClassCount: number;
-  maxAssetClasses: number | null;
+  maxAssetClasses: number;
   priceMonthly: number;
   priceAnnual: number;
 }
@@ -223,7 +223,7 @@ export default function BillingSettingsPage() {
   });
 
   const { data: entitlements, isLoading: entitlementsLoading } = useQuery<OrgEntitlements>({
-    queryKey: ["/api/org-settings/entitlements"],
+    queryKey: ["/api/orgs/me/entitlements"],
   });
 
   const { data: plans, isLoading: plansLoading } = useQuery<Record<string, TierDef>>({

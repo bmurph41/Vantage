@@ -395,7 +395,7 @@ orgSettingsRouter.get("/entitlements", async (req: Request, res: Response) => {
       assetClassTier: tier?.key ?? null,
       assetClassTierName: tier?.name ?? null,
       assetClassCount: count,
-      maxAssetClasses: maxAssetClasses === Infinity ? null : maxAssetClasses,
+      maxAssetClasses: maxAssetClasses === Infinity ? 9999 : maxAssetClasses,
       priceMonthly: tier?.priceMonthly ?? 0,
       priceAnnual: tier?.priceAnnual ?? 0,
     });
