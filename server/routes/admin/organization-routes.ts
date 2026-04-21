@@ -132,7 +132,7 @@ router.get("/asset-class-audit", async (req, res) => {
       WHERE a.action = 'asset_classes_updated'
       ${orgSearch ? sql`AND o.name ILIKE ${"%" + orgSearch + "%"}` : sql``}
     `);
-    const total = Number((totalRows.rows[0] as any)?.total ?? 0);
+    const total = Number((totalRows.rows[0] as { total: string | number } | undefined)?.total ?? 0);
 
     res.json({
       rows: rows.rows,
