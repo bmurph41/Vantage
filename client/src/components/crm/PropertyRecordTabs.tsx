@@ -2331,8 +2331,6 @@ export function PropertyLeasesTab({ propertyId, propertyCategory }: { propertyId
     try {
       const params = new URLSearchParams({
         propertyId,
-        sortBy: 'tenantName',
-        sortDir: 'asc',
         ...(showInactive ? {} : { status: 'active' }),
         ...(leaseTypeFilter !== 'all' ? { leaseType: leaseTypeFilter } : {}),
       });
