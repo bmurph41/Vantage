@@ -27,6 +27,7 @@ export async function extractPDF(filePath: string): Promise<{
   const pdf = await pdfjs.getDocument({ data, verbosity: 0 }).promise;
   const pages: PageTextResult[] = [];
   let hasScannedPages = false;
+  const scannedPageNumbers: number[] = [];
 
   for (let i = 1; i <= pdf.numPages; i++) {
     const page = await pdf.getPage(i);
@@ -47,18 +48,42 @@ export async function extractPDF(filePath: string): Promise<{
 
     if (isScanned) {
       hasScannedPages = true;
-      try {
-        const ocrResult = await runOCROnPage(filePath, i);
-        pageText = ocrResult.text;
-      } catch {
-        pageText = '[OCR failed for this page]';
-      }
+      scannedPageNumbers.push(i);
+      pageText = '[scanned page — pending vision OCR]';
     } else {
       tables = extractTablesFromItems(items, i);
       pageText = buildStructuredText(items);
     }
 
     pages.push({ pageNumber: i, text: pageText, tables, isScanned });
+  }
+
+  // ── Claude Vision OCR fallback ─────────────────────────────────────────
+  // If any page lacked extractable text, send the whole PDF to Claude as a
+  // native `document` content block (SDK v0.68+). Claude reads scanned PDFs
+  // directly via vision — no Tesseract round-trip, much higher accuracy on
+  // financial tables. Replaces the previous broken Tesseract path which
+  // passed a PDF to a worker that expects images.
+  //
+  // Single API call per PDF (not per-page) — Claude handles multi-page docs
+  // natively and we only need it when at least one page is image-only.
+  if (hasScannedPages) {
+    try {
+      const visionResult = await runClaudeVisionOnPDF(filePath);
+      // Replace the placeholder text on each scanned page with the vision
+      // result for that page (Claude returns per-page text when asked).
+      for (const i of scannedPageNumbers) {
+        const page = pages.find(p => p.pageNumber === i);
+        if (page) {
+          page.text = visionResult.perPageText[i] ?? visionResult.fullText;
+        }
+      }
+    } catch (e: any) {
+      // Vision unavailable (no API key, network, etc.) — leave placeholders.
+      // The downstream Claude extractor will still see them and can flag the
+      // job as unparseable instead of silently producing garbage.
+      console.warn(`[pdf-extractor] Vision OCR failed: ${e.message?.slice(0, 200)}`);
+    }
   }
 
   return {
@@ -69,15 +94,65 @@ export async function extractPDF(filePath: string): Promise<{
   };
 }
 
-async function runOCROnPage(filePath: string, _pageNum: number): Promise<{ text: string }> {
-  const Tesseract = await import('tesseract.js');
-  const worker = await Tesseract.createWorker('eng');
-  try {
-    const result = await worker.recognize(filePath);
-    return { text: result.data.text };
-  } finally {
-    await worker.terminate();
+// ── Claude Vision OCR ──────────────────────────────────────────────────────
+// Sends the PDF as a native `document` content block. Claude returns text
+// extracted page-by-page — financial tables, columns, and stamps included.
+// Cost: ~$0.05-0.10 per scanned page (Claude Opus 4.6 vision pricing).
+async function runClaudeVisionOnPDF(filePath: string): Promise<{
+  fullText: string;
+  perPageText: Record<number, string>;
+}> {
+  if (!process.env.ANTHROPIC_API_KEY) {
+    throw new Error('ANTHROPIC_API_KEY not set — vision OCR unavailable');
   }
+
+  const Anthropic = (await import('@anthropic-ai/sdk')).default;
+  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+  const pdfBuffer = await fs.readFile(filePath);
+  const base64 = pdfBuffer.toString('base64');
+
+  // Anthropic enforces a ~32MB document size limit. Bail loudly above that.
+  if (pdfBuffer.byteLength > 30 * 1024 * 1024) {
+    throw new Error(`PDF too large for vision OCR: ${(pdfBuffer.byteLength / 1024 / 1024).toFixed(1)}MB > 30MB`);
+  }
+
+  const response = await client.messages.create({
+    model: 'claude-opus-4-6',
+    max_tokens: 16000,
+    messages: [{
+      role: 'user',
+      content: [
+        {
+          type: 'document',
+          source: { type: 'base64', media_type: 'application/pdf', data: base64 },
+        } as any,
+        {
+          type: 'text',
+          text:
+            'This PDF appears to be scanned or image-only. Extract all visible text ' +
+            'from every page, preserving layout, line items, and numeric values exactly ' +
+            'as printed. Tables should be reproduced row-by-row with cells separated by ' +
+            ' | (pipe). Return ONLY a JSON object: { "pages": [{ "page": 1, "text": "..." }, ...] }. ' +
+            'No markdown, no commentary.',
+        },
+      ],
+    }],
+  });
+
+  const text = response.content[0].type === 'text' ? response.content[0].text : '';
+  const clean = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+  const parsed = JSON.parse(clean);
+
+  const perPageText: Record<number, string> = {};
+  for (const p of parsed.pages ?? []) {
+    if (typeof p.page === 'number' && typeof p.text === 'string') {
+      perPageText[p.page] = p.text;
+    }
+  }
+
+  const fullText = (parsed.pages ?? []).map((p: any) => p.text).join('\n\n');
+  return { fullText, perPageText };
 }
 
 function buildStructuredText(
