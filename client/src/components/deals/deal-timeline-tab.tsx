@@ -155,6 +155,19 @@ export default function DealTimelineTab({ dealId, deal }: DealTimelineTabProps) 
     enabled: !!dealId,
   });
 
+  // Canonical pipeline stages — drives ghost markers in the progression bar
+  // for stages the deal has skipped or hasn't reached yet.
+  const { data: canonicalStages = [] } = useQuery<{ id: string; name: string; stageOrder: number }[]>({
+    queryKey: ["pipeline-stages", deal.pipelineId],
+    queryFn: async () => {
+      if (!deal.pipelineId) return [];
+      const res = await apiRequest("GET", `/api/crm/pipelines/${deal.pipelineId}/stages`);
+      return res.json();
+    },
+    enabled: !!deal.pipelineId,
+    staleTime: 5 * 60 * 1000,
+  });
+
   const now = useMemo(() => startOfDay(new Date()), []);
 
   // Group events by category (+ suppress redundant key_dates now covered by DD/Deposits lanes)
@@ -284,8 +297,12 @@ export default function DealTimelineTab({ dealId, deal }: DealTimelineTabProps) 
 
   return (
     <div className="space-y-4">
-      {/* Stage progression bar (top) */}
-      {stageEvents.length > 0 && <DealStageProgressBar stageEvents={stageEvents} />}
+      {/* Stage progression bar (top) — show even when no stage events have
+          fired yet, as long as we have the canonical stage list (lets users
+          see the full intended path with all stages as ghosts). */}
+      {(stageEvents.length > 0 || canonicalStages.length > 0) && (
+        <DealStageProgressBar stageEvents={stageEvents} canonicalStages={canonicalStages} />
+      )}
 
       {/* Controls */}
       <div className="flex items-center justify-between flex-wrap gap-2">
@@ -466,6 +483,15 @@ export default function DealTimelineTab({ dealId, deal }: DealTimelineTabProps) 
                   }
 
                   if (cat === "deposits") {
+                    // Anchor caps — deposits are typically calculated relative to
+                    // PSA-signed + DD-end. Render those as faint vertical ticks
+                    // so users see the reference points the deposits are anchored
+                    // to. PSA in slate, DD-end in amber (matching DD lane color).
+                    const psaDate = deal.psaSignedDate ? new Date(deal.psaSignedDate) : null;
+                    const totalExtDays = (ddExtensions || []).reduce((n, e) => n + (e.days || 0), 0);
+                    const ddEndDate = (psaDate && deal.ddPeriodDays)
+                      ? new Date(psaDate.getTime() + (deal.ddPeriodDays + totalExtDays) * 86400000)
+                      : null;
                     return (
                       <motion.div
                         key={cat}
@@ -474,6 +500,21 @@ export default function DealTimelineTab({ dealId, deal }: DealTimelineTabProps) 
                         transition={{ delay: laneDelay, duration: 0.3 }}
                         className="h-10 border-b relative"
                       >
+                        {/* Anchor caps (under markers, non-interactive) */}
+                        {psaDate && (
+                          <div
+                            className="absolute top-1 bottom-1 border-l border-dashed pointer-events-none"
+                            style={{ left: `${getXPx(psaDate)}px`, borderColor: 'hsl(220, 13%, 70%)' }}
+                            title={`PSA signed ${format(psaDate, 'MMM d, yyyy')}`}
+                          />
+                        )}
+                        {ddEndDate && (
+                          <div
+                            className="absolute top-1 bottom-1 border-l border-dashed pointer-events-none"
+                            style={{ left: `${getXPx(ddEndDate)}px`, borderColor: 'hsl(43, 96%, 56%)' }}
+                            title={`DD ends ${format(ddEndDate, 'MMM d, yyyy')}`}
+                          />
+                        )}
                         {deposits.map((d, i) => {
                           const due = d.calculatedDueDate ? new Date(d.calculatedDueDate) : null;
                           const paid = d.actualPaidDate ? new Date(d.actualPaidDate) : null;
@@ -498,8 +539,13 @@ export default function DealTimelineTab({ dealId, deal }: DealTimelineTabProps) 
                   }
 
                   const catEvents = eventsByCategory.get(cat) || [];
-                  // Simple collision: sort by x, if next is within 12px of last, bump row offset
-                  const positioned = layoutEventsWithCollision(catEvents, getXPx);
+                  // Collision layout — lane height grows to fit highest row
+                  // offset so 4+ concurrent markers no longer overflow.
+                  const { positioned, maxRowOffset } = layoutEventsWithCollision(catEvents, getXPx);
+                  // Base lane = h-10 (40px) which fits up to 3 stacked rows
+                  // (rowOffset 0,1,2 → topPx 8,16,24 + 8px marker = 32 max).
+                  // Each additional row adds 8px.
+                  const laneHeightPx = Math.max(40, 32 + (maxRowOffset + 1) * 8);
 
                   return (
                     <motion.div
@@ -507,7 +553,8 @@ export default function DealTimelineTab({ dealId, deal }: DealTimelineTabProps) 
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       transition={{ delay: laneDelay, duration: 0.3 }}
-                      className="h-10 border-b relative"
+                      className="border-b relative"
+                      style={{ height: `${laneHeightPx}px` }}
                     >
                       {positioned.map((p, i) => (
                         <EventMarker
@@ -538,20 +585,29 @@ interface PositionedEvent {
   event: TimelineEvent;
   x: number;
   width: number;
-  rowOffset: number; // 0 = top of row, 1 = mid, 2 = bottom
+  rowOffset: number; // 0 = top of row; grows as needed for stacked collisions
+}
+
+interface LayoutResult {
+  positioned: PositionedEvent[];
+  /** Highest rowOffset assigned. Lane container should grow to fit. */
+  maxRowOffset: number;
 }
 
 function layoutEventsWithCollision(
   events: TimelineEvent[],
   getXPx: (d: Date) => number,
-): PositionedEvent[] {
-  // Point events get stacked if within 12px of each other
+): LayoutResult {
+  // Point events stack vertically when within COLLISION_PX of each other.
+  // No upper cap — `lanes` grows dynamically; caller uses `maxRowOffset` to
+  // size the lane container (each row adds ROW_PX vertical space).
   const sorted = [...events].sort(
     (a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime(),
   );
   const COLLISION_PX = 12;
-  const lanes: number[] = []; // last-x-used for each offset row
+  const lanes: number[] = []; // last-x-used at each offset row index
   const out: PositionedEvent[] = [];
+  let maxRowOffset = 0;
   for (const ev of sorted) {
     const start = getXPx(new Date(ev.startDate));
     const end = getXPx(new Date(ev.endDate));
@@ -560,15 +616,15 @@ function layoutEventsWithCollision(
     const width = isPoint ? 0 : Math.max(end - start, 6);
     let rowOffset = 0;
     if (isPoint) {
-      while (rowOffset < 3 && lanes[rowOffset] != null && x - lanes[rowOffset] < COLLISION_PX) {
+      while (lanes[rowOffset] != null && x - lanes[rowOffset] < COLLISION_PX) {
         rowOffset++;
       }
-      rowOffset = Math.min(rowOffset, 2);
       lanes[rowOffset] = x;
+      if (rowOffset > maxRowOffset) maxRowOffset = rowOffset;
     }
     out.push({ event: ev, x, width, rowOffset });
   }
-  return out;
+  return { positioned: out, maxRowOffset };
 }
 
 // ─── Individual marker components ─────────────────────────────────────────

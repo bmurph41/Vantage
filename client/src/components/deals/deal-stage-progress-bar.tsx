@@ -16,22 +16,102 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { format } from "date-fns";
 import type { TimelineEvent } from "@/components/crm/gantt-popover";
 
-interface Props {
-  stageEvents: TimelineEvent[];
+interface CanonicalStage {
+  id: string;
+  name: string;
+  stageOrder: number;
 }
 
-export function DealStageProgressBar({ stageEvents }: Props) {
-  if (!stageEvents || stageEvents.length === 0) return null;
+interface Props {
+  stageEvents: TimelineEvent[];
+  /** Optional canonical pipeline stage list. When provided, stages the deal
+   *  has not yet entered (or skipped past) render as ghost markers in slate
+   *  so users see the full intended path. */
+  canonicalStages?: CanonicalStage[];
+}
 
-  // Sort chronologically by enteredAt (startDate)
-  const sorted = [...stageEvents].sort(
+interface RenderedStage {
+  key: string;
+  label: string;
+  state: 'past' | 'current' | 'future' | 'skipped';
+  startDate?: string;
+  endDate?: string;
+  stageOrder: number;
+}
+
+export function DealStageProgressBar({ stageEvents, canonicalStages }: Props) {
+  if ((!stageEvents || stageEvents.length === 0) && (!canonicalStages || canonicalStages.length === 0)) {
+    return null;
+  }
+
+  // Sort entered stages chronologically
+  const enteredSorted = [...(stageEvents ?? [])].sort(
     (a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime(),
   );
+  const activeIdx = enteredSorted.findIndex((s) => s.status === "active");
+  const currentEnteredIdx = activeIdx >= 0 ? activeIdx : enteredSorted.length - 1;
+  const currentEntered = currentEnteredIdx >= 0 ? enteredSorted[currentEnteredIdx] : null;
 
-  // The current stage is the one whose status === 'active' (from the endpoint),
-  // or the last one if none are marked active.
-  const activeIdx = sorted.findIndex((s) => s.status === "active");
-  const currentIdx = activeIdx >= 0 ? activeIdx : sorted.length - 1;
+  // Build the rendered list: prefer canonicalStages when provided so we can
+  // include skipped/future ghost markers; fall back to entered-only behavior.
+  let rendered: RenderedStage[];
+  if (canonicalStages && canonicalStages.length > 0) {
+    const enteredByLabel = new Map<string, TimelineEvent>();
+    for (const e of enteredSorted) {
+      const label = e.title.replace(/^Stage:\s*/, "").trim().toLowerCase();
+      enteredByLabel.set(label, e);
+    }
+    const currentLabel = currentEntered ? currentEntered.title.replace(/^Stage:\s*/, "").trim().toLowerCase() : null;
+    const currentOrder = currentLabel ? canonicalStages.find(s => s.name.trim().toLowerCase() === currentLabel)?.stageOrder ?? null : null;
+
+    rendered = [...canonicalStages]
+      .sort((a, b) => a.stageOrder - b.stageOrder)
+      .map((cs): RenderedStage => {
+        const matched = enteredByLabel.get(cs.name.trim().toLowerCase());
+        if (matched) {
+          const isCurrent = currentLabel === cs.name.trim().toLowerCase();
+          return {
+            key: cs.id,
+            label: cs.name,
+            state: isCurrent ? 'current' : 'past',
+            startDate: matched.startDate,
+            endDate: matched.endDate,
+            stageOrder: cs.stageOrder,
+          };
+        }
+        // Not entered. If its order is < current, it was SKIPPED; otherwise FUTURE.
+        const state: RenderedStage['state'] =
+          currentOrder != null && cs.stageOrder < currentOrder ? 'skipped' : 'future';
+        return { key: cs.id, label: cs.name, state, stageOrder: cs.stageOrder };
+      });
+  } else {
+    // Legacy: entered-only.
+    rendered = enteredSorted.map((s, i): RenderedStage => ({
+      key: s.id,
+      label: s.title.replace(/^Stage:\s*/, ""),
+      state: i === currentEnteredIdx ? 'current' : 'past',
+      startDate: s.startDate,
+      endDate: s.endDate,
+      stageOrder: i,
+    }));
+  }
+
+  // Style by state. Past = filled blue. Current = teal pulse. Future = slate
+  // ghost (canonical stages not yet reached). Skipped = slate dashed (canonical
+  // stages the deal jumped over).
+  const styleFor = (state: RenderedStage['state']) => {
+    switch (state) {
+      case 'current':
+        return { dot: 'hsl(177, 75%, 38%)', text: 'hsl(177, 75%, 28%)', connector: 'hsl(220, 13%, 90%)', dashed: false };
+      case 'past':
+        return { dot: 'hsl(221, 83%, 35%)', text: 'hsl(221, 83%, 35%)', connector: 'hsl(221, 83%, 35%)', dashed: false };
+      case 'skipped':
+        return { dot: 'hsl(220, 13%, 75%)', text: 'hsl(220, 13%, 60%)', connector: 'hsl(220, 13%, 90%)', dashed: true };
+      case 'future':
+      default:
+        return { dot: 'hsl(220, 13%, 85%)', text: '#94A3B8', connector: 'hsl(220, 13%, 90%)', dashed: false };
+    }
+  };
 
   return (
     <TooltipProvider>
@@ -41,48 +121,51 @@ export function DealStageProgressBar({ stageEvents }: Props) {
             Stage Progression
           </span>
           <span className="text-[10px] font-mono text-slate-400">
-            {sorted.length} stage{sorted.length === 1 ? "" : "s"}
+            {rendered.length} stage{rendered.length === 1 ? "" : "s"}
           </span>
         </div>
         <div className="relative flex items-center">
-          {sorted.map((s, i) => {
-            const isCurrent = i === currentIdx;
-            const isPast = i < currentIdx;
-            const color = isCurrent
-              ? "hsl(177, 75%, 38%)"
-              : isPast
-                ? "hsl(221, 83%, 35%)"
-                : "hsl(220, 13%, 85%)";
-            const label = s.title.replace(/^Stage:\s*/, "");
+          {rendered.map((s, i) => {
+            const sty = styleFor(s.state);
+            const isCurrent = s.state === 'current';
             return (
-              <div key={s.id} className="flex items-center flex-1 min-w-0">
+              <div key={s.key} className="flex items-center flex-1 min-w-0">
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <motion.div
                       initial={{ opacity: 0, y: 6 }}
-                      animate={{ opacity: 1, y: 0 }}
+                      animate={{ opacity: s.state === 'future' || s.state === 'skipped' ? 0.6 : 1, y: 0 }}
                       transition={{ delay: 0.1 + i * 0.08, duration: 0.3, ease: [0.2, 0.8, 0.2, 1] }}
                       className="flex items-center gap-1.5 cursor-default min-w-0 flex-1"
                     >
                       <motion.div
-                        className="h-2.5 w-2.5 rounded-full flex-shrink-0 ring-2 ring-white"
-                        style={{ backgroundColor: color }}
+                        className={`h-2.5 w-2.5 rounded-full flex-shrink-0 ring-2 ring-white ${
+                          s.state === 'skipped' ? 'border border-dashed' : ''
+                        }`}
+                        style={{
+                          backgroundColor: s.state === 'skipped' ? 'transparent' : sty.dot,
+                          borderColor: s.state === 'skipped' ? sty.dot : undefined,
+                        }}
                         animate={isCurrent ? { scale: [1, 1.25, 1] } : {}}
                         transition={isCurrent ? { duration: 2, repeat: Infinity, ease: "easeInOut" } : {}}
                       />
                       <span
                         className="text-[10px] font-medium truncate"
-                        style={{ color: isCurrent ? "hsl(177, 75%, 28%)" : isPast ? "hsl(221, 83%, 35%)" : "#94A3B8" }}
+                        style={{ color: sty.text }}
                       >
-                        {label}
+                        {s.label}
                       </span>
                     </motion.div>
                   </TooltipTrigger>
                   <TooltipContent side="top" className="text-xs">
-                    <p className="font-semibold">{label}</p>
-                    <p className="text-muted-foreground">
-                      Entered {format(new Date(s.startDate), "MMM d, yyyy")}
-                    </p>
+                    <p className="font-semibold">{s.label}</p>
+                    {s.state === 'skipped' && <p className="text-muted-foreground italic">Skipped</p>}
+                    {s.state === 'future' && <p className="text-muted-foreground italic">Not yet reached</p>}
+                    {s.startDate && (
+                      <p className="text-muted-foreground">
+                        Entered {format(new Date(s.startDate), "MMM d, yyyy")}
+                      </p>
+                    )}
                     {!isCurrent && s.endDate && (
                       <p className="text-muted-foreground">
                         Exited {format(new Date(s.endDate), "MMM d, yyyy")}
@@ -91,13 +174,13 @@ export function DealStageProgressBar({ stageEvents }: Props) {
                     {isCurrent && <p className="text-[hsl(177,75%,28%)] font-medium">Current</p>}
                   </TooltipContent>
                 </Tooltip>
-                {i < sorted.length - 1 && (
+                {i < rendered.length - 1 && (
                   <motion.div
                     initial={{ scaleX: 0, transformOrigin: "left center" }}
                     animate={{ scaleX: 1 }}
                     transition={{ delay: 0.15 + i * 0.08, duration: 0.25, ease: [0.2, 0.8, 0.2, 1] }}
-                    className="h-0.5 flex-1 mx-2"
-                    style={{ backgroundColor: isPast ? "hsl(221, 83%, 35%)" : "hsl(220, 13%, 90%)" }}
+                    className={`h-0.5 flex-1 mx-2 ${sty.dashed ? 'border-t border-dashed' : ''}`}
+                    style={{ backgroundColor: sty.dashed ? 'transparent' : sty.connector, borderColor: sty.dashed ? sty.connector : undefined }}
                   />
                 )}
               </div>
