@@ -1440,10 +1440,13 @@ function Router() {
         )}
       </Route>
       <Route path="/operations/budgeting">
-        {() => {
-          window.location.href = '/operations/bookkeeping?tab=budgeting';
-          return null;
-        }}
+        {() => (
+          <GatedLayout pack="operations">
+            <OpsModuleGuard moduleKey="bookkeeping">
+              <BudgetingTabbed />
+            </OpsModuleGuard>
+          </GatedLayout>
+        )}
       </Route>
       <Route path="/operations/hotel">
         {() => (

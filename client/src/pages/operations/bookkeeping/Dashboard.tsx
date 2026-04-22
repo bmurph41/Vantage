@@ -82,7 +82,7 @@ export default function BookkeepingDashboard() {
   }>({
     queryKey: ["/api/bookkeeping/gl", { limit: "10" }],
     queryFn: async () => {
-      const res = await fetch("/api/bookkeeping/gl?limit=10");
+      const res = await fetch("/api/bookkeeping/gl?limit=10", { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch GL entries");
       return res.json();
     },
