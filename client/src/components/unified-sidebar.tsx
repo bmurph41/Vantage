@@ -767,16 +767,25 @@ export default function UnifiedSidebar() {
                 {/* Subcategory-grouped modules — each section is independently collapsible.
                     The 'people' subcategory is rendered as a flat Payroll link (no dropdown). */}
                 {opsSubcategoryGroups.map((subcat) => {
-                  // Payroll — render as a flat label + single link, no collapsible group
+                  // Payroll — the header itself is the clickable link, no sub-item
                   if (subcat.id === 'people') {
                     const payrollItem = subcat.items[0];
                     if (!payrollItem) return null;
+                    const payrollActive = location.startsWith('/operations/payroll');
                     return (
                       <div key={subcat.id}>
-                        <div className="mt-2 mb-0 ml-2 mr-1 flex items-center rounded px-2 py-1 w-[calc(100%-12px)] text-[9px] font-bold uppercase tracking-widest border-l border-sidebar-foreground/15 pl-3 text-sidebar-foreground/40 pointer-events-none select-none">
+                        <Link
+                          href="/operations/payroll"
+                          className={cn(
+                            "mt-2 mb-0 ml-2 mr-1 flex items-center rounded px-2 py-1",
+                            "w-[calc(100%-12px)] text-[9px] font-bold uppercase tracking-widest",
+                            "border-l border-sidebar-foreground/15 pl-3",
+                            "hover:bg-white/[0.06] transition-colors",
+                            payrollActive ? "text-sidebar-foreground/70" : "text-sidebar-foreground/40"
+                          )}
+                        >
                           <span>Payroll</span>
-                        </div>
-                        <NavLink item={payrollItem} depth={1} />
+                        </Link>
                       </div>
                     );
                   }
