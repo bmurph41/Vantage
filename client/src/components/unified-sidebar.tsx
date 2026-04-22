@@ -268,33 +268,42 @@ export default function UnifiedSidebar() {
     return true;
   });
 
-  // Build subcategory-grouped operations nav
+  // Build subcategory-grouped operations nav.
+  // Universal subcategories (Financials, People, Leasing, Marketing) show only enabled modules.
+  // Asset-class-specific subcategories (Marina, Hotel, Multifamily, Retail/Office, Self-Storage)
+  // ALWAYS appear — all their modules are shown, locked if not in the user's subscription.
+  const hasModulesData = !opsModulesLoading && enabledModules.length > 0;
   const opsSubcategoryGroups = OPS_SUBCATEGORY_META
     .map(subcat => {
-      // For asset-class-specific subcategories, check if user owns any matching asset.
-      // Show all while still loading (opsModulesLoading) or in dev mode (enabledModules empty means no subscription data yet).
-      if (!subcat.isUniversal) {
-        const isDev = import.meta.env.DEV || import.meta.env.MODE === 'development';
-        const hasMatchingAsset = isDev || opsModulesLoading || ownedAssetClasses.length === 0 ||
-          (subcat.assetClasses || []).some(ac => ownedAssetClasses.includes(ac));
-        if (!hasMatchingAsset) return null;
+      if (subcat.isUniversal) {
+        // Universal: only show modules the user has enabled
+        const items = operationsModulesNav.filter(item => {
+          if (!item.opsModuleKey) return false;
+          const itemSubcat = OPS_MODULE_SUBCATEGORY[item.opsModuleKey as keyof typeof OPS_MODULE_SUBCATEGORY];
+          if (itemSubcat !== subcat.id) return false;
+          if (item.href === '/rent-roll/executive' && !hasRentRollAccess()) return false;
+          if (hasModulesData) return enabledModules.includes(item.opsModuleKey);
+          return true;
+        });
+        if (items.length === 0) return null;
+        return { ...subcat, items: items.map(item => ({ ...item, locked: false as boolean })) };
+      } else {
+        // Asset-class-specific: always show all modules, mark as locked if not enabled
+        const items = operationsModulesNav
+          .filter(item => {
+            if (!item.opsModuleKey) return false;
+            const itemSubcat = OPS_MODULE_SUBCATEGORY[item.opsModuleKey as keyof typeof OPS_MODULE_SUBCATEGORY];
+            return itemSubcat === subcat.id;
+          })
+          .map(item => ({
+            ...item,
+            locked: hasModulesData && !enabledModules.includes(item.opsModuleKey!),
+          }));
+        // Always render this section (even if all items are locked — discovery/upsell)
+        return { ...subcat, items };
       }
-
-      // Get items for this subcategory
-      const items = operationsModulesNav.filter(item => {
-        if (!item.opsModuleKey) return false;
-        const itemSubcat = OPS_MODULE_SUBCATEGORY[item.opsModuleKey as keyof typeof OPS_MODULE_SUBCATEGORY];
-        if (itemSubcat !== subcat.id) return false;
-        // Apply same module filtering as before
-        if (item.href === '/rent-roll/executive' && !hasRentRollAccess()) return false;
-        if (enabledModules.length > 0) return enabledModules.includes(item.opsModuleKey);
-        return true;
-      });
-
-      if (items.length === 0) return null;
-      return { ...subcat, items };
     })
-    .filter(Boolean) as (typeof OPS_SUBCATEGORY_META[0] & { items: typeof operationsModulesNav })[];
+    .filter(Boolean) as (typeof OPS_SUBCATEGORY_META[0] & { items: (typeof operationsModulesNav[0] & { locked: boolean })[] })[];
 
   // Helper function to check if user can see a section based on persona
   // Always show all sections so users can see what's available (locked items show paywall)
@@ -717,7 +726,8 @@ export default function UnifiedSidebar() {
                 {/* Subcategory-grouped modules — each section is independently collapsible */}
                 {opsSubcategoryGroups.map((subcat) => {
                   const isExpanded = expandedSubcats.has(subcat.id);
-                  const isActive = subcat.items.some(item => location.startsWith(item.href));
+                  const isActive = subcat.items.some(item => !item.locked && location.startsWith(item.href));
+                  const allLocked = subcat.items.length > 0 && subcat.items.every(item => item.locked);
                   const toggleSubcat = () => setExpandedSubcats(prev => {
                     const next = new Set(prev);
                     if (next.has(subcat.id)) next.delete(subcat.id);
@@ -735,13 +745,15 @@ export default function UnifiedSidebar() {
                           "hover:bg-white/[0.06] transition-colors group",
                           isActive
                             ? "text-sidebar-foreground/70"
-                            : "text-sidebar-foreground/40"
+                            : allLocked
+                              ? "text-sidebar-foreground/25"
+                              : "text-sidebar-foreground/40"
                         )}
                       >
                         <div className="flex items-center gap-1.5">
                           <span>{subcat.label}</span>
-                          {!subcat.isUniversal && (
-                            <span className="w-1 h-1 rounded-full bg-primary/50 flex-shrink-0" title="Asset-class specific" />
+                          {allLocked && (
+                            <Lock className="w-2.5 h-2.5 text-sidebar-foreground/30 flex-shrink-0" />
                           )}
                         </div>
                         <ChevronDown className={cn(
@@ -749,9 +761,34 @@ export default function UnifiedSidebar() {
                           isExpanded ? "rotate-0" : "-rotate-90"
                         )} />
                       </button>
-                      {isExpanded && subcat.items.map((item) => (
-                        <NavLink key={item.name} item={item} depth={1} />
-                      ))}
+                      {isExpanded && subcat.items.map((item) =>
+                        item.locked ? (
+                          <Tooltip key={item.name}>
+                            <TooltipTrigger asChild>
+                              <Link
+                                href="/portfolio"
+                                className={cn(
+                                  "flex items-center justify-between min-w-0 transition-colors",
+                                  "text-[12px] text-sidebar-foreground/30 px-4 py-[7px] md:py-[6px]",
+                                  "hover:bg-sidebar-accent/40 hover:text-sidebar-foreground/40 cursor-pointer"
+                                )}
+                                style={{ paddingLeft: `${16 + 24}px` }}
+                              >
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <span className="mr-2 text-sidebar-foreground/20 select-none flex-shrink-0">–</span>
+                                  <span className="truncate">{item.name}</span>
+                                </div>
+                                <Lock className="w-3 h-3 flex-shrink-0 text-sidebar-foreground/25 ml-1" />
+                              </Link>
+                            </TooltipTrigger>
+                            <TooltipContent side="right" sideOffset={10}>
+                              <p className="text-xs">Add a {subcat.label} property to unlock</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        ) : (
+                          <NavLink key={item.name} item={item} depth={1} />
+                        )
+                      )}
                     </div>
                   );
                 })}
