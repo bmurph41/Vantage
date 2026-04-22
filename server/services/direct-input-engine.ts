@@ -361,6 +361,25 @@ const COA_REGISTRY: Record<string, COALine[]> = {
   medical_office: COMMERCIAL_COA,
   mixed_use: COMMERCIAL_COA,
   business: BUSINESS_COA,
+  // Operating businesses — route through BUSINESS_COA (revenue/COGS/payroll/rent/utilities pattern)
+  car_wash: BUSINESS_COA,
+  golf_course: BUSINESS_COA,
+  landscaping: BUSINESS_COA,
+  construction: BUSINESS_COA,
+  accounting_firm: BUSINESS_COA,
+  car_dealership: BUSINESS_COA,
+  gas_station: BUSINESS_COA,
+  restaurant: BUSINESS_COA,
+  gym: BUSINESS_COA,
+  daycare: BUSINESS_COA,
+  parking: BUSINESS_COA,
+  // Commercial lease-driven — route through COMMERCIAL_COA (base rent × SF pattern)
+  shopping_center: COMMERCIAL_COA,
+  data_center: COMMERCIAL_COA,
+  land: COMMERCIAL_COA,
+  // Pad-rent-driven — route through MULTIFAMILY_COA (per-unit monthly × count pattern)
+  rv_park: MULTIFAMILY_COA,
+  mobile_home_park: MULTIFAMILY_COA,
 };
 
 // ---------------------------------------------------------------------------
@@ -547,10 +566,12 @@ function computeFromCOA(
             : baseOcc;
           monthRevenue += rate * mOcc * days * cnt;
         } else {
-          monthRevenue += (line.isSubtraction ? -line.amount : line.amount) * dayFraction;
+          // line.amount is already signed (subtraction lines stored as negative at line 461).
+          monthRevenue += line.amount * dayFraction;
         }
       } else {
-        monthRevenue += (line.isSubtraction ? -line.amount : line.amount) * dayFraction;
+        // line.amount is already signed (subtraction lines stored as negative at line 461).
+        monthRevenue += line.amount * dayFraction;
       }
     }
     const monthExpenses = totalExpenses * dayFraction;
