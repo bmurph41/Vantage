@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { OPS_MODULE_SUBCATEGORY, OPS_SUBCATEGORY_META, type OpsSubcategory } from '@shared/asset-class-ops-modules';
+import { ASSET_CLASS_CATALOGS } from '@shared/asset-class-catalog';
 import { useOpsAssetStore } from '@/stores/operations-asset-store';
 import { DetailDrawer } from "@/components/crm/detail-drawer";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -269,41 +270,32 @@ export default function UnifiedSidebar() {
   });
 
   // Build subcategory-grouped operations nav.
-  // Universal subcategories (Financials, People, Leasing, Marketing) show only enabled modules.
-  // Asset-class-specific subcategories (Marina, Hotel, Multifamily, Retail/Office, Self-Storage)
-  // ALWAYS appear — all their modules are shown, locked if not in the user's subscription.
+  // - 'people' (Payroll) is included but rendered as a flat direct link in the loop below.
+  // - Universal subcategories show only enabled modules for this user.
+  // - Asset-class-specific subcategories only appear when the user owns matching assets.
   const hasModulesData = !opsModulesLoading && enabledModules.length > 0;
   const opsSubcategoryGroups = OPS_SUBCATEGORY_META
     .map(subcat => {
-      if (subcat.isUniversal) {
-        // Universal: only show modules the user has enabled
-        const items = operationsModulesNav.filter(item => {
-          if (!item.opsModuleKey) return false;
-          const itemSubcat = OPS_MODULE_SUBCATEGORY[item.opsModuleKey as keyof typeof OPS_MODULE_SUBCATEGORY];
-          if (itemSubcat !== subcat.id) return false;
-          if (item.href === '/rent-roll/executive' && !hasRentRollAccess()) return false;
-          if (hasModulesData) return enabledModules.includes(item.opsModuleKey);
-          return true;
-        });
-        if (items.length === 0) return null;
-        return { ...subcat, items: items.map(item => ({ ...item, locked: false as boolean })) };
-      } else {
-        // Asset-class-specific: always show all modules, mark as locked if not enabled
-        const items = operationsModulesNav
-          .filter(item => {
-            if (!item.opsModuleKey) return false;
-            const itemSubcat = OPS_MODULE_SUBCATEGORY[item.opsModuleKey as keyof typeof OPS_MODULE_SUBCATEGORY];
-            return itemSubcat === subcat.id;
-          })
-          .map(item => ({
-            ...item,
-            locked: hasModulesData && !enabledModules.includes(item.opsModuleKey!),
-          }));
-        // Always render this section (even if all items are locked — discovery/upsell)
-        return { ...subcat, items };
+      if (!subcat.isUniversal) {
+        // Only show this section when the user owns a matching asset class
+        const hasMatchingAsset = !hasModulesData ||
+          (subcat.assetClasses || []).some(ac => ownedAssetClasses.includes(ac));
+        if (!hasMatchingAsset) return null;
       }
+
+      const items = operationsModulesNav.filter(item => {
+        if (!item.opsModuleKey) return false;
+        const itemSubcat = OPS_MODULE_SUBCATEGORY[item.opsModuleKey as keyof typeof OPS_MODULE_SUBCATEGORY];
+        if (itemSubcat !== subcat.id) return false;
+        if (item.href === '/rent-roll/executive' && !hasRentRollAccess()) return false;
+        if (hasModulesData) return enabledModules.includes(item.opsModuleKey);
+        return true;
+      });
+
+      if (items.length === 0) return null;
+      return { ...subcat, items };
     })
-    .filter(Boolean) as (typeof OPS_SUBCATEGORY_META[0] & { items: (typeof operationsModulesNav[0] & { locked: boolean })[] })[];
+    .filter(Boolean) as (typeof OPS_SUBCATEGORY_META[0] & { items: typeof operationsModulesNav })[];
 
   // Helper function to check if user can see a section based on persona
   // Always show all sections so users can see what's available (locked items show paywall)
@@ -723,11 +715,74 @@ export default function UnifiedSidebar() {
                 {/* Portfolio — always visible */}
                 <NavLink item={{ name: "Portfolio", href: "/portfolio" }} />
 
-                {/* Subcategory-grouped modules — each section is independently collapsible */}
+                {/* Per-asset-class Ops landings — one entry per enabled asset class,
+                    each linking to /operations/asset/:key. Only renders when the org
+                    actually has enabled classes (owned + subscribed). */}
+                {(() => {
+                  const enabledAssetClasses = Array.from(new Set(opsModulesData?.assetClasses || []))
+                    .map((key) => ({
+                      key,
+                      label: ASSET_CLASS_CATALOGS[key]?.label || key,
+                    }))
+                    .sort((a, b) => a.label.localeCompare(b.label));
+                  if (enabledAssetClasses.length === 0) return null;
+                  const sectionId = 'asset_classes';
+                  const isExpanded = expandedSubcats.has(sectionId);
+                  const isActive = enabledAssetClasses.some(ac => location === `/operations/asset/${ac.key}`);
+                  const toggle = () => setExpandedSubcats(prev => {
+                    const next = new Set(prev);
+                    if (next.has(sectionId)) next.delete(sectionId);
+                    else next.add(sectionId);
+                    return next;
+                  });
+                  return (
+                    <div>
+                      <button
+                        onClick={toggle}
+                        className={cn(
+                          "mt-2 mb-0 ml-2 mr-1 flex items-center justify-between rounded px-2 py-1",
+                          "w-[calc(100%-12px)] text-[9px] font-bold uppercase tracking-widest",
+                          "border-l border-sidebar-foreground/15 pl-3",
+                          "hover:bg-white/[0.06] transition-colors group",
+                          isActive ? "text-sidebar-foreground/70" : "text-sidebar-foreground/40",
+                        )}
+                      >
+                        <span>Asset Classes</span>
+                        <ChevronDown className={cn(
+                          "w-2.5 h-2.5 flex-shrink-0 opacity-50 transition-transform duration-150",
+                          isExpanded ? "rotate-0" : "-rotate-90"
+                        )} />
+                      </button>
+                      {isExpanded && enabledAssetClasses.map((ac) => (
+                        <NavLink
+                          key={ac.key}
+                          item={{ name: ac.label, href: `/operations/asset/${ac.key}` }}
+                          depth={1}
+                        />
+                      ))}
+                    </div>
+                  );
+                })()}
+
+                {/* Subcategory-grouped modules — each section is independently collapsible.
+                    The 'people' subcategory is rendered as a flat Payroll link (no dropdown). */}
                 {opsSubcategoryGroups.map((subcat) => {
+                  // Payroll — render as a flat label + single link, no collapsible group
+                  if (subcat.id === 'people') {
+                    const payrollItem = subcat.items[0];
+                    if (!payrollItem) return null;
+                    return (
+                      <div key={subcat.id}>
+                        <div className="mt-2 mb-0 ml-2 mr-1 flex items-center rounded px-2 py-1 w-[calc(100%-12px)] text-[9px] font-bold uppercase tracking-widest border-l border-sidebar-foreground/15 pl-3 text-sidebar-foreground/40 pointer-events-none select-none">
+                          <span>Payroll</span>
+                        </div>
+                        <NavLink item={payrollItem} depth={1} />
+                      </div>
+                    );
+                  }
+
                   const isExpanded = expandedSubcats.has(subcat.id);
-                  const isActive = subcat.items.some(item => !item.locked && location.startsWith(item.href));
-                  const allLocked = subcat.items.length > 0 && subcat.items.every(item => item.locked);
+                  const isActive = subcat.items.some(item => location.startsWith(item.href));
                   const toggleSubcat = () => setExpandedSubcats(prev => {
                     const next = new Set(prev);
                     if (next.has(subcat.id)) next.delete(subcat.id);
@@ -743,52 +798,18 @@ export default function UnifiedSidebar() {
                           "w-[calc(100%-12px)] text-[9px] font-bold uppercase tracking-widest",
                           "border-l border-sidebar-foreground/15 pl-3",
                           "hover:bg-white/[0.06] transition-colors group",
-                          isActive
-                            ? "text-sidebar-foreground/70"
-                            : allLocked
-                              ? "text-sidebar-foreground/25"
-                              : "text-sidebar-foreground/40"
+                          isActive ? "text-sidebar-foreground/70" : "text-sidebar-foreground/40"
                         )}
                       >
-                        <div className="flex items-center gap-1.5">
-                          <span>{subcat.label}</span>
-                          {allLocked && (
-                            <Lock className="w-2.5 h-2.5 text-sidebar-foreground/30 flex-shrink-0" />
-                          )}
-                        </div>
+                        <span>{subcat.label}</span>
                         <ChevronDown className={cn(
                           "w-2.5 h-2.5 flex-shrink-0 opacity-50 transition-transform duration-150",
                           isExpanded ? "rotate-0" : "-rotate-90"
                         )} />
                       </button>
-                      {isExpanded && subcat.items.map((item) =>
-                        item.locked ? (
-                          <Tooltip key={item.name}>
-                            <TooltipTrigger asChild>
-                              <Link
-                                href="/portfolio"
-                                className={cn(
-                                  "flex items-center justify-between min-w-0 transition-colors",
-                                  "text-[12px] text-sidebar-foreground/30 px-4 py-[7px] md:py-[6px]",
-                                  "hover:bg-sidebar-accent/40 hover:text-sidebar-foreground/40 cursor-pointer"
-                                )}
-                                style={{ paddingLeft: `${16 + 24}px` }}
-                              >
-                                <div className="flex items-center gap-2 min-w-0">
-                                  <span className="mr-2 text-sidebar-foreground/20 select-none flex-shrink-0">–</span>
-                                  <span className="truncate">{item.name}</span>
-                                </div>
-                                <Lock className="w-3 h-3 flex-shrink-0 text-sidebar-foreground/25 ml-1" />
-                              </Link>
-                            </TooltipTrigger>
-                            <TooltipContent side="right" sideOffset={10}>
-                              <p className="text-xs">Add a {subcat.label} property to unlock</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        ) : (
-                          <NavLink key={item.name} item={item} depth={1} />
-                        )
-                      )}
+                      {isExpanded && subcat.items.map((item) => (
+                        <NavLink key={item.name} item={item} depth={1} />
+                      ))}
                     </div>
                   );
                 })}

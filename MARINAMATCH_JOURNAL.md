@@ -1,5 +1,84 @@
 # MarinaMatch Platform Journal
 
+## 2026-04-22 — Per-asset-class Ops landings + entitlement intersection
+
+Goal: ensure every asset class and business type has its own Ops section, with
+visibility gated by `organizations.asset_classes` ∩ owned asset types.
+
+**What shipped:**
+
+- `shared/asset-class-catalog.ts` — expanded from 16 simplified keys to **120
+  keys covering all 105 taxonomy IDs**. Added 17 new profit-center arrays for
+  operating-business groups (F&B, SaaS, ecommerce, services, trades,
+  healthcare, auto, fitness, bowling, golf, education, pro-services, personal
+  care, insurance agency, brewery, extended-stay, cold-storage, data-center,
+  coworking, land, parking, car-wash, religious, student/senior housing, MHP,
+  RV park, franchise, notes). Each entry now tags `category` and `group` from
+  the marketplace taxonomy. Helpers: `getAllAssetClassCatalogKeys()`,
+  `hasAssetClassCatalog()`.
+
+- `shared/asset-class-ops-modules.ts` — expanded `ASSET_CLASS_OPS_MODULES` to
+  cover all 120 keys via presets (`UNIVERSAL_OPS`, `CRE_RESIDENTIAL`,
+  `CRE_COMMERCIAL`, `LIGHT_BIZ`, `LAND_OPS`). Added
+  `getOpsModulesForAssetClass()` with universal fallback. Expanded
+  `OPS_SUBCATEGORY_META.assetClasses` arrays so the existing subcategory
+  rendering picks up `hotel_full_service`, `apartment_garden`, etc., in
+  addition to the legacy simplified keys.
+
+- `client/src/pages/operations/AssetClassOpsLanding.tsx` (new) — data-driven
+  landing page for every asset class. Reads `:assetClassKey` from the route,
+  looks up taxonomy + catalog metadata, branches on `category` for KPI cards
+  (CRE: Properties/Revenue/NOI/Occupancy, Operating Biz: Businesses/Revenue/
+  EBITDA/Headcount). Renders profit centers, amenities, enabled module cards,
+  and an "Open detailed view" CTA when a bespoke page is registered
+  (`BESPOKE_PAGE_ROUTES` maps 31 aliases to the 5 existing bespoke
+  Tabbed pages).
+
+- `client/src/Router.tsx` — new route `/operations/asset/:assetClassKey` behind
+  `<GatedLayout pack="operations">`. Placed after the existing bespoke ops
+  routes so they win precedence.
+
+- `server/services/operations-module-resolver.ts` — now reads
+  `organizations.asset_classes` and intersects with owned asset types.
+  Gating rule: class is enabled iff owned AND subscribed. If
+  `asset_classes` is empty we grandfather (full owned set) — avoids locking
+  out existing orgs that haven't populated the column yet. Response now
+  includes `subscribedAssetClasses` so the UI can distinguish
+  locked-but-subscribed from fully unavailable.
+
+- `client/src/components/unified-sidebar.tsx` — new "Asset Classes" section at
+  the top of Ops, rendered when the org has enabled classes. Each entry links
+  to `/operations/asset/:key` with the catalog label. Collapsible, sorted
+  alphabetically.
+
+**Validation:**
+- Targeted tsc on touched files: zero errors (pre-existing errors in
+  server/db.ts and shared/schema.ts are unrelated, known from the tsc OOM
+  deferred item).
+- Coverage check: `node` script confirms all 105 taxonomy IDs are present in
+  both the catalog and the ops-modules map.
+- Full-workspace tsc still OOMs (known; deferred item #6 in post-beta queue).
+
+**Design notes (for future agents):**
+- The generic landing's KPI numbers are placeholders (`—`) except for the
+  "Properties/Businesses" count, which uses `assets.filter(a => a.assetType
+  === key).length`. Wiring real Revenue/NOI/EBITDA per class is a follow-up
+  once the portfolio summary API accepts an asset-class filter.
+- `BESPOKE_PAGE_ROUTES` is a client-side map in `AssetClassOpsLanding.tsx`.
+  When you add a new bespoke Tabbed page, register its route there so the
+  landing shows the CTA.
+- Adding a new asset class now requires three edits: taxonomy entry (id +
+  label + group), catalog entry (via `cre(...)` / `biz(...)` / `franchise(...)`
+  / `note(...)` helpers), and ops-modules entry (usually a preset constant).
+
+**Next suggestions (not yet prioritized):**
+- Per-asset-class KPI data (extend `/api/portfolio/summary` or a new
+  `/api/operations-context/kpi-by-class?assetClass=...`).
+- OperationsHome could expose a small "Your asset classes" grid that links
+  into each landing, mirroring what the sidebar now does.
+- Optional: migration to populate `organizations.asset_classes` from the
+  signup wizard so new orgs get real subscription gating from day one.
+
 ## ✅ F1/F2/F3 patched — hardening follow-up (2026-04-20)
 
 Follow-up to the diagnostic sweep earlier today. All three diagnostic

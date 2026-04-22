@@ -2,11 +2,17 @@
  * Operations Module Resolver Service
  *
  * Resolves which operations modules are enabled for a given org
- * based on the asset classes of their owned properties.
+ * based on the asset classes of their owned properties, intersected
+ * with the asset classes in their subscription (organizations.asset_classes).
+ *
+ * Gating rule: a class is enabled iff the org owns an asset of that class
+ * AND that class is listed in organizations.asset_classes. When
+ * organizations.asset_classes is empty, we grandfather — the full owned set
+ * is returned (no subscription gating applied yet).
  */
 
 import { db } from '../db';
-import { ownedAssets, crmProperties } from '@shared/schema';
+import { ownedAssets, crmProperties, organizations } from '@shared/schema';
 import { eq, and } from 'drizzle-orm';
 import { getOpsModulesForAssetClasses, type OpsModuleKey } from '@shared/asset-class-ops-modules';
 
@@ -23,11 +29,15 @@ export interface ResolvedModulesResult {
   modules: OpsModuleKey[];
   assetClasses: string[];
   assets: OwnedAssetInfo[];
+  /** Full list of subscribed asset classes from organizations.asset_classes.
+   *  Useful for the sidebar to show locked-but-subscribed vs. fully unavailable. */
+  subscribedAssetClasses: string[];
 }
 
 /**
  * Queries owned assets joined with CRM properties to get all property types for the org,
- * then resolves which operations modules should be available.
+ * then intersects with organizations.asset_classes to determine which modules should be
+ * available.
  */
 export async function resolveOpsModulesForOrg(orgId: string): Promise<ResolvedModulesResult> {
   let results: Array<{
@@ -59,17 +69,30 @@ export async function resolveOpsModulesForOrg(orgId: string): Promise<ResolvedMo
     const msg = err instanceof Error ? err.message : String(err);
     if (msg.includes('does not exist') || msg.includes('relation') || msg.includes('column')) {
       console.warn('[resolveOpsModulesForOrg] Table or column missing, returning empty modules:', msg);
-      return { modules: [], assetClasses: [], assets: [] };
+      return { modules: [], assetClasses: [], assets: [], subscribedAssetClasses: [] };
     }
     throw err;
   }
 
-  const assetClassSet = new Set<string>();
+  // Fetch the org's subscribed asset classes
+  let subscribedAssetClasses: string[] = [];
+  try {
+    const orgRow = await db
+      .select({ assetClasses: organizations.assetClasses })
+      .from(organizations)
+      .where(eq(organizations.id, orgId))
+      .limit(1);
+    subscribedAssetClasses = orgRow[0]?.assetClasses ?? [];
+  } catch (err) {
+    console.warn('[resolveOpsModulesForOrg] Failed to read organizations.asset_classes:', err instanceof Error ? err.message : String(err));
+  }
+
+  const ownedSet = new Set<string>();
   const assets: OwnedAssetInfo[] = [];
 
   for (const row of results) {
     const assetType = row.propertyType || 'marina';
-    assetClassSet.add(assetType);
+    ownedSet.add(assetType);
     assets.push({
       id: row.assetId,
       name: row.propertyTitle || 'Unnamed Asset',
@@ -80,10 +103,22 @@ export async function resolveOpsModulesForOrg(orgId: string): Promise<ResolvedMo
     });
   }
 
-  const assetClasses = Array.from(assetClassSet);
-  const modules = getOpsModulesForAssetClasses(assetClasses);
+  const ownedClasses = Array.from(ownedSet);
 
-  return { modules, assetClasses, assets };
+  // Intersect owned with subscribed. If subscribed list is empty, grandfather
+  // (fall through to full owned set).
+  const enabledClasses = subscribedAssetClasses.length > 0
+    ? ownedClasses.filter((c) => subscribedAssetClasses.includes(c))
+    : ownedClasses;
+
+  const modules = getOpsModulesForAssetClasses(enabledClasses);
+
+  return {
+    modules,
+    assetClasses: enabledClasses,
+    assets,
+    subscribedAssetClasses,
+  };
 }
 
 /**

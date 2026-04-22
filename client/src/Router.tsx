@@ -211,6 +211,7 @@ const HotelTabbed = lazy(() => import("@/pages/operations/HotelTabbed"));
 const MultifamilyTabbed = lazy(() => import("@/pages/operations/MultifamilyTabbed"));
 const RetailOfficeTabbed = lazy(() => import("@/pages/operations/RetailOfficeTabbed"));
 const SelfStorageTabbed = lazy(() => import("@/pages/operations/SelfStorageTabbed"));
+const AssetClassOpsLanding = lazy(() => import("@/pages/operations/AssetClassOpsLanding"));
 const SalesCompsIndex = lazy(() => import("@/pages/analysis/sales-comps/Index"));
 const SalesCompsAnalytics = lazy(() => import("@/pages/analysis/sales-comps/Analytics"));
 const SalesCompsProjects = lazy(() => import("@/pages/analysis/sales-comps/Projects"));
@@ -1473,6 +1474,15 @@ function Router() {
         {() => (
           <GatedLayout pack="operations">
             <SelfStorageTabbed />
+          </GatedLayout>
+        )}
+      </Route>
+      {/* Generic per-asset-class Ops landing — data-driven from asset-class-catalog.
+          Handles every taxonomy ID, including operating businesses and franchises. */}
+      <Route path="/operations/asset/:assetClassKey">
+        {() => (
+          <GatedLayout pack="operations">
+            <AssetClassOpsLanding />
           </GatedLayout>
         )}
       </Route>
