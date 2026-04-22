@@ -71,6 +71,7 @@ import {
   marketTargets,
   insertMarketTargetSchema,
   insertModelingProjectSchema,
+  updateModelingProjectSchema,
   organizations,
   dealCommissions,
   insertDealCommissionSchema,
