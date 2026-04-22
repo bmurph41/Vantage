@@ -1766,12 +1766,12 @@ export default function Dashboard() {
           <SortableContext items={extendedModuleOrder} strategy={rectSortingStrategy}>
             {/* Mobile: snap-x horizontal carousel; Desktop: multi-column grid */}
             <div
-              className="flex overflow-x-auto snap-x snap-mandatory scroll-smooth gap-4 pb-3 -mx-4 px-4 md:mx-0 md:px-0 md:grid md:overflow-visible md:grid-cols-2 lg:grid-cols-3 md:gap-6"
+              className="flex overflow-x-auto snap-x snap-mandatory scroll-smooth gap-3 pb-3 md:mx-0 md:px-0 md:grid md:overflow-visible md:grid-cols-2 lg:grid-cols-3 md:gap-6"
               data-tour="dashboard-pipeline"
             >
               {orderedModules.map((module) => (
                 <SectionErrorBoundary key={module.id} sectionName={module.title}>
-                  <div className="snap-center w-[min(85vw,340px)] shrink-0 md:w-auto md:shrink">
+                  <div className="snap-start w-[min(82vw,340px)] shrink-0 md:w-auto md:shrink">
                     <SortableModule
                       module={module}
                       isCollapsed={collapsedModules.has(module.id)}

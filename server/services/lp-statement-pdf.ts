@@ -67,28 +67,53 @@ interface StatementData {
 }
 
 // ── Formatting helpers ─────────────────────────────────────────────────────
+// Note: pdf-lib's standard fonts use WinAnsi encoding which can't render
+// em-dash (U+2014), en-dash (U+2013), Unicode minus (U+2212), or smart quotes.
+// Use ASCII placeholders here and run all dynamic strings through `safeText`
+// before drawText. (Real bug: an em-dash or Unicode minus would crash the
+// entire PDF render.)
+const NULL_PLACEHOLDER = '-';
 
 function fmtCurrency(n: number | null | undefined): string {
-  if (n == null) return '—';
+  if (n == null) return NULL_PLACEHOLDER;
   const abs = Math.abs(n);
   const formatted = abs.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
   return n < 0 ? `($${formatted})` : `$${formatted}`;
 }
 
 function fmtPct(n: number | null | undefined, decimals = 1): string {
-  if (n == null) return '—';
+  if (n == null) return NULL_PLACEHOLDER;
   return `${(n * 100).toFixed(decimals)}%`;
 }
 
 function fmtMultiple(n: number | null | undefined): string {
-  if (n == null) return '—';
+  if (n == null) return NULL_PLACEHOLDER;
   return `${n.toFixed(2)}x`;
 }
 
 function fmtDate(d: Date | string | null | undefined): string {
-  if (!d) return '—';
+  if (!d) return NULL_PLACEHOLDER;
   const date = typeof d === 'string' ? new Date(d) : d;
   return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+/**
+ * Sanitize a string for WinAnsi-encoded fonts.
+ * Replaces Unicode punctuation that pdf-lib's standard fonts can't encode
+ * with ASCII equivalents. Defensive — applies to ANY string drawn to a page,
+ * including dynamic data (investor names, project names that may contain
+ * smart quotes, em-dashes, etc. from upstream sources).
+ */
+function safeText(s: string | null | undefined): string {
+  if (s == null) return NULL_PLACEHOLDER;
+  return String(s)
+    .replace(/[–—]/g, '-')   // en-dash, em-dash → hyphen-minus
+    .replace(/−/g, '-')           // Unicode minus → hyphen-minus
+    .replace(/[‘’‚‛]/g, "'") // curly single quotes → apostrophe
+    .replace(/[“”„‟]/g, '"') // curly double quotes → straight
+    .replace(/…/g, '...')         // horizontal ellipsis → three dots
+    .replace(/ /g, ' ')           // non-breaking space → regular space
+    .replace(/•/g, '*');          // bullet → asterisk
 }
 
 // ── PDF Document Builder ───────────────────────────────────────────────────
@@ -158,9 +183,9 @@ class StatementPDFBuilder {
     this.keyValueTable([
       ['Opening Balance', fmtCurrency(data.capitalAccount.openingBalance)],
       ['(+) Contributions', fmtCurrency(data.capitalAccount.contributions)],
-      ['(−) Distributions', fmtCurrency(data.capitalAccount.distributions)],
+      ['(-) Distributions', fmtCurrency(data.capitalAccount.distributions)],
       ['(+) Preferred Return Accrued', fmtCurrency(data.capitalAccount.preferredReturnAccrued)],
-      ['(+/−) Unrealized Gain/Loss', fmtCurrency(data.capitalAccount.unrealizedGainLoss)],
+      ['(+/-) Unrealized Gain/Loss', fmtCurrency(data.capitalAccount.unrealizedGainLoss)],
     ], true);
     // Bold ending balance
     this.y -= 2;
@@ -253,7 +278,7 @@ class StatementPDFBuilder {
     const x = opts.x || MARGIN_LEFT;
 
     this.ensureSpace(size + 4);
-    this.page.drawText(text, { x, y: this.y, size, font, color });
+    this.page.drawText(safeText(text), { x, y: this.y, size, font, color });
     this.y -= size + 4;
   }
 
@@ -283,10 +308,10 @@ class StatementPDFBuilder {
         });
       }
 
-      this.page.drawText(rows[i][0], {
+      this.page.drawText(safeText(rows[i][0]), {
         x: MARGIN_LEFT, y: this.y, size: 9, font: this.fontRegular, color: COLOR_STEEL,
       });
-      this.page.drawText(rows[i][1], {
+      this.page.drawText(safeText(rows[i][1]), {
         x: valueX, y: this.y, size: 9, font: this.fontBold, color: COLOR_NAVY,
       });
       this.y -= 16;
@@ -304,10 +329,10 @@ class StatementPDFBuilder {
       color: rgb(0.92, 0.95, 0.98),
     });
 
-    this.page.drawText(label, {
+    this.page.drawText(safeText(label), {
       x: MARGIN_LEFT, y: this.y, size: 10, font: this.fontBold, color: COLOR_NAVY,
     });
-    this.page.drawText(value, {
+    this.page.drawText(safeText(value), {
       x: valueX, y: this.y, size: 10, font: this.fontBold, color: COLOR_NAVY,
     });
     this.y -= 16;
@@ -322,10 +347,10 @@ class StatementPDFBuilder {
 
       for (let j = 0; j < cols && i + j < items.length; j++) {
         const x = MARGIN_LEFT + j * colWidth;
-        this.page.drawText(items[i + j][1], {
+        this.page.drawText(safeText(items[i + j][1]), {
           x, y: this.y, size: 14, font: this.fontBold, color: COLOR_NAVY,
         });
-        this.page.drawText(items[i + j][0], {
+        this.page.drawText(safeText(items[i + j][0]), {
           x, y: this.y - 14, size: 8, font: this.fontRegular, color: COLOR_STEEL,
         });
       }
@@ -347,7 +372,7 @@ class StatementPDFBuilder {
 
     let xOffset = MARGIN_LEFT;
     for (let c = 0; c < headers.length; c++) {
-      this.page.drawText(headers[c], {
+      this.page.drawText(safeText(headers[c]), {
         x: xOffset, y: this.y, size: 8, font: this.fontBold, color: COLOR_WHITE,
       });
       xOffset += CONTENT_WIDTH * colWidths[c];
@@ -367,7 +392,7 @@ class StatementPDFBuilder {
 
       xOffset = MARGIN_LEFT;
       for (let c = 0; c < rows[r].length; c++) {
-        this.page.drawText(rows[r][c] || '—', {
+        this.page.drawText(safeText(rows[r][c] || NULL_PLACEHOLDER), {
           x: xOffset, y: this.y, size: 8, font: this.fontRegular, color: COLOR_STEEL,
         });
         xOffset += CONTENT_WIDTH * colWidths[c];
@@ -390,7 +415,7 @@ class StatementPDFBuilder {
       });
 
       // Confidential notice
-      page.drawText('CONFIDENTIAL — For the exclusive use of the named investor.', {
+      page.drawText('CONFIDENTIAL - For the exclusive use of the named investor.', {
         x: MARGIN_LEFT, y: MARGIN_BOTTOM - 24, size: 7, font: this.fontRegular, color: COLOR_STEEL,
       });
 
