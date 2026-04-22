@@ -338,6 +338,72 @@ crmGapsRouter.delete('/custom-fields/:id', async (req: Request, res: Response) =
 });
 
 // ═══════════════════════════════════════════════════════════════════════
+// 2b. SETTINGS CONVENIENCE ROUTES (used by CRM Settings page)
+// ═══════════════════════════════════════════════════════════════════════
+
+// GET /settings/custom-fields — all custom fields across all entity types
+crmGapsRouter.get('/settings/custom-fields', async (req: Request, res: Response) => {
+  try {
+    const orgId = (req as any).user?.orgId;
+    if (!orgId) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { rows } = await pool.query(
+      `SELECT id, entity_type, field_key, field_label, field_type,
+              description, is_required, default_value, options, sort_order
+       FROM crm_custom_field_definitions
+       WHERE org_id = $1 AND is_active = true
+       ORDER BY entity_type ASC, sort_order ASC, created_at ASC`,
+      [orgId]
+    );
+
+    res.json(rows.map(r => ({
+      id: r.id,
+      entityType: r.entity_type,
+      fieldKey: r.field_key,
+      fieldLabel: r.field_label,
+      fieldType: r.field_type,
+      name: r.field_label,
+      type: r.field_type,
+      description: r.description,
+      isRequired: r.is_required,
+      defaultValue: r.default_value,
+      options: r.options,
+      sortOrder: r.sort_order,
+    })));
+  } catch (err: any) {
+    if (isDroppedTableError(err)) return res.json([]);
+    console.error('Get all custom fields error:', err);
+    res.status(500).json({ error: 'Failed to fetch custom fields' });
+  }
+});
+
+// GET /settings/team — org users for Team Permissions tab
+crmGapsRouter.get('/settings/team', async (req: Request, res: Response) => {
+  try {
+    const orgId = (req as any).user?.orgId;
+    if (!orgId) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { rows } = await pool.query(
+      `SELECT id, email, first_name, last_name, role, created_at
+       FROM users
+       WHERE org_id = $1
+       ORDER BY created_at ASC`,
+      [orgId]
+    );
+
+    res.json(rows.map(r => ({
+      id: r.id,
+      email: r.email,
+      name: [r.first_name, r.last_name].filter(Boolean).join(' ') || r.email,
+      role: r.role || 'editor',
+    })));
+  } catch (err: any) {
+    console.error('Get team error:', err);
+    res.status(500).json({ error: 'Failed to fetch team' });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════════
 // 3. REVENUE FORECASTING ROLLUPS
 // ═══════════════════════════════════════════════════════════════════════
 
