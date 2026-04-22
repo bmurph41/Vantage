@@ -1,0 +1,27 @@
+{
+  "id": "10-psa-mixed-offsets",
+  "docClass": "psa",
+  "expected": {
+    "contract_type": "psa",
+    "parties": {
+      "buyer": "Skyline Acquisitions LLC",
+      "seller": "Midland Office REIT, Inc.",
+      "property_address": "500 Commerce Tower, Suite 100, Kansas City, MO 64105",
+      "apn": "18-4400-007"
+    },
+    "money": {
+      "purchase_price": 62400000,
+      "earnest_money": 1250000
+    },
+    "dates": {
+      "effective_date": "2026-03-03",
+      "inspection_end": "2026-04-30",
+      "title_objection": "2026-05-10",
+      "survey_objection": "2026-05-15",
+      "closing_date": "2026-06-20"
+    },
+    "flags": {
+      "assignment_allowed": true
+    }
+  }
+}

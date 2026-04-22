@@ -1522,6 +1522,11 @@ export const projectIntegrations = pgTable("project_integrations", {
   };
 });
 
+// Classifier output for uploaded documents. Distinct from `docType` (user-set).
+export const cddDocumentClassEnum = pgEnum("cdd_document_class", [
+  "pl", "rent_roll", "t12", "om", "loi", "psa", "asa", "unknown",
+]);
+
 // CDD Documents - Commercial Due Diligence documents
 export const cddDocuments = pgTable("cdd_documents", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -1538,9 +1543,16 @@ export const cddDocuments = pgTable("cdd_documents", {
   uploadedAt: timestamp("uploaded_at").notNull().defaultNow(),
   parsedAt: timestamp("parsed_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+  documentClass: cddDocumentClassEnum("document_class"),
+  documentClassConfidence: real("document_class_confidence"),
+  contractExtraction: jsonb("contract_extraction"),
+  contractExtractStatus: parseStatusEnum("contract_extract_status").notNull().default("pending"),
+  contractExtractError: text("contract_extract_error"),
+  contractExtractedAt: timestamp("contract_extracted_at"),
 }, (table) => ({
   projectIdx: index("cdd_documents_project").on(table.projectId),
   parseStatusIdx: index("cdd_documents_parse_status").on(table.parseStatus),
+  documentClassIdx: index("cdd_documents_doc_class_idx").on(table.documentClass),
 }));
 
 // Document Pages - extracted text from documents
@@ -25939,6 +25951,37 @@ export const ddChecklistItemPeriods = pgTable("dd_checklist_item_periods", {
 }));
 export type DdChecklistItemPeriod = typeof ddChecklistItemPeriods.$inferSelect;
 export type DdChecklistTemplate = typeof ddChecklistTemplates.$inferSelect;
+
+// ─── Contract-parser extracted dates ────────────────────────────────────────
+// Per-field dates pulled by the AI contract extractor from LOIs/PSAs/ASAs.
+// Rows start as user_status='pending'; users approve/reject in the review
+// panel, then promote approved rows to dd_milestones / dd_checklist_items.
+export const contractExtractedDates = pgTable("contract_extracted_dates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  documentId: varchar("document_id").notNull().references(() => cddDocuments.id, { onDelete: "cascade" }),
+  workspaceId: varchar("workspace_id").references(() => dealWorkspaces.id, { onDelete: "set null" }),
+  fieldKey: varchar("field_key", { length: 50 }).notNull(),
+  fieldLabel: text("field_label").notNull(),
+  extractedDate: date("extracted_date"),
+  offsetDays: integer("offset_days"),
+  anchorField: varchar("anchor_field", { length: 50 }),
+  confidence: real("confidence").notNull().default(0),
+  sourcePage: integer("source_page"),
+  sourceSnippet: text("source_snippet"),
+  userStatus: varchar("user_status", { length: 20 }).notNull().default("pending"),
+  promotedMilestoneId: varchar("promoted_milestone_id").references(() => ddMilestones.id, { onDelete: "set null" }),
+  promotedChecklistItemId: varchar("promoted_checklist_item_id").references(() => ddChecklistItems.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  documentIdx: index("ced_document_idx").on(table.documentId),
+  workspaceIdx: index("ced_workspace_idx").on(table.workspaceId),
+  userStatusIdx: index("ced_user_status_idx").on(table.userStatus),
+  uniqueDocField: uniqueIndex("ced_document_field_unique").on(table.documentId, table.fieldKey),
+}));
+
+export type ContractExtractedDate = typeof contractExtractedDates.$inferSelect;
+export type InsertContractExtractedDate = typeof contractExtractedDates.$inferInsert;
 
 // ─── DD Section Defaults ────────────────────────────────────────────────────
 export const ddSectionDefaults = pgTable('dd_section_defaults', {

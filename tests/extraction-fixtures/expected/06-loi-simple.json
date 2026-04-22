@@ -1,0 +1,24 @@
+{
+  "id": "06-loi-simple",
+  "docClass": "loi",
+  "expected": {
+    "contract_type": "loi",
+    "parties": {
+      "buyer": "Pacific Coast Marina Partners, LP",
+      "seller": "Reyes Harbor Holdings, LLC",
+      "property_address": "4120 Harbor Road, San Diego, CA 92106",
+      "apn": "540-210-18"
+    },
+    "money": {
+      "purchase_price": 12500000,
+      "earnest_money": 250000
+    },
+    "dates": {
+      "inspection_duration_days": 60,
+      "closing_offset_days": 30
+    },
+    "flags": {
+      "assignment_allowed": null
+    }
+  }
+}

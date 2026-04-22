@@ -264,7 +264,7 @@ export function registerDDRoutes(
   // Get child projects of a portfolio
   app.get("/api/dd/projects/:id/children", authenticateUser, async (req: any, res) => {
     try {
-      const { db } = await import("./db");
+      const { db } = await import("../db");
       const { projects } = await import("@shared/schema");
       const { eq, and } = await import("drizzle-orm");
       
@@ -298,7 +298,7 @@ export function registerDDRoutes(
   // Add a property to a portfolio (creates child project)
   app.post("/api/dd/projects/:id/add-property", authenticateUser, async (req: any, res) => {
     try {
-      const { db } = await import("./db");
+      const { db } = await import("../db");
       const { projects, crmProperties } = await import("@shared/schema");
       const { eq, and } = await import("drizzle-orm");
       
@@ -390,7 +390,7 @@ export function registerDDRoutes(
   app.get("/api/dd/projects/:id", authenticateUser, async (req: any, res) => {
     try {
       // Query database directly (bypassing storage method which has interception issue)
-      const { db } = await import("./db");
+      const { db } = await import("../db");
       const { projects } = await import("@shared/schema");
       const { eq } = await import("drizzle-orm");
       
@@ -466,7 +466,7 @@ export function registerDDRoutes(
       }
 
       // Query database directly (bypassing storage method which has interception issue)
-      const { db } = await import("./db");
+      const { db } = await import("../db");
       const { projects } = await import("@shared/schema");
       const { eq } = await import("drizzle-orm");
       
@@ -503,7 +503,7 @@ export function registerDDRoutes(
       }
 
       // Query database directly (bypassing storage method which has interception issue)
-      const { db } = await import("./db");
+      const { db } = await import("../db");
       const { projects } = await import("@shared/schema");
       const { eq } = await import("drizzle-orm");
       
@@ -4697,6 +4697,343 @@ export function registerDDRoutes(
       res.status(500).json({ error: "Failed to fetch document pages" });
     }
   });
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // Contract parser (LOI / PSA / ASA) — extraction + review + promotion.
+  // Gated behind FEATURE_CONTRACT_PARSER env flag until fixture accuracy ≥85%.
+  // ───────────────────────────────────────────────────────────────────────────
+
+  const contractParserEnabled = () =>
+    process.env.FEATURE_CONTRACT_PARSER === 'true' ||
+    process.env.NODE_ENV !== 'production';
+
+  const featureGate = (_req: any, res: any, next: any) => {
+    if (!contractParserEnabled()) {
+      return res.status(501).json({ error: 'FEATURE_NOT_ENABLED', feature: 'contract_parser' });
+    }
+    next();
+  };
+
+  // Kick off contract extraction (async). Returns immediately with status.
+  app.post(
+    "/api/dd/documents/:documentId/extract-contract",
+    authenticateUser,
+    featureGate,
+    async (req: any, res) => {
+      try {
+        const document = await storage.getCddDocument(req.params.documentId);
+        if (!document) return res.status(404).json({ error: "Document not found" });
+        await authorizeProjectAccess(document.projectId, req.user.orgId);
+
+        // Kick off async — Vision on scanned PDFs can run 30-90s, past the proxy timeout.
+        const forceReclassify = !!req.body?.forceReclassify;
+        const { runContractExtraction } = await import('../services/document-parser/contract-extraction-service');
+        setImmediate(() => {
+          runContractExtraction(document.id, { forceReclassify }).catch((err) => {
+            console.error(`[contract-extraction] background job failed for ${document.id}:`, err);
+          });
+        });
+
+        res.json({
+          documentId: document.id,
+          status: 'processing',
+        });
+      } catch (error: any) {
+        console.error("Error starting contract extraction:", error);
+        res.status(500).json({ error: error.message || "Failed to start extraction" });
+      }
+    }
+  );
+
+  // Status poll for contract extraction.
+  app.get(
+    "/api/dd/documents/:documentId/extract-contract/status",
+    authenticateUser,
+    featureGate,
+    async (req: any, res) => {
+      try {
+        const document = await storage.getCddDocument(req.params.documentId);
+        if (!document) return res.status(404).json({ error: "Document not found" });
+        await authorizeProjectAccess(document.projectId, req.user.orgId);
+
+        res.json({
+          status: document.contractExtractStatus,
+          documentClass: document.documentClass,
+          documentClassConfidence: document.documentClassConfidence,
+          extractedAt: document.contractExtractedAt,
+          error: document.contractExtractError,
+          extraction: document.contractExtraction ?? null,
+        });
+      } catch (error: any) {
+        console.error("Error fetching contract extraction status:", error);
+        res.status(500).json({ error: "Failed to fetch status" });
+      }
+    }
+  );
+
+  // List extracted dates (pending + approved + rejected + promoted) for a doc.
+  app.get(
+    "/api/dd/documents/:documentId/extracted-dates",
+    authenticateUser,
+    featureGate,
+    async (req: any, res) => {
+      try {
+        const document = await storage.getCddDocument(req.params.documentId);
+        if (!document) return res.status(404).json({ error: "Document not found" });
+        await authorizeProjectAccess(document.projectId, req.user.orgId);
+
+        const { contractExtractedDates } = await import('@shared/schema');
+        const rows = await db
+          .select()
+          .from(contractExtractedDates)
+          .where(eq(contractExtractedDates.documentId, req.params.documentId));
+        res.json(rows);
+      } catch (error: any) {
+        console.error("Error fetching extracted dates:", error);
+        res.status(500).json({ error: "Failed to fetch extracted dates" });
+      }
+    }
+  );
+
+  // Approve or reject a single extracted date.
+  app.patch(
+    "/api/dd/extracted-dates/:id",
+    authenticateUser,
+    featureGate,
+    async (req: any, res) => {
+      try {
+        const allowed = ['pending', 'approved', 'rejected'];
+        const newStatus = req.body?.user_status;
+        if (!allowed.includes(newStatus)) {
+          return res.status(400).json({ error: "Invalid user_status" });
+        }
+
+        const { contractExtractedDates } = await import('@shared/schema');
+        const [row] = await db
+          .select()
+          .from(contractExtractedDates)
+          .where(eq(contractExtractedDates.id, req.params.id));
+        if (!row) return res.status(404).json({ error: "Not found" });
+
+        const document = await storage.getCddDocument(row.documentId);
+        if (!document) return res.status(404).json({ error: "Document not found" });
+        await authorizeProjectAccess(document.projectId, req.user.orgId);
+
+        const [updated] = await db
+          .update(contractExtractedDates)
+          .set({ userStatus: newStatus, updatedAt: new Date() })
+          .where(eq(contractExtractedDates.id, req.params.id))
+          .returning();
+        res.json(updated);
+      } catch (error: any) {
+        console.error("Error updating extracted date status:", error);
+        res.status(500).json({ error: "Failed to update" });
+      }
+    }
+  );
+
+  // Promote approved dates into ddMilestones / ddChecklistItems.
+  // Default overwriteExisting=false (fill-if-empty) per plan; checkbox to override.
+  app.post(
+    "/api/dd/documents/:documentId/promote-dates",
+    authenticateUser,
+    featureGate,
+    async (req: any, res) => {
+      try {
+        const document = await storage.getCddDocument(req.params.documentId);
+        if (!document) return res.status(404).json({ error: "Document not found" });
+        await authorizeProjectAccess(document.projectId, req.user.orgId);
+
+        const {
+          dateIds,
+          workspaceId: bodyWorkspaceId,
+          overwriteExisting = false,
+        }: {
+          dateIds: string[];
+          workspaceId?: string;
+          overwriteExisting?: boolean;
+        } = req.body ?? {};
+
+        if (!Array.isArray(dateIds) || dateIds.length === 0) {
+          return res.status(400).json({ error: "dateIds required" });
+        }
+
+        const {
+          contractExtractedDates,
+          dealWorkspaces,
+          ddMilestones,
+        } = await import('@shared/schema');
+        const { CONTRACT_DATE_FIELDS } = await import('@shared/extraction-schemas');
+
+        // Resolve workspace — body wins, else look up via ddProjectId.
+        let workspaceId = bodyWorkspaceId ?? null;
+        if (!workspaceId) {
+          const [ws] = await db
+            .select({ id: dealWorkspaces.id })
+            .from(dealWorkspaces)
+            .where(eq(dealWorkspaces.ddProjectId, document.projectId))
+            .limit(1);
+          workspaceId = ws?.id ?? null;
+        }
+
+        if (!workspaceId) {
+          return res.status(400).json({
+            error: "No deal workspace linked to this DD project — cannot promote dates",
+          });
+        }
+
+        // Fetch all requested rows (must belong to this document).
+        const rows = await db
+          .select()
+          .from(contractExtractedDates)
+          .where(inArray(contractExtractedDates.id, dateIds));
+        const mine = rows.filter((r) => r.documentId === document.id);
+
+        // Map field_key → milestone type from the shared registry.
+        const fieldMap = new Map(
+          CONTRACT_DATE_FIELDS.map((f) => [f.key, f]),
+        );
+
+        let milestonesCreated = 0;
+        const skipped: Array<{ id: string; reason: string }> = [];
+
+        for (const row of mine) {
+          const field = fieldMap.get(row.fieldKey);
+          if (!field) {
+            skipped.push({ id: row.id, reason: 'unknown_field_key' });
+            continue;
+          }
+          if (!row.extractedDate) {
+            skipped.push({ id: row.id, reason: 'no_absolute_date' });
+            continue;
+          }
+
+          // Fill-if-empty logic: if an existing milestone of this type already
+          // exists on the workspace, skip unless overwriteExisting is true.
+          const existing =
+            field.milestoneType === 'custom'
+              ? [] // custom types never block — identical labels are allowed
+              : await db
+                  .select({ id: ddMilestones.id })
+                  .from(ddMilestones)
+                  .where(
+                    and(
+                      eq(ddMilestones.workspaceId, workspaceId),
+                      eq(ddMilestones.type, field.milestoneType as any),
+                    ),
+                  );
+
+          if (existing.length > 0 && !overwriteExisting) {
+            skipped.push({ id: row.id, reason: 'milestone_exists' });
+            continue;
+          }
+
+          let milestoneId: string;
+          if (existing.length > 0 && overwriteExisting) {
+            const [updated] = await db
+              .update(ddMilestones)
+              .set({
+                title: field.label,
+                dueDate: new Date(row.extractedDate),
+                notes: `From contract document ${document.filename}`,
+                updatedAt: new Date(),
+              })
+              .where(eq(ddMilestones.id, existing[0].id))
+              .returning({ id: ddMilestones.id });
+            milestoneId = updated.id;
+          } else {
+            const [created] = await db
+              .insert(ddMilestones)
+              .values({
+                workspaceId,
+                orgId: req.user.orgId,
+                type: field.milestoneType as any,
+                title: field.label,
+                dueDate: new Date(row.extractedDate),
+                status: 'upcoming',
+                notes: `From contract document ${document.filename}`,
+              })
+              .returning({ id: ddMilestones.id });
+            milestoneId = created.id;
+            milestonesCreated += 1;
+          }
+
+          // Update workspace.closingDate when promoting closing — fill-if-empty only.
+          if (field.milestoneType === 'closing') {
+            const [workspaceRow] = await db
+              .select({ closingDate: dealWorkspaces.closingDate })
+              .from(dealWorkspaces)
+              .where(eq(dealWorkspaces.id, workspaceId));
+            if (workspaceRow && (!workspaceRow.closingDate || overwriteExisting)) {
+              await db
+                .update(dealWorkspaces)
+                .set({ closingDate: row.extractedDate, updatedAt: new Date() })
+                .where(eq(dealWorkspaces.id, workspaceId));
+            }
+          }
+
+          await db
+            .update(contractExtractedDates)
+            .set({
+              userStatus: 'promoted',
+              promotedMilestoneId: milestoneId,
+              workspaceId,
+              updatedAt: new Date(),
+            })
+            .where(eq(contractExtractedDates.id, row.id));
+        }
+
+        // Assignment-rights flag handling: if the envelope flagged
+        // assignment_allowed === null OR false, surface via the review panel
+        // (banner) and also drop a "Legal review: assignment clause" note in
+        // the workspace as a custom milestone pinned to the earliest extracted
+        // date (defensive — attorneys should see it in the timeline).
+        // Non-destructive: only added if not already present.
+        if (document.contractExtraction) {
+          const envelope: any = document.contractExtraction;
+          const assignmentFlag = envelope?.data?.flags?.assignment_allowed;
+          if (assignmentFlag === null || assignmentFlag === false) {
+            const existingLegalReview = await db
+              .select({ id: ddMilestones.id })
+              .from(ddMilestones)
+              .where(
+                and(
+                  eq(ddMilestones.workspaceId, workspaceId),
+                  eq(ddMilestones.title, 'Legal review: assignment clause'),
+                ),
+              );
+            if (existingLegalReview.length === 0) {
+              const effectiveDateRow = mine.find((r) => r.fieldKey === 'effective_date');
+              const anchorDate =
+                effectiveDateRow?.extractedDate ?? new Date().toISOString().slice(0, 10);
+              await db.insert(ddMilestones).values({
+                workspaceId,
+                orgId: req.user.orgId,
+                type: 'custom' as any,
+                title: 'Legal review: assignment clause',
+                dueDate: new Date(anchorDate),
+                status: 'upcoming',
+                notes:
+                  assignmentFlag === false
+                    ? 'Contract restricts assignment — confirm with counsel before proceeding.'
+                    : 'Assignment clause is silent or ambiguous — have counsel review.',
+              });
+              milestonesCreated += 1;
+            }
+          }
+        }
+
+        res.json({
+          milestonesCreated,
+          checklistItemsCreated: 0, // v1: milestones only; v2 layers checklist items
+          skipped,
+        });
+      } catch (error: any) {
+        console.error("Error promoting extracted dates:", error);
+        res.status(500).json({ error: error.message || "Failed to promote dates" });
+      }
+    }
+  );
 
   // Generate embeddings for a document
   app.post("/api/dd/documents/:documentId/embeddings", authenticateUser, async (req: any, res) => {

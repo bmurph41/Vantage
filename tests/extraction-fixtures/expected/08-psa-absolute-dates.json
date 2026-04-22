@@ -1,0 +1,32 @@
+{
+  "id": "08-psa-absolute-dates",
+  "docClass": "psa",
+  "expected": {
+    "contract_type": "psa",
+    "parties": {
+      "buyer": "Greenfield Industrial Fund II, L.P.",
+      "seller": "Harbor Freight Terminals, Inc.",
+      "property_address": "15400 East Industrial Boulevard, Stockton, CA 95206",
+      "apn": "215-880-12"
+    },
+    "money": {
+      "purchase_price": 45000000,
+      "earnest_money": 1000000,
+      "earnest_money_deadline": "2026-08-08"
+    },
+    "dates": {
+      "effective_date": "2026-08-01",
+      "inspection_end": "2026-09-15",
+      "title_delivery": "2026-08-12",
+      "title_objection": "2026-08-25",
+      "survey_delivery": "2026-08-20",
+      "survey_objection": "2026-09-05",
+      "financing_deadline": "2026-09-20",
+      "estoppel_delivery": "2026-10-10",
+      "closing_date": "2026-10-30"
+    },
+    "flags": {
+      "assignment_allowed": true
+    }
+  }
+}

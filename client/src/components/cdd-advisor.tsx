@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Upload, FileText, Loader2, Send, Brain, CheckCircle2, XCircle, Clock, Sparkles } from "lucide-react";
 import type { CddDocument } from "@shared/schema";
+import { ContractReviewPanel } from "@/components/contracts/ContractReviewPanel";
 
 interface CddAdvisorProps {
   projectId: string;
@@ -469,6 +470,26 @@ export function CddAdvisor({ projectId }: CddAdvisorProps) {
                             </Button>
                           )}
                         </div>
+
+                        {/* Contract parser panel — shown for LOI/PSA/ASA class
+                            documents, or any parsed doc that hasn't been
+                            classified yet (the panel itself offers the
+                            "Extract dates" action in that case). */}
+                        {doc.parseStatus === 'parsed' && (
+                          doc.documentClass === 'loi' ||
+                          doc.documentClass === 'psa' ||
+                          doc.documentClass === 'asa' ||
+                          doc.documentClass == null
+                        ) && (
+                          <ContractReviewPanel
+                            documentId={doc.id}
+                            filename={doc.filename}
+                            documentClass={
+                              (doc.documentClass as 'loi' | 'psa' | 'asa' | null) ??
+                              null
+                            }
+                          />
+                        )}
                       </div>
                     </Card>
                   ))}

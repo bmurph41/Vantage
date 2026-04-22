@@ -1,0 +1,25 @@
+{
+  "id": "09-asa-business",
+  "docClass": "asa",
+  "expected": {
+    "contract_type": "asa",
+    "parties": {
+      "buyer": "Sunburst Hospitality Group, LLC",
+      "seller": "Coastal Inn Enterprises, Inc.",
+      "property_address": "2200 Atlantic Drive, Jacksonville, FL 32225"
+    },
+    "money": {
+      "purchase_price": 18750000,
+      "earnest_money": 375000
+    },
+    "dates": {
+      "effective_date": "2026-09-10",
+      "inspection_duration_days": 40,
+      "financing_deadline": "2026-10-30",
+      "closing_date": "2026-11-15"
+    },
+    "flags": {
+      "assignment_allowed": false
+    }
+  }
+}

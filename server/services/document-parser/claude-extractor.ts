@@ -179,19 +179,40 @@ Extract into this exact JSON:
   return parseClaudeJSON(text, 'Rent Roll extraction');
 }
 
+export type DocumentClass =
+  | 'pl'
+  | 'rent_roll'
+  | 't12'
+  | 'om'
+  | 'loi'
+  | 'psa'
+  | 'asa'
+  | 'unknown';
+
 export async function classifyDocument(
   firstPageText: string,
   filename: string
-): Promise<{ class: 'pl' | 'rent_roll' | 't12' | 'om' | 'unknown'; confidence: number }> {
+): Promise<{ class: DocumentClass; confidence: number }> {
   try {
     const response = await client.messages.create({
       model: 'claude-haiku-4-5',
       max_tokens: 100,
       messages: [{
         role: 'user',
-        content: `Classify this CRE document. Filename: "${filename}". First page text: "${firstPageText.slice(0, 2000)}".
-        
-Reply ONLY with JSON: {"class": "pl"|"rent_roll"|"t12"|"om"|"unknown", "confidence": 0.0-1.0}`
+        content: `Classify this commercial real estate document. Filename: "${filename}".
+First page text: "${firstPageText.slice(0, 2000)}".
+
+Classes:
+- pl:         profit & loss / income statement (single period).
+- rent_roll:  unit-level rent roll with tenants, rents, lease dates.
+- t12:        trailing-12-month breakdown with monthly columns.
+- om:         offering memorandum / marketing deck.
+- loi:        letter of intent — non-binding, short (1-5 pages), "subject to definitive agreement".
+- psa:        purchase & sale agreement — binding, long, closing/earnest money/contingency clauses for real estate.
+- asa:        asset sale agreement — binding, business-acquisition flavor (stock vs. asset sale language, working-capital peg).
+- unknown:    none of the above.
+
+Reply ONLY with JSON: {"class": "pl"|"rent_roll"|"t12"|"om"|"loi"|"psa"|"asa"|"unknown", "confidence": 0.0-1.0}`
       }]
     });
 

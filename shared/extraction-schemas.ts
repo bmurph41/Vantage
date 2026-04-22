@@ -108,3 +108,69 @@ export type ExtractionResult<T> = {
   extraction_notes: string[];
   document_class_confirmed: string;
 };
+
+// ─── Contract (LOI / PSA / ASA) extraction ──────────────────────────────────
+// v1 is date-first: parties + money + deadlines + one legal-review flag.
+// Schema is versioned so v2 clause extraction (reps & warranties, survival,
+// indemnity caps) can layer in without a table migration.
+
+export type ContractType = 'loi' | 'psa' | 'asa';
+
+export interface ContractExtractionSchema {
+  contract_type: ContractType;
+  extraction_schema_version: 1;
+
+  parties: {
+    buyer?: string | null;
+    seller?: string | null;
+    property_address?: string | null;
+    apn?: string | null;
+  };
+
+  money: {
+    purchase_price?: number | null;
+    earnest_money?: number | null;
+    earnest_money_deadline?: string | null; // ISO date
+  };
+
+  dates: {
+    effective_date?: string | null;
+    inspection_end?: string | null;
+    inspection_duration_days?: number | null;
+    financing_deadline?: string | null;
+    title_delivery?: string | null;
+    title_objection?: string | null;
+    survey_delivery?: string | null;
+    survey_objection?: string | null;
+    estoppel_delivery?: string | null;
+    closing_date?: string | null;
+    closing_offset_days?: number | null;
+  };
+
+  flags: {
+    // true/false when the contract clearly speaks on assignment; null when
+    // silent or ambiguous (which itself is a legal-review signal).
+    assignment_allowed?: boolean | null;
+  };
+}
+
+// Human-readable labels for each field_key stored in contract_extracted_dates.
+// Used by the promote flow and the review UI — keeping labels centralized
+// avoids drift between the extractor, the DB seed, and the React components.
+export const CONTRACT_DATE_FIELDS: Array<{
+  key: string;
+  label: string;
+  // Milestone mapping for promotion. 'custom' creates a custom milestone.
+  milestoneType: 'dd_expiration' | 'closing' | 'financing_contingency' | 'inspection_deadline' | 'custom';
+}> = [
+  { key: 'effective_date',       label: 'Effective Date',              milestoneType: 'custom' },
+  { key: 'earnest_money_deadline', label: 'Earnest Money Deadline',    milestoneType: 'custom' },
+  { key: 'inspection_end',       label: 'Inspection / DD Period End',  milestoneType: 'dd_expiration' },
+  { key: 'financing_deadline',   label: 'Financing Contingency',       milestoneType: 'financing_contingency' },
+  { key: 'title_delivery',       label: 'Title Commitment Delivery',   milestoneType: 'custom' },
+  { key: 'title_objection',      label: 'Title Objection Deadline',    milestoneType: 'custom' },
+  { key: 'survey_delivery',      label: 'Survey Delivery',             milestoneType: 'custom' },
+  { key: 'survey_objection',     label: 'Survey Objection Deadline',   milestoneType: 'custom' },
+  { key: 'estoppel_delivery',    label: 'Estoppel Delivery',           milestoneType: 'custom' },
+  { key: 'closing_date',         label: 'Closing Date',                milestoneType: 'closing' },
+];

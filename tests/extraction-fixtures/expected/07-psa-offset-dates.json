@@ -1,0 +1,30 @@
+{
+  "id": "07-psa-offset-dates",
+  "docClass": "psa",
+  "expected": {
+    "contract_type": "psa",
+    "parties": {
+      "buyer": "Bluewater Capital Partners, LLC",
+      "seller": "Sandstone Retail Trust",
+      "property_address": "2800 Market Street, Portland, OR 97205",
+      "apn": "R245-801-44"
+    },
+    "money": {
+      "purchase_price": 28000000,
+      "earnest_money": 500000
+    },
+    "dates": {
+      "effective_date": "2026-06-15",
+      "inspection_duration_days": 45,
+      "inspection_end": "2026-07-30",
+      "financing_deadline": "2026-08-14",
+      "title_delivery": "2026-06-25",
+      "title_objection": "2026-07-15",
+      "closing_offset_days": 90,
+      "closing_date": "2026-09-13"
+    },
+    "flags": {
+      "assignment_allowed": false
+    }
+  }
+}
