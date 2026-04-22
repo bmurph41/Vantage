@@ -13,10 +13,10 @@
 
 import { useState, useMemo, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { 
+import {
   MessageSquare, Phone, Mail, Calendar as CalendarIcon, FileText,
   ArrowRight, Users, Clock, Plus, Send, ChevronDown, X,
-  Loader2, Filter, Trophy, XCircle, Edit3, Paperclip, AtSign
+  Loader2, Filter, Trophy, XCircle, Edit3, Paperclip, AtSign, Sparkles
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -93,6 +93,32 @@ export function DealActivityTimeline({
   const [composerSubject, setComposerSubject] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [fullComposerOpen, setFullComposerOpen] = useState(false);
+  const [aiSummary, setAiSummary] = useState<string | null>(null);
+
+  // ─── AI summary of last-30-days activity (Claude Sonnet) ──────────────────
+  // Backend endpoint: POST /api/crm/pipeline-enhancements/activity-feed/summarize/:dealId
+  // Returns 3 bullet points covering key developments + status. Gated to deal
+  // entities — the global activity log doesn't expose this (per-deal context
+  // is required for the prompt to be useful).
+  const summarizeMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest(
+        'POST',
+        `/api/crm/pipeline-enhancements/activity-feed/summarize/${dealId}`,
+      );
+      return res.json() as Promise<{ summary: string }>;
+    },
+    onSuccess: (data) => {
+      setAiSummary(data.summary || 'No summary returned.');
+    },
+    onError: (err: any) => {
+      toast({
+        title: 'Summary failed',
+        description: err?.message ?? 'Could not generate summary.',
+        variant: 'destructive',
+      });
+    },
+  });
 
   // Fetch timeline
   const { data: timelineData, isLoading } = useQuery<TimelineEvent[]>({
@@ -273,8 +299,56 @@ export function DealActivityTimeline({
               </Button>
             </>
           )}
+          {entityType === 'deal' && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 text-xs gap-1 border-purple-200 text-purple-700 hover:bg-purple-50 dark:border-purple-800 dark:text-purple-300"
+                  onClick={() => summarizeMutation.mutate()}
+                  disabled={summarizeMutation.isPending || events.length === 0}
+                  data-testid="button-ai-summary"
+                >
+                  {summarizeMutation.isPending ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <Sparkles className="h-3 w-3" />
+                  )}
+                  AI Summary
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="text-xs max-w-xs">
+                Summarize the last 30 days of activity into 3 key bullet points (Claude Sonnet).
+              </TooltipContent>
+            </Tooltip>
+          )}
         </div>
       </div>
+
+      {/* AI Summary panel — shown after the user clicks the button. Dismissable. */}
+      {aiSummary && (
+        <div className="rounded-md border border-purple-200 bg-purple-50/50 dark:border-purple-900 dark:bg-purple-950/20 p-3 relative">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-1.5">
+              <Sparkles className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
+              <span className="text-xs font-semibold text-purple-700 dark:text-purple-300">AI Summary — Last 30 days</span>
+            </div>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-6 w-6 p-0"
+              onClick={() => setAiSummary(null)}
+              aria-label="Dismiss summary"
+            >
+              <X className="h-3 w-3" />
+            </Button>
+          </div>
+          <div className="text-xs text-foreground whitespace-pre-wrap leading-relaxed">
+            {aiSummary}
+          </div>
+        </div>
+      )}
 
       {/* Inline Composer */}
       {composerOpen && (
