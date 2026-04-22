@@ -345,7 +345,7 @@ function StorageLeaseUploads({ projectId }: { projectId: string }) {
   };
 
   return (
-    <div className="mt-4 space-y-4">
+    <div className="mt-8 space-y-4">
       <div>
         <h3 className="text-lg font-semibold">Storage Rent Roll Uploads</h3>
         <p className="text-sm text-muted-foreground">
@@ -907,85 +907,85 @@ export default function ProjectWorkspace() {
           </div>
         </div>
 
-        <TabsContent value="overview" className="mt-4 space-y-4">
+        <TabsContent value="overview" className="mt-8 space-y-4">
           <OverviewDynamic project={project} pricingData={pricingData} financials={financials} onTabChange={handleTabChange} />
           <DDTimelineSection dealId={project?.dealId ? String(project.dealId) : null} />
           {projectId && <BrokerFeedbackPanel targetType="modeling-project" targetId={projectId} />}
         </TabsContent>
 
-        <TabsContent value="inputs" className="mt-4 space-y-4" data-tour="valuator-inputs">
+        <TabsContent value="inputs" className="mt-8 space-y-4" data-tour="valuator-inputs">
           <InputsAssumptions project={project!} />
         </TabsContent>
 
-        <TabsContent value="cases" className="mt-4 space-y-4" data-tour="valuator-scenarios">
+        <TabsContent value="cases" className="mt-8 space-y-4" data-tour="valuator-scenarios">
           <CaseConfiguration projectId={projectId!} onTabChange={handleTabChange} />
         </TabsContent>
 
-        <TabsContent value="uploads" className="mt-4 space-y-4">
+        <TabsContent value="uploads" className="mt-8 space-y-4">
           <WorkspaceUploads projectId={projectId!} onTabChange={handleTabChange} />
         </TabsContent>
 
 
-        <TabsContent value="historical" className="mt-4 space-y-4">
+        <TabsContent value="historical" className="mt-8 space-y-4">
           <WorkspaceHistoricalPL projectId={projectId!} onTabChange={handleTabChange} />
         </TabsContent>
 
-        <TabsContent value="property-tax" className="mt-4 space-y-4">
+        <TabsContent value="property-tax" className="mt-8 space-y-4">
           <PropertyTaxTab projectId={projectId!} onTabChange={handleTabChange} />
         </TabsContent>
 
-        <TabsContent value="analytics" className="mt-4 space-y-4" data-tour="valuator-analysis">
+        <TabsContent value="analytics" className="mt-8 space-y-4" data-tour="valuator-analysis">
           <AnalyticsNormalization projectId={projectId!} />
         </TabsContent>
 
-        <TabsContent value="proforma" className="mt-4 space-y-4">
+        <TabsContent value="proforma" className="mt-8 space-y-4">
           <WorkspaceProForma projectId={projectId!} onTabChange={handleTabChange} />
         </TabsContent>
 
-        <TabsContent value="pricing" className="mt-4 space-y-4">
+        <TabsContent value="pricing" className="mt-8 space-y-4">
           <DealPricing projectId={projectId!} onTabChange={handleTabChange} />
         </TabsContent>
 
-        <TabsContent value="summary" className="mt-4 space-y-4" data-tour="valuator-export">
+        <TabsContent value="summary" className="mt-8 space-y-4" data-tour="valuator-export">
           <ExecutiveSummaryDynamic projectId={projectId!} pricingData={pricingData} financials={financials} onTabChange={handleTabChange} />
         </TabsContent>
 
-        <TabsContent value="debt" className="mt-4 space-y-4">
+        <TabsContent value="debt" className="mt-8 space-y-4">
           <DebtInputs projectId={projectId!} purchasePrice={project?.purchasePrice ? parseFloat(project.purchasePrice) : undefined} />
         </TabsContent>
 
-        <TabsContent value="capital" className="mt-4 space-y-4">
+        <TabsContent value="capital" className="mt-8 space-y-4">
           <CapitalStackWorkspace projectId={projectId!} onTabChange={handleTabChange} />
         </TabsContent>
 
-        <TabsContent value="exit" className="mt-4 space-y-4" data-tour="valuator-exit">
+        <TabsContent value="exit" className="mt-8 space-y-4" data-tour="valuator-exit">
           <WorkspaceExitStrategy projectId={projectId!} onTabChange={handleTabChange} />
         </TabsContent>
 
 
-        <TabsContent value="audit" className="mt-4 space-y-4">
+        <TabsContent value="audit" className="mt-8 space-y-4">
           <AuditTrailViewer projectId={projectId!} />
         </TabsContent>
 
-        <TabsContent value="investment-materials" className="mt-4 space-y-4">
+        <TabsContent value="investment-materials" className="mt-8 space-y-4">
           <InvestmentMaterialsTab
             projectId={projectId!}
             dealId={project?.dealId}
           />
         </TabsContent>
 
-        <TabsContent value="comps" className="mt-4 space-y-4">
+        <TabsContent value="comps" className="mt-8 space-y-4">
           <ModelingProjectIntegrationPanel
             projectId={projectId!}
             projectName={project.marinaName}
           />
         </TabsContent>
 
-        <TabsContent value="storage-leases" className="mt-4 space-y-4">
+        <TabsContent value="storage-leases" className="mt-8 space-y-4">
           <UnitMixLeases project={project!} />
         </TabsContent>
 
-        <TabsContent value="commercial-leases" className="mt-4 space-y-4">
+        <TabsContent value="commercial-leases" className="mt-8 space-y-4">
           {(project?.customMetrics as any)?.profitCenters?.commercialTenants?.enabled ? (
             <CommercialLeasesWorkspace projectId={projectId!} projectName={project.marinaName} onTabChange={handleTabChange} />
           ) : (
@@ -997,19 +997,19 @@ export default function ProjectWorkspace() {
           )}
         </TabsContent>
 
-        <TabsContent value="profit" className="mt-4 space-y-4">
+        <TabsContent value="profit" className="mt-8 space-y-4">
           <ProfitCentersDynamic project={project!} />
         </TabsContent>
 
-        <TabsContent value="dcf" className="mt-4 space-y-4">
+        <TabsContent value="dcf" className="mt-8 space-y-4">
           <DCFCalculatorPage onTabChange={handleTabChange} />
         </TabsContent>
 
-        <TabsContent value="returns" className="mt-4 space-y-4">
+        <TabsContent value="returns" className="mt-8 space-y-4">
           <ModelReturns projectId={projectId!} projectName={project.marinaName} />
         </TabsContent>
 
-        <TabsContent value="multi-year" className="mt-4 space-y-4">
+        <TabsContent value="multi-year" className="mt-8 space-y-4">
           <MultiYearProjectionTab
             projectId={project.id}
             initialConfig={{
@@ -1020,18 +1020,18 @@ export default function ProjectWorkspace() {
             }}
           />
         </TabsContent>
-        <TabsContent value="monte-carlo" className="mt-4 space-y-4">
+        <TabsContent value="monte-carlo" className="mt-8 space-y-4">
           <MonteCarloPage />
         </TabsContent>
 
-        <TabsContent value="proforma-charts" className="mt-4 space-y-4">
+        <TabsContent value="proforma-charts" className="mt-8 space-y-4">
           <WorkspaceProFormaCharts projectId={projectId!} onTabChange={handleTabChange} />
         </TabsContent>
 
-        <TabsContent value="scenario-compare" className="mt-4 space-y-4">
+        <TabsContent value="scenario-compare" className="mt-8 space-y-4">
           <ScenarioComparisonCharts projectId={projectId!} onTabChange={handleTabChange} />
         </TabsContent>
-        <TabsContent value="deal-compare" className="mt-4 space-y-4">
+        <TabsContent value="deal-compare" className="mt-8 space-y-4">
           <WorkspaceDealComparison
             projectId={projectId!}
             onTabChange={handleTabChange}
@@ -1040,97 +1040,97 @@ export default function ProjectWorkspace() {
           />
         </TabsContent>
 
-        <TabsContent value="sensitivity" className="mt-4 space-y-4">
+        <TabsContent value="sensitivity" className="mt-8 space-y-4">
           <SensitivityTornado projectId={projectId!} onTabChange={handleTabChange} />
         </TabsContent>
 
-        <TabsContent value="validation" className="mt-4 space-y-4">
+        <TabsContent value="validation" className="mt-8 space-y-4">
           <ValidationWarnings projectId={projectId!} onTabChange={handleTabChange} />
         </TabsContent>
 
-        <TabsContent value="export" className="mt-4 space-y-4">
+        <TabsContent value="export" className="mt-8 space-y-4">
           <ExportModel projectId={projectId!} projectName={project.marinaName} onTabChange={handleTabChange} />
         </TabsContent>
 
-        <TabsContent value="tax-dist" className="mt-4 space-y-4">
+        <TabsContent value="tax-dist" className="mt-8 space-y-4">
           <TaxAndDistributionsPage projectId={projectId!} onTabChange={handleTabChange} />
         </TabsContent>
 
         {/* ─── Analysis & Institutional Tabs ─── */}
-        <TabsContent value="irr-decomposition" className="mt-4 space-y-4">
+        <TabsContent value="irr-decomposition" className="mt-8 space-y-4">
           <IRRDecomposition projectId={projectId!} onTabChange={handleTabChange} />
         </TabsContent>
-        <TabsContent value="hold-period-summary" className="mt-4 space-y-4">
+        <TabsContent value="hold-period-summary" className="mt-8 space-y-4">
           <HoldPeriodSummary projectId={projectId!} onTabChange={handleTabChange} />
         </TabsContent>
-        <TabsContent value="mark-to-market" className="mt-4 space-y-4">
+        <TabsContent value="mark-to-market" className="mt-8 space-y-4">
           <MarkToMarket projectId={projectId!} onTabChange={handleTabChange} />
         </TabsContent>
-        <TabsContent value="stabilized-noi" className="mt-4 space-y-4">
+        <TabsContent value="stabilized-noi" className="mt-8 space-y-4">
           <StabilizedNOI projectId={projectId!} onTabChange={handleTabChange} />
         </TabsContent>
-        <TabsContent value="capex-budget" className="mt-4 space-y-4">
+        <TabsContent value="capex-budget" className="mt-8 space-y-4">
           <CapExBudget projectId={projectId!} onTabChange={handleTabChange} />
         </TabsContent>
-        <TabsContent value="replacement-cost" className="mt-4 space-y-4">
+        <TabsContent value="replacement-cost" className="mt-8 space-y-4">
           <ReplacementCost projectId={projectId!} onTabChange={handleTabChange} />
         </TabsContent>
-        <TabsContent value="loan-sizing" className="mt-4 space-y-4">
+        <TabsContent value="loan-sizing" className="mt-8 space-y-4">
           <LoanSizing projectId={projectId!} onTabChange={handleTabChange} />
         </TabsContent>
-        <TabsContent value="pe-waterfall" className="mt-4 space-y-4">
+        <TabsContent value="pe-waterfall" className="mt-8 space-y-4">
           <PEWaterfall projectId={projectId!} onTabChange={handleTabChange} />
         </TabsContent>
-        <TabsContent value="waterfall-sensitivity" className="mt-4 space-y-4">
+        <TabsContent value="waterfall-sensitivity" className="mt-8 space-y-4">
           <WaterfallSensitivity projectId={projectId!} onTabChange={handleTabChange} />
         </TabsContent>
-        <TabsContent value="depreciation" className="mt-4 space-y-4">
+        <TabsContent value="depreciation" className="mt-8 space-y-4">
           <DepreciationSchedule projectId={projectId!} onTabChange={handleTabChange} />
         </TabsContent>
-        <TabsContent value="comp-grid" className="mt-4 space-y-4">
+        <TabsContent value="comp-grid" className="mt-8 space-y-4">
           <CompAdjustmentGrid projectId={projectId!} onTabChange={handleTabChange} />
         </TabsContent>
-        <TabsContent value="operator-bench" className="mt-4 space-y-4">
+        <TabsContent value="operator-bench" className="mt-8 space-y-4">
           <OperatorBenchmarking projectId={projectId!} onTabChange={handleTabChange} />
         </TabsContent>
-        <TabsContent value="environmental" className="mt-4 space-y-4">
+        <TabsContent value="environmental" className="mt-8 space-y-4">
           <EnvironmentalRisk projectId={projectId!} onTabChange={handleTabChange} />
         </TabsContent>
-        <TabsContent value="ic-memo" className="mt-4 space-y-4">
+        <TabsContent value="ic-memo" className="mt-8 space-y-4">
           <ICMemo projectId={projectId!} onTabChange={handleTabChange} />
         </TabsContent>
-        <TabsContent value="stress-testing" className="mt-4 space-y-4">
+        <TabsContent value="stress-testing" className="mt-8 space-y-4">
           <StressTesting projectId={projectId!} onTabChange={handleTabChange} />
         </TabsContent>
-        <TabsContent value="benchmark-overlay" className="mt-4 space-y-4">
+        <TabsContent value="benchmark-overlay" className="mt-8 space-y-4">
           <BenchmarkOverlay projectId={projectId!} onTabChange={handleTabChange} />
         </TabsContent>
 
         {/* ─── Fund & Portfolio ─── */}
-        <TabsContent value="fund-metrics" className="mt-4 space-y-4">
+        <TabsContent value="fund-metrics" className="mt-8 space-y-4">
           <FundMetrics projectId={projectId!} onTabChange={handleTabChange} />
         </TabsContent>
-        <TabsContent value="fund-cf" className="mt-4 space-y-4">
+        <TabsContent value="fund-cf" className="mt-8 space-y-4">
           <FundCashFlowDetail projectId={projectId!} onTabChange={handleTabChange} />
         </TabsContent>
-        <TabsContent value="fund-gna" className="mt-4 space-y-4">
+        <TabsContent value="fund-gna" className="mt-8 space-y-4">
           <FundGnAModel projectId={projectId!} onTabChange={handleTabChange} />
         </TabsContent>
-        <TabsContent value="gp-partners" className="mt-4 space-y-4">
+        <TabsContent value="gp-partners" className="mt-8 space-y-4">
           <GpPartnerEconomics projectId={projectId!} onTabChange={handleTabChange} />
         </TabsContent>
-        <TabsContent value="lp-reporting" className="mt-4 space-y-4">
+        <TabsContent value="lp-reporting" className="mt-8 space-y-4">
           <LPReporting projectId={projectId!} onTabChange={handleTabChange} />
         </TabsContent>
-        <TabsContent value="portfolio-risk" className="mt-4 space-y-4">
+        <TabsContent value="portfolio-risk" className="mt-8 space-y-4">
           <PortfolioRisk projectId={projectId!} onTabChange={handleTabChange} />
         </TabsContent>
 
         {/* ─── Scenario Management ─── */}
-        <TabsContent value="model-versions" className="mt-4 space-y-4">
+        <TabsContent value="model-versions" className="mt-8 space-y-4">
           <ModelVersioning projectId={projectId!} onTabChange={handleTabChange} />
         </TabsContent>
-        <TabsContent value="assumption-audit" className="mt-4 space-y-4">
+        <TabsContent value="assumption-audit" className="mt-8 space-y-4">
           <AssumptionAudit projectId={projectId!} onTabChange={handleTabChange} />
         </TabsContent>
       </Tabs>
