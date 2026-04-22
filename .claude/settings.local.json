@@ -265,7 +265,8 @@
       "Bash(ps -p 18172 -o pid,cmd)",
       "Bash(npx playwright *)",
       "Bash(echo \"Started PID $!\")",
-      "Bash(kill 32763)"
+      "Bash(kill 32763)",
+      "Bash(NODE_OPTIONS=\"--max-old-space-size=8192\" timeout 420 npx tsc --noEmit)"
     ]
   }
 }
