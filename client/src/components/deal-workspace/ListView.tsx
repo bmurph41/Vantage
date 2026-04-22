@@ -42,8 +42,9 @@ export default function ListView({ searchQuery, onEditDeal }: ListViewProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: deals = [], isLoading } = useQuery<DealWithRelations[]>({
+  const { data: deals = [], isLoading } = useQuery<any, Error, DealWithRelations[]>({
     queryKey: ['/api/deals'],
+    select: (res: any) => Array.isArray(res) ? res : (res?.data ?? []),
   });
 
   const { data: stages = [] } = useQuery<PipelineStage[]>({

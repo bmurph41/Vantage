@@ -90,8 +90,9 @@ export default function LeadsView({ searchQuery }: LeadsViewProps) {
   const [isConversionModalOpen, setIsConversionModalOpen] = useState(false);
   const [convertingLead, setConvertingLead] = useState<Lead | null>(null);
 
-  const { data: leads = [], isLoading } = useQuery<(Lead & { account?: any; campaign?: any })[]>({
+  const { data: leads = [], isLoading } = useQuery<any, Error, (Lead & { account?: any; campaign?: any })[]>({
     queryKey: ['/api/leads'],
+    select: (res: any) => Array.isArray(res) ? res : (res?.data ?? []),
   });
 
   useEffect(() => {

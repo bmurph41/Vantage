@@ -115,8 +115,14 @@ export default function DealWorkspace() {
   }, [activeView]);
 
   // ── Data Fetching ──
-  const { data: deals = [], isLoading: dealsLoading } = useQuery<DealWithRelations[]>({ queryKey: ['/api/deals'] });
-  const { data: leads = [], isLoading: leadsLoading } = useQuery<Lead[]>({ queryKey: ['/api/leads'] });
+  const { data: deals = [], isLoading: dealsLoading } = useQuery<any, Error, DealWithRelations[]>({
+    queryKey: ['/api/deals'],
+    select: (res: any) => Array.isArray(res) ? res : (res?.data ?? []),
+  });
+  const { data: leads = [], isLoading: leadsLoading } = useQuery<any, Error, Lead[]>({
+    queryKey: ['/api/leads'],
+    select: (res: any) => Array.isArray(res) ? res : (res?.data ?? []),
+  });
   const { data: stages = [] } = useQuery<PipelineStage[]>({ queryKey: ['/api/stages'] });
 
   // ── Analytics ──
