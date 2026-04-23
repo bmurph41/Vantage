@@ -277,7 +277,8 @@
       "Bash(NODE_OPTIONS=\"--max-old-space-size=6144\" npx tsc --noEmit --skipLibCheck server/storage.ts server/routes/crm-routes.ts server/routes/marina-integrations-routes.ts)",
       "Bash(NODE_OPTIONS=\"--max-old-space-size=8192\" npx tsc --noEmit -p tsconfig.json)",
       "Skill(restart-dev)",
-      "Bash(git check-ignore *)"
+      "Bash(git check-ignore *)",
+      "Skill(parser-audit)"
     ]
   }
 }
