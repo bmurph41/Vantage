@@ -259,7 +259,14 @@ CRITICAL RULES:
 4. "VACANT" or empty tenant name → status = 'vacant'
 5. "MTM" = month-to-month → lease_end = null
 6. Populate unit_mix summary after extracting all units.
-7. Add source_references for the units array and key summary fields.`;
+7. Add source_references for the units array and key summary fields.
+8. CRE occupancy convention for the summary counts:
+   - occupied_units = units with status in {'occupied', 'notice'} (tenant is still physically
+     present and paying rent until their lease-end/move-out). Do NOT exclude 'notice' units.
+   - vacant_units = units with status in {'vacant', 'down'}.
+   - 'model' units are typically excluded from both counts.
+   This convention applies to the TOP-LEVEL summary fields only — each unit's status field
+   should still reflect its literal state from the document.`;
 
 export async function extractPL(
   fullText: string,

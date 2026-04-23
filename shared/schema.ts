@@ -29813,6 +29813,7 @@ export const documentExtractionJobs = pgTable("document_extraction_jobs", {
   periodEnd: date("period_end"),
   periodStart: date("period_start"),
   reportingPeriod: text("reporting_period"),
+  reconciliationReport: jsonb("reconciliation_report"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   projectIdx: index("doc_extraction_jobs_project_idx").on(table.projectId),
