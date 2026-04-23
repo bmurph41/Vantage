@@ -100,7 +100,7 @@ Extract into this exact JSON structure (populate every leaf — null for unknown
 ${CONTRACT_OUTPUT_TEMPLATE}`;
 
   const response = await client.messages.create({
-    model: 'claude-opus-4-6',
+    model: 'claude-opus-4-7',
     max_tokens: 6000,
     // Array-form system enables cache_control on the stable block.
     system: [
