@@ -286,13 +286,20 @@ export default function DocumentIntelligence() {
             <Upload className="h-4 w-4 mr-2" />
             Upload Documents
           </TabsTrigger>
-          <TabsTrigger value="review" data-testid="tab-review" className="relative">
+          <TabsTrigger
+            value="review"
+            data-testid="tab-review"
+            className={pnlDocuments.length > 0 ? "relative data-[state=inactive]:text-amber-600 data-[state=inactive]:font-medium" : "relative"}
+          >
             <Eye className="h-4 w-4 mr-2" />
             Review Documents
             {pnlDocuments.length > 0 && (
-              <Badge variant="secondary" className="ml-2 h-5 px-1.5 text-[10px]">
-                {pnlDocuments.length}
-              </Badge>
+              <span className="relative ml-2 inline-flex">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-60" />
+                <Badge className="relative h-5 px-1.5 text-[10px] bg-amber-500 hover:bg-amber-500 text-white border-0">
+                  {pnlDocuments.length}
+                </Badge>
+              </span>
             )}
           </TabsTrigger>
           <TabsTrigger value="categories" data-testid="tab-categories">
