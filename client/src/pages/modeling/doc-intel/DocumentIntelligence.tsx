@@ -112,6 +112,29 @@ export default function DocumentIntelligence() {
   const [reuploadPrevSheetName, setReuploadPrevSheetName] = useState<string | undefined>(undefined);
   const [reuploadStep, setReuploadStep] = useState<"uploading" | "deleting" | "parsing" | null>(null);
 
+  const reuploadStorageKey = projectId ? `doc_intel_reupload_${projectId}` : null;
+  const hasRestoredReupload = useRef(false);
+
+  useEffect(() => {
+    if (!reuploadDoc || !reuploadStorageKey) return;
+    const state = {
+      docId: reuploadDoc.id,
+      docType: reuploadDocType,
+      customTypeName: reuploadCustomTypeName,
+      year: reuploadYear,
+      isT12: reuploadIsT12,
+      t12StartMonth: reuploadT12StartMonth,
+      t12StartYear: reuploadT12StartYear,
+      t12EndMonth: reuploadT12EndMonth,
+      t12EndYear: reuploadT12EndYear,
+    };
+    sessionStorage.setItem(reuploadStorageKey, JSON.stringify(state));
+  }, [
+    reuploadDoc, reuploadDocType, reuploadCustomTypeName, reuploadYear, reuploadIsT12,
+    reuploadT12StartMonth, reuploadT12StartYear, reuploadT12EndMonth, reuploadT12EndYear,
+    reuploadStorageKey,
+  ]);
+
   useEffect(() => {
     const fullUrl = window.location.href;
     let uploadParam: string | null = null;
@@ -167,6 +190,34 @@ export default function DocumentIntelligence() {
   const { data: customDocTypes = [] } = useQuery<CustomDocumentType[]>({
     queryKey: ["/api/doc-intel/custom-document-types"],
   });
+
+  useEffect(() => {
+    if (hasRestoredReupload.current || uploadsLoading || holdingLoading || !reuploadStorageKey) return;
+    hasRestoredReupload.current = true;
+    const stored = sessionStorage.getItem(reuploadStorageKey);
+    if (!stored) return;
+    try {
+      const state = JSON.parse(stored);
+      const doc = [...uploads, ...holdingQueue].find((u) => u.id === state.docId);
+      if (!doc) {
+        sessionStorage.removeItem(reuploadStorageKey);
+        return;
+      }
+      const now = new Date();
+      setReuploadDoc(doc);
+      setReuploadDocType(state.docType || "pnl");
+      setReuploadCustomTypeName(state.customTypeName || "");
+      setReuploadYear(state.year || String(now.getFullYear()));
+      setReuploadIsT12(!!state.isT12);
+      setReuploadT12StartMonth(state.t12StartMonth || "1");
+      setReuploadT12StartYear(state.t12StartYear || String(now.getFullYear() - 1));
+      setReuploadT12EndMonth(state.t12EndMonth || String(now.getMonth() + 1));
+      setReuploadT12EndYear(state.t12EndYear || String(now.getFullYear()));
+      setReuploadDialogOpen(true);
+    } catch {
+      sessionStorage.removeItem(reuploadStorageKey);
+    }
+  }, [uploadsLoading, holdingLoading, uploads, holdingQueue, reuploadStorageKey]);
 
   const pnlDocuments = holdingQueue.filter((doc) => doc.docType === "pnl");
   const parsedPnlDocuments = pnlDocuments.filter(
@@ -285,6 +336,7 @@ export default function DocumentIntelligence() {
     },
     onSuccess: () => {
       setReuploadStep(null);
+      if (reuploadStorageKey) sessionStorage.removeItem(reuploadStorageKey);
       queryClient.invalidateQueries({ queryKey: ["/api/modeling/projects", projectId, "documents"] });
       queryClient.invalidateQueries({ queryKey: ["/api/modeling/projects", projectId, "documents", "holding"] });
       setReuploadDoc(null);
@@ -304,11 +356,40 @@ export default function DocumentIntelligence() {
     file.type === "application/vnd.ms-excel";
 
   const handleReuploadClick = (doc: DocIntelUpload) => {
+    const now = new Date();
+
+    // If there is a stored draft for this exact document, restore it
+    if (reuploadStorageKey) {
+      try {
+        const stored = sessionStorage.getItem(reuploadStorageKey);
+        if (stored) {
+          const state = JSON.parse(stored);
+          if (state.docId === doc.id) {
+            setReuploadDoc(doc);
+            setReuploadDocType(state.docType || "pnl");
+            setReuploadCustomTypeName(state.customTypeName || "");
+            setReuploadYear(state.year || String(now.getFullYear()));
+            setReuploadIsT12(!!state.isT12);
+            setReuploadT12StartMonth(state.t12StartMonth || "1");
+            setReuploadT12StartYear(state.t12StartYear || String(now.getFullYear() - 1));
+            setReuploadT12EndMonth(state.t12EndMonth || String(now.getMonth() + 1));
+            setReuploadT12EndYear(state.t12EndYear || String(now.getFullYear()));
+            const meta = doc.periodMetadata as { sheetName?: string } | null | undefined;
+            setReuploadPrevSheetName(meta?.sheetName);
+            setReuploadDialogOpen(true);
+            return;
+          }
+        }
+      } catch {
+        // fall through to default behavior
+      }
+    }
+
+    // Default: derive settings from the document's own stored metadata
     setReuploadDoc(doc);
     const inherited = doc.docType || "pnl";
     const inheritedIsT12 = doc.isT12 ?? false;
     const meta = doc.periodMetadata as { t12StartMonth?: number; t12StartYear?: number; t12EndMonth?: number; t12EndYear?: number; customTypeName?: string; sheetName?: string; sheetIndex?: number } | null | undefined;
-    const now = new Date();
     setReuploadDocType(inherited);
     setReuploadCustomTypeName(meta?.customTypeName ?? "");
     setReuploadIsT12(inheritedIsT12);
