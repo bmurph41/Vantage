@@ -36,23 +36,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest, queryClient, ensureCsrfToken } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { DocIntelUpload } from "@shared/schema";
-
-function getCsrfToken(): string {
-  const match = document.cookie.match(/(?:^|; )csrf_token=([^;]*)/);
-  return match ? decodeURIComponent(match[1]) : '';
-}
-
-async function ensureCsrfToken(): Promise<string> {
-  let token = getCsrfToken();
-  if (!token) {
-    await fetch('/api/auth/me', { credentials: 'include' });
-    token = getCsrfToken();
-  }
-  return token;
-}
 
 type DocType = "pnl" | "rent_roll" | "balance_sheet" | "rate_sheet" | "invoice" | "other" | string;
 

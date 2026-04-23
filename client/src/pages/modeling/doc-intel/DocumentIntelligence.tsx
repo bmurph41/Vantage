@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, useLocation, Link } from "wouter";
 import { 
@@ -27,7 +27,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest, queryClient, ensureCsrfToken } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { MultiDocumentReview } from "./MultiDocumentReview";
 import { CategoryManager } from "./CategoryManager";
@@ -67,6 +67,9 @@ export default function DocumentIntelligence() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [deleteConfirmName, setDeleteConfirmName] = useState<string>("");
+
+  const [reuploadDoc, setReuploadDoc] = useState<DocIntelUpload | null>(null);
+  const reuploadInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const fullUrl = window.location.href;
@@ -185,6 +188,62 @@ export default function DocumentIntelligence() {
       toast({ title: "Retry failed", description: error.message || "Could not retry parsing", variant: "destructive" });
     },
   });
+
+  const reuploadMutation = useMutation({
+    mutationFn: async ({ file, doc }: { file: File; doc: DocIntelUpload }) => {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("docType", doc.docType || "pnl");
+      formData.append("year", doc.year ? String(doc.year) : String(new Date().getFullYear()));
+      formData.append("holdingStatus", "staging");
+      formData.append("displayName", file.name);
+
+      const csrfToken = await ensureCsrfToken();
+      const headers: Record<string, string> = {};
+      if (csrfToken) headers["X-CSRF-Token"] = csrfToken;
+
+      const response = await fetch(`/api/modeling/projects/${projectId}/documents`, {
+        method: "POST",
+        body: formData,
+        headers,
+        credentials: "include",
+      });
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || "Upload failed");
+      }
+      const uploaded = await response.json();
+
+      await apiRequest("DELETE", `/api/modeling/projects/${projectId}/documents/${doc.id}`);
+      await apiRequest("POST", `/api/modeling/projects/${projectId}/documents/${uploaded.id}/parse`);
+      return uploaded;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/modeling/projects", projectId, "documents"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/modeling/projects", projectId, "documents", "holding"] });
+      setReuploadDoc(null);
+      toast({ title: "Re-uploaded", description: "The document has been replaced and is now processing." });
+    },
+    onError: (error: unknown) => {
+      setReuploadDoc(null);
+      const message = error instanceof Error ? error.message : "Could not replace document.";
+      toast({ title: "Re-upload failed", description: message, variant: "destructive" });
+    },
+  });
+
+  const handleReuploadClick = (doc: DocIntelUpload) => {
+    setReuploadDoc(doc);
+    if (reuploadInputRef.current) {
+      reuploadInputRef.current.value = "";
+      reuploadInputRef.current.click();
+    }
+  };
+
+  const handleReuploadFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !reuploadDoc) return;
+    reuploadMutation.mutate({ file, doc: reuploadDoc });
+  };
 
   const handleReviewDocuments = (documentIds: string[]) => {
     if (documentIds.length === 0) return;
@@ -432,6 +491,22 @@ export default function DocumentIntelligence() {
                            doc.status === "error" ? "Error" :
                            doc.status}
                         </Badge>
+                        {doc.status === "error" && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 px-2 text-xs gap-1"
+                            disabled={reuploadMutation.isPending && reuploadDoc?.id === doc.id}
+                            onClick={() => handleReuploadClick(doc)}
+                          >
+                            {reuploadMutation.isPending && reuploadDoc?.id === doc.id ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              <Upload className="h-3 w-3" />
+                            )}
+                            Re-upload
+                          </Button>
+                        )}
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -484,6 +559,14 @@ export default function DocumentIntelligence() {
           <CategoryManager />
         </TabsContent>
       </Tabs>
+
+      <input
+        ref={reuploadInputRef}
+        type="file"
+        accept=".pdf,.xlsx,.xls,.csv"
+        className="hidden"
+        onChange={handleReuploadFileChange}
+      />
 
       <AlertDialog open={!!deleteConfirmId} onOpenChange={(open) => {
         if (!open) {

@@ -1,8 +1,17 @@
 import { QueryClient, QueryCache, QueryFunction } from "@tanstack/react-query";
 
-function getCsrfToken(): string {
+export function getCsrfToken(): string {
   const match = document.cookie.match(/(?:^|; )csrf_token=([^;]*)/);
   return match ? decodeURIComponent(match[1]) : '';
+}
+
+export async function ensureCsrfToken(): Promise<string> {
+  let token = getCsrfToken();
+  if (!token) {
+    await fetch('/api/auth/me', { credentials: 'include' });
+    token = getCsrfToken();
+  }
+  return token;
 }
 
 async function throwIfResNotOk(res: Response) {
