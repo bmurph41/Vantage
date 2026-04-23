@@ -111,6 +111,7 @@ export default function DocumentIntelligence() {
   const [reuploadAvailableSheets, setReuploadAvailableSheets] = useState<{ index: number; name: string; rowCount: number }[]>([]);
   const [reuploadPrevSheetName, setReuploadPrevSheetName] = useState<string | undefined>(undefined);
   const [reuploadStep, setReuploadStep] = useState<"uploading" | "deleting" | "parsing" | null>(null);
+  const [reuploadProgress, setReuploadProgress] = useState<number>(0);
 
   const reuploadStorageKey = projectId ? `doc_intel_reupload_${projectId}` : null;
   const hasRestoredReupload = useRef(false);
@@ -311,21 +312,38 @@ export default function DocumentIntelligence() {
       }
 
       const csrfToken = await ensureCsrfToken();
-      const headers: Record<string, string> = {};
-      if (csrfToken) headers["X-CSRF-Token"] = csrfToken;
 
       setReuploadStep("uploading");
-      const response = await fetch(`/api/modeling/projects/${projectId}/documents`, {
-        method: "POST",
-        body: formData,
-        headers,
-        credentials: "include",
+      setReuploadProgress(0);
+      const uploaded = await new Promise<DocIntelUpload>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open("POST", `/api/modeling/projects/${projectId}/documents`);
+        xhr.withCredentials = true;
+        if (csrfToken) xhr.setRequestHeader("X-CSRF-Token", csrfToken);
+        xhr.upload.onprogress = (event) => {
+          if (event.lengthComputable) {
+            setReuploadProgress(Math.round((event.loaded / event.total) * 100));
+          }
+        };
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            try {
+              resolve(JSON.parse(xhr.responseText));
+            } catch {
+              reject(new Error("Invalid response from server"));
+            }
+          } else {
+            try {
+              const err = JSON.parse(xhr.responseText);
+              reject(new Error(err.error || "Upload failed"));
+            } catch {
+              reject(new Error("Upload failed"));
+            }
+          }
+        };
+        xhr.onerror = () => reject(new Error("Network error during upload"));
+        xhr.send(formData);
       });
-      if (!response.ok) {
-        const err = await response.json();
-        throw new Error(err.error || "Upload failed");
-      }
-      const uploaded = await response.json();
 
       setReuploadStep("deleting");
       await apiRequest("DELETE", `/api/modeling/projects/${projectId}/documents/${doc.id}`);
@@ -336,6 +354,7 @@ export default function DocumentIntelligence() {
     },
     onSuccess: () => {
       setReuploadStep(null);
+      setReuploadProgress(0);
       if (reuploadStorageKey) sessionStorage.removeItem(reuploadStorageKey);
       queryClient.invalidateQueries({ queryKey: ["/api/modeling/projects", projectId, "documents"] });
       queryClient.invalidateQueries({ queryKey: ["/api/modeling/projects", projectId, "documents", "holding"] });
@@ -344,6 +363,7 @@ export default function DocumentIntelligence() {
     },
     onError: (error: unknown) => {
       setReuploadStep(null);
+      setReuploadProgress(0);
       setReuploadDoc(null);
       const message = error instanceof Error ? error.message : "Could not replace document.";
       toast({ title: "Re-upload failed", description: message, variant: "destructive" });
@@ -672,7 +692,7 @@ export default function DocumentIntelligence() {
                         errMsg.includes("migration"));
                     const isReuploading = reuploadMutation.isPending && reuploadDoc?.id === doc.id;
                     const reuploadStepLabel =
-                      reuploadStep === "uploading" ? "Uploading new file…" :
+                      reuploadStep === "uploading" ? `Uploading new file… ${reuploadProgress}%` :
                       reuploadStep === "deleting" ? "Removing old file…" :
                       reuploadStep === "parsing" ? "Queuing for processing…" : null;
                     return (
