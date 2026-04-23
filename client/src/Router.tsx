@@ -117,6 +117,7 @@ const AssetClassManager = lazy(() => import("@/pages/admin/AssetClassManager"));
 const MasterCompsAdmin = lazy(() => import("@/pages/admin/MasterCompsAdmin"));
 const PlatformDashboard = lazy(() => import("@/pages/admin/PlatformDashboard"));
 const BrokerRegistrationsQueue = lazy(() => import("@/pages/admin/BrokerRegistrationsQueue"));
+const DocIntelMigrationAdmin = lazy(() => import("@/pages/admin/DocIntelMigrationAdmin"));
 const BrokerRegister = lazy(() => import("@/pages/broker/BrokerRegister"));
 const BrokerDashboardOverview = lazy(() => import("@/pages/broker/dashboard/BrokerDashboardOverview"));
 const BrokerProfileEditor = lazy(() => import("@/pages/broker/dashboard/BrokerProfileEditor"));
@@ -697,6 +698,13 @@ function Router() {
         {() => (
           <UnifiedLayout>
             <BrokerRegistrationsQueue />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/admin/doc-intel-migration">
+        {() => (
+          <UnifiedLayout>
+            <DocIntelMigrationAdmin />
           </UnifiedLayout>
         )}
       </Route>
