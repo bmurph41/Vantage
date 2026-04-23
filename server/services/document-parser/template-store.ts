@@ -148,15 +148,17 @@ export async function captureOrUpdateTemplate(input: CaptureInput): Promise<{ te
     return { templateId: row.id, created: false };
   }
 
+  const autoName = `Auto-learned ${input.docClass} — ${new Date().toISOString().slice(0, 10)}`;
   const insert = await pool.query(
     `INSERT INTO extraction_templates
-      (id, org_id, document_class, structural_fingerprint,
+      (id, org_id, name, document_class, structural_fingerprint,
        sample_input, sample_output, source_job_id,
        use_count, avg_confidence, auto_created, last_used_at, created_at, updated_at)
-     VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, 1, $7, true, NOW(), NOW(), NOW())
+     VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, 1, $8, true, NOW(), NOW(), NOW())
      RETURNING id`,
     [
       input.orgId,
+      autoName,
       input.docClass,
       input.fingerprint,
       input.sampleInput.slice(0, 4000),
