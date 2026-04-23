@@ -1,6 +1,15 @@
 import fs from 'fs/promises';
 import path from 'path';
 import { Readable } from 'stream';
+import {
+  isObjectStorageAvailable,
+  downloadObjectStorageToStream,
+  uploadVdrFile,
+  deleteObjectStorageFile,
+  docIntelFileExists,
+} from './utils/doc-intel-storage';
+
+const USE_S3 = !!(process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY && process.env.S3_BUCKET_NAME);
 
 export interface StorageProvider {
   upload(filePath: string, storagePath: string): Promise<string>;
@@ -148,12 +157,76 @@ export class S3StorageProvider implements StorageProvider {
   }
 }
 
-export function createStorageProvider(type: 'local' | 's3' = 'local', config?: any): StorageProvider {
+export class ReplitObjectStorageProvider implements StorageProvider {
+  private localFallbackDir: string;
+
+  constructor(localFallbackDir: string = 'server/uploads/vdr') {
+    this.localFallbackDir = localFallbackDir;
+  }
+
+  async upload(filePath: string, storagePath: string): Promise<string> {
+    const { readFile } = await import('fs/promises');
+    const buffer = await readFile(filePath);
+    const parts = storagePath.split('/');
+    const orgId = parts[1] ?? 'unknown';
+    const projectId = parts[2] ?? 'unknown';
+    const filename = parts.slice(3).join('/') || path.basename(filePath);
+    return uploadVdrFile(orgId, projectId, filename, buffer, 'application/octet-stream');
+  }
+
+  async download(storagePath: string): Promise<Readable> {
+    if (storagePath.startsWith('vdr/') || storagePath.startsWith('doc-intel/')) {
+      return downloadObjectStorageToStream(storagePath);
+    }
+    // Legacy fallback: file was stored on local disk before migration
+    const { createReadStream } = await import('fs');
+    const fullPath = path.join(this.localFallbackDir, storagePath);
+    return createReadStream(fullPath);
+  }
+
+  async delete(storagePath: string): Promise<void> {
+    if (storagePath.startsWith('vdr/') || storagePath.startsWith('doc-intel/')) {
+      await deleteObjectStorageFile(storagePath);
+    } else {
+      const fullPath = path.join(this.localFallbackDir, storagePath);
+      try {
+        await fs.unlink(fullPath);
+      } catch (err: any) {
+        if (err.code !== 'ENOENT') throw err;
+      }
+    }
+  }
+
+  async getSignedUrl(storagePath: string, _expiresIn: number): Promise<string> {
+    return `/api/vdr/documents/download/${encodeURIComponent(storagePath)}`;
+  }
+
+  async exists(storagePath: string): Promise<boolean> {
+    if (storagePath.startsWith('vdr/') || storagePath.startsWith('doc-intel/')) {
+      return docIntelFileExists(storagePath);
+    }
+    const fullPath = path.join(this.localFallbackDir, storagePath);
+    try {
+      await fs.access(fullPath);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+}
+
+export function createStorageProvider(type: 'local' | 's3' | 'replit' = 'local', config?: any): StorageProvider {
   if (type === 's3' && config?.bucket) {
     return new S3StorageProvider(config.bucket, config.region);
   }
-  
+  // Auto-detect: S3 takes priority to match upload priority in vdr-file-service.ts
+  if (USE_S3 && process.env.S3_BUCKET_NAME) {
+    return new S3StorageProvider(process.env.S3_BUCKET_NAME, process.env.AWS_REGION);
+  }
+  if (type === 'replit' || isObjectStorageAvailable()) {
+    return new ReplitObjectStorageProvider(config?.baseDir);
+  }
   return new LocalFileSystemProvider(config?.baseDir);
 }
 
-export const defaultStorageProvider = createStorageProvider('local');
+export const defaultStorageProvider = createStorageProvider();

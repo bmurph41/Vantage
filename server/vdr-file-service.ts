@@ -4,6 +4,13 @@ import path from 'path';
 import { Request } from 'express';
 import multer from 'multer';
 import { uploadToS3, downloadFromS3, deleteFromS3, getSignedDownloadUrl, fileExistsInS3 } from './storage/s3-client';
+import {
+  isObjectStorageAvailable,
+  uploadVdrFile,
+  downloadDocIntelToBuffer,
+  docIntelFileExists,
+  deleteObjectStorageFile,
+} from './utils/doc-intel-storage';
 
 // Check if S3 is configured
 const USE_S3 = !!(process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY && process.env.S3_BUCKET_NAME);
@@ -59,8 +66,10 @@ export class VdrFileService {
     
     if (USE_S3) {
       console.log('✓ VDR File Service: Using S3 storage');
+    } else if (isObjectStorageAvailable()) {
+      console.log('✓ VDR File Service: Using Replit object storage');
     } else {
-      console.log('⚠ VDR File Service: Using local storage (S3 not configured)');
+      console.log('⚠ VDR File Service: Using local storage (no cloud storage configured)');
     }
   }
 
@@ -68,8 +77,8 @@ export class VdrFileService {
     // Always create temp dir for multer
     await fs.mkdir(this.tempDir, { recursive: true });
     
-    // Only create upload dir if not using S3
-    if (!USE_S3) {
+    // Only create upload dir if not using cloud storage
+    if (!USE_S3 && !isObjectStorageAvailable()) {
       await fs.mkdir(this.uploadDir, { recursive: true });
     }
   }
@@ -152,10 +161,9 @@ export class VdrFileService {
       throw new Error(validation.error);
     }
 
-    const storagePath = this.generateStoragePath(orgId, projectId, originalFilename);
-    
     if (USE_S3) {
       // Upload to S3
+      const storagePath = this.generateStoragePath(orgId, projectId, originalFilename);
       const fileBuffer = await fs.readFile(tempPath);
       const checksum = await this.calculateChecksumFromBuffer(fileBuffer);
       
@@ -186,8 +194,30 @@ export class VdrFileService {
         storagePath,
         s3Url: s3Result.url
       };
+    } else if (isObjectStorageAvailable()) {
+      // Upload to Replit object storage
+      const fileBuffer = await fs.readFile(tempPath);
+      const checksum = await this.calculateChecksumFromBuffer(fileBuffer);
+
+      const ext = path.extname(originalFilename);
+      const sanitizedName = path.basename(originalFilename, ext).replace(/[^a-zA-Z0-9-_]/g, '_');
+      const uniqueName = `${sanitizedName}_${Date.now()}_${crypto.randomBytes(8).toString('hex')}${ext}`;
+
+      const storagePath = await uploadVdrFile(orgId, projectId, uniqueName, fileBuffer, mimeType);
+
+      await this.cleanupTempFile(tempPath);
+
+      return {
+        filename: path.basename(storagePath),
+        originalFilename,
+        mimeType,
+        size,
+        checksum,
+        storagePath,
+      };
     } else {
       // Local storage fallback
+      const storagePath = this.generateStoragePath(orgId, projectId, originalFilename);
       const checksum = await this.calculateChecksum(tempPath);
       await this.moveToStorage(tempPath, storagePath);
 
@@ -208,6 +238,8 @@ export class VdrFileService {
       if (!result.success) {
         console.error('Failed to delete from S3:', result.error);
       }
+    } else if (storagePath.startsWith('vdr/')) {
+      await deleteObjectStorageFile(storagePath);
     } else {
       const fullPath = path.join(this.uploadDir, storagePath);
       try {
@@ -240,6 +272,9 @@ export class VdrFileService {
       }
       return result.data;
     }
+    if (storagePath.startsWith('vdr/')) {
+      return downloadDocIntelToBuffer(storagePath);
+    }
     const fullPath = path.join(this.uploadDir, storagePath);
     return fs.readFile(fullPath);
   }
@@ -259,6 +294,9 @@ export class VdrFileService {
   async fileExists(storagePath: string): Promise<boolean> {
     if (USE_S3) {
       return fileExistsInS3(storagePath);
+    }
+    if (storagePath.startsWith('vdr/')) {
+      return docIntelFileExists(storagePath);
     }
     const fullPath = path.join(this.uploadDir, storagePath);
     try {

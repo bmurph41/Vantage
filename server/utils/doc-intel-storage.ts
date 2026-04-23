@@ -48,7 +48,54 @@ export function isObjectStorageAvailable(): boolean {
 }
 
 export function isObjectStorageKey(storagePath: string): boolean {
-  return storagePath.startsWith("doc-intel/");
+  return storagePath.startsWith("doc-intel/") || storagePath.startsWith("vdr/");
+}
+
+export async function uploadVdrFile(
+  orgId: string,
+  projectId: string,
+  filename: string,
+  buffer: Buffer,
+  contentType: string
+): Promise<string> {
+  const { bucketName, prefix } = parseBucketAndPrefix();
+  const client = getStorageClient();
+
+  const key = `vdr/${orgId}/${projectId}/${filename}`;
+  const objectName = prefix ? `${prefix}/${key}` : key;
+
+  const bucket = client.bucket(bucketName);
+  const file = bucket.file(objectName);
+
+  await file.save(buffer, {
+    metadata: { contentType },
+    resumable: false,
+  });
+
+  return key;
+}
+
+export async function downloadObjectStorageToStream(bucketKey: string): Promise<import("stream").Readable> {
+  const { bucketName, prefix } = parseBucketAndPrefix();
+  const client = getStorageClient();
+
+  const objectName = prefix ? `${prefix}/${bucketKey}` : bucketKey;
+  const bucket = client.bucket(bucketName);
+  const file = bucket.file(objectName);
+
+  return file.createReadStream();
+}
+
+export async function deleteObjectStorageFile(bucketKey: string): Promise<void> {
+  try {
+    const { bucketName, prefix } = parseBucketAndPrefix();
+    const client = getStorageClient();
+    const objectName = prefix ? `${prefix}/${bucketKey}` : bucketKey;
+    const bucket = client.bucket(bucketName);
+    const file = bucket.file(objectName);
+    await file.delete({ ignoreNotFound: true });
+  } catch {
+  }
 }
 
 export async function uploadDocIntelFile(
