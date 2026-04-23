@@ -54,9 +54,9 @@ export function SyncStatusBanner({ moduleName, showSettings = false }: SyncStatu
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['/api/operations/sync/status'] });
       if (moduleName === 'fuel') {
-        queryClient.invalidateQueries({ queryKey: ['/api/fuel'] });
+        queryClient.invalidateQueries({ predicate: (q) => typeof q.queryKey?.[0] === 'string' && (q.queryKey[0] as string).startsWith('/api/operations/fuel') });
       } else if (moduleName === 'rent-roll') {
-        queryClient.invalidateQueries({ queryKey: ['/api/rent-rolls'] });
+        queryClient.invalidateQueries({ predicate: (q) => typeof q.queryKey?.[0] === 'string' && ((q.queryKey[0] as string).startsWith('/api/operations/rent-roll') || (q.queryKey[0] as string).startsWith('/api/rent-roll')) });
       } else if (moduleName === 'ship-store') {
         queryClient.invalidateQueries({ queryKey: ['/api/ship-store'] });
       }

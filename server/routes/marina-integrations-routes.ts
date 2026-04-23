@@ -57,8 +57,8 @@ const MARINA_INTEGRATIONS = [
 
 router.get('/available', async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).userId;
-    const orgId = (req as any).orgId;
+    const userId = (req as any).user?.id;
+    const orgId = (req as any).user?.orgId;
 
     if (!userId || !orgId) {
       return res.status(401).json({ error: 'Unauthorized' });
@@ -96,8 +96,8 @@ router.get('/available', async (req: Request, res: Response) => {
 
 router.get('/connected', async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).userId;
-    const orgId = (req as any).orgId;
+    const userId = (req as any).user?.id;
+    const orgId = (req as any).user?.orgId;
 
     if (!userId || !orgId) {
       return res.status(401).json({ error: 'Unauthorized' });
@@ -137,8 +137,8 @@ router.get('/connected', async (req: Request, res: Response) => {
 
 router.post('/connect', async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).userId;
-    const orgId = (req as any).orgId;
+    const userId = (req as any).user?.id;
+    const orgId = (req as any).user?.orgId;
     const { integrationKey, credentials } = req.body;
 
     if (!userId || !orgId) {
@@ -197,8 +197,8 @@ router.post('/connect', async (req: Request, res: Response) => {
 
 router.post('/disconnect/:integrationKey', async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).userId;
-    const orgId = (req as any).orgId;
+    const userId = (req as any).user?.id;
+    const orgId = (req as any).user?.orgId;
     const { integrationKey } = req.params;
 
     if (!userId || !orgId) {
@@ -226,8 +226,8 @@ router.post('/disconnect/:integrationKey', async (req: Request, res: Response) =
 
 router.post('/sync/:integrationKey', async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).userId;
-    const orgId = (req as any).orgId;
+    const userId = (req as any).user?.id;
+    const orgId = (req as any).user?.orgId;
     const { integrationKey } = req.params;
     const { entityTypes, fullSync } = req.body;
 
@@ -276,8 +276,8 @@ router.post('/sync/:integrationKey', async (req: Request, res: Response) => {
 
 router.get('/sync-history/:integrationKey', async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).userId;
-    const orgId = (req as any).orgId;
+    const userId = (req as any).user?.id;
+    const orgId = (req as any).user?.orgId;
     const { integrationKey } = req.params;
     const limit = parseInt(req.query.limit as string) || 10;
 
@@ -305,8 +305,8 @@ router.get('/sync-history/:integrationKey', async (req: Request, res: Response) 
 
 router.get('/status', async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).userId;
-    const orgId = (req as any).orgId;
+    const userId = (req as any).user?.id;
+    const orgId = (req as any).user?.orgId;
 
     if (!userId || !orgId) {
       return res.status(401).json({ error: 'Unauthorized' });
@@ -359,8 +359,8 @@ router.get('/status', async (req: Request, res: Response) => {
 
 router.post('/test-connection/:integrationKey', async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).userId;
-    const orgId = (req as any).orgId;
+    const userId = (req as any).user?.id;
+    const orgId = (req as any).user?.orgId;
     const { integrationKey } = req.params;
     const { credentials } = req.body;
 

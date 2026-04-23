@@ -37,6 +37,7 @@ export function ModuleSyncIndicator({ module, marinaId }: ModuleSyncIndicatorPro
       }
       return res.json();
     },
+    enabled: !!module,
     staleTime: 30 * 1000,
     refetchInterval: 60 * 1000,
   });

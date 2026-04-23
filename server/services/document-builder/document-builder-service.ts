@@ -39,6 +39,7 @@ import {
 
 export interface CreateDocumentParams {
   dealId?: string;
+  modelingProjectId?: string;
   documentType: DocumentType;
   title: string;
   audience?: string;
@@ -76,10 +77,11 @@ class DocumentBuilderService {
       .insert(omBuilderDocuments)
       .values({
         dealId: params.dealId,
+        modelingProjectId: params.modelingProjectId,
         documentType: params.documentType,
         title: params.title,
-        audience: params.audience as any,
-        assetClass: params.assetClass as any,
+        audience: params.audience,
+        assetClass: params.assetClass,
         themeId: params.themeId,
         templateId: params.templateId,
         brandKitId: params.brandKitId,

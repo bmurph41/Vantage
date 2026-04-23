@@ -18132,6 +18132,28 @@ const MIGRATIONS: Migration[] = [
     name: "beta_invite_redemptions: add index on code",
     sql: `CREATE INDEX IF NOT EXISTS beta_invite_redemptions_code_idx ON beta_invite_redemptions (code)`,
   },
+
+  // om_builder_documents — project/model linking
+  {
+    name: "om_builder_documents: make deal_id nullable",
+    sql: `ALTER TABLE om_builder_documents ALTER COLUMN deal_id DROP NOT NULL`,
+  },
+  {
+    name: "om_builder_documents: add modeling_project_id",
+    sql: `ALTER TABLE om_builder_documents ADD COLUMN IF NOT EXISTS modeling_project_id varchar REFERENCES modeling_projects(id) ON DELETE SET NULL`,
+  },
+  {
+    name: "om_builder_documents: add index om_builder_documents_modeling_project_idx",
+    sql: `CREATE INDEX IF NOT EXISTS om_builder_documents_modeling_project_idx ON om_builder_documents (modeling_project_id)`,
+  },
+  {
+    name: "om_builder_documents: convert audience to text",
+    sql: `ALTER TABLE om_builder_documents ALTER COLUMN audience TYPE text USING audience::text`,
+  },
+  {
+    name: "om_builder_documents: convert asset_class to text",
+    sql: `ALTER TABLE om_builder_documents ALTER COLUMN asset_class TYPE text USING asset_class::text`,
+  },
 ];
 
 /**

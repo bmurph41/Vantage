@@ -9,7 +9,7 @@ import { eq, desc } from 'drizzle-orm';
 import { db } from '../db';
 import { and } from 'drizzle-orm';
 import { omBuilderDocuments, omDocumentSections, omExemplars, omDocumentVersions, omExportJobs } from '@shared/document-builder/schema';
-import { omTemplates } from '@shared/schema';
+import { omTemplates, modelingProjects } from '@shared/schema';
 import { documentBuilderService } from '../services/document-builder/document-builder-service';
 import { dataBindingService } from '../services/document-builder/data-binding-service';
 import { aiContentGenerationService } from '../services/document-builder/ai-content-service';
@@ -61,6 +61,7 @@ const AssetClassValues = [
 
 const CreateDocumentSchema = z.object({
   dealId: z.string().optional(),
+  modelingProjectId: z.string().optional(),
   documentType: z.enum(DocumentTypeValues),
   title: z.string().min(1).max(200),
   audience: z.string().optional(),
@@ -198,8 +199,28 @@ router.get(
   asyncHandler(async (req: Request, res: Response) => {
     const userId = (req as any).user?.id;
     const docs = await db
-      .select()
+      .select({
+        id: omBuilderDocuments.id,
+        dealId: omBuilderDocuments.dealId,
+        modelingProjectId: omBuilderDocuments.modelingProjectId,
+        modelingProjectName: modelingProjects.marinaName,
+        documentType: omBuilderDocuments.documentType,
+        title: omBuilderDocuments.title,
+        audience: omBuilderDocuments.audience,
+        assetClass: omBuilderDocuments.assetClass,
+        themeId: omBuilderDocuments.themeId,
+        templateId: omBuilderDocuments.templateId,
+        brandKitId: omBuilderDocuments.brandKitId,
+        status: omBuilderDocuments.status,
+        config: omBuilderDocuments.config,
+        metadata: omBuilderDocuments.metadata,
+        completionStatus: omBuilderDocuments.completionStatus,
+        createdBy: omBuilderDocuments.createdBy,
+        createdAt: omBuilderDocuments.createdAt,
+        updatedAt: omBuilderDocuments.updatedAt,
+      })
       .from(omBuilderDocuments)
+      .leftJoin(modelingProjects, eq(omBuilderDocuments.modelingProjectId, modelingProjects.id))
       .where(eq(omBuilderDocuments.createdBy, userId))
       .orderBy(desc(omBuilderDocuments.updatedAt));
     res.json(docs);
@@ -306,11 +327,12 @@ router.post(
   '/documents',
   validateBody(CreateDocumentSchema),
   asyncHandler(async (req: Request, res: Response) => {
-    const { dealId, documentType, title, audience, assetClass, themeId, templateId } = req.body;
+    const { dealId, modelingProjectId, documentType, title, audience, assetClass, themeId, templateId } = req.body;
     const userId = (req as any).user?.id || 1; // Default for dev
 
     const document = await documentBuilderService.createDocument({
       dealId,
+      modelingProjectId,
       documentType,
       title,
       audience,
@@ -409,6 +431,23 @@ router.get(
       success: true,
       data: documents,
     });
+  })
+);
+
+/**
+ * GET /api/document-builder/modeling-project/:projectId/documents
+ * Get all documents linked to a modeling project
+ */
+router.get(
+  '/modeling-project/:projectId/documents',
+  asyncHandler(async (req: Request, res: Response) => {
+    const projectId = req.params.projectId;
+    const docs = await db
+      .select()
+      .from(omBuilderDocuments)
+      .where(eq(omBuilderDocuments.modelingProjectId, projectId))
+      .orderBy(desc(omBuilderDocuments.updatedAt));
+    res.json({ success: true, data: docs });
   })
 );
 

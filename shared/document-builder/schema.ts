@@ -7,7 +7,7 @@ import { pgTable, varchar, text, integer, boolean, timestamp, jsonb, pgEnum, ind
 import { sql } from 'drizzle-orm';
 import { createInsertSchema } from 'drizzle-zod';
 import { z } from 'zod';
-import { crmDeals } from '../schema';
+import { crmDeals, modelingProjects } from '../schema';
 
 // =============================================================================
 // Enums
@@ -118,11 +118,12 @@ export const omSectionLibrary = pgTable('om_section_library', {
 
 export const omBuilderDocuments = pgTable('om_builder_documents', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()::text`),
-  dealId: varchar('deal_id').notNull().references(() => crmDeals.id, { onDelete: 'cascade' }),
+  dealId: varchar('deal_id').references(() => crmDeals.id, { onDelete: 'set null' }),
+  modelingProjectId: varchar('modeling_project_id').references(() => modelingProjects.id, { onDelete: 'set null' }),
   documentType: documentTypeEnum('document_type').notNull(),
   title: text('title').notNull(),
-  audience: audiencePersonaEnum('audience'),
-  assetClass: assetClassEnum('asset_class'),
+  audience: text('audience'),
+  assetClass: text('asset_class'),
   themeId: varchar('theme_id'),
   templateId: varchar('template_id'),
   brandKitId: varchar('brand_kit_id'),
@@ -163,6 +164,7 @@ export const omBuilderDocuments = pgTable('om_builder_documents', {
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 }, (table) => ({
   dealIdx: index('om_builder_documents_deal_idx').on(table.dealId),
+  modelingProjectIdx: index('om_builder_documents_modeling_project_idx').on(table.modelingProjectId),
   typeIdx: index('om_builder_documents_type_idx').on(table.documentType),
   statusIdx: index('om_builder_documents_status_idx').on(table.status),
   createdByIdx: index('om_builder_documents_created_by_idx').on(table.createdBy),

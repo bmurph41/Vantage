@@ -112,6 +112,83 @@ const uploadSalesComps = multer({
 
 const parserService = new ParserService();
 
+type ProspectingLike = {
+  id: string;
+  userId: string;
+  orgId?: string | null;
+  activityType: string;
+  outcome?: string | null;
+  notes?: string | null;
+  subject?: string | null;
+  duration?: number | null;
+  activityDate?: Date | string | null;
+  dayOfWeek?: string | null;
+  contactId?: string | null;
+  companyId?: string | null;
+  propertyId?: string | null;
+  dealId?: string | null;
+  prospectingEntryId?: string | null;
+  phoneNumber?: string | null;
+  emailAddress?: string | null;
+  linkedinProfile?: string | null;
+};
+
+function deriveMirrorEntity(a: ProspectingLike): { entityType: string; entityId: string } {
+  if (a.contactId) return { entityType: 'contact', entityId: a.contactId };
+  if (a.companyId) return { entityType: 'account', entityId: a.companyId };
+  if (a.propertyId) return { entityType: 'property', entityId: a.propertyId };
+  if (a.dealId) return { entityType: 'deal', entityId: a.dealId };
+  return { entityType: 'prospecting', entityId: a.prospectingEntryId || a.id };
+}
+
+async function upsertProspectingMirror(a: ProspectingLike): Promise<void> {
+  if (!a.orgId) return;
+  const { entityType, entityId } = deriveMirrorEntity(a);
+  const completedAt = a.activityDate ? new Date(a.activityDate) : new Date();
+  const metadata: Record<string, unknown> = {
+    source: 'prospecting',
+    prospectingActivityId: a.id,
+    prospectingEntryId: a.prospectingEntryId ?? null,
+    dayOfWeek: a.dayOfWeek ?? null,
+    contactId: a.contactId ?? null,
+    companyId: a.companyId ?? null,
+    propertyId: a.propertyId ?? null,
+    dealId: a.dealId ?? null,
+    phoneNumber: a.phoneNumber ?? null,
+    emailAddress: a.emailAddress ?? null,
+    linkedinProfile: a.linkedinProfile ?? null,
+  };
+  const values = {
+    id: a.id,
+    type: a.activityType,
+    subject: a.subject ?? null,
+    description: a.notes || a.activityType,
+    duration: a.duration ?? null,
+    outcome: a.outcome ?? null,
+    status: 'completed' as const,
+    entityType,
+    entityId,
+    userId: a.userId,
+    orgId: a.orgId,
+    completedAt,
+    metadata,
+  };
+  await db.insert(crmActivities).values(values).onConflictDoUpdate({
+    target: crmActivities.id,
+    set: {
+      type: values.type,
+      subject: values.subject,
+      description: values.description,
+      duration: values.duration,
+      outcome: values.outcome,
+      entityType: values.entityType,
+      entityId: values.entityId,
+      completedAt: values.completedAt,
+      metadata: values.metadata,
+    },
+  });
+}
+
 export function registerCRMRoutes(
   app: Express,
   authenticateUser: any,
@@ -2355,7 +2432,9 @@ export function registerCRMRoutes(
   app.get("/api/crm/activities", async (req: any, res) => {
     try {
       const pag = parsePagination(req.query, { pageSize: 50 });
-      const allActivities = await storage.getCrmActivitiesForOrg(req.user.orgId);
+      const entityType = typeof req.query.entityType === 'string' ? req.query.entityType : undefined;
+      const entityId = typeof req.query.entityId === 'string' ? req.query.entityId : undefined;
+      const allActivities = await storage.getCrmActivitiesForOrg(req.user.orgId, { entityType, entityId });
       const total = allActivities.length;
       const paged = allActivities.slice(pag.offset, pag.offset + pag.limit);
       res.json(paginatedResponse(paged, total, pag));
@@ -3895,6 +3974,11 @@ export function registerCRMRoutes(
         userId: req.user.id,
         activityDate: body.activityDate ? new Date(body.activityDate) : new Date(),
       });
+      try {
+        await upsertProspectingMirror(activity as ProspectingLike);
+      } catch (mirrorErr) {
+        console.error("Prospecting→activity mirror failed (non-fatal):", mirrorErr);
+      }
       res.json(activity);
     } catch (error: any) {
       console.error("Failed to create prospecting activity:", error);
@@ -3916,6 +4000,11 @@ export function registerCRMRoutes(
       if (propertyId !== undefined) body.propertyId = propertyId;
       if (dealId !== undefined) body.dealId = dealId;
       const activity = await storage.updateProspectingActivity(req.params.id, body, req.user.orgId);
+      try {
+        await upsertProspectingMirror(activity as ProspectingLike);
+      } catch (mirrorErr) {
+        console.error("Prospecting→activity mirror update failed (non-fatal):", mirrorErr);
+      }
       res.json(activity);
     } catch (error: any) {
       console.error("Failed to update prospecting activity:", error);
@@ -3946,6 +4035,11 @@ export function registerCRMRoutes(
   app.delete("/api/prospecting/activities/:id", async (req: any, res) => {
     try {
       await storage.deleteProspectingActivity(req.params.id, req.user.orgId);
+      try {
+        await db.delete(crmActivities).where(eq(crmActivities.id, req.params.id));
+      } catch (mirrorErr) {
+        console.error("Prospecting→activity mirror delete failed (non-fatal):", mirrorErr);
+      }
       res.json({ success: true });
     } catch (error: any) {
       console.error("Failed to delete prospecting activity:", error);

@@ -33,16 +33,17 @@ import { AssetClassSelect } from "@/components/ui/asset-class-select";
 // ---------------------------------------------------------------------------
 
 interface DocumentRecord {
-  id: number;
+  id: string;
   title: string;
   documentType: DocumentType;
   status: "draft" | "published" | "archived";
-  dealId: number | null;
+  dealId: string | null;
+  modelingProjectId: string | null;
+  modelingProjectName?: string | null;
   dealName?: string;
-  projectName?: string;
-  assetClass: AssetClass | null;
-  audience: AudiencePersona | null;
-  templateId: number | null;
+  assetClass: string | null;
+  audience: string | null;
+  templateId: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -57,9 +58,12 @@ interface TemplateRecord {
 }
 
 interface ProjectRecord {
-  id: number;
-  name: string;
-  dealId: number;
+  id: string;
+  marinaName: string;
+  dealId: string | null;
+  assetClass?: string | null;
+  city?: string | null;
+  state?: string | null;
 }
 
 interface QuickAction {
@@ -312,6 +316,7 @@ export default function DocumentStudioHub() {
     mutationFn: async (input: {
       documentType: DocumentType;
       title: string;
+      modelingProjectId?: string;
       dealId?: string;
       templateId?: string;
       audience?: string;
@@ -364,13 +369,13 @@ export default function DocumentStudioHub() {
 
   const projectGroups = useMemo(() => {
     if (!documents || !projects) return [];
-    const map = new Map<number, { project: ProjectRecord; docs: DocumentRecord[] }>();
+    const map = new Map<string, { project: ProjectRecord; docs: DocumentRecord[] }>();
     for (const p of projects) {
-      map.set(p.dealId, { project: p, docs: [] });
+      map.set(p.id, { project: p, docs: [] });
     }
     for (const d of documents) {
-      if (d.dealId && map.has(d.dealId)) {
-        map.get(d.dealId)!.docs.push(d);
+      if (d.modelingProjectId && map.has(d.modelingProjectId)) {
+        map.get(d.modelingProjectId)!.docs.push(d);
       }
     }
     return Array.from(map.values()).filter((g) => g.docs.length > 0);
@@ -393,13 +398,16 @@ export default function DocumentStudioHub() {
 
   function handleCreateSubmit() {
     if (!selectedType || !newDocName.trim()) return;
+    const linkedProjectId = (selectedProjectId && selectedProjectId !== "none") ? selectedProjectId : undefined;
+    const linkedProject = linkedProjectId ? (projects ?? []).find((p) => p.id === linkedProjectId) : undefined;
     createMutation.mutate({
       documentType: selectedType,
       title: newDocName.trim(),
-      dealId: (selectedProjectId && selectedProjectId !== "none") ? selectedProjectId : undefined,
+      modelingProjectId: linkedProjectId,
+      dealId: linkedProject?.dealId ?? undefined,
       templateId: selectedTemplateId ? String(selectedTemplateId) : undefined,
       audience: newDocAudience || undefined,
-      assetClass: newDocAssetClass || undefined,
+      assetClass: newDocAssetClass || (linkedProject?.assetClass ?? undefined),
     });
   }
 
@@ -703,7 +711,7 @@ export default function DocumentStudioHub() {
                           </Badge>
                         </td>
                         <td className="py-3 px-4 text-muted-foreground hidden md:table-cell">
-                          {doc.projectName ?? doc.dealName ?? "-"}
+                          {doc.modelingProjectName ?? doc.dealName ?? "-"}
                         </td>
                         <td className="py-3 px-4">
                           <Badge className={`text-[10px] ${STATUS_STYLES[doc.status]?.className ?? ""}`}>
@@ -887,12 +895,12 @@ export default function DocumentStudioHub() {
                 <Card key={project.id}>
                   <CardHeader className="pb-2">
                     <div className="flex items-center justify-between">
-                      <CardTitle className="text-sm font-semibold">{project.name}</CardTitle>
+                      <CardTitle className="text-sm font-semibold">{project.marinaName}</CardTitle>
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => {
-                          setSelectedProjectId(String(project.dealId));
+                          setSelectedProjectId(project.id);
                           setWizardStep(1);
                           setShowNewDialog(true);
                         }}
@@ -993,12 +1001,11 @@ export default function DocumentStudioHub() {
                   value={selectedProjectId}
                   onValueChange={(val) => {
                     setSelectedProjectId(val);
-                    // Auto-populate name from project if blank
                     if (val && val !== "none") {
-                      const proj = (projects ?? []).find((p) => String(p.dealId) === val);
+                      const proj = (projects ?? []).find((p) => p.id === val);
                       if (proj && !newDocName) {
                         const typeLabel = DOC_TYPE_LABELS[selectedType || ""] || "Document";
-                        setNewDocName(`${proj.name} - ${typeLabel}`);
+                        setNewDocName(`${proj.marinaName} - ${typeLabel}`);
                       }
                     }
                   }}
@@ -1010,8 +1017,8 @@ export default function DocumentStudioHub() {
                   <SelectContent>
                     <SelectItem value="none">No project — enter data manually</SelectItem>
                     {(projects ?? []).map((p) => (
-                      <SelectItem key={p.id} value={String(p.dealId)}>
-                        {p.name}
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.marinaName}{p.city ? ` — ${p.city}${p.state ? `, ${p.state}` : ""}` : ""}
                       </SelectItem>
                     ))}
                   </SelectContent>

@@ -273,7 +273,9 @@
       "Bash(sort -u wc -l /tmp/client_api_calls.txt cat /tmp/client_api_calls.txt)",
       "Bash(python3)",
       "Bash(sort -u wc -l /tmp/registered_api.txt)",
-      "Bash(sort -u echo \"--- router mounts ---\")"
+      "Bash(sort -u echo \"--- router mounts ---\")",
+      "Bash(NODE_OPTIONS=\"--max-old-space-size=6144\" npx tsc --noEmit --skipLibCheck server/storage.ts server/routes/crm-routes.ts server/routes/marina-integrations-routes.ts)",
+      "Bash(NODE_OPTIONS=\"--max-old-space-size=8192\" npx tsc --noEmit -p tsconfig.json)"
     ]
   }
 }

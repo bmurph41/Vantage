@@ -498,7 +498,7 @@ export interface IStorage {
 
   // CRM - Activities
   getCrmActivity(id: string): Promise<CrmActivity | undefined>;
-  getCrmActivitiesForOrg(orgId: string): Promise<CrmActivity[]>;
+  getCrmActivitiesForOrg(orgId: string, opts?: { entityType?: string; entityId?: string; limit?: number; offset?: number }): Promise<CrmActivity[]>;
   getCrmActivitiesByDeal(dealId: string): Promise<CrmActivity[]>;
   getCrmActivitiesByLead(leadId: string): Promise<CrmActivity[]>;
   getCrmActivitiesByContact(contactId: string): Promise<CrmActivity[]>;
@@ -3988,8 +3988,14 @@ export class DatabaseStorage implements IStorage {
     return activity || undefined;
   }
 
-  async getCrmActivitiesForOrg(orgId: string): Promise<CrmActivity[]> {
-    return db.select().from(crmActivities).where(eq(crmActivities.userId, orgId)).orderBy(desc(crmActivities.createdAt));
+  async getCrmActivitiesForOrg(orgId: string, opts?: { entityType?: string; entityId?: string; limit?: number; offset?: number }): Promise<CrmActivity[]> {
+    const conds = [eq(crmActivities.orgId, orgId)];
+    if (opts?.entityType) conds.push(eq(crmActivities.entityType, opts.entityType));
+    if (opts?.entityId) conds.push(eq(crmActivities.entityId, opts.entityId));
+    let q = db.select().from(crmActivities).where(and(...conds)).orderBy(desc(crmActivities.createdAt));
+    if (opts?.limit) q = (q as any).limit(opts.limit);
+    if (opts?.offset) q = (q as any).offset(opts.offset);
+    return q;
   }
 
   async getCrmActivitiesByDeal(dealId: string): Promise<CrmActivity[]> {
