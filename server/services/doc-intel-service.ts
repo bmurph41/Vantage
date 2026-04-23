@@ -1,6 +1,7 @@
 import { db } from '../db';
 import { pool } from '../db';
 import OpenAI from 'openai';
+import Anthropic from '@anthropic-ai/sdk';
 import { 
   pnlCategories, 
   docIntelUploads, 
@@ -581,6 +582,93 @@ class DocIntelService {
     return true;
   }
 
+  private async aiExtractFromWorkbook(
+    workbook: ReturnType<typeof XLSX.read>,
+    granularity: string,
+    fiscalYear: number,
+    multiYears?: number[]
+  ): Promise<ParsedLineItem[]> {
+    try {
+      const sheetTexts: string[] = [];
+      for (const sheetName of workbook.SheetNames) {
+        const csv = XLSX.utils.sheet_to_csv(workbook.Sheets[sheetName]);
+        if (csv.trim()) sheetTexts.push(`=== Sheet: ${sheetName} ===\n${csv}`);
+      }
+      const fullText = sheetTexts.join('\n\n');
+      if (!fullText.trim()) return [];
+
+      const isMonthly = granularity === 'monthly';
+      const examplePeriod = isMonthly ? `${fiscalYear}-01` : `${fiscalYear}-ANNUAL`;
+      const periodDesc = isMonthly
+        ? `YYYY-MM format (e.g. ${fiscalYear}-01 through ${fiscalYear}-12)`
+        : `YYYY-ANNUAL format (e.g. ${fiscalYear}-ANNUAL)`;
+
+      const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+      const response = await client.messages.create({
+        model: 'claude-haiku-20240307',
+        max_tokens: 4096,
+        messages: [{
+          role: 'user',
+          content: `You are a financial data extraction expert. Extract all individual line items from this income statement.
+
+Return ONLY a valid JSON array with this exact structure — no explanation, no markdown:
+[
+  {"lineItem": "line item name", "amounts": {"${examplePeriod}": 10000}},
+  ...
+]
+
+Rules:
+- Period keys must be in ${periodDesc}
+- SKIP section headers (Income, Expenses, Revenue, Cost of Goods Sold, etc.)
+- SKIP subtotals and totals (Total Income, Total Expenses, Net Income, Gross Profit, EBITDA, NOI, Operating Income, etc.)
+- Extract only specific individual line items with dollar amounts
+- Negative amounts shown in parentheses: (5000) → -5000
+- Remove dollar signs and commas from numeric values
+- If column headers show month names, map them to the correct YYYY-MM period
+- Fiscal year for this document: ${fiscalYear}
+${multiYears && multiYears.length > 0 ? `- Multi-year document, years: ${multiYears.join(', ')}` : ''}
+
+Income Statement:
+${fullText.slice(0, 40000)}`
+        }]
+      });
+
+      const text = response.content[0].type === 'text' ? response.content[0].text : '';
+      const jsonMatch = text.match(/\[[\s\S]*\]/);
+      if (!jsonMatch) {
+        console.warn('[DocIntelService] AI fallback: no JSON array found in response');
+        return [];
+      }
+
+      const extracted: Array<{ lineItem: string; amounts: Record<string, number | null> }> = JSON.parse(jsonMatch[0]);
+      const items: ParsedLineItem[] = [];
+      let rowIndex = 0;
+
+      for (const entry of extracted) {
+        rowIndex++;
+        if (!entry.lineItem || !entry.amounts) continue;
+        for (const [periodKey, amount] of Object.entries(entry.amounts)) {
+          if (amount === null || amount === undefined) continue;
+          const numAmount = Number(amount);
+          if (isNaN(numAmount)) continue;
+          items.push({
+            rawText: entry.lineItem,
+            amount: numAmount,
+            sourcePage: 1,
+            sourceRow: rowIndex,
+            periodKey,
+          });
+        }
+      }
+
+      console.log(`[DocIntelService] AI fallback extracted ${items.length} items from ${extracted.length} line items`);
+      return items;
+    } catch (err) {
+      console.error('[DocIntelService] AI fallback extraction error:', err);
+      return [];
+    }
+  }
+
   async parseExcelFile(filePath: string, granularity: string = 'monthly', fiscalYear?: number, multiYears?: number[], targetSheetIndex?: number | null): Promise<ParsedLineItem[]> {
     const buffer = fs.readFileSync(filePath);
     const workbook = XLSX.read(buffer);
@@ -730,6 +818,16 @@ class DocIntelService {
           }
         }
       }
+    }
+
+    if (items.length === 0) {
+      console.log(`[DocIntelService] Heuristic parser found 0 items — invoking AI fallback extraction...`);
+      const aiItems = await this.aiExtractFromWorkbook(workbook, granularity, yearForPeriod, multiYears);
+      if (aiItems.length > 0) {
+        console.log(`[DocIntelService] AI fallback produced ${aiItems.length} items`);
+        return aiItems;
+      }
+      console.warn(`[DocIntelService] AI fallback also found 0 items for this file`);
     }
 
     return items;
@@ -1093,6 +1191,15 @@ class DocIntelService {
     }
 
     await this.updateUpload(orgId, uploadId, { status: 'processing' });
+
+    // Guard: verify the file still exists on disk before attempting to parse
+    if (!fs.existsSync(upload.storagePath)) {
+      await this.updateUpload(orgId, uploadId, {
+        status: 'error',
+        errorMessage: 'File not found on disk. Please re-upload this document.',
+      });
+      throw new Error(`File not found on disk: ${upload.storagePath}`);
+    }
 
     try {
       const existingItems = await db.select({ id: docIntelExtractedItems.id })

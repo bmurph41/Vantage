@@ -289,15 +289,15 @@ export default function DocumentIntelligence() {
           <TabsTrigger
             value="review"
             data-testid="tab-review"
-            className={pnlDocuments.length > 0 ? "relative data-[state=inactive]:text-amber-600 data-[state=inactive]:font-medium" : "relative"}
+            className={reviewablePnlDocuments.length > 0 ? "relative data-[state=inactive]:text-amber-600 data-[state=inactive]:font-medium" : "relative"}
           >
             <Eye className="h-4 w-4 mr-2" />
             Review Documents
-            {pnlDocuments.length > 0 && (
+            {reviewablePnlDocuments.length > 0 && (
               <span className="relative ml-2 inline-flex">
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-60" />
                 <Badge className="relative h-5 px-1.5 text-[10px] bg-amber-500 hover:bg-amber-500 text-white border-0">
-                  {pnlDocuments.length}
+                  {reviewablePnlDocuments.length}
                 </Badge>
               </span>
             )}
@@ -410,6 +410,9 @@ export default function DocumentIntelligence() {
                           {doc.year && <span>• {doc.year}</span>}
                           <span>• {formatFileSize(doc.fileSize)}</span>
                         </div>
+                        {doc.status === "error" && doc.errorMessage && (
+                          <p className="text-xs text-red-600 dark:text-red-400 mt-0.5 truncate">{doc.errorMessage}</p>
+                        )}
                       </div>
                       <div className="flex items-center gap-2">
                         <Badge 
