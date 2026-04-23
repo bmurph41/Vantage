@@ -799,6 +799,13 @@ export default function DocumentIntelligence() {
                                 </Link>
                               </DropdownMenuItem>
                             )}
+                            <DropdownMenuItem
+                              onClick={() => handleReuploadClick(doc)}
+                              disabled={reuploadMutation.isPending && reuploadDoc?.id === doc.id}
+                            >
+                              <Upload className="h-4 w-4 mr-2" />
+                              Replace File
+                            </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => {
                               setDeleteConfirmId(doc.id);
                               setDeleteConfirmName(doc.originalName || "this document");
