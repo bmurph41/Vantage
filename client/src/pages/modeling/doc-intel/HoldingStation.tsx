@@ -124,9 +124,47 @@ function formatFileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+interface PersistedFileSettings {
+  docType: DocType;
+  year: string;
+  isT12: boolean;
+  t12StartMonth?: string;
+  t12StartYear?: string;
+  t12EndMonth?: string;
+  t12EndYear?: string;
+}
+
 export function HoldingStation({ projectId, onReviewDocuments, onUploadComplete }: HoldingStationProps) {
   const { toast } = useToast();
   const [stagedFiles, setStagedFiles] = useState<StagedFile[]>([]);
+
+  const settingsKey = `hs-settings-${projectId}`;
+
+  const loadPersistedSettings = (): Record<string, PersistedFileSettings> => {
+    try {
+      const raw = sessionStorage.getItem(settingsKey);
+      return raw ? JSON.parse(raw) : {};
+    } catch {
+      return {};
+    }
+  };
+
+  const saveSettingForFile = (displayName: string, settings: PersistedFileSettings) => {
+    try {
+      const all = loadPersistedSettings();
+      all[displayName] = settings;
+      sessionStorage.setItem(settingsKey, JSON.stringify(all));
+    } catch {}
+  };
+
+  const clearSettingForFile = (displayName: string) => {
+    try {
+      const all = loadPersistedSettings();
+      delete all[displayName];
+      sessionStorage.setItem(settingsKey, JSON.stringify(all));
+    } catch {}
+  };
+
   const [newCustomTypeName, setNewCustomTypeName] = useState("");
   const [showAddTypeDialog, setShowAddTypeDialog] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -356,13 +394,14 @@ export function HoldingStation({ projectId, onReviewDocuments, onUploadComplete 
     const now = new Date();
     const displayName = sheetName ? `${file.name} → ${sheetName}` : file.name;
     const nameToGuess = sheetName || file.name;
-    const isT12 = guessIsT12(nameToGuess);
+    const persisted = loadPersistedSettings()[displayName];
+    const isT12 = persisted ? persisted.isT12 : guessIsT12(nameToGuess);
     const base: StagedFile = {
       file,
       id: crypto.randomUUID(),
       displayName,
-      docType: guessDocType(nameToGuess),
-      year: isT12 ? "T12" : now.getFullYear().toString(),
+      docType: persisted ? persisted.docType : guessDocType(nameToGuess),
+      year: persisted ? persisted.year : (isT12 ? "T12" : now.getFullYear().toString()),
       isT12,
       status: "pending" as const,
       progress: 0,
@@ -370,19 +409,35 @@ export function HoldingStation({ projectId, onReviewDocuments, onUploadComplete 
       sheetIndex,
     };
     if (isT12) {
-      const parsed = parseDateRange(nameToGuess);
-      if (parsed) {
-        base.t12StartMonth = parsed.startMonth;
-        base.t12StartYear = parsed.startYear;
-        base.t12EndMonth = parsed.endMonth;
-        base.t12EndYear = parsed.endYear;
+      if (persisted) {
+        base.t12StartMonth = persisted.t12StartMonth;
+        base.t12StartYear = persisted.t12StartYear;
+        base.t12EndMonth = persisted.t12EndMonth;
+        base.t12EndYear = persisted.t12EndYear;
       } else {
-        base.t12StartMonth = (now.getMonth() + 1).toString();
-        base.t12StartYear = (now.getFullYear() - 1).toString();
-        base.t12EndMonth = (now.getMonth() + 1).toString();
-        base.t12EndYear = now.getFullYear().toString();
+        const parsed = parseDateRange(nameToGuess);
+        if (parsed) {
+          base.t12StartMonth = parsed.startMonth;
+          base.t12StartYear = parsed.startYear;
+          base.t12EndMonth = parsed.endMonth;
+          base.t12EndYear = parsed.endYear;
+        } else {
+          base.t12StartMonth = (now.getMonth() + 1).toString();
+          base.t12StartYear = (now.getFullYear() - 1).toString();
+          base.t12EndMonth = (now.getMonth() + 1).toString();
+          base.t12EndYear = now.getFullYear().toString();
+        }
       }
     }
+    saveSettingForFile(displayName, {
+      docType: base.docType,
+      year: base.year,
+      isT12: base.isT12 || false,
+      t12StartMonth: base.t12StartMonth,
+      t12StartYear: base.t12StartYear,
+      t12EndMonth: base.t12EndMonth,
+      t12EndYear: base.t12EndYear,
+    });
     return base;
   };
 
@@ -475,6 +530,15 @@ export function HoldingStation({ projectId, onReviewDocuments, onUploadComplete 
         staged.t12EndMonth = sheet.t12EndMonth;
         staged.t12EndYear = sheet.t12EndYear;
       }
+      saveSettingForFile(staged.displayName, {
+        docType: staged.docType,
+        year: staged.year,
+        isT12: staged.isT12 || false,
+        t12StartMonth: staged.t12StartMonth,
+        t12StartYear: staged.t12StartYear,
+        t12EndMonth: staged.t12EndMonth,
+        t12EndYear: staged.t12EndYear,
+      });
       return staged;
     });
     setStagedFiles(prev => [...prev, ...newStaged]);
@@ -493,7 +557,22 @@ export function HoldingStation({ projectId, onReviewDocuments, onUploadComplete 
   };
 
   const updateStagedFile = (id: string, updates: Partial<StagedFile>) => {
-    setStagedFiles((prev) => prev.map((f) => (f.id === id ? { ...f, ...updates } : f)));
+    setStagedFiles((prev) => {
+      const updated = prev.map((f) => (f.id === id ? { ...f, ...updates } : f));
+      const updatedFile = updated.find((f) => f.id === id);
+      if (updatedFile && updatedFile.status === "pending") {
+        saveSettingForFile(updatedFile.displayName, {
+          docType: updatedFile.docType,
+          year: updatedFile.year,
+          isT12: updatedFile.isT12 || false,
+          t12StartMonth: updatedFile.t12StartMonth,
+          t12StartYear: updatedFile.t12StartYear,
+          t12EndMonth: updatedFile.t12EndMonth,
+          t12EndYear: updatedFile.t12EndYear,
+        });
+      }
+      return updated;
+    });
   };
 
   const removeStagedFile = (id: string) => {
@@ -534,6 +613,7 @@ export function HoldingStation({ projectId, onReviewDocuments, onUploadComplete 
         const result = await uploadMutation.mutateAsync(staged);
         updateStagedFile(staged.id, { status: "uploaded", progress: 60, uploadId: result.id });
         uploadedIds.push(result.id);
+        clearSettingForFile(staged.displayName);
       } catch (error: any) {
         updateStagedFile(staged.id, { status: "error", errorMessage: error.message });
       }
