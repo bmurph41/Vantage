@@ -43,10 +43,18 @@ interface ReconciliationReport {
   checks: ReconciliationCheck[];
 }
 
+interface MatchedTemplate {
+  id: string;
+  name: string | null;
+  useCount: number;
+  autoCreated: boolean;
+}
+
 interface JobStatus {
   fiscal_year: number | null;
   reporting_period: string | null;
   reconciliationReport?: ReconciliationReport | null;
+  matchedTemplate?: MatchedTemplate | null;
 }
 
 interface Props {
@@ -275,6 +283,18 @@ export function ExtractionReview({ jobId, projectId, onPopulate }: Props) {
               </li>
             ))}
           </ul>
+        </div>
+      )}
+
+      {/* Template match indicator */}
+      {jobStatus?.matchedTemplate && (
+        <div className="px-6 py-2 border-b border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/20 flex items-center gap-2 text-xs">
+          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
+          <span className="text-emerald-800 dark:text-emerald-300">
+            <span className="font-semibold">Template match:</span> {jobStatus.matchedTemplate.name ?? '(auto-learned)'}
+            {' — used '}{jobStatus.matchedTemplate.useCount} time{jobStatus.matchedTemplate.useCount === 1 ? '' : 's'} before
+            {jobStatus.matchedTemplate.autoCreated ? ' (auto-captured from a prior review)' : ''}
+          </span>
         </div>
       )}
 

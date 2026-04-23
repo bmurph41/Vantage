@@ -174,11 +174,14 @@ router.get('/:jobId/status', async (req: any, res: any) => {
   const orgId = user.orgId || user.org_id;
 
   const result = await pool.query(
-    `SELECT id, status, original_filename, document_class, page_count, sheet_names,
-            error_message, extraction_completed_at, created_at,
-            fiscal_year, period_start, period_end, reporting_period,
-            reconciliation_report
-     FROM document_extraction_jobs WHERE id=$1 AND org_id=$2`,
+    `SELECT j.id, j.status, j.original_filename, j.document_class, j.page_count, j.sheet_names,
+            j.error_message, j.extraction_completed_at, j.created_at,
+            j.fiscal_year, j.period_start, j.period_end, j.reporting_period,
+            j.reconciliation_report, j.matched_template_id,
+            t.name AS template_name, t.use_count AS template_use_count, t.auto_created AS template_auto_created
+     FROM document_extraction_jobs j
+     LEFT JOIN extraction_templates t ON t.id = j.matched_template_id
+     WHERE j.id=$1 AND j.org_id=$2`,
     [jobId, orgId]
   );
 
@@ -187,6 +190,14 @@ router.get('/:jobId/status', async (req: any, res: any) => {
   res.json({
     ...row,
     reconciliationReport: row.reconciliation_report ?? null,
+    matchedTemplate: row.matched_template_id
+      ? {
+          id: row.matched_template_id,
+          name: row.template_name,
+          useCount: row.template_use_count ?? 0,
+          autoCreated: row.template_auto_created ?? false,
+        }
+      : null,
   });
 });
 
@@ -253,20 +264,80 @@ router.post('/:jobId/confirm-all', async (req: any, res: any) => {
   const { jobId } = req.params;
   const orgId = user.orgId || user.org_id;
 
-  // Verify job belongs to this org
-  const job = await pool.query(
-    'SELECT id FROM document_extraction_jobs WHERE id=$1 AND org_id=$2',
+  // Verify job belongs to this org and pull template-capture inputs
+  const jobResult = await pool.query(
+    `SELECT id, document_class, structural_fingerprint, matched_template_id, raw_text_extracted
+     FROM document_extraction_jobs WHERE id=$1 AND org_id=$2`,
     [jobId, orgId]
   );
-  if (job.rows.length === 0) return res.status(404).json({ error: 'Job not found' });
+  if (jobResult.rows.length === 0) return res.status(404).json({ error: 'Job not found' });
+  const jobRow = jobResult.rows[0];
 
   await pool.query(`
     UPDATE extraction_fields SET is_confirmed=true, confirmed_at=NOW()
     WHERE job_id=$1 AND confidence_level IN ('high', 'medium')
   `, [jobId]);
 
-  res.json({ success: true });
+  // Capture/update template exemplar from the confirmed extraction.
+  // Only fires when we have enough context to key the template.
+  const captured = await maybeCaptureTemplate({
+    jobId,
+    orgId,
+    documentClass: jobRow.document_class,
+    fingerprint: jobRow.structural_fingerprint,
+    matchedTemplateId: jobRow.matched_template_id,
+    rawText: jobRow.raw_text_extracted,
+  });
+
+  res.json({ success: true, template: captured });
 });
+
+async function maybeCaptureTemplate(args: {
+  jobId: string;
+  orgId: string;
+  documentClass: string | null;
+  fingerprint: string | null;
+  matchedTemplateId: string | null;
+  rawText: string | null;
+}): Promise<{ templateId: string; created: boolean } | null> {
+  if (!args.fingerprint || !args.documentClass) return null;
+  if (args.documentClass !== 'pl' && args.documentClass !== 't12' && args.documentClass !== 'rent_roll') return null;
+
+  // Reconstruct the confirmed extraction from extraction_fields.
+  const fields = await pool.query(
+    `SELECT schema_key, COALESCE(override_value, normalized_value) AS final_value
+     FROM extraction_fields WHERE job_id=$1 AND is_confirmed=true`,
+    [args.jobId]
+  );
+  if (fields.rows.length === 0) return null;
+
+  const sampleOutput: Record<string, unknown> = {};
+  for (const row of fields.rows) {
+    sampleOutput[row.schema_key] = row.final_value;
+  }
+
+  try {
+    const result = await captureOrUpdateTemplate({
+      orgId: args.orgId,
+      docClass: args.documentClass as TemplateDocClass,
+      fingerprint: args.fingerprint,
+      sampleInput: (args.rawText ?? '').slice(0, 4000),
+      sampleOutput,
+      sourceJobId: args.jobId,
+    });
+    if (!args.matchedTemplateId) {
+      // Backfill the job's matched_template_id now that we created one
+      await pool.query(
+        `UPDATE document_extraction_jobs SET matched_template_id=$1 WHERE id=$2`,
+        [result.templateId, args.jobId]
+      );
+    }
+    return result;
+  } catch (err: any) {
+    console.error('[doc-intel] template capture failed (non-fatal):', err?.message);
+    return null;
+  }
+}
 
 // ─── POST /:jobId/populate-proforma ─────────────────────────────────────────
 // Writes confirmed extraction fields into modeling_actuals as historical data.
@@ -903,20 +974,50 @@ async function processDocument(
 
   let extractionResult: any;
   let reconciliationReport: any = null;
+  let matchedTemplateId: string | null = null;
+  let templateDocClass: TemplateDocClass | null = null;
+  let fingerprint: string | null = null;
+
   if (docClass === 'pl' || docClass === 't12') {
-    extractionResult = await extractPL(fullText, tablesFormatted, filename);
+    templateDocClass = docClass as TemplateDocClass;
+  } else if (docClass === 'rent_roll') {
+    templateDocClass = 'rent_roll';
+  }
+
+  let templateContext: string | null = null;
+  if (templateDocClass && orgId) {
+    fingerprint = computeStructuralFingerprint(templateDocClass, fullText, tablesFormatted);
+    const match = await findMatchingTemplate(orgId, templateDocClass, fingerprint);
+    if (match) {
+      matchedTemplateId = match.id;
+      templateContext = renderTemplateContext(match);
+      await recordTemplateMatch(match.id);
+    }
+  }
+
+  if (docClass === 'pl' || docClass === 't12') {
+    extractionResult = await extractPL(fullText, tablesFormatted, filename, templateContext);
     await saveExtractionFields(jobId, extractionResult, 'pl', thresholds);
     reconciliationReport = reconcilePL(extractionResult?.data ?? {});
   } else if (docClass === 'rent_roll') {
-    extractionResult = await extractRentRoll(fullText, tablesFormatted, filename);
+    extractionResult = await extractRentRoll(fullText, tablesFormatted, filename, templateContext);
     await saveExtractionFields(jobId, extractionResult, 'rent_roll', thresholds);
     reconciliationReport = reconcileRentRoll(extractionResult?.data ?? {});
   }
 
-  if (reconciliationReport) {
+  if (reconciliationReport || matchedTemplateId || fingerprint) {
     await pool.query(
-      `UPDATE document_extraction_jobs SET reconciliation_report=$1 WHERE id=$2`,
-      [JSON.stringify(reconciliationReport), jobId]
+      `UPDATE document_extraction_jobs
+       SET reconciliation_report = COALESCE($1, reconciliation_report),
+           matched_template_id = COALESCE($2, matched_template_id),
+           structural_fingerprint = COALESCE($3, structural_fingerprint)
+       WHERE id=$4`,
+      [
+        reconciliationReport ? JSON.stringify(reconciliationReport) : null,
+        matchedTemplateId,
+        fingerprint,
+        jobId,
+      ]
     );
   }
 

@@ -278,7 +278,8 @@
       "Bash(NODE_OPTIONS=\"--max-old-space-size=8192\" npx tsc --noEmit -p tsconfig.json)",
       "Skill(restart-dev)",
       "Bash(git check-ignore *)",
-      "Skill(parser-audit)"
+      "Skill(parser-audit)",
+      "Bash(bash /home/runner/workspace/.claude/skills/restart-dev/scripts/restart.sh)"
     ]
   }
 }
