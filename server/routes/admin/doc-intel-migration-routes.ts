@@ -4,10 +4,15 @@ import { isObjectStorageAvailable } from "../../utils/doc-intel-storage";
 
 const router = Router();
 
-router.post("/migrate-to-object-storage", async (req: any, res) => {
-  if (!req.user?.isAdmin) {
+const requireAdmin = (req: any, res: any, next: any) => {
+  const user = req.user;
+  if (!user || (user.role !== "owner" && !user.isAdmin)) {
     return res.status(403).json({ error: "Admin access required" });
   }
+  next();
+};
+
+router.post("/migrate-to-object-storage", requireAdmin, async (req: any, res) => {
 
   if (!isObjectStorageAvailable()) {
     return res.status(503).json({
