@@ -110,6 +110,7 @@ export default function DocumentIntelligence() {
   const [reuploadSheetSelectorOpen, setReuploadSheetSelectorOpen] = useState(false);
   const [reuploadAvailableSheets, setReuploadAvailableSheets] = useState<{ index: number; name: string; rowCount: number }[]>([]);
   const [reuploadPrevSheetName, setReuploadPrevSheetName] = useState<string | undefined>(undefined);
+  const [reuploadStep, setReuploadStep] = useState<"uploading" | "deleting" | "parsing" | null>(null);
 
   useEffect(() => {
     const fullUrl = window.location.href;
@@ -262,6 +263,7 @@ export default function DocumentIntelligence() {
       const headers: Record<string, string> = {};
       if (csrfToken) headers["X-CSRF-Token"] = csrfToken;
 
+      setReuploadStep("uploading");
       const response = await fetch(`/api/modeling/projects/${projectId}/documents`, {
         method: "POST",
         body: formData,
@@ -274,17 +276,22 @@ export default function DocumentIntelligence() {
       }
       const uploaded = await response.json();
 
+      setReuploadStep("deleting");
       await apiRequest("DELETE", `/api/modeling/projects/${projectId}/documents/${doc.id}`);
+
+      setReuploadStep("parsing");
       await apiRequest("POST", `/api/modeling/projects/${projectId}/documents/${uploaded.id}/parse`);
       return uploaded;
     },
     onSuccess: () => {
+      setReuploadStep(null);
       queryClient.invalidateQueries({ queryKey: ["/api/modeling/projects", projectId, "documents"] });
       queryClient.invalidateQueries({ queryKey: ["/api/modeling/projects", projectId, "documents", "holding"] });
       setReuploadDoc(null);
       toast({ title: "Re-uploaded", description: "The document has been replaced and is now processing." });
     },
     onError: (error: unknown) => {
+      setReuploadStep(null);
       setReuploadDoc(null);
       const message = error instanceof Error ? error.message : "Could not replace document.";
       toast({ title: "Re-upload failed", description: message, variant: "destructive" });
@@ -582,13 +589,20 @@ export default function DocumentIntelligence() {
                       !!doc.errorMessage &&
                       (errMsg.includes("no longer available") ||
                         errMsg.includes("migration"));
+                    const isReuploading = reuploadMutation.isPending && reuploadDoc?.id === doc.id;
+                    const reuploadStepLabel =
+                      reuploadStep === "uploading" ? "Uploading new file…" :
+                      reuploadStep === "deleting" ? "Removing old file…" :
+                      reuploadStep === "parsing" ? "Queuing for processing…" : null;
                     return (
                     <div key={doc.id} className="space-y-0">
                     <div
-                      className={`flex items-center gap-3 p-3 border rounded-lg transition-colors ${
-                        isMigrationLost
-                          ? "border-amber-300 bg-amber-50/60 dark:border-amber-800 dark:bg-amber-950/20 hover:bg-amber-50 dark:hover:bg-amber-950/30"
-                          : "hover:bg-muted/50"
+                      className={`flex items-center gap-3 p-3 border transition-colors ${
+                        isReuploading
+                          ? "border-blue-300 bg-blue-50/60 dark:border-blue-800 dark:bg-blue-950/20 opacity-80 rounded-t-lg"
+                          : isMigrationLost
+                          ? "border-amber-300 bg-amber-50/60 dark:border-amber-800 dark:bg-amber-950/20 hover:bg-amber-50 dark:hover:bg-amber-950/30 rounded-lg"
+                          : "rounded-lg hover:bg-muted/50"
                       }`}
                     >
                       <Checkbox
@@ -695,6 +709,28 @@ export default function DocumentIntelligence() {
                         </DropdownMenu>
                       </div>
                     </div>
+                    {isReuploading && reuploadStepLabel && (
+                      <div className="flex items-center gap-2 px-3 py-1.5 rounded-b-lg bg-blue-100 dark:bg-blue-950/40 border border-t-0 border-blue-300 dark:border-blue-800 text-xs text-blue-700 dark:text-blue-300">
+                        <Loader2 className="h-3 w-3 animate-spin flex-shrink-0" />
+                        <span className="font-medium">Replacing document —</span>
+                        <span>{reuploadStepLabel}</span>
+                        <div className="ml-auto flex gap-1">
+                          {(["uploading", "deleting", "parsing"] as const).map((step) => (
+                            <div
+                              key={step}
+                              className={`h-1.5 w-8 rounded-full transition-colors ${
+                                reuploadStep === step
+                                  ? "bg-blue-500 dark:bg-blue-400"
+                                  : (reuploadStep === "deleting" && step === "uploading") ||
+                                    (reuploadStep === "parsing" && (step === "uploading" || step === "deleting"))
+                                  ? "bg-blue-300 dark:bg-blue-600"
+                                  : "bg-blue-200 dark:bg-blue-800"
+                              }`}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    )}
                     </div>
                   );
                   })}
