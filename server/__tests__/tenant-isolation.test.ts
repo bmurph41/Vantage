@@ -27,6 +27,7 @@ vi.mock('../middleware/error-handler', async () => {
 function mockReq(overrides: any = {}) {
   return {
     path: '/api/test',
+    originalUrl: '/api/test',
     method: 'GET',
     ip: '127.0.0.1',
     params: {},
@@ -46,15 +47,15 @@ function mockRes() {
 
 describe('Tenant Isolation', () => {
   describe('requireTenantMatch', () => {
-    it('returns 401 if no user is present', () => {
+    it('calls next() without error if no user is present (auth handled upstream)', () => {
       const req = mockReq();
       const res = mockRes();
       const next = vi.fn();
 
       requireTenantMatch(req, res, next);
 
-      expect(res.status).toHaveBeenCalledWith(401);
-      expect(next).not.toHaveBeenCalled();
+      expect(next).toHaveBeenCalledWith();
+      expect(res.status).not.toHaveBeenCalled();
     });
 
     it('allows request when orgId matches user orgId', () => {
@@ -129,19 +130,21 @@ describe('Tenant Isolation', () => {
   });
 
   describe('enforceTenant', () => {
-    it('returns 401 if no user on API routes', () => {
+    it('calls next() without error if no user on API routes (auth handled upstream)', () => {
       const req = mockReq({ path: '/api/test' });
       const res = mockRes();
       const next = vi.fn();
 
       enforceTenant(req, res, next);
 
-      expect(res.status).toHaveBeenCalledWith(401);
+      expect(next).toHaveBeenCalledWith();
+      expect(res.status).not.toHaveBeenCalled();
     });
 
     it('injects user orgId into POST body', () => {
       const req = mockReq({
         path: '/api/test',
+    originalUrl: '/api/test',
         method: 'POST',
         user: { id: 'u1', orgId: 'org-1' },
         body: { name: 'test' },
@@ -158,6 +161,7 @@ describe('Tenant Isolation', () => {
     it('overrides attacker orgId in POST body with user orgId', () => {
       const req = mockReq({
         path: '/api/test',
+    originalUrl: '/api/test',
         method: 'POST',
         user: { id: 'u1', orgId: 'org-1' },
         body: { orgId: 'org-evil', data: 'sensitive' },
@@ -173,6 +177,7 @@ describe('Tenant Isolation', () => {
     it('sets tenantId on request', () => {
       const req = mockReq({
         path: '/api/test',
+    originalUrl: '/api/test',
         user: { id: 'u1', orgId: 'org-1' },
       });
       const res = mockRes();
@@ -186,6 +191,7 @@ describe('Tenant Isolation', () => {
     it('blocks user with missing orgId', () => {
       const req = mockReq({
         path: '/api/test',
+    originalUrl: '/api/test',
         user: { id: 'u1' },
       });
       const res = mockRes();

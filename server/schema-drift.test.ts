@@ -32,8 +32,8 @@ vi.mock("@shared/schema", async () => {
   };
 });
 
-// The commercial tenants schema contributes no tables to this test run.
-vi.mock("../db/schema-commercial-tenants", () => ({}));
+// Secondary schemas contribute no tables to this test run — only testUsers from @shared/schema.
+vi.mock("../db/schema-index", () => ({}));
 
 vi.mock("./db", () => ({
   pool: { connect: mockConnect },

@@ -68,7 +68,7 @@ vi.mock('lucide-react', () => {
     Plus: Icon, Trash2: Icon, ChevronUp: Icon, ChevronDown: Icon, ChevronRight: Icon,
     Percent: Icon, Target: Icon, Activity: Icon, Layers: Icon, AlertCircle: Icon,
     Building2: Icon, Info: Icon, Users: Icon, Check: Icon, X: Icon,
-    ChevronLeft: Icon, MoreHorizontal: Icon, MoreVertical: Icon,
+    ChevronLeft: Icon, MoreHorizontal: Icon, MoreVertical: Icon, Settings2: Icon,
   };
 });
 

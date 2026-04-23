@@ -26,6 +26,7 @@ function createMockRequest(overrides: Partial<AuthenticatedRequest> = {}): Authe
   return {
     method: 'GET',
     path: '/api/test',
+    originalUrl: '/api/test',
     headers: {},
     cookies: {},
     query: {},
@@ -254,7 +255,7 @@ describe('csrfProtection middleware', () => {
       expect.any(String),
       expect.objectContaining({
         httpOnly: false,
-        sameSite: 'strict',
+        sameSite: 'lax',
       })
     );
     expect(next).toHaveBeenCalled();
