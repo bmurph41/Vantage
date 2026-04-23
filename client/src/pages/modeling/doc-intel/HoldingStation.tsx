@@ -142,7 +142,7 @@ export function HoldingStation({ projectId, onReviewDocuments, onUploadComplete 
 
   const loadPersistedSettings = (): Record<string, PersistedFileSettings> => {
     try {
-      const raw = sessionStorage.getItem(settingsKey);
+      const raw = localStorage.getItem(settingsKey);
       return raw ? JSON.parse(raw) : {};
     } catch {
       return {};
@@ -153,7 +153,7 @@ export function HoldingStation({ projectId, onReviewDocuments, onUploadComplete 
     try {
       const all = loadPersistedSettings();
       all[displayName] = settings;
-      sessionStorage.setItem(settingsKey, JSON.stringify(all));
+      localStorage.setItem(settingsKey, JSON.stringify(all));
     } catch {}
   };
 
@@ -161,7 +161,7 @@ export function HoldingStation({ projectId, onReviewDocuments, onUploadComplete 
     try {
       const all = loadPersistedSettings();
       delete all[displayName];
-      sessionStorage.setItem(settingsKey, JSON.stringify(all));
+      localStorage.setItem(settingsKey, JSON.stringify(all));
     } catch {}
   };
 
