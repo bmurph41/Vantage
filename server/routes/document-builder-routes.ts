@@ -60,11 +60,11 @@ const AssetClassValues = [
 ] as const;
 
 const CreateDocumentSchema = z.object({
-  dealId: z.string(),
+  dealId: z.string().optional(),
   documentType: z.enum(DocumentTypeValues),
   title: z.string().min(1).max(200),
-  audience: z.enum(AudiencePersonaValues).optional(),
-  assetClass: z.enum(AssetClassValues).optional(),
+  audience: z.string().optional(),
+  assetClass: z.string().optional(),
   themeId: z.string().optional(),
   templateId: z.string().optional(),
 });
@@ -335,11 +335,11 @@ router.post(
   '/auto-generate',
   validateBody(
     z.object({
-      dealId: z.string(),
+      dealId: z.string().optional(),
       documentType: z.enum(DocumentTypeValues),
       title: z.string().min(1).max(200),
-      audience: z.enum(AudiencePersonaValues).optional(),
-      assetClass: z.enum(AssetClassValues).optional(),
+      audience: z.string().optional(),
+      assetClass: z.string().optional(),
       enableAI: z.boolean().optional(),
     })
   ),

@@ -268,7 +268,12 @@
       "Bash(kill 32763)",
       "Bash(NODE_OPTIONS=\"--max-old-space-size=8192\" timeout 420 npx tsc --noEmit)",
       "Bash(NODE_OPTIONS=\"--max-old-space-size=6144\" npx tsc --noEmit -p tsc-sanity.json)",
-      "Bash(gh auth *)"
+      "Bash(gh auth *)",
+      "Bash(sort -u wc -l /tmp/registered_api.txt echo \"--- sample of registered paths matching ops modules ---\" grep -E \"dockit|marina|fuel|ship-store|ship_store|hotel|multifamily|retail|self-storage|self_storage|boat|bookkeeping|gl\\\\b|gl/|payroll|budget|commercial|rent-roll|lease|activity|prospecting\" /tmp/registered_api.txt)",
+      "Bash(sort -u wc -l /tmp/client_api_calls.txt cat /tmp/client_api_calls.txt)",
+      "Bash(python3)",
+      "Bash(sort -u wc -l /tmp/registered_api.txt)",
+      "Bash(sort -u echo \"--- router mounts ---\")"
     ]
   }
 }
