@@ -606,11 +606,12 @@ export default function WorkspaceUploads({ projectId, onTabChange }: WorkspaceUp
                 const isSyncingRentRoll = syncingRentRollId === upload.id;
                 const canSyncRentRoll = isRentRollType && (upload.status === 'parsed' || upload.status === 'reviewing' || upload.status === 'completed');
                 const uploadErrorMsg = upload.errorMessage;
+                const uploadErrLower = uploadErrorMsg?.toLowerCase() ?? '';
                 const isMigrationLost =
                   upload.status === 'error' &&
                   !!uploadErrorMsg &&
-                  (uploadErrorMsg.includes('no longer available') ||
-                    uploadErrorMsg.toLowerCase().includes('migration'));
+                  (uploadErrLower.includes('no longer available') ||
+                    uploadErrLower.includes('migration'));
 
                 return (
                   <div

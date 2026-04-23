@@ -449,11 +449,12 @@ export default function DocumentIntelligence() {
               ) : (
                 <div className="space-y-2">
                   {pnlDocuments.map((doc) => {
+                    const errMsg = doc.errorMessage?.toLowerCase() ?? "";
                     const isMigrationLost =
                       doc.status === "error" &&
                       !!doc.errorMessage &&
-                      (doc.errorMessage.includes("no longer available") ||
-                        doc.errorMessage.toLowerCase().includes("migration"));
+                      (errMsg.includes("no longer available") ||
+                        errMsg.includes("migration"));
                     return (
                     <div key={doc.id} className="space-y-0">
                     <div
