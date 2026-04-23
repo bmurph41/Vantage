@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useDropzone } from "react-dropzone";
 import * as XLSX from "xlsx";
@@ -134,6 +134,35 @@ interface PersistedFileSettings {
   t12EndYear?: string;
 }
 
+const HS_SETTINGS_PREFIX = "hs-settings-";
+const HS_SETTINGS_TTL_DAYS = 30;
+
+function pruneStaleHsSettings(ttlDays: number = HS_SETTINGS_TTL_DAYS): void {
+  try {
+    const cutoff = Date.now() - ttlDays * 24 * 60 * 60 * 1000;
+    const keysToRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key?.startsWith(HS_SETTINGS_PREFIX)) {
+        try {
+          const raw = localStorage.getItem(key);
+          if (!raw) continue;
+          const parsed = JSON.parse(raw);
+          const savedAt: number | undefined = parsed.__savedAt__;
+          if (!savedAt || savedAt < cutoff) {
+            keysToRemove.push(key);
+          }
+        } catch {
+          keysToRemove.push(key);
+        }
+      }
+    }
+    for (const key of keysToRemove) {
+      localStorage.removeItem(key);
+    }
+  } catch {}
+}
+
 export function HoldingStation({ projectId, onReviewDocuments, onUploadComplete }: HoldingStationProps) {
   const { toast } = useToast();
   const [stagedFiles, setStagedFiles] = useState<StagedFile[]>([]);
@@ -143,7 +172,10 @@ export function HoldingStation({ projectId, onReviewDocuments, onUploadComplete 
   const loadPersistedSettings = (): Record<string, PersistedFileSettings> => {
     try {
       const raw = localStorage.getItem(settingsKey);
-      return raw ? JSON.parse(raw) : {};
+      if (!raw) return {};
+      const parsed = JSON.parse(raw);
+      const { __savedAt__: _savedAt, ...rest } = parsed;
+      return rest as Record<string, PersistedFileSettings>;
     } catch {
       return {};
     }
@@ -153,7 +185,7 @@ export function HoldingStation({ projectId, onReviewDocuments, onUploadComplete 
     try {
       const all = loadPersistedSettings();
       all[displayName] = settings;
-      localStorage.setItem(settingsKey, JSON.stringify(all));
+      localStorage.setItem(settingsKey, JSON.stringify({ ...all, __savedAt__: Date.now() }));
     } catch {}
   };
 
@@ -161,9 +193,13 @@ export function HoldingStation({ projectId, onReviewDocuments, onUploadComplete 
     try {
       const all = loadPersistedSettings();
       delete all[displayName];
-      localStorage.setItem(settingsKey, JSON.stringify(all));
+      localStorage.setItem(settingsKey, JSON.stringify({ ...all, __savedAt__: Date.now() }));
     } catch {}
   };
+
+  useEffect(() => {
+    pruneStaleHsSettings();
+  }, []);
 
   const [newCustomTypeName, setNewCustomTypeName] = useState("");
   const [showAddTypeDialog, setShowAddTypeDialog] = useState(false);
