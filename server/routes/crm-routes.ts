@@ -15,6 +15,8 @@ import { customerAnalyticsService } from "../services/customer-analytics-service
 import { ownedAssetsService } from "../services/owned-assets-service";
 import { marketingService } from "../services/marketing-service";
 import { requireRentRoll } from "../middleware/pack-guard";
+import { rentRollService } from "../services/rent-roll-service";
+import { rraMarinaLocations, rraLeases } from "@shared/schema";
 import { ParserService } from "../services/salescomps/parser";
 import { FilterBuilder } from "../services/salescomps/filterBuilder";
 import { generateAIInsights } from "../services/salescomps/aiInsightsService";
