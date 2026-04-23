@@ -18154,6 +18154,1481 @@ const MIGRATIONS: Migration[] = [
     name: "om_builder_documents: convert asset_class to text",
     sql: `ALTER TABLE om_builder_documents ALTER COLUMN asset_class TYPE text USING asset_class::text`,
   },
+
+  // docket_ai_keyword_weights — uncovered columns
+  { name: "docket_ai_keyword_weights: add asset_class_id", sql: `ALTER TABLE docket_ai_keyword_weights ADD COLUMN IF NOT EXISTS asset_class_id text` },
+
+  // docket_ai_learning_rules — uncovered columns
+  { name: "docket_ai_learning_rules: add asset_class_id", sql: `ALTER TABLE docket_ai_learning_rules ADD COLUMN IF NOT EXISTS asset_class_id text` },
+
+  // docket_ai_source_adjustments — uncovered columns
+  { name: "docket_ai_source_adjustments: add asset_class_id", sql: `ALTER TABLE docket_ai_source_adjustments ADD COLUMN IF NOT EXISTS asset_class_id text` },
+
+  // docket_ai_training_analytics — uncovered columns
+  { name: "docket_ai_training_analytics: add asset_class_id", sql: `ALTER TABLE docket_ai_training_analytics ADD COLUMN IF NOT EXISTS asset_class_id text` },
+
+  // docket_article_feedback — uncovered columns
+  { name: "docket_article_feedback: add asset_class_id", sql: `ALTER TABLE docket_article_feedback ADD COLUMN IF NOT EXISTS asset_class_id text` },
+
+  // docket_article_removal_patterns — uncovered columns
+  { name: "docket_article_removal_patterns: add asset_class_id", sql: `ALTER TABLE docket_article_removal_patterns ADD COLUMN IF NOT EXISTS asset_class_id text` },
+
+  // docket_articles — uncovered columns
+  { name: "docket_articles: add asset_class_id", sql: `ALTER TABLE docket_articles ADD COLUMN IF NOT EXISTS asset_class_id text` },
+
+  // budget_versions — uncovered columns
+  { name: "budget_versions: add is_locked", sql: `ALTER TABLE budget_versions ADD COLUMN IF NOT EXISTS is_locked text` },
+
+  // ship_store_categories — uncovered columns
+  { name: "ship_store_categories: add org_id", sql: `ALTER TABLE ship_store_categories ADD COLUMN IF NOT EXISTS org_id text` },
+
+  // cdd_documents — uncovered columns
+  { name: "cdd_documents: add document_class", sql: `ALTER TABLE cdd_documents ADD COLUMN IF NOT EXISTS document_class text` },
+  { name: "cdd_documents: add document_class_confidence", sql: `ALTER TABLE cdd_documents ADD COLUMN IF NOT EXISTS document_class_confidence text` },
+  { name: "cdd_documents: add contract_extraction", sql: `ALTER TABLE cdd_documents ADD COLUMN IF NOT EXISTS contract_extraction text` },
+  { name: "cdd_documents: add contract_extract_status", sql: `ALTER TABLE cdd_documents ADD COLUMN IF NOT EXISTS contract_extract_status text` },
+  { name: "cdd_documents: add contract_extract_error", sql: `ALTER TABLE cdd_documents ADD COLUMN IF NOT EXISTS contract_extract_error text` },
+  { name: "cdd_documents: add contract_extracted_at", sql: `ALTER TABLE cdd_documents ADD COLUMN IF NOT EXISTS contract_extracted_at text` },
+
+  // comp_set_items — uncovered columns
+  { name: "comp_set_items: add manual_override", sql: `ALTER TABLE comp_set_items ADD COLUMN IF NOT EXISTS manual_override text` },
+  { name: "comp_set_items: add created_at", sql: `ALTER TABLE comp_set_items ADD COLUMN IF NOT EXISTS created_at text` },
+  { name: "comp_set_items: add updated_at", sql: `ALTER TABLE comp_set_items ADD COLUMN IF NOT EXISTS updated_at text` },
+
+  // comp_sets — uncovered columns
+  { name: "comp_sets: add filter_criteria", sql: `ALTER TABLE comp_sets ADD COLUMN IF NOT EXISTS filter_criteria text` },
+  { name: "comp_sets: add status", sql: `ALTER TABLE comp_sets ADD COLUMN IF NOT EXISTS status text` },
+
+  // contract_extracted_dates — uncovered columns
+  { name: "contract_extracted_dates: add id", sql: `ALTER TABLE contract_extracted_dates ADD COLUMN IF NOT EXISTS id text` },
+  { name: "contract_extracted_dates: add document_id", sql: `ALTER TABLE contract_extracted_dates ADD COLUMN IF NOT EXISTS document_id text` },
+  { name: "contract_extracted_dates: add workspace_id", sql: `ALTER TABLE contract_extracted_dates ADD COLUMN IF NOT EXISTS workspace_id text` },
+  { name: "contract_extracted_dates: add field_key", sql: `ALTER TABLE contract_extracted_dates ADD COLUMN IF NOT EXISTS field_key text` },
+  { name: "contract_extracted_dates: add field_label", sql: `ALTER TABLE contract_extracted_dates ADD COLUMN IF NOT EXISTS field_label text` },
+  { name: "contract_extracted_dates: add extracted_date", sql: `ALTER TABLE contract_extracted_dates ADD COLUMN IF NOT EXISTS extracted_date text` },
+  { name: "contract_extracted_dates: add offset_days", sql: `ALTER TABLE contract_extracted_dates ADD COLUMN IF NOT EXISTS offset_days text` },
+  { name: "contract_extracted_dates: add anchor_field", sql: `ALTER TABLE contract_extracted_dates ADD COLUMN IF NOT EXISTS anchor_field text` },
+  { name: "contract_extracted_dates: add confidence", sql: `ALTER TABLE contract_extracted_dates ADD COLUMN IF NOT EXISTS confidence text` },
+  { name: "contract_extracted_dates: add source_page", sql: `ALTER TABLE contract_extracted_dates ADD COLUMN IF NOT EXISTS source_page text` },
+  { name: "contract_extracted_dates: add source_snippet", sql: `ALTER TABLE contract_extracted_dates ADD COLUMN IF NOT EXISTS source_snippet text` },
+  { name: "contract_extracted_dates: add user_status", sql: `ALTER TABLE contract_extracted_dates ADD COLUMN IF NOT EXISTS user_status text` },
+  { name: "contract_extracted_dates: add promoted_milestone_id", sql: `ALTER TABLE contract_extracted_dates ADD COLUMN IF NOT EXISTS promoted_milestone_id text` },
+  { name: "contract_extracted_dates: add promoted_checklist_item_id", sql: `ALTER TABLE contract_extracted_dates ADD COLUMN IF NOT EXISTS promoted_checklist_item_id text` },
+  { name: "contract_extracted_dates: add created_at", sql: `ALTER TABLE contract_extracted_dates ADD COLUMN IF NOT EXISTS created_at text` },
+  { name: "contract_extracted_dates: add updated_at", sql: `ALTER TABLE contract_extracted_dates ADD COLUMN IF NOT EXISTS updated_at text` },
+
+  // crm_activities — uncovered columns
+  { name: "crm_activities: add parent_activity_id", sql: `ALTER TABLE crm_activities ADD COLUMN IF NOT EXISTS parent_activity_id text` },
+  { name: "crm_activities: add is_recurring", sql: `ALTER TABLE crm_activities ADD COLUMN IF NOT EXISTS is_recurring text` },
+  { name: "crm_activities: add recurrence_rule", sql: `ALTER TABLE crm_activities ADD COLUMN IF NOT EXISTS recurrence_rule text` },
+  { name: "crm_activities: add recurrence_end_date", sql: `ALTER TABLE crm_activities ADD COLUMN IF NOT EXISTS recurrence_end_date text` },
+  { name: "crm_activities: add occurrence_index", sql: `ALTER TABLE crm_activities ADD COLUMN IF NOT EXISTS occurrence_index text` },
+  { name: "crm_activities: add reminder_at", sql: `ALTER TABLE crm_activities ADD COLUMN IF NOT EXISTS reminder_at text` },
+  { name: "crm_activities: add reminder_minutes_before", sql: `ALTER TABLE crm_activities ADD COLUMN IF NOT EXISTS reminder_minutes_before text` },
+  { name: "crm_activities: add reminder_sent", sql: `ALTER TABLE crm_activities ADD COLUMN IF NOT EXISTS reminder_sent text` },
+
+  // crm_companies — uncovered columns
+  { name: "crm_companies: add company_type", sql: `ALTER TABLE crm_companies ADD COLUMN IF NOT EXISTS company_type text` },
+  { name: "crm_companies: add parent_company_id", sql: `ALTER TABLE crm_companies ADD COLUMN IF NOT EXISTS parent_company_id text` },
+  { name: "crm_companies: add aum_approx", sql: `ALTER TABLE crm_companies ADD COLUMN IF NOT EXISTS aum_approx text` },
+  { name: "crm_companies: add aum_range", sql: `ALTER TABLE crm_companies ADD COLUMN IF NOT EXISTS aum_range text` },
+  { name: "crm_companies: add investment_mandate", sql: `ALTER TABLE crm_companies ADD COLUMN IF NOT EXISTS investment_mandate text` },
+  { name: "crm_companies: add nda_expiry_date", sql: `ALTER TABLE crm_companies ADD COLUMN IF NOT EXISTS nda_expiry_date text` },
+
+  // crm_contacts — uncovered columns
+  { name: "crm_contacts: add primary_role", sql: `ALTER TABLE crm_contacts ADD COLUMN IF NOT EXISTS primary_role text` },
+  { name: "crm_contacts: add crm_role", sql: `ALTER TABLE crm_contacts ADD COLUMN IF NOT EXISTS crm_role text` },
+  { name: "crm_contacts: add source_type", sql: `ALTER TABLE crm_contacts ADD COLUMN IF NOT EXISTS source_type text` },
+  { name: "crm_contacts: add relationship_score", sql: `ALTER TABLE crm_contacts ADD COLUMN IF NOT EXISTS relationship_score text` },
+  { name: "crm_contacts: add last_contacted_at", sql: `ALTER TABLE crm_contacts ADD COLUMN IF NOT EXISTS last_contacted_at text` },
+  { name: "crm_contacts: add next_followup_date", sql: `ALTER TABLE crm_contacts ADD COLUMN IF NOT EXISTS next_followup_date text` },
+  { name: "crm_contacts: add linked_in_url", sql: `ALTER TABLE crm_contacts ADD COLUMN IF NOT EXISTS linked_in_url text` },
+  { name: "crm_contacts: add nda_on_file", sql: `ALTER TABLE crm_contacts ADD COLUMN IF NOT EXISTS nda_on_file text` },
+  { name: "crm_contacts: add do_not_contact", sql: `ALTER TABLE crm_contacts ADD COLUMN IF NOT EXISTS do_not_contact text` },
+  { name: "crm_contacts: add email_consent", sql: `ALTER TABLE crm_contacts ADD COLUMN IF NOT EXISTS email_consent text` },
+  { name: "crm_contacts: add email_consent_date", sql: `ALTER TABLE crm_contacts ADD COLUMN IF NOT EXISTS email_consent_date text` },
+  { name: "crm_contacts: add email_opt_out", sql: `ALTER TABLE crm_contacts ADD COLUMN IF NOT EXISTS email_opt_out text` },
+  { name: "crm_contacts: add sms_opt_out", sql: `ALTER TABLE crm_contacts ADD COLUMN IF NOT EXISTS sms_opt_out text` },
+  { name: "crm_contacts: add mail_opt_out", sql: `ALTER TABLE crm_contacts ADD COLUMN IF NOT EXISTS mail_opt_out text` },
+  { name: "crm_contacts: add gdpr_consent", sql: `ALTER TABLE crm_contacts ADD COLUMN IF NOT EXISTS gdpr_consent text` },
+  { name: "crm_contacts: add gdpr_consent_date", sql: `ALTER TABLE crm_contacts ADD COLUMN IF NOT EXISTS gdpr_consent_date text` },
+  { name: "crm_contacts: add gdpr_consent_source", sql: `ALTER TABLE crm_contacts ADD COLUMN IF NOT EXISTS gdpr_consent_source text` },
+  { name: "crm_contacts: add consent_notes", sql: `ALTER TABLE crm_contacts ADD COLUMN IF NOT EXISTS consent_notes text` },
+  { name: "crm_contacts: add investment_notes", sql: `ALTER TABLE crm_contacts ADD COLUMN IF NOT EXISTS investment_notes text` },
+  { name: "crm_contacts: add target_asset_classes", sql: `ALTER TABLE crm_contacts ADD COLUMN IF NOT EXISTS target_asset_classes text` },
+  { name: "crm_contacts: add target_geographies", sql: `ALTER TABLE crm_contacts ADD COLUMN IF NOT EXISTS target_geographies text` },
+  { name: "crm_contacts: add deal_size_min", sql: `ALTER TABLE crm_contacts ADD COLUMN IF NOT EXISTS deal_size_min text` },
+  { name: "crm_contacts: add deal_size_max", sql: `ALTER TABLE crm_contacts ADD COLUMN IF NOT EXISTS deal_size_max text` },
+  { name: "crm_contacts: add return_criteria_min", sql: `ALTER TABLE crm_contacts ADD COLUMN IF NOT EXISTS return_criteria_min text` },
+
+  // crm_deals — uncovered columns
+  { name: "crm_deals: add dd_period_mode", sql: `ALTER TABLE crm_deals ADD COLUMN IF NOT EXISTS dd_period_mode text` },
+
+  // crm_properties — uncovered columns
+  { name: "crm_properties: add asking_price", sql: `ALTER TABLE crm_properties ADD COLUMN IF NOT EXISTS asking_price text` },
+  { name: "crm_properties: add listing_status", sql: `ALTER TABLE crm_properties ADD COLUMN IF NOT EXISTS listing_status text` },
+  { name: "crm_properties: add latitude", sql: `ALTER TABLE crm_properties ADD COLUMN IF NOT EXISTS latitude text` },
+  { name: "crm_properties: add longitude", sql: `ALTER TABLE crm_properties ADD COLUMN IF NOT EXISTS longitude text` },
+  { name: "crm_properties: add year_built", sql: `ALTER TABLE crm_properties ADD COLUMN IF NOT EXISTS year_built text` },
+  { name: "crm_properties: add total_slips", sql: `ALTER TABLE crm_properties ADD COLUMN IF NOT EXISTS total_slips text` },
+  { name: "crm_properties: add water_depth_ft", sql: `ALTER TABLE crm_properties ADD COLUMN IF NOT EXISTS water_depth_ft text` },
+  { name: "crm_properties: add dock_material", sql: `ALTER TABLE crm_properties ADD COLUMN IF NOT EXISTS dock_material text` },
+  { name: "crm_properties: add has_fuel_dock", sql: `ALTER TABLE crm_properties ADD COLUMN IF NOT EXISTS has_fuel_dock text` },
+  { name: "crm_properties: add has_repair_yard", sql: `ALTER TABLE crm_properties ADD COLUMN IF NOT EXISTS has_repair_yard text` },
+  { name: "crm_properties: add in_flood_zone", sql: `ALTER TABLE crm_properties ADD COLUMN IF NOT EXISTS in_flood_zone text` },
+  { name: "crm_properties: add has_wetlands", sql: `ALTER TABLE crm_properties ADD COLUMN IF NOT EXISTS has_wetlands text` },
+  { name: "crm_properties: add has_env_issues", sql: `ALTER TABLE crm_properties ADD COLUMN IF NOT EXISTS has_env_issues text` },
+  { name: "crm_properties: add has_title_issues", sql: `ALTER TABLE crm_properties ADD COLUMN IF NOT EXISTS has_title_issues text` },
+  { name: "crm_properties: add last_sale_date", sql: `ALTER TABLE crm_properties ADD COLUMN IF NOT EXISTS last_sale_date text` },
+
+  // crm_tasks — uncovered columns
+  { name: "crm_tasks: add task_type", sql: `ALTER TABLE crm_tasks ADD COLUMN IF NOT EXISTS task_type text` },
+  { name: "crm_tasks: add reminder_at", sql: `ALTER TABLE crm_tasks ADD COLUMN IF NOT EXISTS reminder_at text` },
+  { name: "crm_tasks: add reminder_minutes_before", sql: `ALTER TABLE crm_tasks ADD COLUMN IF NOT EXISTS reminder_minutes_before text` },
+  { name: "crm_tasks: add reminder_sent", sql: `ALTER TABLE crm_tasks ADD COLUMN IF NOT EXISTS reminder_sent text` },
+
+  // custom_document_types — uncovered columns
+  { name: "custom_document_types: add category", sql: `ALTER TABLE custom_document_types ADD COLUMN IF NOT EXISTS category text` },
+  { name: "custom_document_types: add fields", sql: `ALTER TABLE custom_document_types ADD COLUMN IF NOT EXISTS fields text` },
+
+  // data_source_sync_logs — uncovered columns
+  { name: "data_source_sync_logs: add records_processed", sql: `ALTER TABLE data_source_sync_logs ADD COLUMN IF NOT EXISTS records_processed text` },
+  { name: "data_source_sync_logs: add sync_config", sql: `ALTER TABLE data_source_sync_logs ADD COLUMN IF NOT EXISTS sync_config text` },
+  { name: "data_source_sync_logs: add sync_type", sql: `ALTER TABLE data_source_sync_logs ADD COLUMN IF NOT EXISTS sync_type text` },
+
+  // deal_workspaces — uncovered columns
+  { name: "deal_workspaces: add closing_date", sql: `ALTER TABLE deal_workspaces ADD COLUMN IF NOT EXISTS closing_date text` },
+  { name: "deal_workspaces: add dd_expiration_date", sql: `ALTER TABLE deal_workspaces ADD COLUMN IF NOT EXISTS dd_expiration_date text` },
+  { name: "deal_workspaces: add dd_start_date", sql: `ALTER TABLE deal_workspaces ADD COLUMN IF NOT EXISTS dd_start_date text` },
+
+  // doc_intel_uploads — uncovered columns
+  { name: "doc_intel_uploads: add seasonal_config", sql: `ALTER TABLE doc_intel_uploads ADD COLUMN IF NOT EXISTS seasonal_config text` },
+  { name: "doc_intel_uploads: add seasonal_profile", sql: `ALTER TABLE doc_intel_uploads ADD COLUMN IF NOT EXISTS seasonal_profile text` },
+
+  // document_extraction_jobs — uncovered columns
+  { name: "document_extraction_jobs: add fiscal_year", sql: `ALTER TABLE document_extraction_jobs ADD COLUMN IF NOT EXISTS fiscal_year text` },
+  { name: "document_extraction_jobs: add period_end", sql: `ALTER TABLE document_extraction_jobs ADD COLUMN IF NOT EXISTS period_end text` },
+  { name: "document_extraction_jobs: add period_start", sql: `ALTER TABLE document_extraction_jobs ADD COLUMN IF NOT EXISTS period_start text` },
+  { name: "document_extraction_jobs: add reporting_period", sql: `ALTER TABLE document_extraction_jobs ADD COLUMN IF NOT EXISTS reporting_period text` },
+  { name: "document_extraction_jobs: add reconciliation_report", sql: `ALTER TABLE document_extraction_jobs ADD COLUMN IF NOT EXISTS reconciliation_report text` },
+  { name: "document_extraction_jobs: add structural_fingerprint", sql: `ALTER TABLE document_extraction_jobs ADD COLUMN IF NOT EXISTS structural_fingerprint text` },
+  { name: "document_extraction_jobs: add matched_template_id", sql: `ALTER TABLE document_extraction_jobs ADD COLUMN IF NOT EXISTS matched_template_id text` },
+
+  // exit_scenarios — uncovered columns
+  { name: "exit_scenarios: add allocation_json", sql: `ALTER TABLE exit_scenarios ADD COLUMN IF NOT EXISTS allocation_json text` },
+  { name: "exit_scenarios: add allocation_checksum", sql: `ALTER TABLE exit_scenarios ADD COLUMN IF NOT EXISTS allocation_checksum text` },
+  { name: "exit_scenarios: add allocation_locked_at", sql: `ALTER TABLE exit_scenarios ADD COLUMN IF NOT EXISTS allocation_locked_at text` },
+  { name: "exit_scenarios: add inputs_json", sql: `ALTER TABLE exit_scenarios ADD COLUMN IF NOT EXISTS inputs_json text` },
+  { name: "exit_scenarios: add asset_class", sql: `ALTER TABLE exit_scenarios ADD COLUMN IF NOT EXISTS asset_class text` },
+  { name: "exit_scenarios: add deal_type", sql: `ALTER TABLE exit_scenarios ADD COLUMN IF NOT EXISTS deal_type text` },
+  { name: "exit_scenarios: add engine_version", sql: `ALTER TABLE exit_scenarios ADD COLUMN IF NOT EXISTS engine_version text` },
+
+  // extraction_templates — uncovered columns
+  { name: "extraction_templates: add structural_fingerprint", sql: `ALTER TABLE extraction_templates ADD COLUMN IF NOT EXISTS structural_fingerprint text` },
+  { name: "extraction_templates: add sample_input", sql: `ALTER TABLE extraction_templates ADD COLUMN IF NOT EXISTS sample_input text` },
+  { name: "extraction_templates: add sample_output", sql: `ALTER TABLE extraction_templates ADD COLUMN IF NOT EXISTS sample_output text` },
+  { name: "extraction_templates: add source_job_id", sql: `ALTER TABLE extraction_templates ADD COLUMN IF NOT EXISTS source_job_id text` },
+  { name: "extraction_templates: add last_used_at", sql: `ALTER TABLE extraction_templates ADD COLUMN IF NOT EXISTS last_used_at text` },
+  { name: "extraction_templates: add auto_created", sql: `ALTER TABLE extraction_templates ADD COLUMN IF NOT EXISTS auto_created text` },
+
+  // industry_standards — uncovered columns
+  { name: "industry_standards: add curated_at", sql: `ALTER TABLE industry_standards ADD COLUMN IF NOT EXISTS curated_at text` },
+  { name: "industry_standards: add curated_by_user_id", sql: `ALTER TABLE industry_standards ADD COLUMN IF NOT EXISTS curated_by_user_id text` },
+  { name: "industry_standards: add metric_type", sql: `ALTER TABLE industry_standards ADD COLUMN IF NOT EXISTS metric_type text` },
+  { name: "industry_standards: add notes", sql: `ALTER TABLE industry_standards ADD COLUMN IF NOT EXISTS notes text` },
+  { name: "industry_standards: add source", sql: `ALTER TABLE industry_standards ADD COLUMN IF NOT EXISTS source text` },
+  { name: "industry_standards: add year", sql: `ALTER TABLE industry_standards ADD COLUMN IF NOT EXISTS year text` },
+
+  // integration_connections — uncovered columns
+  { name: "integration_connections: add provider", sql: `ALTER TABLE integration_connections ADD COLUMN IF NOT EXISTS provider text` },
+  { name: "integration_connections: add status", sql: `ALTER TABLE integration_connections ADD COLUMN IF NOT EXISTS status text` },
+  { name: "integration_connections: add access_token_encrypted", sql: `ALTER TABLE integration_connections ADD COLUMN IF NOT EXISTS access_token_encrypted text` },
+  { name: "integration_connections: add refresh_token_encrypted", sql: `ALTER TABLE integration_connections ADD COLUMN IF NOT EXISTS refresh_token_encrypted text` },
+  { name: "integration_connections: add token_expires_at", sql: `ALTER TABLE integration_connections ADD COLUMN IF NOT EXISTS token_expires_at text` },
+  { name: "integration_connections: add connected_by", sql: `ALTER TABLE integration_connections ADD COLUMN IF NOT EXISTS connected_by text` },
+  { name: "integration_connections: add sync_error", sql: `ALTER TABLE integration_connections ADD COLUMN IF NOT EXISTS sync_error text` },
+
+  // integration_sync_logs — uncovered columns
+  { name: "integration_sync_logs: add provider", sql: `ALTER TABLE integration_sync_logs ADD COLUMN IF NOT EXISTS provider text` },
+  { name: "integration_sync_logs: add records_synced", sql: `ALTER TABLE integration_sync_logs ADD COLUMN IF NOT EXISTS records_synced text` },
+  { name: "integration_sync_logs: add error_details", sql: `ALTER TABLE integration_sync_logs ADD COLUMN IF NOT EXISTS error_details text` },
+
+  // rra_leases — uncovered columns
+  { name: "rra_leases: add boat_name", sql: `ALTER TABLE rra_leases ADD COLUMN IF NOT EXISTS boat_name text` },
+  { name: "rra_leases: add boat_make", sql: `ALTER TABLE rra_leases ADD COLUMN IF NOT EXISTS boat_make text` },
+  { name: "rra_leases: add boat_year", sql: `ALTER TABLE rra_leases ADD COLUMN IF NOT EXISTS boat_year text` },
+  { name: "rra_leases: add registration_number", sql: `ALTER TABLE rra_leases ADD COLUMN IF NOT EXISTS registration_number text` },
+  { name: "rra_leases: add registration_state", sql: `ALTER TABLE rra_leases ADD COLUMN IF NOT EXISTS registration_state text` },
+
+  // marina_field_sources — uncovered columns
+  { name: "marina_field_sources: add notes", sql: `ALTER TABLE marina_field_sources ADD COLUMN IF NOT EXISTS notes text` },
+
+  // marina_listings — uncovered columns
+  { name: "marina_listings: add search_vector", sql: `ALTER TABLE marina_listings ADD COLUMN IF NOT EXISTS search_vector text` },
+
+  // market_benchmarks — uncovered columns
+  { name: "market_benchmarks: add benchmarks", sql: `ALTER TABLE market_benchmarks ADD COLUMN IF NOT EXISTS benchmarks text` },
+  { name: "market_benchmarks: add market_segment", sql: `ALTER TABLE market_benchmarks ADD COLUMN IF NOT EXISTS market_segment text` },
+  { name: "market_benchmarks: add notes", sql: `ALTER TABLE market_benchmarks ADD COLUMN IF NOT EXISTS notes text` },
+  { name: "market_benchmarks: add period_end", sql: `ALTER TABLE market_benchmarks ADD COLUMN IF NOT EXISTS period_end text` },
+  { name: "market_benchmarks: add period_start", sql: `ALTER TABLE market_benchmarks ADD COLUMN IF NOT EXISTS period_start text` },
+  { name: "market_benchmarks: add region", sql: `ALTER TABLE market_benchmarks ADD COLUMN IF NOT EXISTS region text` },
+  { name: "market_benchmarks: add updated_at", sql: `ALTER TABLE market_benchmarks ADD COLUMN IF NOT EXISTS updated_at text` },
+
+  // modeling_addback_values — uncovered columns
+  { name: "modeling_addback_values: add org_id", sql: `ALTER TABLE modeling_addback_values ADD COLUMN IF NOT EXISTS org_id text` },
+
+  // modeling_approver_decisions — uncovered columns
+  { name: "modeling_approver_decisions: add org_id", sql: `ALTER TABLE modeling_approver_decisions ADD COLUMN IF NOT EXISTS org_id text` },
+
+  // modeling_comments — uncovered columns
+  { name: "modeling_comments: add org_id", sql: `ALTER TABLE modeling_comments ADD COLUMN IF NOT EXISTS org_id text` },
+
+  // modeling_project_config — uncovered columns
+  { name: "modeling_project_config: add org_id", sql: `ALTER TABLE modeling_project_config ADD COLUMN IF NOT EXISTS org_id text` },
+  { name: "modeling_project_config: add acquisition_close_date", sql: `ALTER TABLE modeling_project_config ADD COLUMN IF NOT EXISTS acquisition_close_date text` },
+  { name: "modeling_project_config: add hold_period_months", sql: `ALTER TABLE modeling_project_config ADD COLUMN IF NOT EXISTS hold_period_months text` },
+  { name: "modeling_project_config: add projection_start_date", sql: `ALTER TABLE modeling_project_config ADD COLUMN IF NOT EXISTS projection_start_date text` },
+  { name: "modeling_project_config: add projection_start_rule", sql: `ALTER TABLE modeling_project_config ADD COLUMN IF NOT EXISTS projection_start_rule text` },
+  { name: "modeling_project_config: add ttm_end_date", sql: `ALTER TABLE modeling_project_config ADD COLUMN IF NOT EXISTS ttm_end_date text` },
+  { name: "modeling_project_config: add stabilized_noi_mode", sql: `ALTER TABLE modeling_project_config ADD COLUMN IF NOT EXISTS stabilized_noi_mode text` },
+  { name: "modeling_project_config: add stabilized_noi_year", sql: `ALTER TABLE modeling_project_config ADD COLUMN IF NOT EXISTS stabilized_noi_year text` },
+  { name: "modeling_project_config: add stabilized_noi_month", sql: `ALTER TABLE modeling_project_config ADD COLUMN IF NOT EXISTS stabilized_noi_month text` },
+  { name: "modeling_project_config: add irr_display_preference", sql: `ALTER TABLE modeling_project_config ADD COLUMN IF NOT EXISTS irr_display_preference text` },
+  { name: "modeling_project_config: add seasonality_profile_id", sql: `ALTER TABLE modeling_project_config ADD COLUMN IF NOT EXISTS seasonality_profile_id text` },
+
+  // om_document_versions — uncovered columns
+  { name: "om_document_versions: add change_description", sql: `ALTER TABLE om_document_versions ADD COLUMN IF NOT EXISTS change_description text` },
+  { name: "om_document_versions: add document_id", sql: `ALTER TABLE om_document_versions ADD COLUMN IF NOT EXISTS document_id text` },
+  { name: "om_document_versions: add snapshot", sql: `ALTER TABLE om_document_versions ADD COLUMN IF NOT EXISTS snapshot text` },
+  { name: "om_document_versions: add status", sql: `ALTER TABLE om_document_versions ADD COLUMN IF NOT EXISTS status text` },
+  { name: "om_document_versions: add title", sql: `ALTER TABLE om_document_versions ADD COLUMN IF NOT EXISTS title text` },
+
+  // ops_self_storage_units — uncovered columns
+  { name: "ops_self_storage_units: add move_out_date", sql: `ALTER TABLE ops_self_storage_units ADD COLUMN IF NOT EXISTS move_out_date text` },
+
+  // organizations — uncovered columns
+  { name: "organizations: add user_role", sql: `ALTER TABLE organizations ADD COLUMN IF NOT EXISTS user_role text` },
+
+  // platform_data_source_mappings — uncovered columns
+  { name: "platform_data_source_mappings: add asset_class_key", sql: `ALTER TABLE platform_data_source_mappings ADD COLUMN IF NOT EXISTS asset_class_key text` },
+  { name: "platform_data_source_mappings: add config", sql: `ALTER TABLE platform_data_source_mappings ADD COLUMN IF NOT EXISTS config text` },
+  { name: "platform_data_source_mappings: add priority", sql: `ALTER TABLE platform_data_source_mappings ADD COLUMN IF NOT EXISTS priority text` },
+  { name: "platform_data_source_mappings: add updated_at", sql: `ALTER TABLE platform_data_source_mappings ADD COLUMN IF NOT EXISTS updated_at text` },
+
+  // platform_data_sources — uncovered columns
+  { name: "platform_data_sources: add config", sql: `ALTER TABLE platform_data_sources ADD COLUMN IF NOT EXISTS config text` },
+  { name: "platform_data_sources: add created_by", sql: `ALTER TABLE platform_data_sources ADD COLUMN IF NOT EXISTS created_by text` },
+  { name: "platform_data_sources: add credentials_encrypted", sql: `ALTER TABLE platform_data_sources ADD COLUMN IF NOT EXISTS credentials_encrypted text` },
+  { name: "platform_data_sources: add last_rate_reset", sql: `ALTER TABLE platform_data_sources ADD COLUMN IF NOT EXISTS last_rate_reset text` },
+  { name: "platform_data_sources: add last_sync_status", sql: `ALTER TABLE platform_data_sources ADD COLUMN IF NOT EXISTS last_sync_status text` },
+  { name: "platform_data_sources: add rate_limit_per_day", sql: `ALTER TABLE platform_data_sources ADD COLUMN IF NOT EXISTS rate_limit_per_day text` },
+  { name: "platform_data_sources: add rate_limit_per_minute", sql: `ALTER TABLE platform_data_sources ADD COLUMN IF NOT EXISTS rate_limit_per_minute text` },
+  { name: "platform_data_sources: add requests_this_minute", sql: `ALTER TABLE platform_data_sources ADD COLUMN IF NOT EXISTS requests_this_minute text` },
+  { name: "platform_data_sources: add requests_today", sql: `ALTER TABLE platform_data_sources ADD COLUMN IF NOT EXISTS requests_today text` },
+
+  // pnl_canonical_line_items — uncovered columns
+  { name: "pnl_canonical_line_items: add canonical_key", sql: `ALTER TABLE pnl_canonical_line_items ADD COLUMN IF NOT EXISTS canonical_key text` },
+  { name: "pnl_canonical_line_items: add department", sql: `ALTER TABLE pnl_canonical_line_items ADD COLUMN IF NOT EXISTS department text` },
+  { name: "pnl_canonical_line_items: add org_id", sql: `ALTER TABLE pnl_canonical_line_items ADD COLUMN IF NOT EXISTS org_id text` },
+  { name: "pnl_canonical_line_items: add parent_id", sql: `ALTER TABLE pnl_canonical_line_items ADD COLUMN IF NOT EXISTS parent_id text` },
+  { name: "pnl_canonical_line_items: add section", sql: `ALTER TABLE pnl_canonical_line_items ADD COLUMN IF NOT EXISTS section text` },
+
+  // pnl_jobs — uncovered columns
+  { name: "pnl_jobs: add parse_metrics_json", sql: `ALTER TABLE pnl_jobs ADD COLUMN IF NOT EXISTS parse_metrics_json text` },
+  { name: "pnl_jobs: add validation_json", sql: `ALTER TABLE pnl_jobs ADD COLUMN IF NOT EXISTS validation_json text` },
+  { name: "pnl_jobs: add validation_status", sql: `ALTER TABLE pnl_jobs ADD COLUMN IF NOT EXISTS validation_status text` },
+
+  // pnl_keyword_rules — uncovered columns
+  { name: "pnl_keyword_rules: add bucket", sql: `ALTER TABLE pnl_keyword_rules ADD COLUMN IF NOT EXISTS bucket text` },
+  { name: "pnl_keyword_rules: add canonical_line_item_id", sql: `ALTER TABLE pnl_keyword_rules ADD COLUMN IF NOT EXISTS canonical_line_item_id text` },
+  { name: "pnl_keyword_rules: add department", sql: `ALTER TABLE pnl_keyword_rules ADD COLUMN IF NOT EXISTS department text` },
+  { name: "pnl_keyword_rules: add keyword", sql: `ALTER TABLE pnl_keyword_rules ADD COLUMN IF NOT EXISTS keyword text` },
+  { name: "pnl_keyword_rules: add source", sql: `ALTER TABLE pnl_keyword_rules ADD COLUMN IF NOT EXISTS source text` },
+
+  // pnl_line_item_aliases — uncovered columns
+  { name: "pnl_line_item_aliases: add alias_regex", sql: `ALTER TABLE pnl_line_item_aliases ADD COLUMN IF NOT EXISTS alias_regex text` },
+  { name: "pnl_line_item_aliases: add alias_text", sql: `ALTER TABLE pnl_line_item_aliases ADD COLUMN IF NOT EXISTS alias_text text` },
+  { name: "pnl_line_item_aliases: add canonical_line_item_id", sql: `ALTER TABLE pnl_line_item_aliases ADD COLUMN IF NOT EXISTS canonical_line_item_id text` },
+  { name: "pnl_line_item_aliases: add vendor_hint", sql: `ALTER TABLE pnl_line_item_aliases ADD COLUMN IF NOT EXISTS vendor_hint text` },
+  { name: "pnl_line_item_aliases: add weight", sql: `ALTER TABLE pnl_line_item_aliases ADD COLUMN IF NOT EXISTS weight text` },
+
+  // property_data_cache — uncovered columns
+  { name: "property_data_cache: add address_full", sql: `ALTER TABLE property_data_cache ADD COLUMN IF NOT EXISTS address_full text` },
+  { name: "property_data_cache: add asset_class_key", sql: `ALTER TABLE property_data_cache ADD COLUMN IF NOT EXISTS asset_class_key text` },
+  { name: "property_data_cache: add data_quality_score", sql: `ALTER TABLE property_data_cache ADD COLUMN IF NOT EXISTS data_quality_score text` },
+  { name: "property_data_cache: add external_id", sql: `ALTER TABLE property_data_cache ADD COLUMN IF NOT EXISTS external_id text` },
+  { name: "property_data_cache: add raw_response", sql: `ALTER TABLE property_data_cache ADD COLUMN IF NOT EXISTS raw_response text` },
+
+  // rate_comps — uncovered columns
+  { name: "rate_comps: add deal_flags", sql: `ALTER TABLE rate_comps ADD COLUMN IF NOT EXISTS deal_flags text` },
+
+  // docket_rss_sources — uncovered columns
+  { name: "docket_rss_sources: add asset_class_id", sql: `ALTER TABLE docket_rss_sources ADD COLUMN IF NOT EXISTS asset_class_id text` },
+
+  // security_audit_log — uncovered columns
+  { name: "security_audit_log: add description", sql: `ALTER TABLE security_audit_log ADD COLUMN IF NOT EXISTS description text` },
+  { name: "security_audit_log: add severity", sql: `ALTER TABLE security_audit_log ADD COLUMN IF NOT EXISTS severity text` },
+
+  // vdr_documents — uncovered columns
+  { name: "vdr_documents: add workspace_id", sql: `ALTER TABLE vdr_documents ADD COLUMN IF NOT EXISTS workspace_id text` },
+
+  // vdr_folders — uncovered columns
+  { name: "vdr_folders: add workspace_id", sql: `ALTER TABLE vdr_folders ADD COLUMN IF NOT EXISTS workspace_id text` },
+  { name: "vdr_folders: add template_key", sql: `ALTER TABLE vdr_folders ADD COLUMN IF NOT EXISTS template_key text` },
+  { name: "vdr_folders: add security_level", sql: `ALTER TABLE vdr_folders ADD COLUMN IF NOT EXISTS security_level text` },
+
+  // workspace_members — uncovered columns
+  { name: "workspace_members: add can_edit_dd_checklist", sql: `ALTER TABLE workspace_members ADD COLUMN IF NOT EXISTS can_edit_dd_checklist text` },
+  { name: "workspace_members: add can_respond_to_requests", sql: `ALTER TABLE workspace_members ADD COLUMN IF NOT EXISTS can_respond_to_requests text` },
+  { name: "workspace_members: add can_upload_to_vdr", sql: `ALTER TABLE workspace_members ADD COLUMN IF NOT EXISTS can_upload_to_vdr text` },
+  { name: "workspace_members: add can_view_dd_checklist", sql: `ALTER TABLE workspace_members ADD COLUMN IF NOT EXISTS can_view_dd_checklist text` },
+  { name: "workspace_members: add invite_scope", sql: `ALTER TABLE workspace_members ADD COLUMN IF NOT EXISTS invite_scope text` },
+  { name: "workspace_members: add permission_preset", sql: `ALTER TABLE workspace_members ADD COLUMN IF NOT EXISTS permission_preset text` },
+
+  // account_balances — uncovered columns
+  { name: "account_balances: add id", sql: `ALTER TABLE account_balances ADD COLUMN IF NOT EXISTS id text` },
+  { name: "account_balances: add org_id", sql: `ALTER TABLE account_balances ADD COLUMN IF NOT EXISTS org_id text` },
+  { name: "account_balances: add account_id", sql: `ALTER TABLE account_balances ADD COLUMN IF NOT EXISTS account_id text` },
+  { name: "account_balances: add period_start", sql: `ALTER TABLE account_balances ADD COLUMN IF NOT EXISTS period_start text` },
+  { name: "account_balances: add debit_total", sql: `ALTER TABLE account_balances ADD COLUMN IF NOT EXISTS debit_total text` },
+  { name: "account_balances: add credit_total", sql: `ALTER TABLE account_balances ADD COLUMN IF NOT EXISTS credit_total text` },
+  { name: "account_balances: add net_balance", sql: `ALTER TABLE account_balances ADD COLUMN IF NOT EXISTS net_balance text` },
+  { name: "account_balances: add updated_at", sql: `ALTER TABLE account_balances ADD COLUMN IF NOT EXISTS updated_at text` },
+
+  // ap_bill_lines — uncovered columns
+  { name: "ap_bill_lines: add id", sql: `ALTER TABLE ap_bill_lines ADD COLUMN IF NOT EXISTS id text` },
+  { name: "ap_bill_lines: add bill_id", sql: `ALTER TABLE ap_bill_lines ADD COLUMN IF NOT EXISTS bill_id text` },
+  { name: "ap_bill_lines: add line_number", sql: `ALTER TABLE ap_bill_lines ADD COLUMN IF NOT EXISTS line_number text` },
+  { name: "ap_bill_lines: add description", sql: `ALTER TABLE ap_bill_lines ADD COLUMN IF NOT EXISTS description text` },
+  { name: "ap_bill_lines: add quantity", sql: `ALTER TABLE ap_bill_lines ADD COLUMN IF NOT EXISTS quantity text` },
+  { name: "ap_bill_lines: add unit_price", sql: `ALTER TABLE ap_bill_lines ADD COLUMN IF NOT EXISTS unit_price text` },
+  { name: "ap_bill_lines: add amount", sql: `ALTER TABLE ap_bill_lines ADD COLUMN IF NOT EXISTS amount text` },
+  { name: "ap_bill_lines: add account_id", sql: `ALTER TABLE ap_bill_lines ADD COLUMN IF NOT EXISTS account_id text` },
+  { name: "ap_bill_lines: add department_id", sql: `ALTER TABLE ap_bill_lines ADD COLUMN IF NOT EXISTS department_id text` },
+
+  // ap_bills — uncovered columns
+  { name: "ap_bills: add id", sql: `ALTER TABLE ap_bills ADD COLUMN IF NOT EXISTS id text` },
+  { name: "ap_bills: add org_id", sql: `ALTER TABLE ap_bills ADD COLUMN IF NOT EXISTS org_id text` },
+  { name: "ap_bills: add bill_number", sql: `ALTER TABLE ap_bills ADD COLUMN IF NOT EXISTS bill_number text` },
+  { name: "ap_bills: add vendor_id", sql: `ALTER TABLE ap_bills ADD COLUMN IF NOT EXISTS vendor_id text` },
+  { name: "ap_bills: add vendor_name", sql: `ALTER TABLE ap_bills ADD COLUMN IF NOT EXISTS vendor_name text` },
+  { name: "ap_bills: add vendor_tax_id", sql: `ALTER TABLE ap_bills ADD COLUMN IF NOT EXISTS vendor_tax_id text` },
+  { name: "ap_bills: add issue_date", sql: `ALTER TABLE ap_bills ADD COLUMN IF NOT EXISTS issue_date text` },
+  { name: "ap_bills: add due_date", sql: `ALTER TABLE ap_bills ADD COLUMN IF NOT EXISTS due_date text` },
+  { name: "ap_bills: add terms", sql: `ALTER TABLE ap_bills ADD COLUMN IF NOT EXISTS terms text` },
+  { name: "ap_bills: add subtotal", sql: `ALTER TABLE ap_bills ADD COLUMN IF NOT EXISTS subtotal text` },
+  { name: "ap_bills: add tax_amount", sql: `ALTER TABLE ap_bills ADD COLUMN IF NOT EXISTS tax_amount text` },
+  { name: "ap_bills: add total_amount", sql: `ALTER TABLE ap_bills ADD COLUMN IF NOT EXISTS total_amount text` },
+  { name: "ap_bills: add amount_paid", sql: `ALTER TABLE ap_bills ADD COLUMN IF NOT EXISTS amount_paid text` },
+  { name: "ap_bills: add balance_due", sql: `ALTER TABLE ap_bills ADD COLUMN IF NOT EXISTS balance_due text` },
+  { name: "ap_bills: add status", sql: `ALTER TABLE ap_bills ADD COLUMN IF NOT EXISTS status text` },
+  { name: "ap_bills: add currency_code", sql: `ALTER TABLE ap_bills ADD COLUMN IF NOT EXISTS currency_code text` },
+  { name: "ap_bills: add memo", sql: `ALTER TABLE ap_bills ADD COLUMN IF NOT EXISTS memo text` },
+  { name: "ap_bills: add journal_entry_id", sql: `ALTER TABLE ap_bills ADD COLUMN IF NOT EXISTS journal_entry_id text` },
+  { name: "ap_bills: add is_1099_eligible", sql: `ALTER TABLE ap_bills ADD COLUMN IF NOT EXISTS is_1099_eligible text` },
+  { name: "ap_bills: add form_1099_type", sql: `ALTER TABLE ap_bills ADD COLUMN IF NOT EXISTS form_1099_type text` },
+  { name: "ap_bills: add form_1099_box", sql: `ALTER TABLE ap_bills ADD COLUMN IF NOT EXISTS form_1099_box text` },
+  { name: "ap_bills: add approved_by", sql: `ALTER TABLE ap_bills ADD COLUMN IF NOT EXISTS approved_by text` },
+  { name: "ap_bills: add approved_at", sql: `ALTER TABLE ap_bills ADD COLUMN IF NOT EXISTS approved_at text` },
+  { name: "ap_bills: add created_by", sql: `ALTER TABLE ap_bills ADD COLUMN IF NOT EXISTS created_by text` },
+  { name: "ap_bills: add created_at", sql: `ALTER TABLE ap_bills ADD COLUMN IF NOT EXISTS created_at text` },
+  { name: "ap_bills: add updated_at", sql: `ALTER TABLE ap_bills ADD COLUMN IF NOT EXISTS updated_at text` },
+
+  // ap_payments — uncovered columns
+  { name: "ap_payments: add id", sql: `ALTER TABLE ap_payments ADD COLUMN IF NOT EXISTS id text` },
+  { name: "ap_payments: add org_id", sql: `ALTER TABLE ap_payments ADD COLUMN IF NOT EXISTS org_id text` },
+  { name: "ap_payments: add bill_id", sql: `ALTER TABLE ap_payments ADD COLUMN IF NOT EXISTS bill_id text` },
+  { name: "ap_payments: add payment_date", sql: `ALTER TABLE ap_payments ADD COLUMN IF NOT EXISTS payment_date text` },
+  { name: "ap_payments: add amount", sql: `ALTER TABLE ap_payments ADD COLUMN IF NOT EXISTS amount text` },
+  { name: "ap_payments: add payment_method", sql: `ALTER TABLE ap_payments ADD COLUMN IF NOT EXISTS payment_method text` },
+  { name: "ap_payments: add check_number", sql: `ALTER TABLE ap_payments ADD COLUMN IF NOT EXISTS check_number text` },
+  { name: "ap_payments: add bank_account_id", sql: `ALTER TABLE ap_payments ADD COLUMN IF NOT EXISTS bank_account_id text` },
+  { name: "ap_payments: add journal_entry_id", sql: `ALTER TABLE ap_payments ADD COLUMN IF NOT EXISTS journal_entry_id text` },
+  { name: "ap_payments: add memo", sql: `ALTER TABLE ap_payments ADD COLUMN IF NOT EXISTS memo text` },
+  { name: "ap_payments: add created_at", sql: `ALTER TABLE ap_payments ADD COLUMN IF NOT EXISTS created_at text` },
+
+  // ar_invoice_lines — uncovered columns
+  { name: "ar_invoice_lines: add id", sql: `ALTER TABLE ar_invoice_lines ADD COLUMN IF NOT EXISTS id text` },
+  { name: "ar_invoice_lines: add invoice_id", sql: `ALTER TABLE ar_invoice_lines ADD COLUMN IF NOT EXISTS invoice_id text` },
+  { name: "ar_invoice_lines: add line_number", sql: `ALTER TABLE ar_invoice_lines ADD COLUMN IF NOT EXISTS line_number text` },
+  { name: "ar_invoice_lines: add description", sql: `ALTER TABLE ar_invoice_lines ADD COLUMN IF NOT EXISTS description text` },
+  { name: "ar_invoice_lines: add quantity", sql: `ALTER TABLE ar_invoice_lines ADD COLUMN IF NOT EXISTS quantity text` },
+  { name: "ar_invoice_lines: add unit_price", sql: `ALTER TABLE ar_invoice_lines ADD COLUMN IF NOT EXISTS unit_price text` },
+  { name: "ar_invoice_lines: add amount", sql: `ALTER TABLE ar_invoice_lines ADD COLUMN IF NOT EXISTS amount text` },
+  { name: "ar_invoice_lines: add account_id", sql: `ALTER TABLE ar_invoice_lines ADD COLUMN IF NOT EXISTS account_id text` },
+  { name: "ar_invoice_lines: add tax_rate", sql: `ALTER TABLE ar_invoice_lines ADD COLUMN IF NOT EXISTS tax_rate text` },
+  { name: "ar_invoice_lines: add tax_amount", sql: `ALTER TABLE ar_invoice_lines ADD COLUMN IF NOT EXISTS tax_amount text` },
+
+  // ar_invoices — uncovered columns
+  { name: "ar_invoices: add id", sql: `ALTER TABLE ar_invoices ADD COLUMN IF NOT EXISTS id text` },
+  { name: "ar_invoices: add org_id", sql: `ALTER TABLE ar_invoices ADD COLUMN IF NOT EXISTS org_id text` },
+  { name: "ar_invoices: add invoice_number", sql: `ALTER TABLE ar_invoices ADD COLUMN IF NOT EXISTS invoice_number text` },
+  { name: "ar_invoices: add customer_id", sql: `ALTER TABLE ar_invoices ADD COLUMN IF NOT EXISTS customer_id text` },
+  { name: "ar_invoices: add customer_name", sql: `ALTER TABLE ar_invoices ADD COLUMN IF NOT EXISTS customer_name text` },
+  { name: "ar_invoices: add issue_date", sql: `ALTER TABLE ar_invoices ADD COLUMN IF NOT EXISTS issue_date text` },
+  { name: "ar_invoices: add due_date", sql: `ALTER TABLE ar_invoices ADD COLUMN IF NOT EXISTS due_date text` },
+  { name: "ar_invoices: add terms", sql: `ALTER TABLE ar_invoices ADD COLUMN IF NOT EXISTS terms text` },
+  { name: "ar_invoices: add subtotal", sql: `ALTER TABLE ar_invoices ADD COLUMN IF NOT EXISTS subtotal text` },
+  { name: "ar_invoices: add tax_amount", sql: `ALTER TABLE ar_invoices ADD COLUMN IF NOT EXISTS tax_amount text` },
+  { name: "ar_invoices: add total_amount", sql: `ALTER TABLE ar_invoices ADD COLUMN IF NOT EXISTS total_amount text` },
+  { name: "ar_invoices: add amount_paid", sql: `ALTER TABLE ar_invoices ADD COLUMN IF NOT EXISTS amount_paid text` },
+  { name: "ar_invoices: add balance_due", sql: `ALTER TABLE ar_invoices ADD COLUMN IF NOT EXISTS balance_due text` },
+  { name: "ar_invoices: add status", sql: `ALTER TABLE ar_invoices ADD COLUMN IF NOT EXISTS status text` },
+  { name: "ar_invoices: add currency_code", sql: `ALTER TABLE ar_invoices ADD COLUMN IF NOT EXISTS currency_code text` },
+  { name: "ar_invoices: add memo", sql: `ALTER TABLE ar_invoices ADD COLUMN IF NOT EXISTS memo text` },
+  { name: "ar_invoices: add journal_entry_id", sql: `ALTER TABLE ar_invoices ADD COLUMN IF NOT EXISTS journal_entry_id text` },
+  { name: "ar_invoices: add recurring_schedule_id", sql: `ALTER TABLE ar_invoices ADD COLUMN IF NOT EXISTS recurring_schedule_id text` },
+  { name: "ar_invoices: add created_by", sql: `ALTER TABLE ar_invoices ADD COLUMN IF NOT EXISTS created_by text` },
+  { name: "ar_invoices: add created_at", sql: `ALTER TABLE ar_invoices ADD COLUMN IF NOT EXISTS created_at text` },
+  { name: "ar_invoices: add updated_at", sql: `ALTER TABLE ar_invoices ADD COLUMN IF NOT EXISTS updated_at text` },
+
+  // ar_payments — uncovered columns
+  { name: "ar_payments: add id", sql: `ALTER TABLE ar_payments ADD COLUMN IF NOT EXISTS id text` },
+  { name: "ar_payments: add org_id", sql: `ALTER TABLE ar_payments ADD COLUMN IF NOT EXISTS org_id text` },
+  { name: "ar_payments: add invoice_id", sql: `ALTER TABLE ar_payments ADD COLUMN IF NOT EXISTS invoice_id text` },
+  { name: "ar_payments: add payment_date", sql: `ALTER TABLE ar_payments ADD COLUMN IF NOT EXISTS payment_date text` },
+  { name: "ar_payments: add amount", sql: `ALTER TABLE ar_payments ADD COLUMN IF NOT EXISTS amount text` },
+  { name: "ar_payments: add payment_method", sql: `ALTER TABLE ar_payments ADD COLUMN IF NOT EXISTS payment_method text` },
+  { name: "ar_payments: add reference_number", sql: `ALTER TABLE ar_payments ADD COLUMN IF NOT EXISTS reference_number text` },
+  { name: "ar_payments: add deposit_account_id", sql: `ALTER TABLE ar_payments ADD COLUMN IF NOT EXISTS deposit_account_id text` },
+  { name: "ar_payments: add journal_entry_id", sql: `ALTER TABLE ar_payments ADD COLUMN IF NOT EXISTS journal_entry_id text` },
+  { name: "ar_payments: add memo", sql: `ALTER TABLE ar_payments ADD COLUMN IF NOT EXISTS memo text` },
+  { name: "ar_payments: add created_at", sql: `ALTER TABLE ar_payments ADD COLUMN IF NOT EXISTS created_at text` },
+
+  // bank_reconciliation_items — uncovered columns
+  { name: "bank_reconciliation_items: add id", sql: `ALTER TABLE bank_reconciliation_items ADD COLUMN IF NOT EXISTS id text` },
+  { name: "bank_reconciliation_items: add reconciliation_id", sql: `ALTER TABLE bank_reconciliation_items ADD COLUMN IF NOT EXISTS reconciliation_id text` },
+  { name: "bank_reconciliation_items: add bank_transaction_id", sql: `ALTER TABLE bank_reconciliation_items ADD COLUMN IF NOT EXISTS bank_transaction_id text` },
+  { name: "bank_reconciliation_items: add journal_entry_line_id", sql: `ALTER TABLE bank_reconciliation_items ADD COLUMN IF NOT EXISTS journal_entry_line_id text` },
+  { name: "bank_reconciliation_items: add amount", sql: `ALTER TABLE bank_reconciliation_items ADD COLUMN IF NOT EXISTS amount text` },
+  { name: "bank_reconciliation_items: add item_type", sql: `ALTER TABLE bank_reconciliation_items ADD COLUMN IF NOT EXISTS item_type text` },
+  { name: "bank_reconciliation_items: add description", sql: `ALTER TABLE bank_reconciliation_items ADD COLUMN IF NOT EXISTS description text` },
+  { name: "bank_reconciliation_items: add is_cleared", sql: `ALTER TABLE bank_reconciliation_items ADD COLUMN IF NOT EXISTS is_cleared text` },
+  { name: "bank_reconciliation_items: add created_at", sql: `ALTER TABLE bank_reconciliation_items ADD COLUMN IF NOT EXISTS created_at text` },
+
+  // bank_reconciliations — uncovered columns
+  { name: "bank_reconciliations: add id", sql: `ALTER TABLE bank_reconciliations ADD COLUMN IF NOT EXISTS id text` },
+  { name: "bank_reconciliations: add org_id", sql: `ALTER TABLE bank_reconciliations ADD COLUMN IF NOT EXISTS org_id text` },
+  { name: "bank_reconciliations: add bank_account_id", sql: `ALTER TABLE bank_reconciliations ADD COLUMN IF NOT EXISTS bank_account_id text` },
+  { name: "bank_reconciliations: add statement_date", sql: `ALTER TABLE bank_reconciliations ADD COLUMN IF NOT EXISTS statement_date text` },
+  { name: "bank_reconciliations: add statement_balance", sql: `ALTER TABLE bank_reconciliations ADD COLUMN IF NOT EXISTS statement_balance text` },
+  { name: "bank_reconciliations: add book_balance", sql: `ALTER TABLE bank_reconciliations ADD COLUMN IF NOT EXISTS book_balance text` },
+  { name: "bank_reconciliations: add adjusted_bank_balance", sql: `ALTER TABLE bank_reconciliations ADD COLUMN IF NOT EXISTS adjusted_bank_balance text` },
+  { name: "bank_reconciliations: add adjusted_book_balance", sql: `ALTER TABLE bank_reconciliations ADD COLUMN IF NOT EXISTS adjusted_book_balance text` },
+  { name: "bank_reconciliations: add difference", sql: `ALTER TABLE bank_reconciliations ADD COLUMN IF NOT EXISTS difference text` },
+  { name: "bank_reconciliations: add status", sql: `ALTER TABLE bank_reconciliations ADD COLUMN IF NOT EXISTS status text` },
+  { name: "bank_reconciliations: add reconciled_by", sql: `ALTER TABLE bank_reconciliations ADD COLUMN IF NOT EXISTS reconciled_by text` },
+  { name: "bank_reconciliations: add reconciled_at", sql: `ALTER TABLE bank_reconciliations ADD COLUMN IF NOT EXISTS reconciled_at text` },
+  { name: "bank_reconciliations: add created_by", sql: `ALTER TABLE bank_reconciliations ADD COLUMN IF NOT EXISTS created_by text` },
+  { name: "bank_reconciliations: add created_at", sql: `ALTER TABLE bank_reconciliations ADD COLUMN IF NOT EXISTS created_at text` },
+  { name: "bank_reconciliations: add updated_at", sql: `ALTER TABLE bank_reconciliations ADD COLUMN IF NOT EXISTS updated_at text` },
+
+  // bank_transactions — uncovered columns
+  { name: "bank_transactions: add id", sql: `ALTER TABLE bank_transactions ADD COLUMN IF NOT EXISTS id text` },
+  { name: "bank_transactions: add org_id", sql: `ALTER TABLE bank_transactions ADD COLUMN IF NOT EXISTS org_id text` },
+  { name: "bank_transactions: add bank_account_id", sql: `ALTER TABLE bank_transactions ADD COLUMN IF NOT EXISTS bank_account_id text` },
+  { name: "bank_transactions: add transaction_date", sql: `ALTER TABLE bank_transactions ADD COLUMN IF NOT EXISTS transaction_date text` },
+  { name: "bank_transactions: add post_date", sql: `ALTER TABLE bank_transactions ADD COLUMN IF NOT EXISTS post_date text` },
+  { name: "bank_transactions: add description", sql: `ALTER TABLE bank_transactions ADD COLUMN IF NOT EXISTS description text` },
+  { name: "bank_transactions: add amount", sql: `ALTER TABLE bank_transactions ADD COLUMN IF NOT EXISTS amount text` },
+  { name: "bank_transactions: add running_balance", sql: `ALTER TABLE bank_transactions ADD COLUMN IF NOT EXISTS running_balance text` },
+  { name: "bank_transactions: add transaction_type", sql: `ALTER TABLE bank_transactions ADD COLUMN IF NOT EXISTS transaction_type text` },
+  { name: "bank_transactions: add check_number", sql: `ALTER TABLE bank_transactions ADD COLUMN IF NOT EXISTS check_number text` },
+  { name: "bank_transactions: add reference_number", sql: `ALTER TABLE bank_transactions ADD COLUMN IF NOT EXISTS reference_number text` },
+  { name: "bank_transactions: add category", sql: `ALTER TABLE bank_transactions ADD COLUMN IF NOT EXISTS category text` },
+  { name: "bank_transactions: add reconciliation_status", sql: `ALTER TABLE bank_transactions ADD COLUMN IF NOT EXISTS reconciliation_status text` },
+  { name: "bank_transactions: add matched_journal_entry_id", sql: `ALTER TABLE bank_transactions ADD COLUMN IF NOT EXISTS matched_journal_entry_id text` },
+  { name: "bank_transactions: add matched_invoice_id", sql: `ALTER TABLE bank_transactions ADD COLUMN IF NOT EXISTS matched_invoice_id text` },
+  { name: "bank_transactions: add matched_bill_payment_id", sql: `ALTER TABLE bank_transactions ADD COLUMN IF NOT EXISTS matched_bill_payment_id text` },
+  { name: "bank_transactions: add import_batch_id", sql: `ALTER TABLE bank_transactions ADD COLUMN IF NOT EXISTS import_batch_id text` },
+  { name: "bank_transactions: add plaid_transaction_id", sql: `ALTER TABLE bank_transactions ADD COLUMN IF NOT EXISTS plaid_transaction_id text` },
+  { name: "bank_transactions: add created_at", sql: `ALTER TABLE bank_transactions ADD COLUMN IF NOT EXISTS created_at text` },
+
+  // budget_tree_accounts — uncovered columns
+  { name: "budget_tree_accounts: add id", sql: `ALTER TABLE budget_tree_accounts ADD COLUMN IF NOT EXISTS id text` },
+  { name: "budget_tree_accounts: add budget_version_id", sql: `ALTER TABLE budget_tree_accounts ADD COLUMN IF NOT EXISTS budget_version_id text` },
+  { name: "budget_tree_accounts: add account_key", sql: `ALTER TABLE budget_tree_accounts ADD COLUMN IF NOT EXISTS account_key text` },
+  { name: "budget_tree_accounts: add display_name", sql: `ALTER TABLE budget_tree_accounts ADD COLUMN IF NOT EXISTS display_name text` },
+  { name: "budget_tree_accounts: add parent_key", sql: `ALTER TABLE budget_tree_accounts ADD COLUMN IF NOT EXISTS parent_key text` },
+  { name: "budget_tree_accounts: add line_type", sql: `ALTER TABLE budget_tree_accounts ADD COLUMN IF NOT EXISTS line_type text` },
+  { name: "budget_tree_accounts: add sort_order", sql: `ALTER TABLE budget_tree_accounts ADD COLUMN IF NOT EXISTS sort_order text` },
+  { name: "budget_tree_accounts: add is_parent", sql: `ALTER TABLE budget_tree_accounts ADD COLUMN IF NOT EXISTS is_parent text` },
+  { name: "budget_tree_accounts: add asset_class", sql: `ALTER TABLE budget_tree_accounts ADD COLUMN IF NOT EXISTS asset_class text` },
+  { name: "budget_tree_accounts: add created_at", sql: `ALTER TABLE budget_tree_accounts ADD COLUMN IF NOT EXISTS created_at text` },
+
+  // financial_audit_log — uncovered columns
+  { name: "financial_audit_log: add id", sql: `ALTER TABLE financial_audit_log ADD COLUMN IF NOT EXISTS id text` },
+  { name: "financial_audit_log: add org_id", sql: `ALTER TABLE financial_audit_log ADD COLUMN IF NOT EXISTS org_id text` },
+  { name: "financial_audit_log: add fund_id", sql: `ALTER TABLE financial_audit_log ADD COLUMN IF NOT EXISTS fund_id text` },
+  { name: "financial_audit_log: add investor_id", sql: `ALTER TABLE financial_audit_log ADD COLUMN IF NOT EXISTS investor_id text` },
+  { name: "financial_audit_log: add event_type", sql: `ALTER TABLE financial_audit_log ADD COLUMN IF NOT EXISTS event_type text` },
+  { name: "financial_audit_log: add actor_user_id", sql: `ALTER TABLE financial_audit_log ADD COLUMN IF NOT EXISTS actor_user_id text` },
+  { name: "financial_audit_log: add actor_email", sql: `ALTER TABLE financial_audit_log ADD COLUMN IF NOT EXISTS actor_email text` },
+  { name: "financial_audit_log: add actor_role", sql: `ALTER TABLE financial_audit_log ADD COLUMN IF NOT EXISTS actor_role text` },
+  { name: "financial_audit_log: add ip_address", sql: `ALTER TABLE financial_audit_log ADD COLUMN IF NOT EXISTS ip_address text` },
+  { name: "financial_audit_log: add user_agent", sql: `ALTER TABLE financial_audit_log ADD COLUMN IF NOT EXISTS user_agent text` },
+  { name: "financial_audit_log: add amount", sql: `ALTER TABLE financial_audit_log ADD COLUMN IF NOT EXISTS amount text` },
+  { name: "financial_audit_log: add currency", sql: `ALTER TABLE financial_audit_log ADD COLUMN IF NOT EXISTS currency text` },
+  { name: "financial_audit_log: add before_state", sql: `ALTER TABLE financial_audit_log ADD COLUMN IF NOT EXISTS before_state text` },
+  { name: "financial_audit_log: add after_state", sql: `ALTER TABLE financial_audit_log ADD COLUMN IF NOT EXISTS after_state text` },
+  { name: "financial_audit_log: add metadata", sql: `ALTER TABLE financial_audit_log ADD COLUMN IF NOT EXISTS metadata text` },
+  { name: "financial_audit_log: add created_at", sql: `ALTER TABLE financial_audit_log ADD COLUMN IF NOT EXISTS created_at text` },
+
+  // fund_period_locks — uncovered columns
+  { name: "fund_period_locks: add id", sql: `ALTER TABLE fund_period_locks ADD COLUMN IF NOT EXISTS id text` },
+  { name: "fund_period_locks: add org_id", sql: `ALTER TABLE fund_period_locks ADD COLUMN IF NOT EXISTS org_id text` },
+  { name: "fund_period_locks: add fund_id", sql: `ALTER TABLE fund_period_locks ADD COLUMN IF NOT EXISTS fund_id text` },
+  { name: "fund_period_locks: add period_label", sql: `ALTER TABLE fund_period_locks ADD COLUMN IF NOT EXISTS period_label text` },
+  { name: "fund_period_locks: add period_start", sql: `ALTER TABLE fund_period_locks ADD COLUMN IF NOT EXISTS period_start text` },
+  { name: "fund_period_locks: add period_end", sql: `ALTER TABLE fund_period_locks ADD COLUMN IF NOT EXISTS period_end text` },
+  { name: "fund_period_locks: add locked_at", sql: `ALTER TABLE fund_period_locks ADD COLUMN IF NOT EXISTS locked_at text` },
+  { name: "fund_period_locks: add locked_by", sql: `ALTER TABLE fund_period_locks ADD COLUMN IF NOT EXISTS locked_by text` },
+  { name: "fund_period_locks: add unlocked_at", sql: `ALTER TABLE fund_period_locks ADD COLUMN IF NOT EXISTS unlocked_at text` },
+  { name: "fund_period_locks: add unlocked_by", sql: `ALTER TABLE fund_period_locks ADD COLUMN IF NOT EXISTS unlocked_by text` },
+  { name: "fund_period_locks: add unlock_reason", sql: `ALTER TABLE fund_period_locks ADD COLUMN IF NOT EXISTS unlock_reason text` },
+  { name: "fund_period_locks: add is_locked", sql: `ALTER TABLE fund_period_locks ADD COLUMN IF NOT EXISTS is_locked text` },
+
+  // intercompany_transactions — uncovered columns
+  { name: "intercompany_transactions: add id", sql: `ALTER TABLE intercompany_transactions ADD COLUMN IF NOT EXISTS id text` },
+  { name: "intercompany_transactions: add org_id", sql: `ALTER TABLE intercompany_transactions ADD COLUMN IF NOT EXISTS org_id text` },
+  { name: "intercompany_transactions: add from_entity_id", sql: `ALTER TABLE intercompany_transactions ADD COLUMN IF NOT EXISTS from_entity_id text` },
+  { name: "intercompany_transactions: add from_entity_name", sql: `ALTER TABLE intercompany_transactions ADD COLUMN IF NOT EXISTS from_entity_name text` },
+  { name: "intercompany_transactions: add to_entity_id", sql: `ALTER TABLE intercompany_transactions ADD COLUMN IF NOT EXISTS to_entity_id text` },
+  { name: "intercompany_transactions: add to_entity_name", sql: `ALTER TABLE intercompany_transactions ADD COLUMN IF NOT EXISTS to_entity_name text` },
+  { name: "intercompany_transactions: add transaction_date", sql: `ALTER TABLE intercompany_transactions ADD COLUMN IF NOT EXISTS transaction_date text` },
+  { name: "intercompany_transactions: add amount", sql: `ALTER TABLE intercompany_transactions ADD COLUMN IF NOT EXISTS amount text` },
+  { name: "intercompany_transactions: add description", sql: `ALTER TABLE intercompany_transactions ADD COLUMN IF NOT EXISTS description text` },
+  { name: "intercompany_transactions: add from_journal_entry_id", sql: `ALTER TABLE intercompany_transactions ADD COLUMN IF NOT EXISTS from_journal_entry_id text` },
+  { name: "intercompany_transactions: add to_journal_entry_id", sql: `ALTER TABLE intercompany_transactions ADD COLUMN IF NOT EXISTS to_journal_entry_id text` },
+  { name: "intercompany_transactions: add elimination_journal_entry_id", sql: `ALTER TABLE intercompany_transactions ADD COLUMN IF NOT EXISTS elimination_journal_entry_id text` },
+  { name: "intercompany_transactions: add is_eliminated", sql: `ALTER TABLE intercompany_transactions ADD COLUMN IF NOT EXISTS is_eliminated text` },
+  { name: "intercompany_transactions: add created_at", sql: `ALTER TABLE intercompany_transactions ADD COLUMN IF NOT EXISTS created_at text` },
+
+  // journal_entries — uncovered columns
+  { name: "journal_entries: add id", sql: `ALTER TABLE journal_entries ADD COLUMN IF NOT EXISTS id text` },
+  { name: "journal_entries: add org_id", sql: `ALTER TABLE journal_entries ADD COLUMN IF NOT EXISTS org_id text` },
+  { name: "journal_entries: add entry_number", sql: `ALTER TABLE journal_entries ADD COLUMN IF NOT EXISTS entry_number text` },
+  { name: "journal_entries: add entry_date", sql: `ALTER TABLE journal_entries ADD COLUMN IF NOT EXISTS entry_date text` },
+  { name: "journal_entries: add post_date", sql: `ALTER TABLE journal_entries ADD COLUMN IF NOT EXISTS post_date text` },
+  { name: "journal_entries: add memo", sql: `ALTER TABLE journal_entries ADD COLUMN IF NOT EXISTS memo text` },
+  { name: "journal_entries: add status", sql: `ALTER TABLE journal_entries ADD COLUMN IF NOT EXISTS status text` },
+  { name: "journal_entries: add source", sql: `ALTER TABLE journal_entries ADD COLUMN IF NOT EXISTS source text` },
+  { name: "journal_entries: add source_ref", sql: `ALTER TABLE journal_entries ADD COLUMN IF NOT EXISTS source_ref text` },
+  { name: "journal_entries: add reversal_of_id", sql: `ALTER TABLE journal_entries ADD COLUMN IF NOT EXISTS reversal_of_id text` },
+  { name: "journal_entries: add auto_reversal_date", sql: `ALTER TABLE journal_entries ADD COLUMN IF NOT EXISTS auto_reversal_date text` },
+  { name: "journal_entries: add entity_id", sql: `ALTER TABLE journal_entries ADD COLUMN IF NOT EXISTS entity_id text` },
+  { name: "journal_entries: add entity_type", sql: `ALTER TABLE journal_entries ADD COLUMN IF NOT EXISTS entity_type text` },
+  { name: "journal_entries: add created_by", sql: `ALTER TABLE journal_entries ADD COLUMN IF NOT EXISTS created_by text` },
+  { name: "journal_entries: add approved_by", sql: `ALTER TABLE journal_entries ADD COLUMN IF NOT EXISTS approved_by text` },
+  { name: "journal_entries: add posted_by", sql: `ALTER TABLE journal_entries ADD COLUMN IF NOT EXISTS posted_by text` },
+  { name: "journal_entries: add created_at", sql: `ALTER TABLE journal_entries ADD COLUMN IF NOT EXISTS created_at text` },
+  { name: "journal_entries: add updated_at", sql: `ALTER TABLE journal_entries ADD COLUMN IF NOT EXISTS updated_at text` },
+
+  // journal_entry_lines — uncovered columns
+  { name: "journal_entry_lines: add id", sql: `ALTER TABLE journal_entry_lines ADD COLUMN IF NOT EXISTS id text` },
+  { name: "journal_entry_lines: add journal_entry_id", sql: `ALTER TABLE journal_entry_lines ADD COLUMN IF NOT EXISTS journal_entry_id text` },
+  { name: "journal_entry_lines: add line_number", sql: `ALTER TABLE journal_entry_lines ADD COLUMN IF NOT EXISTS line_number text` },
+  { name: "journal_entry_lines: add account_id", sql: `ALTER TABLE journal_entry_lines ADD COLUMN IF NOT EXISTS account_id text` },
+  { name: "journal_entry_lines: add account_code", sql: `ALTER TABLE journal_entry_lines ADD COLUMN IF NOT EXISTS account_code text` },
+  { name: "journal_entry_lines: add account_name", sql: `ALTER TABLE journal_entry_lines ADD COLUMN IF NOT EXISTS account_name text` },
+  { name: "journal_entry_lines: add department_id", sql: `ALTER TABLE journal_entry_lines ADD COLUMN IF NOT EXISTS department_id text` },
+  { name: "journal_entry_lines: add profit_center_id", sql: `ALTER TABLE journal_entry_lines ADD COLUMN IF NOT EXISTS profit_center_id text` },
+  { name: "journal_entry_lines: add description", sql: `ALTER TABLE journal_entry_lines ADD COLUMN IF NOT EXISTS description text` },
+  { name: "journal_entry_lines: add debit", sql: `ALTER TABLE journal_entry_lines ADD COLUMN IF NOT EXISTS debit text` },
+  { name: "journal_entry_lines: add credit", sql: `ALTER TABLE journal_entry_lines ADD COLUMN IF NOT EXISTS credit text` },
+  { name: "journal_entry_lines: add entity_id", sql: `ALTER TABLE journal_entry_lines ADD COLUMN IF NOT EXISTS entity_id text` },
+  { name: "journal_entry_lines: add entity_type", sql: `ALTER TABLE journal_entry_lines ADD COLUMN IF NOT EXISTS entity_type text` },
+
+  // month_end_close_steps — uncovered columns
+  { name: "month_end_close_steps: add id", sql: `ALTER TABLE month_end_close_steps ADD COLUMN IF NOT EXISTS id text` },
+  { name: "month_end_close_steps: add close_id", sql: `ALTER TABLE month_end_close_steps ADD COLUMN IF NOT EXISTS close_id text` },
+  { name: "month_end_close_steps: add step_order", sql: `ALTER TABLE month_end_close_steps ADD COLUMN IF NOT EXISTS step_order text` },
+  { name: "month_end_close_steps: add step_name", sql: `ALTER TABLE month_end_close_steps ADD COLUMN IF NOT EXISTS step_name text` },
+  { name: "month_end_close_steps: add step_description", sql: `ALTER TABLE month_end_close_steps ADD COLUMN IF NOT EXISTS step_description text` },
+  { name: "month_end_close_steps: add status", sql: `ALTER TABLE month_end_close_steps ADD COLUMN IF NOT EXISTS status text` },
+  { name: "month_end_close_steps: add assigned_to", sql: `ALTER TABLE month_end_close_steps ADD COLUMN IF NOT EXISTS assigned_to text` },
+  { name: "month_end_close_steps: add completed_by", sql: `ALTER TABLE month_end_close_steps ADD COLUMN IF NOT EXISTS completed_by text` },
+  { name: "month_end_close_steps: add completed_at", sql: `ALTER TABLE month_end_close_steps ADD COLUMN IF NOT EXISTS completed_at text` },
+  { name: "month_end_close_steps: add notes", sql: `ALTER TABLE month_end_close_steps ADD COLUMN IF NOT EXISTS notes text` },
+  { name: "month_end_close_steps: add required_approval", sql: `ALTER TABLE month_end_close_steps ADD COLUMN IF NOT EXISTS required_approval text` },
+  { name: "month_end_close_steps: add approved_by", sql: `ALTER TABLE month_end_close_steps ADD COLUMN IF NOT EXISTS approved_by text` },
+  { name: "month_end_close_steps: add approved_at", sql: `ALTER TABLE month_end_close_steps ADD COLUMN IF NOT EXISTS approved_at text` },
+  { name: "month_end_close_steps: add created_at", sql: `ALTER TABLE month_end_close_steps ADD COLUMN IF NOT EXISTS created_at text` },
+  { name: "month_end_close_steps: add updated_at", sql: `ALTER TABLE month_end_close_steps ADD COLUMN IF NOT EXISTS updated_at text` },
+
+  // month_end_closes — uncovered columns
+  { name: "month_end_closes: add id", sql: `ALTER TABLE month_end_closes ADD COLUMN IF NOT EXISTS id text` },
+  { name: "month_end_closes: add org_id", sql: `ALTER TABLE month_end_closes ADD COLUMN IF NOT EXISTS org_id text` },
+  { name: "month_end_closes: add period_label", sql: `ALTER TABLE month_end_closes ADD COLUMN IF NOT EXISTS period_label text` },
+  { name: "month_end_closes: add period_start", sql: `ALTER TABLE month_end_closes ADD COLUMN IF NOT EXISTS period_start text` },
+  { name: "month_end_closes: add period_end", sql: `ALTER TABLE month_end_closes ADD COLUMN IF NOT EXISTS period_end text` },
+  { name: "month_end_closes: add status", sql: `ALTER TABLE month_end_closes ADD COLUMN IF NOT EXISTS status text` },
+  { name: "month_end_closes: add closed_by", sql: `ALTER TABLE month_end_closes ADD COLUMN IF NOT EXISTS closed_by text` },
+  { name: "month_end_closes: add closed_at", sql: `ALTER TABLE month_end_closes ADD COLUMN IF NOT EXISTS closed_at text` },
+  { name: "month_end_closes: add reopened_by", sql: `ALTER TABLE month_end_closes ADD COLUMN IF NOT EXISTS reopened_by text` },
+  { name: "month_end_closes: add reopened_at", sql: `ALTER TABLE month_end_closes ADD COLUMN IF NOT EXISTS reopened_at text` },
+  { name: "month_end_closes: add reopen_reason", sql: `ALTER TABLE month_end_closes ADD COLUMN IF NOT EXISTS reopen_reason text` },
+  { name: "month_end_closes: add created_by", sql: `ALTER TABLE month_end_closes ADD COLUMN IF NOT EXISTS created_by text` },
+  { name: "month_end_closes: add created_at", sql: `ALTER TABLE month_end_closes ADD COLUMN IF NOT EXISTS created_at text` },
+  { name: "month_end_closes: add updated_at", sql: `ALTER TABLE month_end_closes ADD COLUMN IF NOT EXISTS updated_at text` },
+
+  // rent_roll_projects — uncovered columns
+  { name: "rent_roll_projects: add id", sql: `ALTER TABLE rent_roll_projects ADD COLUMN IF NOT EXISTS id text` },
+  { name: "rent_roll_projects: add org_id", sql: `ALTER TABLE rent_roll_projects ADD COLUMN IF NOT EXISTS org_id text` },
+  { name: "rent_roll_projects: add name", sql: `ALTER TABLE rent_roll_projects ADD COLUMN IF NOT EXISTS name text` },
+  { name: "rent_roll_projects: add code", sql: `ALTER TABLE rent_roll_projects ADD COLUMN IF NOT EXISTS code text` },
+  { name: "rent_roll_projects: add description", sql: `ALTER TABLE rent_roll_projects ADD COLUMN IF NOT EXISTS description text` },
+  { name: "rent_roll_projects: add status", sql: `ALTER TABLE rent_roll_projects ADD COLUMN IF NOT EXISTS status text` },
+  { name: "rent_roll_projects: add project_type", sql: `ALTER TABLE rent_roll_projects ADD COLUMN IF NOT EXISTS project_type text` },
+  { name: "rent_roll_projects: add season_type", sql: `ALTER TABLE rent_roll_projects ADD COLUMN IF NOT EXISTS season_type text` },
+  { name: "rent_roll_projects: add capacity", sql: `ALTER TABLE rent_roll_projects ADD COLUMN IF NOT EXISTS capacity text` },
+  { name: "rent_roll_projects: add is_active", sql: `ALTER TABLE rent_roll_projects ADD COLUMN IF NOT EXISTS is_active text` },
+  { name: "rent_roll_projects: add target_noi", sql: `ALTER TABLE rent_roll_projects ADD COLUMN IF NOT EXISTS target_noi text` },
+  { name: "rent_roll_projects: add include_in_executive", sql: `ALTER TABLE rent_roll_projects ADD COLUMN IF NOT EXISTS include_in_executive text` },
+  { name: "rent_roll_projects: add season_start_date", sql: `ALTER TABLE rent_roll_projects ADD COLUMN IF NOT EXISTS season_start_date text` },
+  { name: "rent_roll_projects: add season_end_date", sql: `ALTER TABLE rent_roll_projects ADD COLUMN IF NOT EXISTS season_end_date text` },
+  { name: "rent_roll_projects: add winter_start_date", sql: `ALTER TABLE rent_roll_projects ADD COLUMN IF NOT EXISTS winter_start_date text` },
+  { name: "rent_roll_projects: add winter_end_date", sql: `ALTER TABLE rent_roll_projects ADD COLUMN IF NOT EXISTS winter_end_date text` },
+  { name: "rent_roll_projects: add budgeted_revenue", sql: `ALTER TABLE rent_roll_projects ADD COLUMN IF NOT EXISTS budgeted_revenue text` },
+  { name: "rent_roll_projects: add budgeted_occupancy", sql: `ALTER TABLE rent_roll_projects ADD COLUMN IF NOT EXISTS budgeted_occupancy text` },
+  { name: "rent_roll_projects: add budgeted_expenses", sql: `ALTER TABLE rent_roll_projects ADD COLUMN IF NOT EXISTS budgeted_expenses text` },
+  { name: "rent_roll_projects: add budget_year", sql: `ALTER TABLE rent_roll_projects ADD COLUMN IF NOT EXISTS budget_year text` },
+  { name: "rent_roll_projects: add storage_mix", sql: `ALTER TABLE rent_roll_projects ADD COLUMN IF NOT EXISTS storage_mix text` },
+  { name: "rent_roll_projects: add base_rent1_label", sql: `ALTER TABLE rent_roll_projects ADD COLUMN IF NOT EXISTS base_rent1_label text` },
+  { name: "rent_roll_projects: add base_rent2_label", sql: `ALTER TABLE rent_roll_projects ADD COLUMN IF NOT EXISTS base_rent2_label text` },
+  { name: "rent_roll_projects: add base_rent3_label", sql: `ALTER TABLE rent_roll_projects ADD COLUMN IF NOT EXISTS base_rent3_label text` },
+  { name: "rent_roll_projects: add charge1_label", sql: `ALTER TABLE rent_roll_projects ADD COLUMN IF NOT EXISTS charge1_label text` },
+  { name: "rent_roll_projects: add charge2_label", sql: `ALTER TABLE rent_roll_projects ADD COLUMN IF NOT EXISTS charge2_label text` },
+  { name: "rent_roll_projects: add charge3_label", sql: `ALTER TABLE rent_roll_projects ADD COLUMN IF NOT EXISTS charge3_label text` },
+  { name: "rent_roll_projects: add created_by", sql: `ALTER TABLE rent_roll_projects ADD COLUMN IF NOT EXISTS created_by text` },
+  { name: "rent_roll_projects: add created_at", sql: `ALTER TABLE rent_roll_projects ADD COLUMN IF NOT EXISTS created_at text` },
+  { name: "rent_roll_projects: add updated_at", sql: `ALTER TABLE rent_roll_projects ADD COLUMN IF NOT EXISTS updated_at text` },
+
+  // revenue_contracts — uncovered columns
+  { name: "revenue_contracts: add id", sql: `ALTER TABLE revenue_contracts ADD COLUMN IF NOT EXISTS id text` },
+  { name: "revenue_contracts: add org_id", sql: `ALTER TABLE revenue_contracts ADD COLUMN IF NOT EXISTS org_id text` },
+  { name: "revenue_contracts: add contract_number", sql: `ALTER TABLE revenue_contracts ADD COLUMN IF NOT EXISTS contract_number text` },
+  { name: "revenue_contracts: add customer_name", sql: `ALTER TABLE revenue_contracts ADD COLUMN IF NOT EXISTS customer_name text` },
+  { name: "revenue_contracts: add start_date", sql: `ALTER TABLE revenue_contracts ADD COLUMN IF NOT EXISTS start_date text` },
+  { name: "revenue_contracts: add end_date", sql: `ALTER TABLE revenue_contracts ADD COLUMN IF NOT EXISTS end_date text` },
+  { name: "revenue_contracts: add total_contract_value", sql: `ALTER TABLE revenue_contracts ADD COLUMN IF NOT EXISTS total_contract_value text` },
+  { name: "revenue_contracts: add recognition_method", sql: `ALTER TABLE revenue_contracts ADD COLUMN IF NOT EXISTS recognition_method text` },
+  { name: "revenue_contracts: add recognized_to_date", sql: `ALTER TABLE revenue_contracts ADD COLUMN IF NOT EXISTS recognized_to_date text` },
+  { name: "revenue_contracts: add deferred_revenue", sql: `ALTER TABLE revenue_contracts ADD COLUMN IF NOT EXISTS deferred_revenue text` },
+  { name: "revenue_contracts: add status", sql: `ALTER TABLE revenue_contracts ADD COLUMN IF NOT EXISTS status text` },
+  { name: "revenue_contracts: add created_by", sql: `ALTER TABLE revenue_contracts ADD COLUMN IF NOT EXISTS created_by text` },
+  { name: "revenue_contracts: add created_at", sql: `ALTER TABLE revenue_contracts ADD COLUMN IF NOT EXISTS created_at text` },
+  { name: "revenue_contracts: add updated_at", sql: `ALTER TABLE revenue_contracts ADD COLUMN IF NOT EXISTS updated_at text` },
+
+  // revenue_performance_obligations — uncovered columns
+  { name: "revenue_performance_obligations: add id", sql: `ALTER TABLE revenue_performance_obligations ADD COLUMN IF NOT EXISTS id text` },
+  { name: "revenue_performance_obligations: add contract_id", sql: `ALTER TABLE revenue_performance_obligations ADD COLUMN IF NOT EXISTS contract_id text` },
+  { name: "revenue_performance_obligations: add description", sql: `ALTER TABLE revenue_performance_obligations ADD COLUMN IF NOT EXISTS description text` },
+  { name: "revenue_performance_obligations: add standalone_selling_price", sql: `ALTER TABLE revenue_performance_obligations ADD COLUMN IF NOT EXISTS standalone_selling_price text` },
+  { name: "revenue_performance_obligations: add allocated_price", sql: `ALTER TABLE revenue_performance_obligations ADD COLUMN IF NOT EXISTS allocated_price text` },
+  { name: "revenue_performance_obligations: add recognition_method", sql: `ALTER TABLE revenue_performance_obligations ADD COLUMN IF NOT EXISTS recognition_method text` },
+  { name: "revenue_performance_obligations: add progress_measure", sql: `ALTER TABLE revenue_performance_obligations ADD COLUMN IF NOT EXISTS progress_measure text` },
+  { name: "revenue_performance_obligations: add percent_complete", sql: `ALTER TABLE revenue_performance_obligations ADD COLUMN IF NOT EXISTS percent_complete text` },
+  { name: "revenue_performance_obligations: add recognized_amount", sql: `ALTER TABLE revenue_performance_obligations ADD COLUMN IF NOT EXISTS recognized_amount text` },
+  { name: "revenue_performance_obligations: add deferred_amount", sql: `ALTER TABLE revenue_performance_obligations ADD COLUMN IF NOT EXISTS deferred_amount text` },
+  { name: "revenue_performance_obligations: add created_at", sql: `ALTER TABLE revenue_performance_obligations ADD COLUMN IF NOT EXISTS created_at text` },
+
+  // distribution_approvals — uncovered columns
+  { name: "distribution_approvals: add id", sql: `ALTER TABLE distribution_approvals ADD COLUMN IF NOT EXISTS id text` },
+  { name: "distribution_approvals: add org_id", sql: `ALTER TABLE distribution_approvals ADD COLUMN IF NOT EXISTS org_id text` },
+  { name: "distribution_approvals: add fund_id", sql: `ALTER TABLE distribution_approvals ADD COLUMN IF NOT EXISTS fund_id text` },
+  { name: "distribution_approvals: add status", sql: `ALTER TABLE distribution_approvals ADD COLUMN IF NOT EXISTS status text` },
+  { name: "distribution_approvals: add total_proceeds", sql: `ALTER TABLE distribution_approvals ADD COLUMN IF NOT EXISTS total_proceeds text` },
+  { name: "distribution_approvals: add distribution_type", sql: `ALTER TABLE distribution_approvals ADD COLUMN IF NOT EXISTS distribution_type text` },
+  { name: "distribution_approvals: add deal_allocation_id", sql: `ALTER TABLE distribution_approvals ADD COLUMN IF NOT EXISTS deal_allocation_id text` },
+  { name: "distribution_approvals: add notes", sql: `ALTER TABLE distribution_approvals ADD COLUMN IF NOT EXISTS notes text` },
+  { name: "distribution_approvals: add years_held", sql: `ALTER TABLE distribution_approvals ADD COLUMN IF NOT EXISTS years_held text` },
+  { name: "distribution_approvals: add created_by", sql: `ALTER TABLE distribution_approvals ADD COLUMN IF NOT EXISTS created_by text` },
+  { name: "distribution_approvals: add created_at", sql: `ALTER TABLE distribution_approvals ADD COLUMN IF NOT EXISTS created_at text` },
+  { name: "distribution_approvals: add submitted_for_approval_at", sql: `ALTER TABLE distribution_approvals ADD COLUMN IF NOT EXISTS submitted_for_approval_at text` },
+  { name: "distribution_approvals: add submitted_by", sql: `ALTER TABLE distribution_approvals ADD COLUMN IF NOT EXISTS submitted_by text` },
+  { name: "distribution_approvals: add approvals_json", sql: `ALTER TABLE distribution_approvals ADD COLUMN IF NOT EXISTS approvals_json text` },
+  { name: "distribution_approvals: add required_approvals", sql: `ALTER TABLE distribution_approvals ADD COLUMN IF NOT EXISTS required_approvals text` },
+  { name: "distribution_approvals: add rejected_by", sql: `ALTER TABLE distribution_approvals ADD COLUMN IF NOT EXISTS rejected_by text` },
+  { name: "distribution_approvals: add rejected_at", sql: `ALTER TABLE distribution_approvals ADD COLUMN IF NOT EXISTS rejected_at text` },
+  { name: "distribution_approvals: add rejection_reason", sql: `ALTER TABLE distribution_approvals ADD COLUMN IF NOT EXISTS rejection_reason text` },
+  { name: "distribution_approvals: add executed_at", sql: `ALTER TABLE distribution_approvals ADD COLUMN IF NOT EXISTS executed_at text` },
+  { name: "distribution_approvals: add executed_by", sql: `ALTER TABLE distribution_approvals ADD COLUMN IF NOT EXISTS executed_by text` },
+  { name: "distribution_approvals: add waterfall_result", sql: `ALTER TABLE distribution_approvals ADD COLUMN IF NOT EXISTS waterfall_result text` },
+  { name: "distribution_approvals: add investor_allocations", sql: `ALTER TABLE distribution_approvals ADD COLUMN IF NOT EXISTS investor_allocations text` },
+
+  // investor_letter_templates — uncovered columns
+  { name: "investor_letter_templates: add id", sql: `ALTER TABLE investor_letter_templates ADD COLUMN IF NOT EXISTS id text` },
+  { name: "investor_letter_templates: add org_id", sql: `ALTER TABLE investor_letter_templates ADD COLUMN IF NOT EXISTS org_id text` },
+  { name: "investor_letter_templates: add name", sql: `ALTER TABLE investor_letter_templates ADD COLUMN IF NOT EXISTS name text` },
+  { name: "investor_letter_templates: add template_type", sql: `ALTER TABLE investor_letter_templates ADD COLUMN IF NOT EXISTS template_type text` },
+  { name: "investor_letter_templates: add subject", sql: `ALTER TABLE investor_letter_templates ADD COLUMN IF NOT EXISTS subject text` },
+  { name: "investor_letter_templates: add body_template", sql: `ALTER TABLE investor_letter_templates ADD COLUMN IF NOT EXISTS body_template text` },
+  { name: "investor_letter_templates: add tokens", sql: `ALTER TABLE investor_letter_templates ADD COLUMN IF NOT EXISTS tokens text` },
+  { name: "investor_letter_templates: add is_default", sql: `ALTER TABLE investor_letter_templates ADD COLUMN IF NOT EXISTS is_default text` },
+  { name: "investor_letter_templates: add created_by", sql: `ALTER TABLE investor_letter_templates ADD COLUMN IF NOT EXISTS created_by text` },
+  { name: "investor_letter_templates: add created_at", sql: `ALTER TABLE investor_letter_templates ADD COLUMN IF NOT EXISTS created_at text` },
+
+  // kpi_dashboards — uncovered columns
+  { name: "kpi_dashboards: add id", sql: `ALTER TABLE kpi_dashboards ADD COLUMN IF NOT EXISTS id text` },
+  { name: "kpi_dashboards: add org_id", sql: `ALTER TABLE kpi_dashboards ADD COLUMN IF NOT EXISTS org_id text` },
+  { name: "kpi_dashboards: add name", sql: `ALTER TABLE kpi_dashboards ADD COLUMN IF NOT EXISTS name text` },
+  { name: "kpi_dashboards: add description", sql: `ALTER TABLE kpi_dashboards ADD COLUMN IF NOT EXISTS description text` },
+  { name: "kpi_dashboards: add widgets", sql: `ALTER TABLE kpi_dashboards ADD COLUMN IF NOT EXISTS widgets text` },
+  { name: "kpi_dashboards: add layout", sql: `ALTER TABLE kpi_dashboards ADD COLUMN IF NOT EXISTS layout text` },
+  { name: "kpi_dashboards: add is_default", sql: `ALTER TABLE kpi_dashboards ADD COLUMN IF NOT EXISTS is_default text` },
+  { name: "kpi_dashboards: add created_by", sql: `ALTER TABLE kpi_dashboards ADD COLUMN IF NOT EXISTS created_by text` },
+  { name: "kpi_dashboards: add created_at", sql: `ALTER TABLE kpi_dashboards ADD COLUMN IF NOT EXISTS created_at text` },
+  { name: "kpi_dashboards: add updated_at", sql: `ALTER TABLE kpi_dashboards ADD COLUMN IF NOT EXISTS updated_at text` },
+
+  // kyc_verifications — uncovered columns
+  { name: "kyc_verifications: add id", sql: `ALTER TABLE kyc_verifications ADD COLUMN IF NOT EXISTS id text` },
+  { name: "kyc_verifications: add org_id", sql: `ALTER TABLE kyc_verifications ADD COLUMN IF NOT EXISTS org_id text` },
+  { name: "kyc_verifications: add investor_id", sql: `ALTER TABLE kyc_verifications ADD COLUMN IF NOT EXISTS investor_id text` },
+  { name: "kyc_verifications: add verification_type", sql: `ALTER TABLE kyc_verifications ADD COLUMN IF NOT EXISTS verification_type text` },
+  { name: "kyc_verifications: add status", sql: `ALTER TABLE kyc_verifications ADD COLUMN IF NOT EXISTS status text` },
+  { name: "kyc_verifications: add provider", sql: `ALTER TABLE kyc_verifications ADD COLUMN IF NOT EXISTS provider text` },
+  { name: "kyc_verifications: add provider_reference", sql: `ALTER TABLE kyc_verifications ADD COLUMN IF NOT EXISTS provider_reference text` },
+  { name: "kyc_verifications: add verification_data", sql: `ALTER TABLE kyc_verifications ADD COLUMN IF NOT EXISTS verification_data text` },
+  { name: "kyc_verifications: add verified_at", sql: `ALTER TABLE kyc_verifications ADD COLUMN IF NOT EXISTS verified_at text` },
+  { name: "kyc_verifications: add expires_at", sql: `ALTER TABLE kyc_verifications ADD COLUMN IF NOT EXISTS expires_at text` },
+  { name: "kyc_verifications: add created_at", sql: `ALTER TABLE kyc_verifications ADD COLUMN IF NOT EXISTS created_at text` },
+
+  // loan_packages — uncovered columns
+  { name: "loan_packages: add id", sql: `ALTER TABLE loan_packages ADD COLUMN IF NOT EXISTS id text` },
+  { name: "loan_packages: add org_id", sql: `ALTER TABLE loan_packages ADD COLUMN IF NOT EXISTS org_id text` },
+  { name: "loan_packages: add deal_id", sql: `ALTER TABLE loan_packages ADD COLUMN IF NOT EXISTS deal_id text` },
+  { name: "loan_packages: add deal_name", sql: `ALTER TABLE loan_packages ADD COLUMN IF NOT EXISTS deal_name text` },
+  { name: "loan_packages: add lender_name", sql: `ALTER TABLE loan_packages ADD COLUMN IF NOT EXISTS lender_name text` },
+  { name: "loan_packages: add package_type", sql: `ALTER TABLE loan_packages ADD COLUMN IF NOT EXISTS package_type text` },
+  { name: "loan_packages: add documents", sql: `ALTER TABLE loan_packages ADD COLUMN IF NOT EXISTS documents text` },
+  { name: "loan_packages: add status", sql: `ALTER TABLE loan_packages ADD COLUMN IF NOT EXISTS status text` },
+  { name: "loan_packages: add submitted_at", sql: `ALTER TABLE loan_packages ADD COLUMN IF NOT EXISTS submitted_at text` },
+  { name: "loan_packages: add created_by", sql: `ALTER TABLE loan_packages ADD COLUMN IF NOT EXISTS created_by text` },
+  { name: "loan_packages: add created_at", sql: `ALTER TABLE loan_packages ADD COLUMN IF NOT EXISTS created_at text` },
+  { name: "loan_packages: add updated_at", sql: `ALTER TABLE loan_packages ADD COLUMN IF NOT EXISTS updated_at text` },
+
+  // lp_portal_sessions — uncovered columns
+  { name: "lp_portal_sessions: add id", sql: `ALTER TABLE lp_portal_sessions ADD COLUMN IF NOT EXISTS id text` },
+  { name: "lp_portal_sessions: add user_id", sql: `ALTER TABLE lp_portal_sessions ADD COLUMN IF NOT EXISTS user_id text` },
+  { name: "lp_portal_sessions: add session_hash", sql: `ALTER TABLE lp_portal_sessions ADD COLUMN IF NOT EXISTS session_hash text` },
+  { name: "lp_portal_sessions: add expires_at", sql: `ALTER TABLE lp_portal_sessions ADD COLUMN IF NOT EXISTS expires_at text` },
+  { name: "lp_portal_sessions: add created_at", sql: `ALTER TABLE lp_portal_sessions ADD COLUMN IF NOT EXISTS created_at text` },
+
+  // lp_portal_users — uncovered columns
+  { name: "lp_portal_users: add id", sql: `ALTER TABLE lp_portal_users ADD COLUMN IF NOT EXISTS id text` },
+  { name: "lp_portal_users: add org_id", sql: `ALTER TABLE lp_portal_users ADD COLUMN IF NOT EXISTS org_id text` },
+  { name: "lp_portal_users: add investor_id", sql: `ALTER TABLE lp_portal_users ADD COLUMN IF NOT EXISTS investor_id text` },
+  { name: "lp_portal_users: add email", sql: `ALTER TABLE lp_portal_users ADD COLUMN IF NOT EXISTS email text` },
+  { name: "lp_portal_users: add name", sql: `ALTER TABLE lp_portal_users ADD COLUMN IF NOT EXISTS name text` },
+  { name: "lp_portal_users: add password_hash", sql: `ALTER TABLE lp_portal_users ADD COLUMN IF NOT EXISTS password_hash text` },
+  { name: "lp_portal_users: add invite_token_hash", sql: `ALTER TABLE lp_portal_users ADD COLUMN IF NOT EXISTS invite_token_hash text` },
+  { name: "lp_portal_users: add mfa_enabled", sql: `ALTER TABLE lp_portal_users ADD COLUMN IF NOT EXISTS mfa_enabled text` },
+  { name: "lp_portal_users: add mfa_secret", sql: `ALTER TABLE lp_portal_users ADD COLUMN IF NOT EXISTS mfa_secret text` },
+  { name: "lp_portal_users: add last_login", sql: `ALTER TABLE lp_portal_users ADD COLUMN IF NOT EXISTS last_login text` },
+  { name: "lp_portal_users: add status", sql: `ALTER TABLE lp_portal_users ADD COLUMN IF NOT EXISTS status text` },
+  { name: "lp_portal_users: add created_at", sql: `ALTER TABLE lp_portal_users ADD COLUMN IF NOT EXISTS created_at text` },
+  { name: "lp_portal_users: add updated_at", sql: `ALTER TABLE lp_portal_users ADD COLUMN IF NOT EXISTS updated_at text` },
+
+  // lp_statements — uncovered columns
+  { name: "lp_statements: add id", sql: `ALTER TABLE lp_statements ADD COLUMN IF NOT EXISTS id text` },
+  { name: "lp_statements: add org_id", sql: `ALTER TABLE lp_statements ADD COLUMN IF NOT EXISTS org_id text` },
+  { name: "lp_statements: add fund_id", sql: `ALTER TABLE lp_statements ADD COLUMN IF NOT EXISTS fund_id text` },
+  { name: "lp_statements: add investor_id", sql: `ALTER TABLE lp_statements ADD COLUMN IF NOT EXISTS investor_id text` },
+  { name: "lp_statements: add statement_type", sql: `ALTER TABLE lp_statements ADD COLUMN IF NOT EXISTS statement_type text` },
+  { name: "lp_statements: add period_label", sql: `ALTER TABLE lp_statements ADD COLUMN IF NOT EXISTS period_label text` },
+  { name: "lp_statements: add period_start", sql: `ALTER TABLE lp_statements ADD COLUMN IF NOT EXISTS period_start text` },
+  { name: "lp_statements: add period_end", sql: `ALTER TABLE lp_statements ADD COLUMN IF NOT EXISTS period_end text` },
+  { name: "lp_statements: add data", sql: `ALTER TABLE lp_statements ADD COLUMN IF NOT EXISTS data text` },
+  { name: "lp_statements: add pdf_url", sql: `ALTER TABLE lp_statements ADD COLUMN IF NOT EXISTS pdf_url text` },
+  { name: "lp_statements: add generated_at", sql: `ALTER TABLE lp_statements ADD COLUMN IF NOT EXISTS generated_at text` },
+  { name: "lp_statements: add delivered_at", sql: `ALTER TABLE lp_statements ADD COLUMN IF NOT EXISTS delivered_at text` },
+  { name: "lp_statements: add delivery_method", sql: `ALTER TABLE lp_statements ADD COLUMN IF NOT EXISTS delivery_method text` },
+
+  // acquisition_properties — uncovered indexes
+  { name: "acquisition_properties: add index acq_properties_org_idx", sql: `CREATE INDEX IF NOT EXISTS acq_properties_org_idx ON acquisition_properties (org_id)` },
+  { name: "acquisition_properties: add index acq_properties_status_idx", sql: `CREATE INDEX IF NOT EXISTS acq_properties_status_idx ON acquisition_properties (status)` },
+  { name: "acquisition_properties: add index acq_properties_score_idx", sql: `CREATE INDEX IF NOT EXISTS acq_properties_score_idx ON acquisition_properties (score)` },
+  { name: "acquisition_properties: add index acq_properties_lat_lng_idx", sql: `CREATE INDEX IF NOT EXISTS acq_properties_lat_lng_idx ON acquisition_properties (lat, lng)` },
+  { name: "acquisition_properties: add index acq_properties_asset_type_idx", sql: `CREATE INDEX IF NOT EXISTS acq_properties_asset_type_idx ON acquisition_properties (asset_type)` },
+
+  // actuals_facts — uncovered indexes
+  { name: "actuals_facts: add index actuals_facts_user_idx", sql: `CREATE INDEX IF NOT EXISTS actuals_facts_user_idx ON actuals_facts (user_id)` },
+  { name: "actuals_facts: add index actuals_facts_org_idx", sql: `CREATE INDEX IF NOT EXISTS actuals_facts_org_idx ON actuals_facts (org_id)` },
+  { name: "actuals_facts: add index actuals_facts_period_idx", sql: `CREATE INDEX IF NOT EXISTS actuals_facts_period_idx ON actuals_facts (period_start)` },
+  { name: "actuals_facts: add index actuals_facts_account_idx", sql: `CREATE INDEX IF NOT EXISTS actuals_facts_account_idx ON actuals_facts (account_key)` },
+  { name: "actuals_facts: add index actuals_facts_marina_idx", sql: `CREATE INDEX IF NOT EXISTS actuals_facts_marina_idx ON actuals_facts (dimension_marina_id)` },
+
+  // admin_audit_log — uncovered indexes
+  { name: "admin_audit_log: add index admin_audit_admin_idx", sql: `CREATE INDEX IF NOT EXISTS admin_audit_admin_idx ON admin_audit_log (admin_user_id)` },
+  { name: "admin_audit_log: add index admin_audit_target_idx", sql: `CREATE INDEX IF NOT EXISTS admin_audit_target_idx ON admin_audit_log (target_user_id)` },
+  { name: "admin_audit_log: add index admin_audit_created_at_idx", sql: `CREATE INDEX IF NOT EXISTS admin_audit_created_at_idx ON admin_audit_log (created_at)` },
+
+  // agreement_executions — uncovered indexes
+  { name: "agreement_executions: add index ae_workspace_idx", sql: `CREATE INDEX IF NOT EXISTS ae_workspace_idx ON agreement_executions (workspace_id)` },
+  { name: "agreement_executions: add index ae_agreement_idx", sql: `CREATE INDEX IF NOT EXISTS ae_agreement_idx ON agreement_executions (agreement_id)` },
+  { name: "agreement_executions: add index ae_user_idx", sql: `CREATE INDEX IF NOT EXISTS ae_user_idx ON agreement_executions (user_id)` },
+
+  // ai_conversations — uncovered indexes
+  { name: "ai_conversations: add index ai_conversations_org_idx", sql: `CREATE INDEX IF NOT EXISTS ai_conversations_org_idx ON ai_conversations (org_id)` },
+  { name: "ai_conversations: add index ai_conversations_user_idx", sql: `CREATE INDEX IF NOT EXISTS ai_conversations_user_idx ON ai_conversations (user_id)` },
+
+  // ai_messages — uncovered indexes
+  { name: "ai_messages: add index ai_messages_conv_idx", sql: `CREATE INDEX IF NOT EXISTS ai_messages_conv_idx ON ai_messages (conversation_id)` },
+
+  // asset_class_assumption_sets — uncovered indexes
+  { name: "asset_class_assumption_sets: add index assumption_sets_asset_class_idx", sql: `CREATE INDEX IF NOT EXISTS assumption_sets_asset_class_idx ON asset_class_assumption_sets (asset_class)` },
+  { name: "asset_class_assumption_sets: add index assumption_sets_org_idx", sql: `CREATE INDEX IF NOT EXISTS assumption_sets_org_idx ON asset_class_assumption_sets (org_id)` },
+
+  // benchmark_aggregates — uncovered indexes
+  { name: "benchmark_aggregates: add index bench_agg_metric_cohort_idx", sql: `CREATE INDEX IF NOT EXISTS bench_agg_metric_cohort_idx ON benchmark_aggregates (metric_key, cohort_key)` },
+  { name: "benchmark_aggregates: add index bench_agg_period_idx", sql: `CREATE INDEX IF NOT EXISTS bench_agg_period_idx ON benchmark_aggregates (period_key)` },
+
+  // billing_feature_flags — uncovered indexes
+  { name: "billing_feature_flags: add index idx_bff_org_feature", sql: `CREATE UNIQUE INDEX IF NOT EXISTS idx_bff_org_feature ON billing_feature_flags (org_id, feature)` },
+
+  // broker_advisory_content — uncovered indexes
+  { name: "broker_advisory_content: add index broker_advisory_content_profile_idx", sql: `CREATE INDEX IF NOT EXISTS broker_advisory_content_profile_idx ON broker_advisory_content (broker_profile_id)` },
+  { name: "broker_advisory_content: add index broker_advisory_content_visibility_idx", sql: `CREATE INDEX IF NOT EXISTS broker_advisory_content_visibility_idx ON broker_advisory_content (visibility)` },
+
+  // broker_advisory_messages — uncovered indexes
+  { name: "broker_advisory_messages: add index broker_advisory_messages_sub_idx", sql: `CREATE INDEX IF NOT EXISTS broker_advisory_messages_sub_idx ON broker_advisory_messages (subscription_id, created_at)` },
+
+  // broker_advisory_packages — uncovered indexes
+  { name: "broker_advisory_packages: add index broker_advisory_packages_profile_idx", sql: `CREATE INDEX IF NOT EXISTS broker_advisory_packages_profile_idx ON broker_advisory_packages (broker_profile_id)` },
+
+  // broker_evaluations — uncovered indexes
+  { name: "broker_evaluations: add index broker_evaluations_broker_idx", sql: `CREATE INDEX IF NOT EXISTS broker_evaluations_broker_idx ON broker_evaluations (broker_profile_id)` },
+  { name: "broker_evaluations: add index broker_evaluations_target_idx", sql: `CREATE INDEX IF NOT EXISTS broker_evaluations_target_idx ON broker_evaluations (target_type, target_id)` },
+  { name: "broker_evaluations: add index broker_evaluations_expires_idx", sql: `CREATE INDEX IF NOT EXISTS broker_evaluations_expires_idx ON broker_evaluations (expires_at)` },
+
+  // broker_follow_history — uncovered indexes
+  { name: "broker_follow_history: add index broker_follow_history_user_idx", sql: `CREATE INDEX IF NOT EXISTS broker_follow_history_user_idx ON broker_follow_history (user_id)` },
+
+  // broker_listing_claim_disputes — uncovered indexes
+  { name: "broker_listing_claim_disputes: add index broker_claim_disputes_status_idx", sql: `CREATE INDEX IF NOT EXISTS broker_claim_disputes_status_idx ON broker_listing_claim_disputes (status)` },
+  { name: "broker_listing_claim_disputes: add index broker_claim_disputes_listing_idx", sql: `CREATE INDEX IF NOT EXISTS broker_claim_disputes_listing_idx ON broker_listing_claim_disputes (listing_id)` },
+
+  // broker_listing_claims — uncovered indexes
+  { name: "broker_listing_claims: add index broker_listing_claims_broker_idx", sql: `CREATE INDEX IF NOT EXISTS broker_listing_claims_broker_idx ON broker_listing_claims (broker_profile_id)` },
+
+  // broker_profiles — uncovered indexes
+  { name: "broker_profiles: add index broker_profiles_user_idx", sql: `CREATE INDEX IF NOT EXISTS broker_profiles_user_idx ON broker_profiles (user_id)` },
+  { name: "broker_profiles: add index broker_profiles_org_idx", sql: `CREATE INDEX IF NOT EXISTS broker_profiles_org_idx ON broker_profiles (org_id)` },
+  { name: "broker_profiles: add index broker_profiles_tier_idx", sql: `CREATE INDEX IF NOT EXISTS broker_profiles_tier_idx ON broker_profiles (broker_tier)` },
+  { name: "broker_profiles: add index broker_profiles_verified_deals_idx", sql: `CREATE INDEX IF NOT EXISTS broker_profiles_verified_deals_idx ON broker_profiles (verified_closed_deals_count, verified_closed_deals_volume)` },
+
+  // broker_registrations — uncovered indexes
+  { name: "broker_registrations: add index broker_registrations_user_idx", sql: `CREATE INDEX IF NOT EXISTS broker_registrations_user_idx ON broker_registrations (user_id)` },
+  { name: "broker_registrations: add index broker_registrations_status_idx", sql: `CREATE INDEX IF NOT EXISTS broker_registrations_status_idx ON broker_registrations (status)` },
+  { name: "broker_registrations: add index broker_registrations_license_status_idx", sql: `CREATE INDEX IF NOT EXISTS broker_registrations_license_status_idx ON broker_registrations (license_verification_status, license_expires_at)` },
+
+  // broker_response_samples — uncovered indexes
+  { name: "broker_response_samples: add index broker_response_samples_broker_idx", sql: `CREATE INDEX IF NOT EXISTS broker_response_samples_broker_idx ON broker_response_samples (broker_profile_id, first_inbound_at)` },
+
+  // broker_subscriptions — uncovered indexes
+  { name: "broker_subscriptions: add index broker_subscriptions_user_idx", sql: `CREATE INDEX IF NOT EXISTS broker_subscriptions_user_idx ON broker_subscriptions (user_id)` },
+  { name: "broker_subscriptions: add index broker_subscriptions_broker_idx", sql: `CREATE INDEX IF NOT EXISTS broker_subscriptions_broker_idx ON broker_subscriptions (broker_profile_id)` },
+
+  // budget_amounts — uncovered indexes
+  { name: "budget_amounts: add index budget_amounts_line_idx", sql: `CREATE INDEX IF NOT EXISTS budget_amounts_line_idx ON budget_amounts (budget_line_id)` },
+  { name: "budget_amounts: add index budget_amounts_period_idx", sql: `CREATE INDEX IF NOT EXISTS budget_amounts_period_idx ON budget_amounts (period_start)` },
+  { name: "budget_amounts: add index budget_amounts_line_period_uniq", sql: `CREATE UNIQUE INDEX IF NOT EXISTS budget_amounts_line_period_uniq ON budget_amounts (budget_line_id, period_start)` },
+
+  // budget_lines — uncovered indexes
+  { name: "budget_lines: add index budget_lines_version_idx", sql: `CREATE INDEX IF NOT EXISTS budget_lines_version_idx ON budget_lines (budget_version_id)` },
+  { name: "budget_lines: add index budget_lines_account_idx", sql: `CREATE INDEX IF NOT EXISTS budget_lines_account_idx ON budget_lines (account_key)` },
+
+  // budget_targets — uncovered indexes
+  { name: "budget_targets: add index budget_targets_user_idx", sql: `CREATE INDEX IF NOT EXISTS budget_targets_user_idx ON budget_targets (user_id)` },
+  { name: "budget_targets: add index budget_targets_org_idx", sql: `CREATE INDEX IF NOT EXISTS budget_targets_org_idx ON budget_targets (org_id)` },
+  { name: "budget_targets: add index budget_targets_year_idx", sql: `CREATE INDEX IF NOT EXISTS budget_targets_year_idx ON budget_targets (fiscal_year)` },
+
+  // budget_versions — uncovered indexes
+  { name: "budget_versions: add index budget_versions_budget_idx", sql: `CREATE INDEX IF NOT EXISTS budget_versions_budget_idx ON budget_versions (budget_id)` },
+
+  // budgets — uncovered indexes
+  { name: "budgets: add index budgets_user_idx", sql: `CREATE INDEX IF NOT EXISTS budgets_user_idx ON budgets (user_id)` },
+  { name: "budgets: add index budgets_org_idx", sql: `CREATE INDEX IF NOT EXISTS budgets_org_idx ON budgets (org_id)` },
+  { name: "budgets: add index budgets_year_idx", sql: `CREATE INDEX IF NOT EXISTS budgets_year_idx ON budgets (fiscal_year)` },
+
+  // capital_markets_forward_curves — uncovered indexes
+  { name: "capital_markets_forward_curves: add index capital_markets_forward_curves_date_idx", sql: `CREATE INDEX IF NOT EXISTS capital_markets_forward_curves_date_idx ON capital_markets_forward_curves (curve_date)` },
+  { name: "capital_markets_forward_curves: add index capital_markets_forward_curves_type_idx", sql: `CREATE INDEX IF NOT EXISTS capital_markets_forward_curves_type_idx ON capital_markets_forward_curves (rate_type)` },
+
+  // capital_markets_fred_series — uncovered indexes
+  { name: "capital_markets_fred_series: add index capital_markets_fred_series_type_tenor_idx", sql: `CREATE INDEX IF NOT EXISTS capital_markets_fred_series_type_tenor_idx ON capital_markets_fred_series (rate_type, tenor)` },
+
+  // capital_markets_rates — uncovered indexes
+  { name: "capital_markets_rates: add index capital_markets_rates_date_idx", sql: `CREATE INDEX IF NOT EXISTS capital_markets_rates_date_idx ON capital_markets_rates (observation_date)` },
+  { name: "capital_markets_rates: add index capital_markets_rates_type_idx", sql: `CREATE INDEX IF NOT EXISTS capital_markets_rates_type_idx ON capital_markets_rates (rate_type)` },
+
+  // cdd_documents — uncovered indexes
+  { name: "cdd_documents: add index cdd_documents_doc_class_idx", sql: `CREATE INDEX IF NOT EXISTS cdd_documents_doc_class_idx ON cdd_documents (document_class)` },
+
+  // chart_of_accounts — uncovered indexes
+  { name: "chart_of_accounts: add index coa_org_idx", sql: `CREATE INDEX IF NOT EXISTS coa_org_idx ON chart_of_accounts (org_id)` },
+  { name: "chart_of_accounts: add index coa_external_idx", sql: `CREATE INDEX IF NOT EXISTS coa_external_idx ON chart_of_accounts (org_id, external_account_id)` },
+
+  // coa_audit_log — uncovered indexes
+  { name: "coa_audit_log: add index coa_audit_org_idx", sql: `CREATE INDEX IF NOT EXISTS coa_audit_org_idx ON coa_audit_log (org_id)` },
+  { name: "coa_audit_log: add index coa_audit_action_idx", sql: `CREATE INDEX IF NOT EXISTS coa_audit_action_idx ON coa_audit_log (action)` },
+  { name: "coa_audit_log: add index coa_audit_entity_type_idx", sql: `CREATE INDEX IF NOT EXISTS coa_audit_entity_type_idx ON coa_audit_log (entity_type)` },
+
+  // coa_mapping — uncovered indexes
+  { name: "coa_mapping: add index coa_mapping_org_idx", sql: `CREATE INDEX IF NOT EXISTS coa_mapping_org_idx ON coa_mapping (org_id)` },
+  { name: "coa_mapping: add index coa_mapping_coa_idx", sql: `CREATE INDEX IF NOT EXISTS coa_mapping_coa_idx ON coa_mapping (coa_account_id)` },
+
+  // coa_mapping_rules — uncovered indexes
+  { name: "coa_mapping_rules: add index coa_mapping_rules_pack_priority_idx", sql: `CREATE INDEX IF NOT EXISTS coa_mapping_rules_pack_priority_idx ON coa_mapping_rules (pack_id, priority)` },
+
+  // coa_mapping_suggestions — uncovered indexes
+  { name: "coa_mapping_suggestions: add index coa_suggestions_org_idx", sql: `CREATE INDEX IF NOT EXISTS coa_suggestions_org_idx ON coa_mapping_suggestions (org_id)` },
+  { name: "coa_mapping_suggestions: add index coa_suggestions_coa_idx", sql: `CREATE INDEX IF NOT EXISTS coa_suggestions_coa_idx ON coa_mapping_suggestions (coa_account_id)` },
+  { name: "coa_mapping_suggestions: add index coa_suggestions_status_idx", sql: `CREATE INDEX IF NOT EXISTS coa_suggestions_status_idx ON coa_mapping_suggestions (status)` },
+
+  // commercial_tenant_amendments — uncovered indexes
+  { name: "commercial_tenant_amendments: add index amendments_tenant_idx", sql: `CREATE INDEX IF NOT EXISTS amendments_tenant_idx ON commercial_tenant_amendments (tenant_id)` },
+  { name: "commercial_tenant_amendments: add index amendments_date_idx", sql: `CREATE INDEX IF NOT EXISTS amendments_date_idx ON commercial_tenant_amendments (effective_date)` },
+
+  // commercial_tenant_rent_schedule — uncovered indexes
+  { name: "commercial_tenant_rent_schedule: add index rent_schedule_tenant_idx", sql: `CREATE INDEX IF NOT EXISTS rent_schedule_tenant_idx ON commercial_tenant_rent_schedule (tenant_id)` },
+  { name: "commercial_tenant_rent_schedule: add index rent_schedule_period_idx", sql: `CREATE INDEX IF NOT EXISTS rent_schedule_period_idx ON commercial_tenant_rent_schedule (period_start, period_end)` },
+
+  // commercial_tenant_scenarios — uncovered indexes
+  { name: "commercial_tenant_scenarios: add index tenant_scenarios_tenant_idx", sql: `CREATE INDEX IF NOT EXISTS tenant_scenarios_tenant_idx ON commercial_tenant_scenarios (tenant_id)` },
+  { name: "commercial_tenant_scenarios: add index tenant_scenarios_project_idx", sql: `CREATE INDEX IF NOT EXISTS tenant_scenarios_project_idx ON commercial_tenant_scenarios (modeling_project_id)` },
+  { name: "commercial_tenant_scenarios: add index tenant_scenarios_case_type_idx", sql: `CREATE INDEX IF NOT EXISTS tenant_scenarios_case_type_idx ON commercial_tenant_scenarios (case_type)` },
+
+  // commercial_tenants — uncovered indexes
+  { name: "commercial_tenants: add index commercial_tenants_org_idx", sql: `CREATE INDEX IF NOT EXISTS commercial_tenants_org_idx ON commercial_tenants (org_id)` },
+  { name: "commercial_tenants: add index commercial_tenants_modeling_project_idx", sql: `CREATE INDEX IF NOT EXISTS commercial_tenants_modeling_project_idx ON commercial_tenants (modeling_project_id)` },
+  { name: "commercial_tenants: add index commercial_tenants_marina_idx", sql: `CREATE INDEX IF NOT EXISTS commercial_tenants_marina_idx ON commercial_tenants (marina_id)` },
+  { name: "commercial_tenants: add index commercial_tenants_tenant_name_idx", sql: `CREATE INDEX IF NOT EXISTS commercial_tenants_tenant_name_idx ON commercial_tenants (tenant_name)` },
+  { name: "commercial_tenants: add index commercial_tenants_status_idx", sql: `CREATE INDEX IF NOT EXISTS commercial_tenants_status_idx ON commercial_tenants (tenant_status)` },
+  { name: "commercial_tenants: add index commercial_tenants_expiration_idx", sql: `CREATE INDEX IF NOT EXISTS commercial_tenants_expiration_idx ON commercial_tenants (lease_expiration_date)` },
+
+  // confidentiality_agreements — uncovered indexes
+  { name: "confidentiality_agreements: add index ca_workspace_idx", sql: `CREATE INDEX IF NOT EXISTS ca_workspace_idx ON confidentiality_agreements (workspace_id)` },
+
+  // contract_extracted_dates — uncovered indexes
+  { name: "contract_extracted_dates: add index ced_document_idx", sql: `CREATE INDEX IF NOT EXISTS ced_document_idx ON contract_extracted_dates (document_id)` },
+  { name: "contract_extracted_dates: add index ced_workspace_idx", sql: `CREATE INDEX IF NOT EXISTS ced_workspace_idx ON contract_extracted_dates (workspace_id)` },
+  { name: "contract_extracted_dates: add index ced_user_status_idx", sql: `CREATE INDEX IF NOT EXISTS ced_user_status_idx ON contract_extracted_dates (user_status)` },
+  { name: "contract_extracted_dates: add index ced_document_field_unique", sql: `CREATE UNIQUE INDEX IF NOT EXISTS ced_document_field_unique ON contract_extracted_dates (document_id, field_key)` },
+
+  // crm_activity_associations — uncovered indexes
+  { name: "crm_activity_associations: add index crm_activity_assoc_activity_idx", sql: `CREATE INDEX IF NOT EXISTS crm_activity_assoc_activity_idx ON crm_activity_associations (activity_id)` },
+  { name: "crm_activity_associations: add index crm_activity_assoc_object_idx", sql: `CREATE INDEX IF NOT EXISTS crm_activity_assoc_object_idx ON crm_activity_associations (object_type, object_id)` },
+  { name: "crm_activity_associations: add index crm_activity_assoc_org_idx", sql: `CREATE INDEX IF NOT EXISTS crm_activity_assoc_org_idx ON crm_activity_associations (org_id)` },
+
+  // crm_deal_engagement_scores — uncovered indexes
+  { name: "crm_deal_engagement_scores: add index crm_deal_engagement_deal_idx", sql: `CREATE INDEX IF NOT EXISTS crm_deal_engagement_deal_idx ON crm_deal_engagement_scores (deal_id)` },
+  { name: "crm_deal_engagement_scores: add index crm_deal_engagement_score_idx", sql: `CREATE INDEX IF NOT EXISTS crm_deal_engagement_score_idx ON crm_deal_engagement_scores (engagement_score)` },
+  { name: "crm_deal_engagement_scores: add index crm_deal_engagement_probability_idx", sql: `CREATE INDEX IF NOT EXISTS crm_deal_engagement_probability_idx ON crm_deal_engagement_scores (win_probability)` },
+
+  // crm_deal_stage_history — uncovered indexes
+  { name: "crm_deal_stage_history: add index crm_deal_stage_history_deal_idx", sql: `CREATE INDEX IF NOT EXISTS crm_deal_stage_history_deal_idx ON crm_deal_stage_history (deal_id)` },
+  { name: "crm_deal_stage_history: add index crm_deal_stage_history_stage_idx", sql: `CREATE INDEX IF NOT EXISTS crm_deal_stage_history_stage_idx ON crm_deal_stage_history (stage_id)` },
+  { name: "crm_deal_stage_history: add index crm_deal_stage_history_entered_at_idx", sql: `CREATE INDEX IF NOT EXISTS crm_deal_stage_history_entered_at_idx ON crm_deal_stage_history (entered_at)` },
+  { name: "crm_deal_stage_history: add index crm_deal_stage_history_current_idx", sql: `CREATE INDEX IF NOT EXISTS crm_deal_stage_history_current_idx ON crm_deal_stage_history (deal_id, is_current_stage)` },
+
+  // crm_entity_dd_project_links — uncovered indexes
+  { name: "crm_entity_dd_project_links: add index crm_entity_dd_links_entity_idx", sql: `CREATE INDEX IF NOT EXISTS crm_entity_dd_links_entity_idx ON crm_entity_dd_project_links (entity_type, entity_id)` },
+  { name: "crm_entity_dd_project_links: add index crm_entity_dd_links_project_idx", sql: `CREATE INDEX IF NOT EXISTS crm_entity_dd_links_project_idx ON crm_entity_dd_project_links (dd_project_id)` },
+
+  // crm_property_storage_entries — uncovered indexes
+  { name: "crm_property_storage_entries: add index crm_property_storage_entries_property_idx", sql: `CREATE INDEX IF NOT EXISTS crm_property_storage_entries_property_idx ON crm_property_storage_entries (property_id)` },
+  { name: "crm_property_storage_entries: add index crm_property_storage_entries_org_idx", sql: `CREATE INDEX IF NOT EXISTS crm_property_storage_entries_org_idx ON crm_property_storage_entries (org_id)` },
+
+  // crm_saved_views — uncovered indexes
+  { name: "crm_saved_views: add index crm_saved_views_user_idx", sql: `CREATE INDEX IF NOT EXISTS crm_saved_views_user_idx ON crm_saved_views (user_id)` },
+  { name: "crm_saved_views: add index crm_saved_views_org_idx", sql: `CREATE INDEX IF NOT EXISTS crm_saved_views_org_idx ON crm_saved_views (org_id)` },
+  { name: "crm_saved_views: add index crm_saved_views_object_type_idx", sql: `CREATE INDEX IF NOT EXISTS crm_saved_views_object_type_idx ON crm_saved_views (object_type)` },
+
+  // crm_storage_types — uncovered indexes
+  { name: "crm_storage_types: add index crm_storage_types_org_idx", sql: `CREATE INDEX IF NOT EXISTS crm_storage_types_org_idx ON crm_storage_types (org_id)` },
+  { name: "crm_storage_types: add index crm_storage_types_org_name_idx", sql: `CREATE INDEX IF NOT EXISTS crm_storage_types_org_name_idx ON crm_storage_types (org_id, name)` },
+
+  // crm_timeline_events — uncovered indexes
+  { name: "crm_timeline_events: add index crm_timeline_events_org_idx", sql: `CREATE INDEX IF NOT EXISTS crm_timeline_events_org_idx ON crm_timeline_events (org_id)` },
+  { name: "crm_timeline_events: add index crm_timeline_events_entity_idx", sql: `CREATE INDEX IF NOT EXISTS crm_timeline_events_entity_idx ON crm_timeline_events (entity_type, entity_id)` },
+  { name: "crm_timeline_events: add index crm_timeline_events_occurred_at_idx", sql: `CREATE INDEX IF NOT EXISTS crm_timeline_events_occurred_at_idx ON crm_timeline_events (occurred_at)` },
+  { name: "crm_timeline_events: add index crm_timeline_events_type_idx", sql: `CREATE INDEX IF NOT EXISTS crm_timeline_events_type_idx ON crm_timeline_events (event_type)` },
+
+  // custom_catalog_items — uncovered indexes
+  { name: "custom_catalog_items: add index custom_catalog_org_type_idx", sql: `CREATE INDEX IF NOT EXISTS custom_catalog_org_type_idx ON custom_catalog_items (org_id, type)` },
+
+  // customer_notes — uncovered indexes
+  { name: "customer_notes: add index customer_notes_user_idx", sql: `CREATE INDEX IF NOT EXISTS customer_notes_user_idx ON customer_notes (user_id)` },
+
+  // dd_automation_rules — uncovered indexes
+  { name: "dd_automation_rules: add index dd_automation_rules_project", sql: `CREATE INDEX IF NOT EXISTS dd_automation_rules_project ON dd_automation_rules (project_id)` },
+  { name: "dd_automation_rules: add index dd_automation_rules_org", sql: `CREATE INDEX IF NOT EXISTS dd_automation_rules_org ON dd_automation_rules (org_id)` },
+  { name: "dd_automation_rules: add index dd_automation_rules_trigger", sql: `CREATE INDEX IF NOT EXISTS dd_automation_rules_trigger ON dd_automation_rules (trigger_type)` },
+  { name: "dd_automation_rules: add index dd_automation_rules_active", sql: `CREATE INDEX IF NOT EXISTS dd_automation_rules_active ON dd_automation_rules (is_active)` },
+
+  // dd_checklist_item_comments — uncovered indexes
+  { name: "dd_checklist_item_comments: add index ddcic_item_idx", sql: `CREATE INDEX IF NOT EXISTS ddcic_item_idx ON dd_checklist_item_comments (item_id)` },
+
+  // dd_checklist_item_files — uncovered indexes
+  { name: "dd_checklist_item_files: add index ddcif_item_idx", sql: `CREATE INDEX IF NOT EXISTS ddcif_item_idx ON dd_checklist_item_files (item_id)` },
+
+  // dd_checklist_item_history — uncovered indexes
+  { name: "dd_checklist_item_history: add index ddcih_item_idx", sql: `CREATE INDEX IF NOT EXISTS ddcih_item_idx ON dd_checklist_item_history (item_id)` },
+  { name: "dd_checklist_item_history: add index ddcih_created_idx", sql: `CREATE INDEX IF NOT EXISTS ddcih_created_idx ON dd_checklist_item_history (created_at)` },
+
+  // dd_checklist_items — uncovered indexes
+  { name: "dd_checklist_items: add index ddci_section_idx", sql: `CREATE INDEX IF NOT EXISTS ddci_section_idx ON dd_checklist_items (section_id)` },
+  { name: "dd_checklist_items: add index ddci_status_idx", sql: `CREATE INDEX IF NOT EXISTS ddci_status_idx ON dd_checklist_items (status)` },
+  { name: "dd_checklist_items: add index ddci_assigned_idx", sql: `CREATE INDEX IF NOT EXISTS ddci_assigned_idx ON dd_checklist_items (assigned_to_member_id)` },
+
+  // dd_checklist_sections — uncovered indexes
+  { name: "dd_checklist_sections: add index ddcs_checklist_idx", sql: `CREATE INDEX IF NOT EXISTS ddcs_checklist_idx ON dd_checklist_sections (checklist_id)` },
+
+  // dd_checklist_templates — uncovered indexes
+  { name: "dd_checklist_templates: add index dd_checklist_templates_org", sql: `CREATE INDEX IF NOT EXISTS dd_checklist_templates_org ON dd_checklist_templates (org_id)` },
+  { name: "dd_checklist_templates: add index dd_checklist_templates_type", sql: `CREATE INDEX IF NOT EXISTS dd_checklist_templates_type ON dd_checklist_templates (template_type)` },
+  { name: "dd_checklist_templates: add index dd_checklist_templates_system", sql: `CREATE INDEX IF NOT EXISTS dd_checklist_templates_system ON dd_checklist_templates (is_system)` },
+
+  // dd_checklists — uncovered indexes
+  { name: "dd_checklists: add index ddc_workspace_idx", sql: `CREATE INDEX IF NOT EXISTS ddc_workspace_idx ON dd_checklists (workspace_id)` },
+
+  // dd_milestone_notifications — uncovered indexes
+  { name: "dd_milestone_notifications: add index dd_milestone_notifications_user", sql: `CREATE INDEX IF NOT EXISTS dd_milestone_notifications_user ON dd_milestone_notifications (user_id)` },
+  { name: "dd_milestone_notifications: add index dd_milestone_notifications_project", sql: `CREATE INDEX IF NOT EXISTS dd_milestone_notifications_project ON dd_milestone_notifications (project_id)` },
+  { name: "dd_milestone_notifications: add index dd_milestone_notifications_read", sql: `CREATE INDEX IF NOT EXISTS dd_milestone_notifications_read ON dd_milestone_notifications (is_read)` },
+  { name: "dd_milestone_notifications: add index dd_milestone_notifications_created", sql: `CREATE INDEX IF NOT EXISTS dd_milestone_notifications_created ON dd_milestone_notifications (created_at)` },
+
+  // dd_milestones — uncovered indexes
+  { name: "dd_milestones: add index dm_workspace_idx", sql: `CREATE INDEX IF NOT EXISTS dm_workspace_idx ON dd_milestones (workspace_id)` },
+  { name: "dd_milestones: add index dm_due_idx", sql: `CREATE INDEX IF NOT EXISTS dm_due_idx ON dd_milestones (due_date)` },
+
+  // dd_section_defaults — uncovered indexes
+  { name: "dd_section_defaults: add index ddsd_title_idx", sql: `CREATE INDEX IF NOT EXISTS ddsd_title_idx ON dd_section_defaults (title)` },
+
+  // document_extraction_jobs — uncovered indexes
+  { name: "document_extraction_jobs: add index doc_extraction_jobs_project_idx", sql: `CREATE INDEX IF NOT EXISTS doc_extraction_jobs_project_idx ON document_extraction_jobs (project_id)` },
+  { name: "document_extraction_jobs: add index doc_extraction_jobs_status_idx", sql: `CREATE INDEX IF NOT EXISTS doc_extraction_jobs_status_idx ON document_extraction_jobs (status)` },
+  { name: "document_extraction_jobs: add index doc_extraction_jobs_org_idx", sql: `CREATE INDEX IF NOT EXISTS doc_extraction_jobs_org_idx ON document_extraction_jobs (org_id)` },
+
+  // extraction_fields — uncovered indexes
+  { name: "extraction_fields: add index extraction_fields_job_idx", sql: `CREATE INDEX IF NOT EXISTS extraction_fields_job_idx ON extraction_fields (job_id)` },
+  { name: "extraction_fields: add index extraction_fields_schema_key_idx", sql: `CREATE INDEX IF NOT EXISTS extraction_fields_schema_key_idx ON extraction_fields (schema_key)` },
+
+  // extraction_templates — uncovered indexes
+  { name: "extraction_templates: add index extraction_templates_org_idx", sql: `CREATE INDEX IF NOT EXISTS extraction_templates_org_idx ON extraction_templates (org_id)` },
+  { name: "extraction_templates: add index extraction_templates_org_class_fp_idx", sql: `CREATE INDEX IF NOT EXISTS extraction_templates_org_class_fp_idx ON extraction_templates (org_id, document_class, structural_fingerprint)` },
+
+  // integrations — uncovered indexes
+  { name: "integrations: add index integrations_key_idx", sql: `CREATE INDEX IF NOT EXISTS integrations_key_idx ON integrations (key)` },
+  { name: "integrations: add index integrations_category_idx", sql: `CREATE INDEX IF NOT EXISTS integrations_category_idx ON integrations (category)` },
+  { name: "integrations: add index integrations_active_idx", sql: `CREATE INDEX IF NOT EXISTS integrations_active_idx ON integrations (is_active)` },
+
+  // knowledge_chunks — uncovered indexes
+  { name: "knowledge_chunks: add index knowledge_chunks_doc_idx", sql: `CREATE INDEX IF NOT EXISTS knowledge_chunks_doc_idx ON knowledge_chunks (document_id)` },
+  { name: "knowledge_chunks: add index knowledge_chunks_org_idx", sql: `CREATE INDEX IF NOT EXISTS knowledge_chunks_org_idx ON knowledge_chunks (org_id)` },
+
+  // knowledge_documents — uncovered indexes
+  { name: "knowledge_documents: add index knowledge_docs_org_idx", sql: `CREATE INDEX IF NOT EXISTS knowledge_docs_org_idx ON knowledge_documents (org_id)` },
+  { name: "knowledge_documents: add index knowledge_docs_status_idx", sql: `CREATE INDEX IF NOT EXISTS knowledge_docs_status_idx ON knowledge_documents (status)` },
+
+  // lease_cash_flows — uncovered indexes
+  { name: "lease_cash_flows: add index lease_cash_flows_org_idx", sql: `CREATE INDEX IF NOT EXISTS lease_cash_flows_org_idx ON lease_cash_flows (org_id)` },
+  { name: "lease_cash_flows: add index lease_cash_flows_lease_idx", sql: `CREATE INDEX IF NOT EXISTS lease_cash_flows_lease_idx ON lease_cash_flows (lease_id)` },
+  { name: "lease_cash_flows: add index lease_cash_flows_period_idx", sql: `CREATE INDEX IF NOT EXISTS lease_cash_flows_period_idx ON lease_cash_flows (period_year, period_month)` },
+  { name: "lease_cash_flows: add index lease_cash_flows_paid_idx", sql: `CREATE INDEX IF NOT EXISTS lease_cash_flows_paid_idx ON lease_cash_flows (is_paid)` },
+
+  // lease_line_items — uncovered indexes
+  { name: "lease_line_items: add index lease_line_items_org_idx", sql: `CREATE INDEX IF NOT EXISTS lease_line_items_org_idx ON lease_line_items (org_id)` },
+  { name: "lease_line_items: add index lease_line_items_lease_idx", sql: `CREATE INDEX IF NOT EXISTS lease_line_items_lease_idx ON lease_line_items (lease_id)` },
+  { name: "lease_line_items: add index lease_line_items_category_idx", sql: `CREATE INDEX IF NOT EXISTS lease_line_items_category_idx ON lease_line_items (category)` },
+
+  // line_item_learning_rules — uncovered indexes
+  { name: "line_item_learning_rules: add index line_item_rules_tenant_id_idx", sql: `CREATE INDEX IF NOT EXISTS line_item_rules_tenant_id_idx ON line_item_learning_rules (tenant_id)` },
+  { name: "line_item_learning_rules: add index line_item_rules_tenant_marina_idx", sql: `CREATE INDEX IF NOT EXISTS line_item_rules_tenant_marina_idx ON line_item_learning_rules (tenant_id, marina_id)` },
+  { name: "line_item_learning_rules: add index line_item_rules_normalized_idx", sql: `CREATE INDEX IF NOT EXISTS line_item_rules_normalized_idx ON line_item_learning_rules (normalized_line_item)` },
+  { name: "line_item_learning_rules: add index line_item_rules_category_idx", sql: `CREATE INDEX IF NOT EXISTS line_item_rules_category_idx ON line_item_learning_rules (category)` },
+
+  // loan_balance_timeline — uncovered indexes
+  { name: "loan_balance_timeline: add index loan_balance_timeline_org_idx", sql: `CREATE INDEX IF NOT EXISTS loan_balance_timeline_org_idx ON loan_balance_timeline (org_id)` },
+  { name: "loan_balance_timeline: add index loan_balance_timeline_model_idx", sql: `CREATE INDEX IF NOT EXISTS loan_balance_timeline_model_idx ON loan_balance_timeline (model_id)` },
+  { name: "loan_balance_timeline: add index loan_balance_timeline_property_idx", sql: `CREATE INDEX IF NOT EXISTS loan_balance_timeline_property_idx ON loan_balance_timeline (property_id)` },
+  { name: "loan_balance_timeline: add index loan_balance_timeline_date_idx", sql: `CREATE INDEX IF NOT EXISTS loan_balance_timeline_date_idx ON loan_balance_timeline (as_of_date)` },
+
+  // loan_schedules — uncovered indexes
+  { name: "loan_schedules: add index loan_schedules_loan_idx", sql: `CREATE INDEX IF NOT EXISTS loan_schedules_loan_idx ON loan_schedules (loan_id)` },
+  { name: "loan_schedules: add index loan_schedules_month_idx", sql: `CREATE INDEX IF NOT EXISTS loan_schedules_month_idx ON loan_schedules (loan_id, month_index)` },
+
+  // loans — uncovered indexes
+  { name: "loans: add index loans_project_idx", sql: `CREATE INDEX IF NOT EXISTS loans_project_idx ON loans (project_id)` },
+  { name: "loans: add index loans_org_idx", sql: `CREATE INDEX IF NOT EXISTS loans_org_idx ON loans (org_id)` },
+
+  // marina_leases — uncovered indexes
+  { name: "marina_leases: add index marina_leases_org_idx", sql: `CREATE INDEX IF NOT EXISTS marina_leases_org_idx ON marina_leases (org_id)` },
+  { name: "marina_leases: add index marina_leases_marina_idx", sql: `CREATE INDEX IF NOT EXISTS marina_leases_marina_idx ON marina_leases (marina_project_id)` },
+  { name: "marina_leases: add index marina_leases_storage_idx", sql: `CREATE INDEX IF NOT EXISTS marina_leases_storage_idx ON marina_leases (storage_location_id)` },
+  { name: "marina_leases: add index marina_leases_tenant_idx", sql: `CREATE INDEX IF NOT EXISTS marina_leases_tenant_idx ON marina_leases (tenant_id)` },
+  { name: "marina_leases: add index marina_leases_status_idx", sql: `CREATE INDEX IF NOT EXISTS marina_leases_status_idx ON marina_leases (status)` },
+  { name: "marina_leases: add index marina_leases_term_group_idx", sql: `CREATE INDEX IF NOT EXISTS marina_leases_term_group_idx ON marina_leases (contract_term_group)` },
+  { name: "marina_leases: add index marina_leases_dates_idx", sql: `CREATE INDEX IF NOT EXISTS marina_leases_dates_idx ON marina_leases (start_date, end_date)` },
+  { name: "marina_leases: add index marina_leases_num_idx", sql: `CREATE INDEX IF NOT EXISTS marina_leases_num_idx ON marina_leases (lease_number)` },
+
+  // marina_listings — uncovered indexes
+  { name: "marina_listings: add index marina_listings_dedupe_hash_idx", sql: `CREATE UNIQUE INDEX IF NOT EXISTS marina_listings_dedupe_hash_idx ON marina_listings (dedupe_hash)` },
+  { name: "marina_listings: add index marina_listings_category_idx", sql: `CREATE INDEX IF NOT EXISTS marina_listings_category_idx ON marina_listings (listing_category)` },
+  { name: "marina_listings: add index marina_listings_asset_class_idx", sql: `CREATE INDEX IF NOT EXISTS marina_listings_asset_class_idx ON marina_listings (asset_class)` },
+  { name: "marina_listings: add index marina_listings_broker_profile_idx", sql: `CREATE INDEX IF NOT EXISTS marina_listings_broker_profile_idx ON marina_listings (broker_profile_id)` },
+
+  // rra_marina_locations — uncovered indexes
+  { name: "rra_marina_locations: add index rra_marina_locations_asset_class_idx", sql: `CREATE INDEX IF NOT EXISTS rra_marina_locations_asset_class_idx ON rra_marina_locations (asset_class)` },
+
+  // marina_projects — uncovered indexes
+  { name: "marina_projects: add index marina_projects_org_idx", sql: `CREATE INDEX IF NOT EXISTS marina_projects_org_idx ON marina_projects (org_id)` },
+  { name: "marina_projects: add index marina_projects_code_idx", sql: `CREATE INDEX IF NOT EXISTS marina_projects_code_idx ON marina_projects (code)` },
+  { name: "marina_projects: add index marina_projects_season_type_idx", sql: `CREATE INDEX IF NOT EXISTS marina_projects_season_type_idx ON marina_projects (season_type)` },
+  { name: "marina_projects: add index marina_projects_active_idx", sql: `CREATE INDEX IF NOT EXISTS marina_projects_active_idx ON marina_projects (is_active)` },
+
+  // marina_tenants — uncovered indexes
+  { name: "marina_tenants: add index marina_tenants_org_idx", sql: `CREATE INDEX IF NOT EXISTS marina_tenants_org_idx ON marina_tenants (org_id)` },
+  { name: "marina_tenants: add index marina_tenants_marina_idx", sql: `CREATE INDEX IF NOT EXISTS marina_tenants_marina_idx ON marina_tenants (marina_project_id)` },
+  { name: "marina_tenants: add index marina_tenants_name_idx", sql: `CREATE INDEX IF NOT EXISTS marina_tenants_name_idx ON marina_tenants (last_name, first_name)` },
+  { name: "marina_tenants: add index marina_tenants_email_idx", sql: `CREATE INDEX IF NOT EXISTS marina_tenants_email_idx ON marina_tenants (email)` },
+  { name: "marina_tenants: add index marina_tenants_active_idx", sql: `CREATE INDEX IF NOT EXISTS marina_tenants_active_idx ON marina_tenants (is_active)` },
+  { name: "marina_tenants: add index marina_tenants_state_idx", sql: `CREATE INDEX IF NOT EXISTS marina_tenants_state_idx ON marina_tenants (state)` },
+  { name: "marina_tenants: add index marina_tenants_city_idx", sql: `CREATE INDEX IF NOT EXISTS marina_tenants_city_idx ON marina_tenants (city)` },
+
+  // marketplace_scrape_runs — uncovered indexes
+  { name: "marketplace_scrape_runs: add index marketplace_scrape_runs_source_idx", sql: `CREATE INDEX IF NOT EXISTS marketplace_scrape_runs_source_idx ON marketplace_scrape_runs (source_id, started_at)` },
+  { name: "marketplace_scrape_runs: add index marketplace_scrape_runs_status_idx", sql: `CREATE INDEX IF NOT EXISTS marketplace_scrape_runs_status_idx ON marketplace_scrape_runs (status)` },
+
+  // marketplace_sources — uncovered indexes
+  { name: "marketplace_sources: add index marketplace_sources_category_idx", sql: `CREATE INDEX IF NOT EXISTS marketplace_sources_category_idx ON marketplace_sources (category)` },
+
+  // mm_standard_accounts — uncovered indexes
+  { name: "mm_standard_accounts: add index mm_std_acct_group_asset_idx", sql: `CREATE INDEX IF NOT EXISTS mm_std_acct_group_asset_idx ON mm_standard_accounts (category_group, asset_class_tag)` },
+
+  // modeling_display_preferences — uncovered indexes
+  { name: "modeling_display_preferences: add index modeling_display_prefs_org_idx", sql: `CREATE INDEX IF NOT EXISTS modeling_display_prefs_org_idx ON modeling_display_preferences (org_id)` },
+
+  // modeling_name_overrides — uncovered indexes
+  { name: "modeling_name_overrides: add index name_overrides_project_idx", sql: `CREATE INDEX IF NOT EXISTS name_overrides_project_idx ON modeling_name_overrides (project_id)` },
+  { name: "modeling_name_overrides: add index name_overrides_org_idx", sql: `CREATE INDEX IF NOT EXISTS name_overrides_org_idx ON modeling_name_overrides (org_id)` },
+  { name: "modeling_name_overrides: add index name_overrides_lookup_idx", sql: `CREATE INDEX IF NOT EXISTS name_overrides_lookup_idx ON modeling_name_overrides (project_id, scope, original_name)` },
+
+  // modeling_pnl_overrides — uncovered indexes
+  { name: "modeling_pnl_overrides: add index modeling_pnl_overrides_project_idx", sql: `CREATE INDEX IF NOT EXISTS modeling_pnl_overrides_project_idx ON modeling_pnl_overrides (project_id)` },
+  { name: "modeling_pnl_overrides: add index modeling_pnl_overrides_org_idx", sql: `CREATE INDEX IF NOT EXISTS modeling_pnl_overrides_org_idx ON modeling_pnl_overrides (org_id)` },
+  { name: "modeling_pnl_overrides: add index modeling_pnl_overrides_line_item_idx", sql: `CREATE INDEX IF NOT EXISTS modeling_pnl_overrides_line_item_idx ON modeling_pnl_overrides (project_id, line_item_key)` },
+
+  // modeling_project_activity — uncovered indexes
+  { name: "modeling_project_activity: add index mp_activity_project_idx", sql: `CREATE INDEX IF NOT EXISTS mp_activity_project_idx ON modeling_project_activity (project_id)` },
+  { name: "modeling_project_activity: add index mp_activity_project_created_at_idx", sql: `CREATE INDEX IF NOT EXISTS mp_activity_project_created_at_idx ON modeling_project_activity (project_id, created_at)` },
+
+  // modeling_project_collaborators — uncovered indexes
+  { name: "modeling_project_collaborators: add index mp_collab_project_idx", sql: `CREATE INDEX IF NOT EXISTS mp_collab_project_idx ON modeling_project_collaborators (project_id)` },
+  { name: "modeling_project_collaborators: add index mp_collab_user_idx", sql: `CREATE INDEX IF NOT EXISTS mp_collab_user_idx ON modeling_project_collaborators (user_id)` },
+
+  // modeling_rent_roll_config — uncovered indexes
+  { name: "modeling_rent_roll_config: add index modeling_rent_roll_config_org_idx", sql: `CREATE INDEX IF NOT EXISTS modeling_rent_roll_config_org_idx ON modeling_rent_roll_config (org_id)` },
+  { name: "modeling_rent_roll_config: add index modeling_rent_roll_config_project_idx", sql: `CREATE INDEX IF NOT EXISTS modeling_rent_roll_config_project_idx ON modeling_rent_roll_config (modeling_project_id)` },
+
+  // modeling_rent_roll_units — uncovered indexes
+  { name: "modeling_rent_roll_units: add index modeling_rent_roll_units_org_idx", sql: `CREATE INDEX IF NOT EXISTS modeling_rent_roll_units_org_idx ON modeling_rent_roll_units (org_id)` },
+  { name: "modeling_rent_roll_units: add index modeling_rent_roll_units_project_idx", sql: `CREATE INDEX IF NOT EXISTS modeling_rent_roll_units_project_idx ON modeling_rent_roll_units (modeling_project_id)` },
+  { name: "modeling_rent_roll_units: add index modeling_rent_roll_units_storage_type_idx", sql: `CREATE INDEX IF NOT EXISTS modeling_rent_roll_units_storage_type_idx ON modeling_rent_roll_units (storage_type)` },
+  { name: "modeling_rent_roll_units: add index modeling_rent_roll_units_status_idx", sql: `CREATE INDEX IF NOT EXISTS modeling_rent_roll_units_status_idx ON modeling_rent_roll_units (status)` },
+
+  // modeling_scenario_templates — uncovered indexes
+  { name: "modeling_scenario_templates: add index scenario_templates_org_idx", sql: `CREATE INDEX IF NOT EXISTS scenario_templates_org_idx ON modeling_scenario_templates (org_id)` },
+  { name: "modeling_scenario_templates: add index scenario_templates_scope_idx", sql: `CREATE INDEX IF NOT EXISTS scenario_templates_scope_idx ON modeling_scenario_templates (scope)` },
+  { name: "modeling_scenario_templates: add index scenario_templates_name_idx", sql: `CREATE INDEX IF NOT EXISTS scenario_templates_name_idx ON modeling_scenario_templates (name)` },
+
+  // move_events — uncovered indexes
+  { name: "move_events: add index move_events_org_idx", sql: `CREATE INDEX IF NOT EXISTS move_events_org_idx ON move_events (org_id)` },
+  { name: "move_events: add index move_events_marina_idx", sql: `CREATE INDEX IF NOT EXISTS move_events_marina_idx ON move_events (marina_project_id)` },
+  { name: "move_events: add index move_events_lease_idx", sql: `CREATE INDEX IF NOT EXISTS move_events_lease_idx ON move_events (lease_id)` },
+  { name: "move_events: add index move_events_tenant_idx", sql: `CREATE INDEX IF NOT EXISTS move_events_tenant_idx ON move_events (tenant_id)` },
+  { name: "move_events: add index move_events_type_idx", sql: `CREATE INDEX IF NOT EXISTS move_events_type_idx ON move_events (event_type)` },
+  { name: "move_events: add index move_events_date_idx", sql: `CREATE INDEX IF NOT EXISTS move_events_date_idx ON move_events (event_date)` },
+
+  // ops_boat_rentals — uncovered indexes
+  { name: "ops_boat_rentals: add index ops_boat_rentals_marina_date_idx", sql: `CREATE INDEX IF NOT EXISTS ops_boat_rentals_marina_date_idx ON ops_boat_rentals (marina_id, rental_date)` },
+  { name: "ops_boat_rentals: add index ops_boat_rentals_org_idx", sql: `CREATE INDEX IF NOT EXISTS ops_boat_rentals_org_idx ON ops_boat_rentals (org_id)` },
+  { name: "ops_boat_rentals: add index ops_boat_rentals_modeling_project_idx", sql: `CREATE INDEX IF NOT EXISTS ops_boat_rentals_modeling_project_idx ON ops_boat_rentals (modeling_project_id)` },
+
+  // ops_bookkeeping_gl — uncovered indexes
+  { name: "ops_bookkeeping_gl: add index ops_bookkeeping_marina_period_idx", sql: `CREATE INDEX IF NOT EXISTS ops_bookkeeping_marina_period_idx ON ops_bookkeeping_gl (marina_id, period_start)` },
+  { name: "ops_bookkeeping_gl: add index ops_bookkeeping_org_idx", sql: `CREATE INDEX IF NOT EXISTS ops_bookkeeping_org_idx ON ops_bookkeeping_gl (org_id)` },
+
+  // ops_fuel_transactions — uncovered indexes
+  { name: "ops_fuel_transactions: add index ops_fuel_marina_date_idx", sql: `CREATE INDEX IF NOT EXISTS ops_fuel_marina_date_idx ON ops_fuel_transactions (marina_id, txn_date)` },
+  { name: "ops_fuel_transactions: add index ops_fuel_org_idx", sql: `CREATE INDEX IF NOT EXISTS ops_fuel_org_idx ON ops_fuel_transactions (org_id)` },
+  { name: "ops_fuel_transactions: add index ops_fuel_modeling_project_idx", sql: `CREATE INDEX IF NOT EXISTS ops_fuel_modeling_project_idx ON ops_fuel_transactions (modeling_project_id)` },
+
+  // ops_marinas — uncovered indexes
+  { name: "ops_marinas: add index ops_marinas_portfolio_idx", sql: `CREATE INDEX IF NOT EXISTS ops_marinas_portfolio_idx ON ops_marinas (portfolio_id)` },
+  { name: "ops_marinas: add index ops_marinas_org_idx", sql: `CREATE INDEX IF NOT EXISTS ops_marinas_org_idx ON ops_marinas (org_id)` },
+  { name: "ops_marinas: add index ops_marinas_ownership_idx", sql: `CREATE INDEX IF NOT EXISTS ops_marinas_ownership_idx ON ops_marinas (ownership_status)` },
+
+  // ops_parking_lot — uncovered indexes
+  { name: "ops_parking_lot: add index ops_parking_lot_marina_date_idx", sql: `CREATE INDEX IF NOT EXISTS ops_parking_lot_marina_date_idx ON ops_parking_lot (marina_id, txn_date)` },
+  { name: "ops_parking_lot: add index ops_parking_lot_org_idx", sql: `CREATE INDEX IF NOT EXISTS ops_parking_lot_org_idx ON ops_parking_lot (org_id)` },
+  { name: "ops_parking_lot: add index ops_parking_lot_modeling_project_idx", sql: `CREATE INDEX IF NOT EXISTS ops_parking_lot_modeling_project_idx ON ops_parking_lot (modeling_project_id)` },
+
+  // ops_portfolios — uncovered indexes
+  { name: "ops_portfolios: add index ops_portfolios_user_idx", sql: `CREATE INDEX IF NOT EXISTS ops_portfolios_user_idx ON ops_portfolios (user_id)` },
+  { name: "ops_portfolios: add index ops_portfolios_org_idx", sql: `CREATE INDEX IF NOT EXISTS ops_portfolios_org_idx ON ops_portfolios (org_id)` },
+
+  // ops_service_work_orders — uncovered indexes
+  { name: "ops_service_work_orders: add index ops_service_marina_open_idx", sql: `CREATE INDEX IF NOT EXISTS ops_service_marina_open_idx ON ops_service_work_orders (marina_id, open_date)` },
+  { name: "ops_service_work_orders: add index ops_service_org_idx", sql: `CREATE INDEX IF NOT EXISTS ops_service_org_idx ON ops_service_work_orders (org_id)` },
+  { name: "ops_service_work_orders: add index ops_service_modeling_project_idx", sql: `CREATE INDEX IF NOT EXISTS ops_service_modeling_project_idx ON ops_service_work_orders (modeling_project_id)` },
+
+  // ops_ship_store_sales — uncovered indexes
+  { name: "ops_ship_store_sales: add index ops_ship_store_marina_date_idx", sql: `CREATE INDEX IF NOT EXISTS ops_ship_store_marina_date_idx ON ops_ship_store_sales (marina_id, txn_date)` },
+  { name: "ops_ship_store_sales: add index ops_ship_store_org_idx", sql: `CREATE INDEX IF NOT EXISTS ops_ship_store_org_idx ON ops_ship_store_sales (org_id)` },
+  { name: "ops_ship_store_sales: add index ops_ship_store_modeling_project_idx", sql: `CREATE INDEX IF NOT EXISTS ops_ship_store_modeling_project_idx ON ops_ship_store_sales (modeling_project_id)` },
+
+  // org_pnl_display_defaults — uncovered indexes
+  { name: "org_pnl_display_defaults: add index org_display_defaults_org_idx", sql: `CREATE INDEX IF NOT EXISTS org_display_defaults_org_idx ON org_pnl_display_defaults (org_id)` },
+  { name: "org_pnl_display_defaults: add index org_display_defaults_lookup_idx", sql: `CREATE INDEX IF NOT EXISTS org_display_defaults_lookup_idx ON org_pnl_display_defaults (org_id, scope, original_name)` },
+
+  // password_reset_tokens — uncovered indexes
+  { name: "password_reset_tokens: add index password_reset_token_idx", sql: `CREATE INDEX IF NOT EXISTS password_reset_token_idx ON password_reset_tokens (token)` },
+  { name: "password_reset_tokens: add index password_reset_user_id_idx", sql: `CREATE INDEX IF NOT EXISTS password_reset_user_id_idx ON password_reset_tokens (user_id)` },
+
+  // payroll_bonus_events — uncovered indexes
+  { name: "payroll_bonus_events: add index idx_bonus_line", sql: `CREATE INDEX IF NOT EXISTS idx_bonus_line ON payroll_bonus_events (plan_line_id)` },
+  { name: "payroll_bonus_events: add index idx_bonus_date", sql: `CREATE INDEX IF NOT EXISTS idx_bonus_date ON payroll_bonus_events (pay_date)` },
+
+  // payroll_employees — uncovered indexes
+  { name: "payroll_employees: add index idx_payroll_emp_org", sql: `CREATE INDEX IF NOT EXISTS idx_payroll_emp_org ON payroll_employees (org_id)` },
+  { name: "payroll_employees: add index idx_payroll_emp_asset", sql: `CREATE INDEX IF NOT EXISTS idx_payroll_emp_asset ON payroll_employees (asset_id)` },
+
+  // payroll_permission_grants — uncovered indexes
+  { name: "payroll_permission_grants: add index uq_payroll_perm_grant", sql: `CREATE UNIQUE INDEX IF NOT EXISTS uq_payroll_perm_grant ON payroll_permission_grants (org_id, granted_to_user_id, scope_type, scope_id)` },
+  { name: "payroll_permission_grants: add index idx_payroll_perm_granted_to", sql: `CREATE INDEX IF NOT EXISTS idx_payroll_perm_granted_to ON payroll_permission_grants (granted_to_user_id)` },
+  { name: "payroll_permission_grants: add index idx_payroll_perm_org", sql: `CREATE INDEX IF NOT EXISTS idx_payroll_perm_org ON payroll_permission_grants (org_id)` },
+
+  // payroll_plan_lines — uncovered indexes
+  { name: "payroll_plan_lines: add index idx_payroll_line_plan", sql: `CREATE INDEX IF NOT EXISTS idx_payroll_line_plan ON payroll_plan_lines (plan_id)` },
+  { name: "payroll_plan_lines: add index idx_payroll_line_dept", sql: `CREATE INDEX IF NOT EXISTS idx_payroll_line_dept ON payroll_plan_lines (department_id)` },
+
+  // payroll_plans — uncovered indexes
+  { name: "payroll_plans: add index idx_payroll_plan_org", sql: `CREATE INDEX IF NOT EXISTS idx_payroll_plan_org ON payroll_plans (org_id)` },
+  { name: "payroll_plans: add index idx_payroll_plan_asset", sql: `CREATE INDEX IF NOT EXISTS idx_payroll_plan_asset ON payroll_plans (asset_id)` },
+  { name: "payroll_plans: add index idx_payroll_plan_portfolio", sql: `CREATE INDEX IF NOT EXISTS idx_payroll_plan_portfolio ON payroll_plans (portfolio_id)` },
+
+  // payroll_rate_events — uncovered indexes
+  { name: "payroll_rate_events: add index idx_rate_event_line", sql: `CREATE INDEX IF NOT EXISTS idx_rate_event_line ON payroll_rate_events (plan_line_id)` },
+
+  // payroll_weekly_hours — uncovered indexes
+  { name: "payroll_weekly_hours: add index idx_weekly_hours_line_week", sql: `CREATE INDEX IF NOT EXISTS idx_weekly_hours_line_week ON payroll_weekly_hours (plan_line_id, week_start_date)` },
+
+  // rra_periods — uncovered indexes
+  { name: "rra_periods: add index rra_periods_location_idx", sql: `CREATE INDEX IF NOT EXISTS rra_periods_location_idx ON rra_periods (location_id)` },
+  { name: "rra_periods: add index rra_periods_date_idx", sql: `CREATE INDEX IF NOT EXISTS rra_periods_date_idx ON rra_periods (period_date)` },
+  { name: "rra_periods: add index rra_periods_year_month_idx", sql: `CREATE INDEX IF NOT EXISTS rra_periods_year_month_idx ON rra_periods (year, month)` },
+
+  // pnl_actuals_values — uncovered indexes
+  { name: "pnl_actuals_values: add index idx_pnl_actuals_asset_period", sql: `CREATE INDEX IF NOT EXISTS idx_pnl_actuals_asset_period ON pnl_actuals_values (asset_id, period_start_date)` },
+
+  // pnl_department_verifications — uncovered indexes
+  { name: "pnl_department_verifications: add index pnl_dept_verifications_job_idx", sql: `CREATE INDEX IF NOT EXISTS pnl_dept_verifications_job_idx ON pnl_department_verifications (job_id)` },
+  { name: "pnl_department_verifications: add index pnl_dept_verifications_status_idx", sql: `CREATE INDEX IF NOT EXISTS pnl_dept_verifications_status_idx ON pnl_department_verifications (status)` },
+  { name: "pnl_department_verifications: add index pnl_dept_verifications_org_idx", sql: `CREATE INDEX IF NOT EXISTS pnl_dept_verifications_org_idx ON pnl_department_verifications (org_id)` },
+  { name: "pnl_department_verifications: add index pnl_dept_verifications_normalized_idx", sql: `CREATE INDEX IF NOT EXISTS pnl_dept_verifications_normalized_idx ON pnl_department_verifications (normalized_label)` },
+
+  // pnl_documents — uncovered indexes
+  { name: "pnl_documents: add index pnl_documents_asset_idx", sql: `CREATE INDEX IF NOT EXISTS pnl_documents_asset_idx ON pnl_documents (asset_id)` },
+  { name: "pnl_documents: add index pnl_documents_project_idx", sql: `CREATE INDEX IF NOT EXISTS pnl_documents_project_idx ON pnl_documents (modeling_project_id)` },
+
+  // pnl_facts — uncovered indexes
+  { name: "pnl_facts: add index pnl_facts_org_asset_idx", sql: `CREATE INDEX IF NOT EXISTS pnl_facts_org_asset_idx ON pnl_facts (org_id, asset_id)` },
+  { name: "pnl_facts: add index pnl_facts_fiscal_year_idx", sql: `CREATE INDEX IF NOT EXISTS pnl_facts_fiscal_year_idx ON pnl_facts (fiscal_year)` },
+
+  // pnl_jobs — uncovered indexes
+  { name: "pnl_jobs: add index pnl_jobs_document_idx", sql: `CREATE INDEX IF NOT EXISTS pnl_jobs_document_idx ON pnl_jobs (document_id)` },
+  { name: "pnl_jobs: add index pnl_jobs_status_idx", sql: `CREATE INDEX IF NOT EXISTS pnl_jobs_status_idx ON pnl_jobs (status)` },
+  { name: "pnl_jobs: add index pnl_jobs_org_idx", sql: `CREATE INDEX IF NOT EXISTS pnl_jobs_org_idx ON pnl_jobs (org_id)` },
+
+  // pnl_keyword_rules — uncovered indexes
+  { name: "pnl_keyword_rules: add index pnl_keyword_rules_coa_idx", sql: `CREATE INDEX IF NOT EXISTS pnl_keyword_rules_coa_idx ON pnl_keyword_rules (canonical_coa_code)` },
+  { name: "pnl_keyword_rules: add index pnl_keyword_rules_priority_idx", sql: `CREATE INDEX IF NOT EXISTS pnl_keyword_rules_priority_idx ON pnl_keyword_rules (priority)` },
+
+  // pnl_line_item_aliases — uncovered indexes
+  { name: "pnl_line_item_aliases: add index pnl_aliases_normalized_idx", sql: `CREATE INDEX IF NOT EXISTS pnl_aliases_normalized_idx ON pnl_line_item_aliases (normalized_label)` },
+  { name: "pnl_line_item_aliases: add index pnl_aliases_coa_code_idx", sql: `CREATE INDEX IF NOT EXISTS pnl_aliases_coa_code_idx ON pnl_line_item_aliases (canonical_coa_code)` },
+
+  // pnl_parsed_statements — uncovered indexes
+  { name: "pnl_parsed_statements: add index pnl_parsed_statements_job_idx", sql: `CREATE INDEX IF NOT EXISTS pnl_parsed_statements_job_idx ON pnl_parsed_statements (job_id)` },
+
+  // rra_pnl_rack_revenue — uncovered indexes
+  { name: "rra_pnl_rack_revenue: add index rra_pnl_rack_revenue_location_idx", sql: `CREATE INDEX IF NOT EXISTS rra_pnl_rack_revenue_location_idx ON rra_pnl_rack_revenue (location_id)` },
+  { name: "rra_pnl_rack_revenue: add index rra_pnl_rack_revenue_period_idx", sql: `CREATE INDEX IF NOT EXISTS rra_pnl_rack_revenue_period_idx ON rra_pnl_rack_revenue (period_id)` },
+
+  // pnl_review_items — uncovered indexes
+  { name: "pnl_review_items: add index pnl_review_items_job_idx", sql: `CREATE INDEX IF NOT EXISTS pnl_review_items_job_idx ON pnl_review_items (job_id)` },
+  { name: "pnl_review_items: add index pnl_review_items_status_idx", sql: `CREATE INDEX IF NOT EXISTS pnl_review_items_status_idx ON pnl_review_items (status)` },
+
+  // pnl_segments — uncovered indexes
+  { name: "pnl_segments: add index pnl_segments_code_idx", sql: `CREATE INDEX IF NOT EXISTS pnl_segments_code_idx ON pnl_segments (segment_code)` },
+  { name: "pnl_segments: add index pnl_segments_type_idx", sql: `CREATE INDEX IF NOT EXISTS pnl_segments_type_idx ON pnl_segments (segment_type)` },
+
+  // pricing_recommendations — uncovered indexes
+  { name: "pricing_recommendations: add index prec_org_idx", sql: `CREATE INDEX IF NOT EXISTS prec_org_idx ON pricing_recommendations (org_id)` },
+  { name: "pricing_recommendations: add index prec_property_idx", sql: `CREATE INDEX IF NOT EXISTS prec_property_idx ON pricing_recommendations (property_id)` },
+  { name: "pricing_recommendations: add index prec_rule_idx", sql: `CREATE INDEX IF NOT EXISTS prec_rule_idx ON pricing_recommendations (rule_id)` },
+  { name: "pricing_recommendations: add index prec_status_idx", sql: `CREATE INDEX IF NOT EXISTS prec_status_idx ON pricing_recommendations (status)` },
+  { name: "pricing_recommendations: add index prec_property_status_idx", sql: `CREATE INDEX IF NOT EXISTS prec_property_status_idx ON pricing_recommendations (property_id, status)` },
+
+  // pricing_rules — uncovered indexes
+  { name: "pricing_rules: add index pr_org_idx", sql: `CREATE INDEX IF NOT EXISTS pr_org_idx ON pricing_rules (org_id)` },
+  { name: "pricing_rules: add index pr_status_idx", sql: `CREATE INDEX IF NOT EXISTS pr_status_idx ON pricing_rules (status)` },
+
+  // project_equity_contributions — uncovered indexes
+  { name: "project_equity_contributions: add index equity_contributions_project_idx", sql: `CREATE INDEX IF NOT EXISTS equity_contributions_project_idx ON project_equity_contributions (project_id)` },
+  { name: "project_equity_contributions: add index equity_contributions_partner_idx", sql: `CREATE INDEX IF NOT EXISTS equity_contributions_partner_idx ON project_equity_contributions (partner_id)` },
+
+  // project_partners — uncovered indexes
+  { name: "project_partners: add index project_partners_project_idx", sql: `CREATE INDEX IF NOT EXISTS project_partners_project_idx ON project_partners (project_id)` },
+
+  // rent_roll_periods — uncovered indexes
+  { name: "rent_roll_periods: add index rent_roll_periods_org_idx", sql: `CREATE INDEX IF NOT EXISTS rent_roll_periods_org_idx ON rent_roll_periods (org_id)` },
+  { name: "rent_roll_periods: add index rent_roll_periods_marina_idx", sql: `CREATE INDEX IF NOT EXISTS rent_roll_periods_marina_idx ON rent_roll_periods (marina_project_id)` },
+  { name: "rent_roll_periods: add index rent_roll_periods_period_idx", sql: `CREATE INDEX IF NOT EXISTS rent_roll_periods_period_idx ON rent_roll_periods (period_year, period_month)` },
+
+  // returns_ledger — uncovered indexes
+  { name: "returns_ledger: add index returns_ledger_org_idx", sql: `CREATE INDEX IF NOT EXISTS returns_ledger_org_idx ON returns_ledger (org_id)` },
+  { name: "returns_ledger: add index returns_ledger_user_idx", sql: `CREATE INDEX IF NOT EXISTS returns_ledger_user_idx ON returns_ledger (user_id)` },
+  { name: "returns_ledger: add index returns_ledger_model_idx", sql: `CREATE INDEX IF NOT EXISTS returns_ledger_model_idx ON returns_ledger (model_id)` },
+  { name: "returns_ledger: add index returns_ledger_property_idx", sql: `CREATE INDEX IF NOT EXISTS returns_ledger_property_idx ON returns_ledger (property_id)` },
+  { name: "returns_ledger: add index returns_ledger_date_idx", sql: `CREATE INDEX IF NOT EXISTS returns_ledger_date_idx ON returns_ledger (as_of_date)` },
+
+  // returns_valuation — uncovered indexes
+  { name: "returns_valuation: add index returns_valuation_org_idx", sql: `CREATE INDEX IF NOT EXISTS returns_valuation_org_idx ON returns_valuation (org_id)` },
+  { name: "returns_valuation: add index returns_valuation_model_idx", sql: `CREATE INDEX IF NOT EXISTS returns_valuation_model_idx ON returns_valuation (model_id)` },
+  { name: "returns_valuation: add index returns_valuation_property_idx", sql: `CREATE INDEX IF NOT EXISTS returns_valuation_property_idx ON returns_valuation (property_id)` },
+  { name: "returns_valuation: add index returns_valuation_date_idx", sql: `CREATE INDEX IF NOT EXISTS returns_valuation_date_idx ON returns_valuation (as_of_date)` },
+
+  // sessions — uncovered indexes
+  { name: "sessions: add index IDX_session_expire", sql: `CREATE INDEX IF NOT EXISTS IDX_session_expire ON sessions (expire)` },
+
+  // ship_store_transactions — uncovered indexes
+  { name: "ship_store_transactions: add index ship_store_transactions_org_id_idx", sql: `CREATE INDEX IF NOT EXISTS ship_store_transactions_org_id_idx ON ship_store_transactions (org_id)` },
+
+  // storage_locations — uncovered indexes
+  { name: "storage_locations: add index storage_locations_org_idx", sql: `CREATE INDEX IF NOT EXISTS storage_locations_org_idx ON storage_locations (org_id)` },
+  { name: "storage_locations: add index storage_locations_marina_idx", sql: `CREATE INDEX IF NOT EXISTS storage_locations_marina_idx ON storage_locations (marina_project_id)` },
+  { name: "storage_locations: add index storage_locations_code_idx", sql: `CREATE INDEX IF NOT EXISTS storage_locations_code_idx ON storage_locations (code)` },
+  { name: "storage_locations: add index storage_locations_type_idx", sql: `CREATE INDEX IF NOT EXISTS storage_locations_type_idx ON storage_locations (location_type)` },
+  { name: "storage_locations: add index storage_locations_available_idx", sql: `CREATE INDEX IF NOT EXISTS storage_locations_available_idx ON storage_locations (is_available)` },
+  { name: "storage_locations: add index storage_locations_dock_idx", sql: `CREATE INDEX IF NOT EXISTS storage_locations_dock_idx ON storage_locations (dock)` },
+
+  // subscriptions — uncovered indexes
+  { name: "subscriptions: add index subscriptions_user_idx", sql: `CREATE INDEX IF NOT EXISTS subscriptions_user_idx ON subscriptions (user_id)` },
+  { name: "subscriptions: add index subscriptions_org_idx", sql: `CREATE INDEX IF NOT EXISTS subscriptions_org_idx ON subscriptions (org_id)` },
+  { name: "subscriptions: add index subscriptions_status_idx", sql: `CREATE INDEX IF NOT EXISTS subscriptions_status_idx ON subscriptions (status)` },
+
+  // tax_profiles — uncovered indexes
+  { name: "tax_profiles: add index tax_profiles_user_idx", sql: `CREATE INDEX IF NOT EXISTS tax_profiles_user_idx ON tax_profiles (user_id)` },
+
+  // user_broker_entitlements — uncovered indexes
+  { name: "user_broker_entitlements: add index user_broker_entitlements_org_idx", sql: `CREATE INDEX IF NOT EXISTS user_broker_entitlements_org_idx ON user_broker_entitlements (org_id)` },
+
+  // user_integrations — uncovered indexes
+  { name: "user_integrations: add index user_integrations_user_idx", sql: `CREATE INDEX IF NOT EXISTS user_integrations_user_idx ON user_integrations (user_id)` },
+  { name: "user_integrations: add index user_integrations_org_idx", sql: `CREATE INDEX IF NOT EXISTS user_integrations_org_idx ON user_integrations (org_id)` },
+  { name: "user_integrations: add index user_integrations_key_idx", sql: `CREATE INDEX IF NOT EXISTS user_integrations_key_idx ON user_integrations (integration_key)` },
+  { name: "user_integrations: add index user_integrations_connected_idx", sql: `CREATE INDEX IF NOT EXISTS user_integrations_connected_idx ON user_integrations (is_connected)` },
+
+  // user_tour_progress — uncovered indexes
+  { name: "user_tour_progress: add index user_tour_progress_user_id_idx", sql: `CREATE INDEX IF NOT EXISTS user_tour_progress_user_id_idx ON user_tour_progress (user_id)` },
+
+  // util_inventory_units — uncovered indexes
+  { name: "util_inventory_units: add index util_inv_org_idx", sql: `CREATE INDEX IF NOT EXISTS util_inv_org_idx ON util_inventory_units (org_id)` },
+  { name: "util_inventory_units: add index util_inv_property_type_idx", sql: `CREATE INDEX IF NOT EXISTS util_inv_property_type_idx ON util_inventory_units (property_id, unit_type)` },
+  { name: "util_inventory_units: add index util_inv_property_idx", sql: `CREATE INDEX IF NOT EXISTS util_inv_property_idx ON util_inventory_units (property_id)` },
+  { name: "util_inventory_units: add index util_inv_asset_class_idx", sql: `CREATE INDEX IF NOT EXISTS util_inv_asset_class_idx ON util_inventory_units (asset_class)` },
+  { name: "util_inventory_units: add index util_inv_band_idx", sql: `CREATE INDEX IF NOT EXISTS util_inv_band_idx ON util_inventory_units (band_key)` },
+  { name: "util_inventory_units: add index util_inv_source_idx", sql: `CREATE INDEX IF NOT EXISTS util_inv_source_idx ON util_inventory_units (source_table, source_id)` },
+
+  // util_occupancy_events — uncovered indexes
+  { name: "util_occupancy_events: add index util_occ_org_idx", sql: `CREATE INDEX IF NOT EXISTS util_occ_org_idx ON util_occupancy_events (org_id)` },
+  { name: "util_occupancy_events: add index util_occ_property_type_idx", sql: `CREATE INDEX IF NOT EXISTS util_occ_property_type_idx ON util_occupancy_events (property_id, unit_type)` },
+  { name: "util_occupancy_events: add index util_occ_property_dates_idx", sql: `CREATE INDEX IF NOT EXISTS util_occ_property_dates_idx ON util_occupancy_events (property_id, start_date, end_date)` },
+  { name: "util_occupancy_events: add index util_occ_unit_idx", sql: `CREATE INDEX IF NOT EXISTS util_occ_unit_idx ON util_occupancy_events (unit_id)` },
+  { name: "util_occupancy_events: add index util_occ_status_idx", sql: `CREATE INDEX IF NOT EXISTS util_occ_status_idx ON util_occupancy_events (status)` },
+  { name: "util_occupancy_events: add index util_occ_source_idx", sql: `CREATE INDEX IF NOT EXISTS util_occ_source_idx ON util_occupancy_events (source_table, source_id)` },
+
+  // util_offline_blocks — uncovered indexes
+  { name: "util_offline_blocks: add index util_offline_org_idx", sql: `CREATE INDEX IF NOT EXISTS util_offline_org_idx ON util_offline_blocks (org_id)` },
+  { name: "util_offline_blocks: add index util_offline_property_idx", sql: `CREATE INDEX IF NOT EXISTS util_offline_property_idx ON util_offline_blocks (property_id)` },
+  { name: "util_offline_blocks: add index util_offline_scope_idx", sql: `CREATE INDEX IF NOT EXISTS util_offline_scope_idx ON util_offline_blocks (scope_type, scope_key)` },
+  { name: "util_offline_blocks: add index util_offline_unit_idx", sql: `CREATE INDEX IF NOT EXISTS util_offline_unit_idx ON util_offline_blocks (unit_id)` },
+  { name: "util_offline_blocks: add index util_offline_dates_idx", sql: `CREATE INDEX IF NOT EXISTS util_offline_dates_idx ON util_offline_blocks (start_date, end_date)` },
+
+  // util_presence_events — uncovered indexes
+  { name: "util_presence_events: add index util_presence_org_idx", sql: `CREATE INDEX IF NOT EXISTS util_presence_org_idx ON util_presence_events (org_id)` },
+  { name: "util_presence_events: add index util_presence_property_idx", sql: `CREATE INDEX IF NOT EXISTS util_presence_property_idx ON util_presence_events (property_id)` },
+  { name: "util_presence_events: add index util_presence_unit_idx", sql: `CREATE INDEX IF NOT EXISTS util_presence_unit_idx ON util_presence_events (unit_id)` },
+  { name: "util_presence_events: add index util_presence_property_dates_idx", sql: `CREATE INDEX IF NOT EXISTS util_presence_property_dates_idx ON util_presence_events (property_id, timestamp_start, timestamp_end)` },
+  { name: "util_presence_events: add index util_presence_source_idx", sql: `CREATE INDEX IF NOT EXISTS util_presence_source_idx ON util_presence_events (source)` },
+
+  // util_snapshots — uncovered indexes
+  { name: "util_snapshots: add index util_snap_org_idx", sql: `CREATE INDEX IF NOT EXISTS util_snap_org_idx ON util_snapshots (org_id)` },
+  { name: "util_snapshots: add index util_snap_property_period_idx", sql: `CREATE INDEX IF NOT EXISTS util_snap_property_period_idx ON util_snapshots (property_id, period_start, period_end)` },
+  { name: "util_snapshots: add index util_snap_lookup_idx", sql: `CREATE UNIQUE INDEX IF NOT EXISTS util_snap_lookup_idx ON util_snapshots (property_id, period_start, period_end, unit_type, band_key, mode)` },
+  { name: "util_snapshots: add index util_snap_asset_class_idx", sql: `CREATE INDEX IF NOT EXISTS util_snap_asset_class_idx ON util_snapshots (asset_class)` },
+  { name: "util_snapshots: add index util_snap_mode_idx", sql: `CREATE INDEX IF NOT EXISTS util_snap_mode_idx ON util_snapshots (mode)` },
+
+  // valuation_snapshot_sources — uncovered indexes
+  { name: "valuation_snapshot_sources: add index valuation_snapshot_sources_snapshot_idx", sql: `CREATE INDEX IF NOT EXISTS valuation_snapshot_sources_snapshot_idx ON valuation_snapshot_sources (snapshot_id)` },
+  { name: "valuation_snapshot_sources: add index valuation_snapshot_sources_type_idx", sql: `CREATE INDEX IF NOT EXISTS valuation_snapshot_sources_type_idx ON valuation_snapshot_sources (source_type)` },
+
+  // valuation_snapshots — uncovered indexes
+  { name: "valuation_snapshots: add index valuation_snapshots_org_idx", sql: `CREATE INDEX IF NOT EXISTS valuation_snapshots_org_idx ON valuation_snapshots (org_id)` },
+  { name: "valuation_snapshots: add index valuation_snapshots_project_idx", sql: `CREATE INDEX IF NOT EXISTS valuation_snapshots_project_idx ON valuation_snapshots (modeling_project_id)` },
+  { name: "valuation_snapshots: add index valuation_snapshots_date_idx", sql: `CREATE INDEX IF NOT EXISTS valuation_snapshots_date_idx ON valuation_snapshots (snapshot_date)` },
+  { name: "valuation_snapshots: add index valuation_snapshots_project_date_idx", sql: `CREATE INDEX IF NOT EXISTS valuation_snapshots_project_date_idx ON valuation_snapshots (modeling_project_id, snapshot_date)` },
+  { name: "valuation_snapshots: add index valuation_snapshots_trigger_idx", sql: `CREATE INDEX IF NOT EXISTS valuation_snapshots_trigger_idx ON valuation_snapshots (trigger)` },
+
+  // valuator_pnl_values — uncovered indexes
+  { name: "valuator_pnl_values: add index idx_valuator_pnl_model_period", sql: `CREATE INDEX IF NOT EXISTS idx_valuator_pnl_model_period ON valuator_pnl_values (valuation_model_id, period_start_date)` },
+
+  // waitlist_entries — uncovered indexes
+  { name: "waitlist_entries: add index wle_waitlist_idx", sql: `CREATE INDEX IF NOT EXISTS wle_waitlist_idx ON waitlist_entries (waitlist_id)` },
+  { name: "waitlist_entries: add index wle_org_idx", sql: `CREATE INDEX IF NOT EXISTS wle_org_idx ON waitlist_entries (org_id)` },
+  { name: "waitlist_entries: add index wle_status_idx", sql: `CREATE INDEX IF NOT EXISTS wle_status_idx ON waitlist_entries (status)` },
+  { name: "waitlist_entries: add index wle_position_idx", sql: `CREATE INDEX IF NOT EXISTS wle_position_idx ON waitlist_entries (waitlist_id, position)` },
+  { name: "waitlist_entries: add index wle_contact_idx", sql: `CREATE INDEX IF NOT EXISTS wle_contact_idx ON waitlist_entries (contact_id)` },
+
+  // waitlist_offers — uncovered indexes
+  { name: "waitlist_offers: add index wlo_entry_idx", sql: `CREATE INDEX IF NOT EXISTS wlo_entry_idx ON waitlist_offers (entry_id)` },
+  { name: "waitlist_offers: add index wlo_waitlist_idx", sql: `CREATE INDEX IF NOT EXISTS wlo_waitlist_idx ON waitlist_offers (waitlist_id)` },
+  { name: "waitlist_offers: add index wlo_org_idx", sql: `CREATE INDEX IF NOT EXISTS wlo_org_idx ON waitlist_offers (org_id)` },
+  { name: "waitlist_offers: add index wlo_status_idx", sql: `CREATE INDEX IF NOT EXISTS wlo_status_idx ON waitlist_offers (status)` },
+  { name: "waitlist_offers: add index wlo_unit_idx", sql: `CREATE INDEX IF NOT EXISTS wlo_unit_idx ON waitlist_offers (unit_id)` },
+
+  // waitlists — uncovered indexes
+  { name: "waitlists: add index wl_org_idx", sql: `CREATE INDEX IF NOT EXISTS wl_org_idx ON waitlists (org_id)` },
+  { name: "waitlists: add index wl_property_idx", sql: `CREATE INDEX IF NOT EXISTS wl_property_idx ON waitlists (property_id)` },
+  { name: "waitlists: add index wl_property_type_idx", sql: `CREATE INDEX IF NOT EXISTS wl_property_type_idx ON waitlists (property_id, unit_type)` },
+  { name: "waitlists: add index wl_property_band_idx", sql: `CREATE INDEX IF NOT EXISTS wl_property_band_idx ON waitlists (property_id, unit_type, band_key)` },
+  { name: "waitlists: add index wl_status_idx", sql: `CREATE INDEX IF NOT EXISTS wl_status_idx ON waitlists (status)` },
+
+  // waterfall_configs — uncovered indexes
+  { name: "waterfall_configs: add index waterfall_configs_project_idx", sql: `CREATE INDEX IF NOT EXISTS waterfall_configs_project_idx ON waterfall_configs (project_id)` },
+
+  // waterfall_tiers — uncovered indexes
+  { name: "waterfall_tiers: add index waterfall_tiers_config_idx", sql: `CREATE INDEX IF NOT EXISTS waterfall_tiers_config_idx ON waterfall_tiers (waterfall_config_id)` },
+
+  // workspace_members — uncovered indexes
+  { name: "workspace_members: add index wm_workspace_idx", sql: `CREATE INDEX IF NOT EXISTS wm_workspace_idx ON workspace_members (workspace_id)` },
+  { name: "workspace_members: add index wm_user_idx", sql: `CREATE INDEX IF NOT EXISTS wm_user_idx ON workspace_members (user_id)` },
+  { name: "workspace_members: add index wm_org_idx", sql: `CREATE INDEX IF NOT EXISTS wm_org_idx ON workspace_members (org_id)` },
 ];
 
 /**
