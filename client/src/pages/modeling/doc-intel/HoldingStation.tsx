@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useDropzone } from "react-dropzone";
 import * as XLSX from "xlsx";
@@ -14,6 +14,8 @@ import {
   Plus,
   Eye,
   Layers,
+  RefreshCw,
+  Clock,
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
@@ -116,6 +118,12 @@ const BUILTIN_DOC_TYPES: Record<string, { label: string; icon: typeof FileSpread
   other: { label: "Other", icon: FileText },
 };
 
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 export function HoldingStation({ projectId, onReviewDocuments, onUploadComplete }: HoldingStationProps) {
   const { toast } = useToast();
   const [stagedFiles, setStagedFiles] = useState<StagedFile[]>([]);
@@ -126,6 +134,11 @@ export function HoldingStation({ projectId, onReviewDocuments, onUploadComplete 
   const [processingJustCompleted, setProcessingJustCompleted] = useState(false);
   const [pendingExcelFile, setPendingExcelFile] = useState<PendingExcelFile | null>(null);
   const [showSheetSelector, setShowSheetSelector] = useState(false);
+
+  const [replaceDoc, setReplaceDoc] = useState<DocIntelUpload | null>(null);
+  const [replaceStep, setReplaceStep] = useState<"uploading" | "deleting" | "parsing" | null>(null);
+  const [replaceProgress, setReplaceProgress] = useState(0);
+  const replaceInputRef = useRef<HTMLInputElement>(null);
 
   // Fetch documents from server
   const { data: holdingQueue = [], isLoading, refetch } = useQuery<DocIntelUpload[]>({
@@ -222,6 +235,91 @@ export function HoldingStation({ projectId, onReviewDocuments, onUploadComplete 
     },
   });
 
+  const replaceMutation = useMutation({
+    mutationFn: async ({ file, doc }: { file: File; doc: DocIntelUpload }) => {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("docType", doc.docType || "other");
+      formData.append("year", String(doc.year || new Date().getFullYear()));
+      formData.append("holdingStatus", "staging");
+      formData.append("displayName", file.name);
+      if (doc.isT12) {
+        formData.append("isT12", "true");
+        const meta = doc.periodMetadata as { t12StartMonth?: number; t12StartYear?: number; t12EndMonth?: number; t12EndYear?: number } | null | undefined;
+        if (meta?.t12StartMonth) formData.append("t12StartMonth", String(meta.t12StartMonth));
+        if (meta?.t12StartYear) formData.append("t12StartYear", String(meta.t12StartYear));
+        if (meta?.t12EndMonth) formData.append("t12EndMonth", String(meta.t12EndMonth));
+        if (meta?.t12EndYear) formData.append("t12EndYear", String(meta.t12EndYear));
+      }
+
+      const csrfToken = await ensureCsrfToken();
+
+      setReplaceStep("uploading");
+      setReplaceProgress(0);
+
+      const uploaded = await new Promise<DocIntelUpload>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open("POST", `/api/modeling/projects/${projectId}/documents`);
+        xhr.withCredentials = true;
+        if (csrfToken) xhr.setRequestHeader("X-CSRF-Token", csrfToken);
+        xhr.upload.onprogress = (event) => {
+          if (event.lengthComputable) {
+            setReplaceProgress(Math.round((event.loaded / event.total) * 100));
+          }
+        };
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            try { resolve(JSON.parse(xhr.responseText)); }
+            catch { reject(new Error("Invalid response from server")); }
+          } else {
+            try {
+              const err = JSON.parse(xhr.responseText);
+              reject(new Error(err.error || "Upload failed"));
+            } catch { reject(new Error("Upload failed")); }
+          }
+        };
+        xhr.onerror = () => reject(new Error("Network error during upload"));
+        xhr.send(formData);
+      });
+
+      setReplaceStep("deleting");
+      await apiRequest("DELETE", `/api/modeling/projects/${projectId}/documents/${doc.id}`);
+
+      setReplaceStep("parsing");
+      await apiRequest("POST", `/api/modeling/projects/${projectId}/documents/${uploaded.id}/parse`);
+
+      return uploaded;
+    },
+    onSuccess: () => {
+      setReplaceStep(null);
+      setReplaceProgress(0);
+      setReplaceDoc(null);
+      queryClient.invalidateQueries({ queryKey: ["/api/modeling/projects", projectId, "documents"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/modeling/projects", projectId, "documents", "holding"] });
+      toast({ title: "Replaced", description: "The document has been replaced and is now processing." });
+    },
+    onError: (error: unknown) => {
+      setReplaceStep(null);
+      setReplaceProgress(0);
+      setReplaceDoc(null);
+      const message = error instanceof Error ? error.message : "Could not replace document.";
+      toast({ title: "Replace failed", description: message, variant: "destructive" });
+    },
+  });
+
+  const handleReplaceClick = (doc: DocIntelUpload) => {
+    setReplaceDoc(doc);
+    if (replaceInputRef.current) {
+      replaceInputRef.current.value = "";
+      replaceInputRef.current.click();
+    }
+  };
+
+  const handleReplaceFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !replaceDoc) return;
+    replaceMutation.mutate({ file, doc: replaceDoc });
+  };
 
   const isExcelFile = (file: File) => {
     return file.name.match(/\.(xlsx|xls)$/i) || 
@@ -803,6 +901,133 @@ export function HoldingStation({ projectId, onReviewDocuments, onUploadComplete 
           )}
         </CardContent>
       </Card>
+
+      {/* Hidden file input for document replacement */}
+      <input
+        ref={replaceInputRef}
+        type="file"
+        accept=".pdf,.xlsx,.xls,.csv"
+        className="hidden"
+        onChange={handleReplaceFileChange}
+      />
+
+      {/* Documents in Holding Queue */}
+      {holdingQueue.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <FileText className="h-5 w-5" />
+              Documents in Holding Queue
+              <span className="ml-1 text-xs font-normal text-muted-foreground">
+                ({holdingQueue.length})
+              </span>
+            </CardTitle>
+            <CardDescription>
+              Documents uploaded to this project. Replace any file that encountered an error.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {holdingQueue.map((doc) => {
+                const isReplacing = replaceMutation.isPending && replaceDoc?.id === doc.id;
+                const replaceStepLabel =
+                  replaceStep === "uploading" ? `Uploading new file… ${replaceProgress}%` :
+                  replaceStep === "deleting" ? "Removing old file…" :
+                  replaceStep === "parsing" ? "Queuing for processing…" : null;
+                return (
+                  <div key={doc.id} className="space-y-0">
+                    <div
+                      className={`flex items-center gap-3 p-3 border transition-colors ${
+                        isReplacing
+                          ? "border-blue-300 bg-blue-50/60 dark:border-blue-800 dark:bg-blue-950/20 opacity-80 rounded-t-lg"
+                          : "rounded-lg hover:bg-muted/50"
+                      }`}
+                    >
+                      {doc.originalName?.endsWith(".pdf") ? (
+                        <FileText className="h-8 w-8 text-red-600 flex-shrink-0" />
+                      ) : (
+                        <FileSpreadsheet className="h-8 w-8 text-green-600 flex-shrink-0" />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-sm truncate">{doc.originalName}</p>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <span>{BUILTIN_DOC_TYPES[doc.docType || "other"]?.label || doc.docType}</span>
+                          {doc.year && <span>• {doc.year}</span>}
+                          <span>• {formatFileSize(doc.fileSize)}</span>
+                        </div>
+                        {doc.status === "error" && doc.errorMessage && (
+                          <p className="text-xs text-red-600 dark:text-red-400 mt-0.5 truncate">{doc.errorMessage}</p>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${
+                            doc.status === "parsed" || doc.status === "reviewing"
+                              ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+                              : doc.status === "error"
+                              ? "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
+                              : doc.status === "processing"
+                              ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
+                              : "bg-muted text-muted-foreground"
+                          }`}
+                        >
+                          {doc.status === "uploaded" && <Clock className="h-3 w-3" />}
+                          {doc.status === "processing" && <Loader2 className="h-3 w-3 animate-spin" />}
+                          {(doc.status === "parsed" || doc.status === "reviewing") && <CheckCircle2 className="h-3 w-3" />}
+                          {doc.status === "error" && <AlertTriangle className="h-3 w-3" />}
+                          {doc.status === "uploaded" ? "Queued" :
+                           doc.status === "processing" ? "Processing…" :
+                           doc.status === "parsed" || doc.status === "reviewing" ? "Ready" :
+                           doc.status === "error" ? "Error" :
+                           doc.status}
+                        </span>
+                        {doc.status === "error" && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 px-2 text-xs gap-1"
+                            disabled={replaceMutation.isPending}
+                            onClick={() => handleReplaceClick(doc)}
+                          >
+                            {isReplacing ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              <RefreshCw className="h-3 w-3" />
+                            )}
+                            Replace
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    {isReplacing && replaceStepLabel && (
+                      <div className="flex items-center gap-2 px-3 py-1.5 rounded-b-lg bg-blue-100 dark:bg-blue-950/40 border border-t-0 border-blue-300 dark:border-blue-800 text-xs text-blue-700 dark:text-blue-300">
+                        <Loader2 className="h-3 w-3 animate-spin flex-shrink-0" />
+                        <span className="font-medium">Replacing document —</span>
+                        <span>{replaceStepLabel}</span>
+                        <div className="ml-auto flex gap-1">
+                          {(["uploading", "deleting", "parsing"] as const).map((step) => (
+                            <div
+                              key={step}
+                              className={`h-1.5 w-8 rounded-full transition-colors ${
+                                replaceStep === step
+                                  ? "bg-blue-500 dark:bg-blue-400"
+                                  : (replaceStep === "deleting" && step === "uploading") ||
+                                    (replaceStep === "parsing" && (step === "uploading" || step === "deleting"))
+                                  ? "bg-blue-300 dark:bg-blue-600"
+                                  : "bg-blue-200 dark:bg-blue-800"
+                              }`}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Sheet Selector Dialog */}
       <Dialog open={showSheetSelector} onOpenChange={(open) => {
