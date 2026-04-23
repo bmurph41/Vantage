@@ -2050,6 +2050,9 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
         periodMetadata.sheetIndex = sheetIndex;
         periodMetadata.sheetName = sheetName;
       }
+      if (req.body.customTypeName) {
+        periodMetadata.customTypeName = req.body.customTypeName;
+      }
       const finalPeriodMetadata = Object.keys(periodMetadata).length > 0 ? periodMetadata : null;
 
       let holdingTagsList = holdingTags;

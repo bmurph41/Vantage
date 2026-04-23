@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, useLocation, Link } from "wouter";
+import * as XLSX from "xlsx";
 import { 
   ArrowLeft, Upload, FileSpreadsheet, Brain, CheckCircle2, AlertCircle, 
   Clock, Settings, Inbox, Trash2, Eye, Loader2, MoreVertical, RefreshCw,
@@ -10,6 +11,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   DropdownMenu,
@@ -27,12 +30,34 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { apiRequest, queryClient, ensureCsrfToken } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { MultiDocumentReview } from "./MultiDocumentReview";
 import { CategoryManager } from "./CategoryManager";
 import { HoldingStation } from "./HoldingStation";
 import type { DocIntelUpload, PnlCategory, CustomDocumentType } from "@shared/schema";
+
+const MONTHS = [
+  { value: "1", label: "Jan" }, { value: "2", label: "Feb" }, { value: "3", label: "Mar" },
+  { value: "4", label: "Apr" }, { value: "5", label: "May" }, { value: "6", label: "Jun" },
+  { value: "7", label: "Jul" }, { value: "8", label: "Aug" }, { value: "9", label: "Sep" },
+  { value: "10", label: "Oct" }, { value: "11", label: "Nov" }, { value: "12", label: "Dec" },
+];
 
 interface UploadWithStats extends DocIntelUpload {
   stats?: {
@@ -70,6 +95,21 @@ export default function DocumentIntelligence() {
 
   const [reuploadDoc, setReuploadDoc] = useState<DocIntelUpload | null>(null);
   const reuploadInputRef = useRef<HTMLInputElement>(null);
+
+  const [reuploadDialogOpen, setReuploadDialogOpen] = useState(false);
+  const [reuploadDocType, setReuploadDocType] = useState("pnl");
+  const [reuploadCustomTypeName, setReuploadCustomTypeName] = useState("");
+  const [reuploadYear, setReuploadYear] = useState(String(new Date().getFullYear()));
+  const [reuploadIsT12, setReuploadIsT12] = useState(false);
+  const [reuploadT12StartMonth, setReuploadT12StartMonth] = useState("1");
+  const [reuploadT12StartYear, setReuploadT12StartYear] = useState(String(new Date().getFullYear() - 1));
+  const [reuploadT12EndMonth, setReuploadT12EndMonth] = useState(String(new Date().getMonth() + 1));
+  const [reuploadT12EndYear, setReuploadT12EndYear] = useState(String(new Date().getFullYear()));
+
+  const [reuploadPendingFile, setReuploadPendingFile] = useState<File | null>(null);
+  const [reuploadSheetSelectorOpen, setReuploadSheetSelectorOpen] = useState(false);
+  const [reuploadAvailableSheets, setReuploadAvailableSheets] = useState<{ index: number; name: string; rowCount: number }[]>([]);
+  const [reuploadPrevSheetName, setReuploadPrevSheetName] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     const fullUrl = window.location.href;
@@ -190,13 +230,33 @@ export default function DocumentIntelligence() {
   });
 
   const reuploadMutation = useMutation({
-    mutationFn: async ({ file, doc }: { file: File; doc: DocIntelUpload }) => {
+    mutationFn: async ({ file, doc, sheetName, sheetIndex }: { file: File; doc: DocIntelUpload; sheetName?: string; sheetIndex?: number }) => {
       const formData = new FormData();
       formData.append("file", file);
-      formData.append("docType", doc.docType || "pnl");
-      formData.append("year", doc.year ? String(doc.year) : String(new Date().getFullYear()));
+      formData.append("docType", reuploadDocType || doc.docType || "pnl");
+      if (reuploadDocType === "other" && reuploadCustomTypeName.trim()) {
+        formData.append("customTypeName", reuploadCustomTypeName.trim());
+      }
+      const effectiveYear = reuploadIsT12
+        ? (reuploadT12EndYear || String(new Date().getFullYear()))
+        : (reuploadYear || String(doc.year || new Date().getFullYear()));
+      formData.append("year", effectiveYear);
       formData.append("holdingStatus", "staging");
-      formData.append("displayName", file.name);
+      const sheetSuffix = sheetName ? ` → ${sheetName}` : "";
+      formData.append("displayName", file.name + sheetSuffix);
+      if (reuploadIsT12) {
+        formData.append("isT12", "true");
+        if (reuploadT12StartMonth) formData.append("t12StartMonth", reuploadT12StartMonth);
+        if (reuploadT12StartYear) formData.append("t12StartYear", reuploadT12StartYear);
+        if (reuploadT12EndMonth) formData.append("t12EndMonth", reuploadT12EndMonth);
+        if (reuploadT12EndYear) formData.append("t12EndYear", reuploadT12EndYear);
+      }
+      if (sheetName != null) {
+        formData.append("sheetName", sheetName);
+      }
+      if (sheetIndex != null) {
+        formData.append("sheetIndex", String(sheetIndex));
+      }
 
       const csrfToken = await ensureCsrfToken();
       const headers: Record<string, string> = {};
@@ -231,18 +291,85 @@ export default function DocumentIntelligence() {
     },
   });
 
+  const isExcelFile = (file: File) =>
+    /\.(xlsx|xls)$/i.test(file.name) ||
+    file.type === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
+    file.type === "application/vnd.ms-excel";
+
   const handleReuploadClick = (doc: DocIntelUpload) => {
     setReuploadDoc(doc);
+    const inherited = doc.docType || "pnl";
+    const inheritedIsT12 = doc.isT12 ?? false;
+    const meta = doc.periodMetadata as { t12StartMonth?: number; t12StartYear?: number; t12EndMonth?: number; t12EndYear?: number; customTypeName?: string; sheetName?: string; sheetIndex?: number } | null | undefined;
+    const now = new Date();
+    setReuploadDocType(inherited);
+    setReuploadCustomTypeName(meta?.customTypeName ?? "");
+    setReuploadIsT12(inheritedIsT12);
+    setReuploadPrevSheetName(meta?.sheetName);
+    if (inheritedIsT12 && meta) {
+      setReuploadT12StartMonth(meta.t12StartMonth ? String(meta.t12StartMonth) : "1");
+      setReuploadT12StartYear(meta.t12StartYear ? String(meta.t12StartYear) : String(now.getFullYear() - 1));
+      setReuploadT12EndMonth(meta.t12EndMonth ? String(meta.t12EndMonth) : String(now.getMonth() + 1));
+      setReuploadT12EndYear(meta.t12EndYear ? String(meta.t12EndYear) : String(now.getFullYear()));
+    } else {
+      setReuploadT12StartMonth("1");
+      setReuploadT12StartYear(String(now.getFullYear() - 1));
+      setReuploadT12EndMonth(String(now.getMonth() + 1));
+      setReuploadT12EndYear(String(now.getFullYear()));
+    }
+    setReuploadYear(doc.year ? String(doc.year) : String(now.getFullYear()));
+    setReuploadDialogOpen(true);
+  };
+
+  const handleReuploadConfirm = () => {
+    setReuploadDialogOpen(false);
     if (reuploadInputRef.current) {
       reuploadInputRef.current.value = "";
       reuploadInputRef.current.click();
     }
   };
 
-  const handleReuploadFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleReuploadFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !reuploadDoc) return;
+
+    if (isExcelFile(file)) {
+      try {
+        const buffer = await file.arrayBuffer();
+        const workbook = XLSX.read(buffer, { type: "array" });
+        if (workbook.SheetNames.length > 1) {
+          const sheets = workbook.SheetNames.map((name, index) => {
+            const ws = workbook.Sheets[name];
+            const range = ws["!ref"];
+            let rowCount = 0;
+            if (range) {
+              const decoded = XLSX.utils.decode_range(range);
+              rowCount = decoded.e.r - decoded.s.r + 1;
+            }
+            return { index, name, rowCount };
+          });
+          setReuploadAvailableSheets(sheets);
+          setReuploadPendingFile(file);
+          setReuploadSheetSelectorOpen(true);
+          return;
+        }
+      } catch {
+        // fall through to single-file upload if sheet reading fails
+      }
+    }
+
     reuploadMutation.mutate({ file, doc: reuploadDoc });
+  };
+
+  const handleReuploadSheetConfirm = (sheetIdx: number, sheetNm: string) => {
+    setReuploadSheetSelectorOpen(false);
+    const pendingFile = reuploadPendingFile;
+    const pendingDoc = reuploadDoc;
+    setReuploadPendingFile(null);
+    setReuploadAvailableSheets([]);
+    if (pendingFile && pendingDoc) {
+      reuploadMutation.mutate({ file: pendingFile, doc: pendingDoc, sheetName: sheetNm, sheetIndex: sheetIdx });
+    }
   };
 
   const handleReviewDocuments = (documentIds: string[]) => {
@@ -589,6 +716,220 @@ export default function DocumentIntelligence() {
         className="hidden"
         onChange={handleReuploadFileChange}
       />
+
+      <Dialog open={reuploadDialogOpen} onOpenChange={(open) => {
+        if (!open) {
+          setReuploadDialogOpen(false);
+          setReuploadDoc(null);
+        }
+      }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Upload className="h-5 w-5" />
+              Re-upload Document
+            </DialogTitle>
+            <DialogDescription>
+              Review and adjust the document settings below, then choose a replacement file.
+              {reuploadDoc && (
+                <span className="block mt-1 font-medium text-foreground truncate">
+                  Replacing: {reuploadDoc.originalName}
+                </span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label>Document Type</Label>
+              <Select value={reuploadDocType} onValueChange={setReuploadDocType}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="pnl">P&L Statement</SelectItem>
+                  <SelectItem value="rent_roll">Rent Roll</SelectItem>
+                  <SelectItem value="balance_sheet">Balance Sheet</SelectItem>
+                  <SelectItem value="rate_sheet">Rate Sheet</SelectItem>
+                  <SelectItem value="invoice">Invoice</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                  {customDocTypes.map((ct) => (
+                    <SelectItem key={ct.id} value={ct.id}>{ct.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {reuploadDocType === "other" && (
+              <div className="space-y-1.5">
+                <Label>Custom Type Name <span className="text-muted-foreground text-xs">(optional)</span></Label>
+                <Input
+                  placeholder="e.g. Operating Statement"
+                  value={reuploadCustomTypeName}
+                  onChange={(e) => setReuploadCustomTypeName(e.target.value)}
+                />
+              </div>
+            )}
+
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="reupload-is-t12"
+                checked={reuploadIsT12}
+                onCheckedChange={(checked) => setReuploadIsT12(!!checked)}
+              />
+              <Label htmlFor="reupload-is-t12" className="cursor-pointer">
+                Trailing 12-Month (T12) document
+              </Label>
+            </div>
+
+            {reuploadIsT12 ? (
+              <div className="space-y-3 border rounded-md p-3 bg-muted/30">
+                <p className="text-xs text-muted-foreground font-medium">T12 Date Range</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Start</Label>
+                    <div className="flex gap-1">
+                      <Select value={reuploadT12StartMonth} onValueChange={setReuploadT12StartMonth}>
+                        <SelectTrigger className="h-8 text-xs">
+                          <SelectValue placeholder="Mo" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {MONTHS.map((m) => (
+                            <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Select value={reuploadT12StartYear} onValueChange={setReuploadT12StartYear}>
+                        <SelectTrigger className="h-8 text-xs">
+                          <SelectValue placeholder="Year" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Array.from({ length: 12 }, (_, i) => String(new Date().getFullYear() + 1 - i)).map((y) => (
+                            <SelectItem key={y} value={y}>{y}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">End</Label>
+                    <div className="flex gap-1">
+                      <Select value={reuploadT12EndMonth} onValueChange={setReuploadT12EndMonth}>
+                        <SelectTrigger className="h-8 text-xs">
+                          <SelectValue placeholder="Mo" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {MONTHS.map((m) => (
+                            <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Select value={reuploadT12EndYear} onValueChange={setReuploadT12EndYear}>
+                        <SelectTrigger className="h-8 text-xs">
+                          <SelectValue placeholder="Year" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Array.from({ length: 12 }, (_, i) => String(new Date().getFullYear() + 1 - i)).map((y) => (
+                            <SelectItem key={y} value={y}>{y}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-1.5">
+                <Label>Fiscal Year</Label>
+                <Select value={reuploadYear} onValueChange={setReuploadYear}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select year" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.from({ length: 10 }, (_, i) => String(new Date().getFullYear() - i)).map((y) => (
+                      <SelectItem key={y} value={y}>{y}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => {
+              setReuploadDialogOpen(false);
+              setReuploadDoc(null);
+            }}>
+              Cancel
+            </Button>
+            <Button onClick={handleReuploadConfirm}>
+              <Upload className="h-4 w-4 mr-2" />
+              Choose File &amp; Upload
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={reuploadSheetSelectorOpen} onOpenChange={(open) => {
+        if (!open) {
+          setReuploadSheetSelectorOpen(false);
+          setReuploadPendingFile(null);
+          setReuploadAvailableSheets([]);
+          setReuploadPrevSheetName(undefined);
+        }
+      }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileSpreadsheet className="h-5 w-5" />
+              Select Sheet
+            </DialogTitle>
+            <DialogDescription>
+              This Excel workbook has multiple sheets. Choose one to upload.
+            </DialogDescription>
+          </DialogHeader>
+          {reuploadPrevSheetName && (
+            <p className="text-xs text-muted-foreground pb-1">
+              Previously used: <span className="font-medium text-foreground">{reuploadPrevSheetName}</span>
+            </p>
+          )}
+          <div className="space-y-2 py-2 max-h-64 overflow-y-auto">
+            {reuploadAvailableSheets.map((sheet) => {
+              const isPrev = reuploadPrevSheetName && sheet.name === reuploadPrevSheetName;
+              return (
+                <button
+                  key={sheet.index}
+                  className={`w-full flex items-center justify-between p-3 border rounded-lg transition-colors text-left ${
+                    isPrev
+                      ? "border-primary bg-primary/5 hover:bg-primary/10"
+                      : "hover:bg-muted/50"
+                  }`}
+                  onClick={() => handleReuploadSheetConfirm(sheet.index, sheet.name)}
+                >
+                  <span className="font-medium text-sm">{sheet.name}</span>
+                  <div className="flex items-center gap-2">
+                    {isPrev && (
+                      <Badge variant="outline" className="text-[10px] px-1.5 h-4 border-primary text-primary">
+                        previous
+                      </Badge>
+                    )}
+                    <span className="text-xs text-muted-foreground">{sheet.rowCount} rows</span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setReuploadSheetSelectorOpen(false);
+              setReuploadPendingFile(null);
+              setReuploadAvailableSheets([]);
+            }}>
+              Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog open={!!deleteConfirmId} onOpenChange={(open) => {
         if (!open) {
