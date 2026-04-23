@@ -4,6 +4,8 @@ export interface FeatureFlags {
   CONNECTOR_INTACCT_ENABLED: boolean;
   CONNECTOR_NETSUITE_ENABLED: boolean;
   FINANCIAL_KERNEL_UI_ENABLED: boolean;
+  TRANSIENT_RENT_ROLL_ENABLED: boolean;
+  TRANSIENT_RENT_ROLL_UI_ENABLED: boolean;
 }
 
 function parseBoolean(value: string | undefined, defaultValue: boolean = false): boolean {
@@ -17,6 +19,8 @@ export const featureFlags: FeatureFlags = {
   CONNECTOR_INTACCT_ENABLED: parseBoolean(process.env.CONNECTOR_INTACCT_ENABLED, false),
   CONNECTOR_NETSUITE_ENABLED: parseBoolean(process.env.CONNECTOR_NETSUITE_ENABLED, false),
   FINANCIAL_KERNEL_UI_ENABLED: parseBoolean(process.env.FINANCIAL_KERNEL_UI_ENABLED, false),
+  TRANSIENT_RENT_ROLL_ENABLED: parseBoolean(process.env.TRANSIENT_RENT_ROLL_ENABLED, false),
+  TRANSIENT_RENT_ROLL_UI_ENABLED: parseBoolean(process.env.TRANSIENT_RENT_ROLL_UI_ENABLED, false),
 };
 
 export function isFeatureEnabled(flag: keyof FeatureFlags): boolean {
@@ -39,5 +43,6 @@ export function getPublicFeatureFlags(): Partial<FeatureFlags> {
   return {
     INTEGRATIONS_PLATFORM_ENABLED: featureFlags.INTEGRATIONS_PLATFORM_ENABLED,
     FINANCIAL_KERNEL_UI_ENABLED: featureFlags.FINANCIAL_KERNEL_UI_ENABLED,
+    TRANSIENT_RENT_ROLL_UI_ENABLED: featureFlags.TRANSIENT_RENT_ROLL_UI_ENABLED,
   };
 }
