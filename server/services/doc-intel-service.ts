@@ -44,6 +44,10 @@ import * as fs from 'fs';
 import * as crypto from 'crypto';
 import path from 'path';
 import * as XLSX from 'xlsx';
+import {
+  isObjectStorageKey,
+  downloadDocIntelToTempFile,
+} from '../utils/doc-intel-storage';
 import { extractDocument, assessOcrQuality } from '../utils/ocr';
 import { findAliasMatch, getMatchResult, learnAlias, buildCoaCode } from "./pnl-alias-matcher";
 import { onLineItemConfirmed, applyLearningRulesOnRetrieval } from './learning-rules.integration';
@@ -465,6 +469,22 @@ class DocIntelService {
     });
   }
 
+  computeBufferHash(buffer: Buffer): string {
+    return crypto.createHash('sha256').update(buffer).digest('hex');
+  }
+
+  async resolveLocalPath(
+    storagePath: string,
+    filenameHint: string
+  ): Promise<{ path: string; tempCreated: boolean }> {
+    if (isObjectStorageKey(storagePath)) {
+      const ext = path.extname(filenameHint || '.tmp');
+      const tmpPath = await downloadDocIntelToTempFile(storagePath, ext);
+      return { path: tmpPath, tempCreated: true };
+    }
+    return { path: storagePath, tempCreated: false };
+  }
+
   async findDuplicateByHash(orgId: string, hash: string, projectId?: string): Promise<DocIntelUpload | null> {
     const conditions = [
       eq(docIntelUploads.orgId, orgId),
@@ -493,12 +513,13 @@ class DocIntelService {
   }
 
   async createUploadWithDuplicateCheck(
-    orgId: string, 
+    orgId: string,
+    fileBuffer: Buffer,
     data: InsertDocIntelUpload & { storagePath: string },
     checkProjectOnly: boolean = false,
     allowOverwrite: boolean = false
   ): Promise<{ upload: DocIntelUpload; isDuplicate: boolean; overwritten: boolean; originalUpload?: DocIntelUpload }> {
-    const hash = await this.computeFileHash(data.storagePath);
+    const hash = this.computeBufferHash(fileBuffer);
     const existingUpload = await this.findDuplicateByHash(
       orgId, 
       hash, 
@@ -1192,8 +1213,23 @@ ${fullText.slice(0, 40000)}`
 
     await this.updateUpload(orgId, uploadId, { status: 'processing' });
 
-    // Guard: verify the file still exists on disk before attempting to parse
-    if (!fs.existsSync(upload.storagePath)) {
+    // Resolve a local file path for parsing — download from object storage if needed
+    let localFilePath = upload.storagePath;
+    let tempFileCreated = false;
+    if (isObjectStorageKey(upload.storagePath)) {
+      const ext = path.extname(upload.filename || upload.originalName || '.tmp');
+      try {
+        localFilePath = await downloadDocIntelToTempFile(upload.storagePath, ext);
+        tempFileCreated = true;
+        console.log(`[DocIntelService] Downloaded from object storage for parsing: ${upload.storagePath}`);
+      } catch (dlErr: any) {
+        await this.updateUpload(orgId, uploadId, {
+          status: 'error',
+          errorMessage: 'File could not be retrieved from storage. Please re-upload this document.',
+        });
+        throw new Error(`Failed to download file from object storage: ${dlErr.message}`);
+      }
+    } else if (!fs.existsSync(upload.storagePath)) {
       await this.updateUpload(orgId, uploadId, {
         status: 'error',
         errorMessage: 'File not found on disk. Please re-upload this document.',
@@ -1225,7 +1261,7 @@ ${fullText.slice(0, 40000)}`
       
       if (isPdf) {
         console.log(`[DocIntelService] Processing PDF file: ${upload.originalName} (granularity: ${granularity})`);
-        const ocrResult = await extractDocument(upload.storagePath, upload.mimeType);
+        const ocrResult = await extractDocument(localFilePath, upload.mimeType);
         usedOcrFallback = ocrResult.meta?.usedOcrFallback === true;
         
         if (usedOcrFallback) {
@@ -1262,7 +1298,7 @@ ${fullText.slice(0, 40000)}`
         if (targetSheetIndex != null) {
           console.log(`[DocIntelService] Processing only sheet index ${targetSheetIndex} ("${(upload.periodMetadata as any)?.sheetName || 'unknown'}")`);
         }
-        parsedItems = await this.parseExcelFile(upload.storagePath, granularity, fiscalYear, multiYears || undefined, targetSheetIndex);
+        parsedItems = await this.parseExcelFile(localFilePath, granularity, fiscalYear, multiYears || undefined, targetSheetIndex);
       }
       
       const extractedItems: DocIntelExtractedItem[] = [];
@@ -1398,6 +1434,10 @@ ${fullText.slice(0, 40000)}`
         errorMessage: error instanceof Error ? error.message : 'Unknown parsing error'
       });
       throw error;
+    } finally {
+      if (tempFileCreated && localFilePath) {
+        try { fs.unlinkSync(localFilePath); } catch {}
+      }
     }
   }
 
@@ -3002,7 +3042,11 @@ Respond with JSON only:
       throw new Error('Document is not classified as a Rent Roll');
     }
 
-    const parsedEntries = await this.parseRentRollFile(upload.storagePath);
+    const rentRollLocalPath = await this.resolveLocalPath(upload.storagePath, upload.filename || upload.originalName || '');
+    const parsedEntries = await this.parseRentRollFile(rentRollLocalPath.path);
+    if (rentRollLocalPath.tempCreated) {
+      try { fs.unlinkSync(rentRollLocalPath.path); } catch {}
+    }
     
     let rentRoll: RentRoll;
     if (options.rentRollId) {

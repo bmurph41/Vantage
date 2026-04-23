@@ -6,6 +6,7 @@ import { requirePermission } from "../middleware/rbac";
 import { parsePagination, paginatedResponse } from "../utils/pagination";
 import { debtScenarioService } from "../debt-scenario-service";
 import { docIntelService } from "../services/doc-intel-service";
+import { vdrFileService } from "../vdr-file-service";
 import { dashboardService } from "../services/dashboard-service";
 import { personaService } from "../services/persona-service";
 import { calculateAll, type TransactionClosingData } from "../services/transactionClosingEngine";
@@ -26,6 +27,10 @@ import { validateFileUpload } from "../middleware/file-upload-security";
 import path from "path";
 import fs from "fs-extra";
 import crypto from "crypto";
+import {
+  isObjectStorageAvailable,
+  uploadDocIntelFile,
+} from "../utils/doc-intel-storage";
 import {
   modelingProjects,
   modelingProjectCollaborators,
@@ -786,35 +791,48 @@ export function registerModelingRoutes(
         return res.status(403).json({ error: 'Document does not belong to this project\'s linked Data Room' });
       }
 
-      const fsModule = await import('fs');
       const pathModule = await import('path');
-
-      const sourceExists = fsModule.existsSync(vdrDoc.storagePath);
-      if (!sourceExists) {
-        return res.status(404).json({ error: 'VDR document file not found on disk' });
-      }
-
-      const docIntelDir = pathModule.default.join(process.cwd(), 'server', 'uploads', 'doc-intel');
-      fsModule.mkdirSync(docIntelDir, { recursive: true });
 
       const timestamp = Date.now();
       const ext = pathModule.default.extname(vdrDoc.originalFilename);
       const newFilename = `${timestamp}-vdr-${crypto.randomBytes(8).toString('hex')}${ext}`;
-      const destPath = pathModule.default.join(docIntelDir, newFilename);
 
-      fsModule.copyFileSync(vdrDoc.storagePath, destPath);
+      // Read the VDR file using the VDR file service, which handles S3 and local storage
+      let vdrFileBuffer: Buffer;
+      try {
+        vdrFileBuffer = await vdrFileService.getFileBuffer(vdrDoc.storagePath);
+      } catch {
+        return res.status(404).json({ error: 'VDR document file not found in storage' });
+      }
 
-      const stat = fsModule.statSync(destPath);
+      // Persist to object storage (or local fallback) so the new doc-intel record is durable
+      let vdrDocIntelStoragePath: string;
+      if (isObjectStorageAvailable()) {
+        vdrDocIntelStoragePath = await uploadDocIntelFile(
+          orgId,
+          newFilename,
+          vdrFileBuffer,
+          vdrDoc.mimeType
+        );
+      } else {
+        const fsModule = await import('fs');
+        const docIntelDir = pathModule.default.join(process.cwd(), 'server', 'uploads', 'doc-intel');
+        fsModule.mkdirSync(docIntelDir, { recursive: true });
+        const destPath = pathModule.default.join(docIntelDir, newFilename);
+        fsModule.writeFileSync(destPath, vdrFileBuffer);
+        vdrDocIntelStoragePath = destPath;
+      }
 
       const result = await docIntelService.createUploadWithDuplicateCheck(
         orgId,
+        vdrFileBuffer,
         {
           modelingProjectId: projectId,
           filename: newFilename,
           originalName: vdrDoc.originalFilename,
-          storagePath: destPath,
+          storagePath: vdrDocIntelStoragePath,
           mimeType: vdrDoc.mimeType,
-          fileSize: stat.size,
+          fileSize: vdrFileBuffer.byteLength,
           docType: docType || null,
           year: year ? parseInt(year) : null,
           uploadedBy: userId,
@@ -1729,18 +1747,7 @@ export function registerModelingRoutes(
 
   // Configure multer for document uploads
   const docIntelUpload = multer({
-    storage: multer.diskStorage({
-      destination: (req, file, cb) => {
-        const uploadDir = path.join(process.cwd(), 'server', 'uploads', 'doc-intel');
-        fs.ensureDirSync(uploadDir);
-        cb(null, uploadDir);
-      },
-      filename: (req, file, cb) => {
-        const timestamp = Date.now();
-        const ext = path.extname(file.originalname);
-        cb(null, `${timestamp}-${crypto.randomBytes(8).toString('hex')}${ext}`);
-      }
-    }),
+    storage: multer.memoryStorage(),
     limits: { fileSize: 50 * 1024 * 1024 }, // 50MB limit for financial docs
     fileFilter: (req, file, cb) => {
       const allowedTypes = [
@@ -1983,7 +1990,30 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
       if (!req.file) {
         return res.status(400).json({ error: 'No file uploaded' });
       }
-      
+
+      // Generate a stable filename for the uploaded file
+      const uploadTimestamp = Date.now();
+      const uploadExt = path.extname(req.file.originalname);
+      const uploadFilename = `${uploadTimestamp}-${crypto.randomBytes(8).toString('hex')}${uploadExt}`;
+
+      // Determine storage path: object storage bucket key or local fallback
+      let resolvedStoragePath: string;
+      if (isObjectStorageAvailable()) {
+        resolvedStoragePath = await uploadDocIntelFile(
+          orgId,
+          uploadFilename,
+          req.file.buffer,
+          req.file.mimetype
+        );
+      } else {
+        // Fallback to local disk (ephemeral, not recommended for production)
+        const uploadDir = path.join(process.cwd(), 'server', 'uploads', 'doc-intel');
+        fs.ensureDirSync(uploadDir);
+        const localPath = path.join(uploadDir, uploadFilename);
+        fs.writeFileSync(localPath, req.file.buffer);
+        resolvedStoragePath = localPath;
+      }
+
       let holdingTags: string[] = [];
       if (req.body.tags) {
         try {
@@ -2033,12 +2063,13 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
       const allowOverwrite = req.body.allowOverwrite === 'true';
       
       const result = await docIntelService.createUploadWithDuplicateCheck(
-        orgId, 
+        orgId,
+        req.file.buffer,
         {
           modelingProjectId: projectId,
-          filename: req.file.filename,
+          filename: uploadFilename,
           originalName: displayName,
-          storagePath: req.file.path,
+          storagePath: resolvedStoragePath,
           mimeType: req.file.mimetype,
           fileSize: req.file.size,
           docType: req.body.docType || null,
@@ -2106,14 +2137,14 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
               }).returning();
             }
 
-            const fileBuffer = await fs.readFile(req.file.path);
+            const fileBuffer = req.file.buffer;
             const hashHex = require('crypto').createHash('sha256').update(fileBuffer).digest('hex');
 
             await db.insert(vdrDocsTable).values({
               folderId: targetFolder.id, projectId: ddProjectId, orgId,
               filename: displayName, originalFilename: req.file.originalname,
               mimeType: req.file.mimetype, size: req.file.size,
-              checksum: hashHex, storagePath: req.file.path,
+              checksum: hashHex, storagePath: resolvedStoragePath,
               uploadedBy: userId,
               aiCategory: docTypeLabel,
               tags: [req.body.docType],
@@ -3167,8 +3198,19 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
       if (!upload) {
         return res.status(404).json({ error: 'Document not found' });
       }
-      
-      const parsed = await docIntelService.parseRentRollFile(upload.storagePath);
+
+      const resolved = await docIntelService.resolveLocalPath(
+        upload.storagePath,
+        upload.filename || upload.originalName || ''
+      );
+      let parsed: Awaited<ReturnType<typeof docIntelService.parseRentRollFile>>;
+      try {
+        parsed = await docIntelService.parseRentRollFile(resolved.path);
+      } finally {
+        if (resolved.tempCreated) {
+          try { fs.unlinkSync(resolved.path); } catch {}
+        }
+      }
       
       const tenantNames = parsed
         .filter(p => p.tenantName && p.status !== 'vacant')
