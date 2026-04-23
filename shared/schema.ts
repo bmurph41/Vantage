@@ -29865,10 +29865,17 @@ export const extractionTemplates = pgTable("extraction_templates", {
   skipPatterns: text("skip_patterns").array(),
   useCount: integer("use_count").default(0),
   avgConfidence: numeric("avg_confidence", { precision: 4, scale: 3 }),
+  structuralFingerprint: text("structural_fingerprint"),
+  sampleInput: text("sample_input"),
+  sampleOutput: jsonb("sample_output"),
+  sourceJobId: varchar("source_job_id"),
+  lastUsedAt: timestamp("last_used_at"),
+  autoCreated: boolean("auto_created").default(false),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
   orgIdx: index("extraction_templates_org_idx").on(table.orgId),
+  orgClassFpIdx: index("extraction_templates_org_class_fp_idx").on(table.orgId, table.documentClass, table.structuralFingerprint),
 }));
 export type ExtractionTemplate = typeof extractionTemplates.$inferSelect;
 export type InsertExtractionTemplate = typeof extractionTemplates.$inferInsert;

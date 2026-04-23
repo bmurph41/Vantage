@@ -271,7 +271,8 @@ CRITICAL RULES:
 export async function extractPL(
   fullText: string,
   tables: string,
-  filename: string
+  filename: string,
+  templateContext?: string | null
 ): Promise<ExtractionResult<PLExtractionSchema>> {
   const userPrompt = `Filename: ${filename}
 
@@ -280,7 +281,7 @@ ${fullText.slice(0, 50000)}${fullText.length > 50000 ? '\n[TEXT TRUNCATED — fi
 
 DETECTED TABLES (formatted):
 ${tables.slice(0, 10000)}
-
+${templateContext ? `\n${templateContext}\n` : ''}
 Call the emit_pl_extraction tool to return the structured extraction.`;
 
   const response = await client.messages.create({
@@ -298,7 +299,8 @@ Call the emit_pl_extraction tool to return the structured extraction.`;
 export async function extractRentRoll(
   fullText: string,
   tables: string,
-  filename: string
+  filename: string,
+  templateContext?: string | null
 ): Promise<ExtractionResult<RentRollExtractionSchema>> {
   const userPrompt = `Filename: ${filename}
 
@@ -307,7 +309,7 @@ ${fullText.slice(0, 60000)}${fullText.length > 60000 ? '\n[TEXT TRUNCATED]' : ''
 
 TABLES:
 ${tables.slice(0, 15000)}
-
+${templateContext ? `\n${templateContext}\n` : ''}
 Call the emit_rent_roll_extraction tool to return the structured extraction.`;
 
   const response = await client.messages.create({

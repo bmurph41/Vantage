@@ -8,6 +8,14 @@ import { extractPL, extractRentRoll, classifyDocument } from '../services/docume
 import { flattenExtractionResult } from '../services/document-parser/flatten-extraction.js';
 import { EXTRACTION_TO_ACTUALS_MAP, RENT_ROLL_TO_ACTUALS_MAP, type ActualsMapping } from '../services/document-parser/proforma-mapper.js';
 import { reconcilePL, reconcileRentRoll } from '../../shared/extraction-reconciliation.js';
+import {
+  computeStructuralFingerprint,
+  findMatchingTemplate,
+  renderTemplateContext,
+  captureOrUpdateTemplate,
+  recordTemplateMatch,
+  type TemplateDocClass,
+} from '../services/document-parser/template-store.js';
 import { pool } from '../db.js';
 
 const router = express.Router();
