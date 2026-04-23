@@ -7,6 +7,7 @@ import { extractExcel } from '../services/document-parser/excel-extractor.js';
 import { extractPL, extractRentRoll, classifyDocument } from '../services/document-parser/claude-extractor.js';
 import { flattenExtractionResult } from '../services/document-parser/flatten-extraction.js';
 import { EXTRACTION_TO_ACTUALS_MAP, RENT_ROLL_TO_ACTUALS_MAP, type ActualsMapping } from '../services/document-parser/proforma-mapper.js';
+import { reconcilePL, reconcileRentRoll } from '../../shared/extraction-reconciliation.js';
 import { pool } from '../db.js';
 
 const router = express.Router();
@@ -167,13 +168,18 @@ router.get('/:jobId/status', async (req: any, res: any) => {
   const result = await pool.query(
     `SELECT id, status, original_filename, document_class, page_count, sheet_names,
             error_message, extraction_completed_at, created_at,
-            fiscal_year, period_start, period_end, reporting_period
+            fiscal_year, period_start, period_end, reporting_period,
+            reconciliation_report
      FROM document_extraction_jobs WHERE id=$1 AND org_id=$2`,
     [jobId, orgId]
   );
 
   if (result.rows.length === 0) return res.status(404).json({ error: 'Job not found' });
-  res.json(result.rows[0]);
+  const row = result.rows[0];
+  res.json({
+    ...row,
+    reconciliationReport: row.reconciliation_report ?? null,
+  });
 });
 
 // ─── GET /:jobId/fields ──────────────────────────────────────────────────────
@@ -888,12 +894,22 @@ async function processDocument(
   const thresholds = orgId ? await getOrgThresholds(orgId) : DEFAULT_CONFIDENCE_THRESHOLDS;
 
   let extractionResult: any;
+  let reconciliationReport: any = null;
   if (docClass === 'pl' || docClass === 't12') {
     extractionResult = await extractPL(fullText, tablesFormatted, filename);
     await saveExtractionFields(jobId, extractionResult, 'pl', thresholds);
+    reconciliationReport = reconcilePL(extractionResult?.data ?? {});
   } else if (docClass === 'rent_roll') {
     extractionResult = await extractRentRoll(fullText, tablesFormatted, filename);
     await saveExtractionFields(jobId, extractionResult, 'rent_roll', thresholds);
+    reconciliationReport = reconcileRentRoll(extractionResult?.data ?? {});
+  }
+
+  if (reconciliationReport) {
+    await pool.query(
+      `UPDATE document_extraction_jobs SET reconciliation_report=$1 WHERE id=$2`,
+      [JSON.stringify(reconciliationReport), jobId]
+    );
   }
 
   // Save Claude-detected period info and infer fiscal year if not already set

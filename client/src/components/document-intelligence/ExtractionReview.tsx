@@ -28,9 +28,25 @@ interface ValidationWarning {
   severity: 'warning' | 'error';
 }
 
+interface ReconciliationCheck {
+  id: string;
+  severity: 'error' | 'warning' | 'info';
+  field: string;
+  message: string;
+}
+
+interface ReconciliationReport {
+  passes: number;
+  warnings: number;
+  errors: number;
+  blocking: boolean;
+  checks: ReconciliationCheck[];
+}
+
 interface JobStatus {
   fiscal_year: number | null;
   reporting_period: string | null;
+  reconciliationReport?: ReconciliationReport | null;
 }
 
 interface Props {
@@ -229,10 +245,15 @@ export function ExtractionReview({ jobId, projectId, onPopulate }: Props) {
                     toast({ title: 'No project linked', description: 'Navigate to Document Intelligence from a project to populate Pro Forma.', variant: 'destructive' });
                     return;
                   }
+                  if (jobStatus?.reconciliationReport?.blocking) {
+                    toast({ title: 'Reconciliation failed', description: 'Resolve the reconciliation errors above before pushing to Pro Forma.', variant: 'destructive' });
+                    return;
+                  }
                   populateProforma.mutate();
                 }}
-                disabled={populateProforma.isPending}
-                className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50"
+                disabled={populateProforma.isPending || !!jobStatus?.reconciliationReport?.blocking}
+                className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                title={jobStatus?.reconciliationReport?.blocking ? 'Blocked by reconciliation errors' : undefined}
               >
                 <Database className="w-3.5 h-3.5" />
                 {populateProforma.isPending ? 'Populating...' : `Populate Pro Forma (${confirmedCount} fields)`}
@@ -251,6 +272,38 @@ export function ExtractionReview({ jobId, projectId, onPopulate }: Props) {
               <li key={w.rule} className="flex items-start gap-2 text-xs text-amber-700 dark:text-amber-300">
                 <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
                 {w.message}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* Reconciliation report — totals/identity checks across extracted fields */}
+      {jobStatus?.reconciliationReport && jobStatus.reconciliationReport.checks.length > 0 && (
+        <div className={`px-6 py-3 border-b ${
+          jobStatus.reconciliationReport.blocking
+            ? 'border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/20'
+            : 'border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/20'
+        }`}>
+          <p className={`text-xs font-semibold uppercase tracking-wider mb-1.5 ${
+            jobStatus.reconciliationReport.blocking
+              ? 'text-red-700 dark:text-red-400'
+              : 'text-amber-700 dark:text-amber-400'
+          }`}>
+            Reconciliation — {jobStatus.reconciliationReport.errors} error{jobStatus.reconciliationReport.errors === 1 ? '' : 's'}, {jobStatus.reconciliationReport.warnings} warning{jobStatus.reconciliationReport.warnings === 1 ? '' : 's'}, {jobStatus.reconciliationReport.passes} pass{jobStatus.reconciliationReport.passes === 1 ? '' : 'es'}
+          </p>
+          <ul className="space-y-1">
+            {jobStatus.reconciliationReport.checks.map((c) => (
+              <li
+                key={c.id}
+                className={`flex items-start gap-2 text-xs ${
+                  c.severity === 'error'
+                    ? 'text-red-700 dark:text-red-300'
+                    : 'text-amber-700 dark:text-amber-300'
+                }`}
+              >
+                <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+                <span><span className="font-medium">[{c.field}]</span> {c.message}</span>
               </li>
             ))}
           </ul>
