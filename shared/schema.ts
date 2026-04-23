@@ -29814,6 +29814,8 @@ export const documentExtractionJobs = pgTable("document_extraction_jobs", {
   periodStart: date("period_start"),
   reportingPeriod: text("reporting_period"),
   reconciliationReport: jsonb("reconciliation_report"),
+  structuralFingerprint: text("structural_fingerprint"),
+  matchedTemplateId: varchar("matched_template_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   projectIdx: index("doc_extraction_jobs_project_idx").on(table.projectId),

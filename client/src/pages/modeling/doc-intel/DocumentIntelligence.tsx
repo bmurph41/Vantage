@@ -5,7 +5,7 @@ import * as XLSX from "xlsx";
 import { 
   ArrowLeft, Upload, FileSpreadsheet, Brain, CheckCircle2, AlertCircle, 
   Clock, Settings, Inbox, Trash2, Eye, Loader2, MoreVertical, RefreshCw,
-  FileText, ListChecks
+  FileText, ListChecks, X
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -115,6 +115,7 @@ export default function DocumentIntelligence() {
 
   const reuploadStorageKey = projectId ? `doc_intel_reupload_${projectId}` : null;
   const hasRestoredReupload = useRef(false);
+  const [showResumeBanner, setShowResumeBanner] = useState(false);
 
   useEffect(() => {
     if (!reuploadDoc || !reuploadStorageKey) return;
@@ -214,7 +215,7 @@ export default function DocumentIntelligence() {
       setReuploadT12StartYear(state.t12StartYear || String(now.getFullYear() - 1));
       setReuploadT12EndMonth(state.t12EndMonth || String(now.getMonth() + 1));
       setReuploadT12EndYear(state.t12EndYear || String(now.getFullYear()));
-      setReuploadDialogOpen(true);
+      setShowResumeBanner(true);
     } catch {
       sessionStorage.removeItem(reuploadStorageKey);
     }
@@ -359,6 +360,7 @@ export default function DocumentIntelligence() {
       queryClient.invalidateQueries({ queryKey: ["/api/modeling/projects", projectId, "documents"] });
       queryClient.invalidateQueries({ queryKey: ["/api/modeling/projects", projectId, "documents", "holding"] });
       setReuploadDoc(null);
+      setShowResumeBanner(false);
       toast({ title: "Re-uploaded", description: "The document has been replaced and is now processing." });
     },
     onError: (error: unknown) => {
@@ -663,6 +665,38 @@ export default function DocumentIntelligence() {
               </div>
             </CardHeader>
             <CardContent>
+              {showResumeBanner && reuploadDoc && (
+                <div className="flex items-start gap-3 mb-4 p-3 rounded-lg border border-blue-300 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/30 text-blue-900 dark:text-blue-200">
+                  <RefreshCw className="h-4 w-4 mt-0.5 flex-shrink-0 text-blue-600 dark:text-blue-400" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium">Re-upload in progress</p>
+                    <p className="text-xs text-blue-700 dark:text-blue-300 truncate mt-0.5">
+                      A re-upload was started for <span className="font-semibold">{reuploadDoc.originalName}</span> before the page closed. Choose a replacement file to continue.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <Button
+                      size="sm"
+                      className="h-7 px-3 text-xs bg-blue-600 hover:bg-blue-700 text-white border-0"
+                      onClick={() => setReuploadDialogOpen(true)}
+                    >
+                      Resume
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-7 w-7 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/40"
+                      onClick={() => {
+                        setShowResumeBanner(false);
+                        setReuploadDoc(null);
+                        if (reuploadStorageKey) sessionStorage.removeItem(reuploadStorageKey);
+                      }}
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </div>
+              )}
               {holdingLoading ? (
                 <div className="flex justify-center py-8">
                   <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -864,7 +898,6 @@ export default function DocumentIntelligence() {
       <Dialog open={reuploadDialogOpen} onOpenChange={(open) => {
         if (!open) {
           setReuploadDialogOpen(false);
-          setReuploadDoc(null);
         }
       }}>
         <DialogContent className="sm:max-w-md">
@@ -1003,6 +1036,8 @@ export default function DocumentIntelligence() {
             <Button variant="outline" onClick={() => {
               setReuploadDialogOpen(false);
               setReuploadDoc(null);
+              setShowResumeBanner(false);
+              if (reuploadStorageKey) sessionStorage.removeItem(reuploadStorageKey);
             }}>
               Cancel
             </Button>
