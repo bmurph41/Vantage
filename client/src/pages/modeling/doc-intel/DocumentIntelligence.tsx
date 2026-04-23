@@ -448,10 +448,20 @@ export default function DocumentIntelligence() {
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {pnlDocuments.map((doc) => (
+                  {pnlDocuments.map((doc) => {
+                    const isMigrationLost =
+                      doc.status === "error" &&
+                      !!doc.errorMessage &&
+                      (doc.errorMessage.includes("no longer available") ||
+                        doc.errorMessage.toLowerCase().includes("migration"));
+                    return (
+                    <div key={doc.id} className="space-y-0">
                     <div
-                      key={doc.id}
-                      className="flex items-center gap-3 p-3 border rounded-lg hover:bg-muted/50 transition-colors"
+                      className={`flex items-center gap-3 p-3 border rounded-lg transition-colors ${
+                        isMigrationLost
+                          ? "border-amber-300 bg-amber-50/60 dark:border-amber-800 dark:bg-amber-950/20 hover:bg-amber-50 dark:hover:bg-amber-950/30"
+                          : "hover:bg-muted/50"
+                      }`}
                     >
                       <Checkbox
                         checked={selectedIds.has(doc.id)}
@@ -469,8 +479,13 @@ export default function DocumentIntelligence() {
                           {doc.year && <span>• {doc.year}</span>}
                           <span>• {formatFileSize(doc.fileSize)}</span>
                         </div>
-                        {doc.status === "error" && doc.errorMessage && (
+                        {doc.status === "error" && !isMigrationLost && doc.errorMessage && (
                           <p className="text-xs text-red-600 dark:text-red-400 mt-0.5 truncate">{doc.errorMessage}</p>
+                        )}
+                        {isMigrationLost && (
+                          <p className="text-xs text-amber-800 dark:text-amber-300 mt-0.5 font-medium">
+                            File lost during storage migration — re-upload required
+                          </p>
                         )}
                       </div>
                       <div className="flex items-center gap-2">
@@ -494,8 +509,12 @@ export default function DocumentIntelligence() {
                         {doc.status === "error" && (
                           <Button
                             size="sm"
-                            variant="outline"
-                            className="h-7 px-2 text-xs gap-1"
+                            variant={isMigrationLost ? "default" : "outline"}
+                            className={
+                              isMigrationLost
+                                ? "h-7 px-3 text-xs gap-1 bg-amber-600 hover:bg-amber-700 text-white border-amber-600"
+                                : "h-7 px-2 text-xs gap-1"
+                            }
                             disabled={reuploadMutation.isPending && reuploadDoc?.id === doc.id}
                             onClick={() => handleReuploadClick(doc)}
                           >
@@ -548,7 +567,9 @@ export default function DocumentIntelligence() {
                         </DropdownMenu>
                       </div>
                     </div>
-                  ))}
+                    </div>
+                  );
+                  })}
                 </div>
               )}
             </CardContent>

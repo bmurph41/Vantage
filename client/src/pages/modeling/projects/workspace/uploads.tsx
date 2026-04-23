@@ -605,6 +605,12 @@ export default function WorkspaceUploads({ projectId, onTabChange }: WorkspaceUp
                 const isRentRollType = isRentRollSyncable(upload);
                 const isSyncingRentRoll = syncingRentRollId === upload.id;
                 const canSyncRentRoll = isRentRollType && (upload.status === 'parsed' || upload.status === 'reviewing' || upload.status === 'completed');
+                const uploadErrorMsg = upload.errorMessage;
+                const isMigrationLost =
+                  upload.status === 'error' &&
+                  !!uploadErrorMsg &&
+                  (uploadErrorMsg.includes('no longer available') ||
+                    uploadErrorMsg.toLowerCase().includes('migration'));
 
                 return (
                   <div
@@ -614,6 +620,8 @@ export default function WorkspaceUploads({ projectId, onTabChange }: WorkspaceUp
                         ? 'border-blue-400 bg-gradient-to-r from-blue-50/80 to-indigo-50/80 dark:from-blue-950/30 dark:to-indigo-950/30 shadow-md'
                         : isSyncing
                         ? 'border-amber-400 bg-amber-50/50 dark:bg-amber-950/20'
+                        : isMigrationLost
+                        ? 'border-amber-300 bg-amber-50/40 dark:border-amber-800 dark:bg-amber-950/20'
                         : ''
                     }`}
                     data-testid={`upload-pending-${upload.id}`}
@@ -641,6 +649,17 @@ export default function WorkspaceUploads({ projectId, onTabChange }: WorkspaceUp
                             </Badge>
                           )}
                         </div>
+                        {upload.status === 'error' && !isMigrationLost && uploadErrorMsg && (
+                          <p className="text-xs text-red-500 mt-1.5 line-clamp-2">{uploadErrorMsg}</p>
+                        )}
+                        {isMigrationLost && (
+                          <div className="flex items-center gap-1.5 mt-1.5">
+                            <AlertCircle className="h-3 w-3 text-amber-600 flex-shrink-0" />
+                            <span className="text-xs text-amber-800 dark:text-amber-300 font-medium">
+                              File lost during storage migration — re-upload required
+                            </span>
+                          </div>
+                        )}
                         {upload.stats && upload.stats.total > 0 && (
                           <div className="mt-2 space-y-1">
                             <div className="flex justify-between text-xs text-muted-foreground">
@@ -662,6 +681,18 @@ export default function WorkspaceUploads({ projectId, onTabChange }: WorkspaceUp
                     </div>
 
                     <div className="flex items-center gap-2 ml-4">
+                      {isMigrationLost && (
+                        <Link href={`/modeling/projects/${projectId}/doc-intel`}>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="gap-1.5 border-amber-400 text-amber-800 hover:bg-amber-100 dark:border-amber-700 dark:text-amber-300 dark:hover:bg-amber-950/40"
+                          >
+                            <Upload className="h-3.5 w-3.5" />
+                            Re-upload
+                          </Button>
+                        </Link>
+                      )}
                       {(upload.status === 'parsed' || upload.status === 'reviewing') && (
                         <Button size="sm" onClick={() => handleReview(upload.id)} data-testid={`button-review-${upload.id}`}>
                           <Eye className="h-4 w-4 mr-2" />
