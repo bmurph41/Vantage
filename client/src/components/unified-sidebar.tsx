@@ -739,17 +739,18 @@ export default function UnifiedSidebar() {
                     <div>
                       <button
                         onClick={toggle}
+                        style={{ paddingLeft: "40px" }}
                         className={cn(
-                          "mt-2 mb-0 ml-2 mr-1 flex items-center justify-between rounded px-2 py-1",
-                          "w-[calc(100%-12px)] text-[9px] font-bold uppercase tracking-widest",
-                          "border-l border-sidebar-foreground/15 pl-3",
-                          "hover:bg-white/[0.06] transition-colors group",
-                          isActive ? "text-sidebar-foreground/70" : "text-sidebar-foreground/40",
+                          "flex items-center min-w-0 w-full transition-colors",
+                          "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                          "text-[12px] px-4 py-[7px] md:py-[6px]",
+                          isActive ? "text-sidebar-primary font-medium" : "text-sidebar-foreground/60",
                         )}
                       >
-                        <span>Asset Classes</span>
+                        <span className="mr-2 text-sidebar-foreground/30 select-none flex-shrink-0">–</span>
+                        <span className="flex-1 text-left">Asset Classes</span>
                         <ChevronDown className={cn(
-                          "w-2.5 h-2.5 flex-shrink-0 opacity-50 transition-transform duration-150",
+                          "w-3 h-3 flex-shrink-0 opacity-40 transition-transform duration-150 mr-2",
                           isExpanded ? "rotate-0" : "-rotate-90"
                         )} />
                       </button>
@@ -776,14 +777,15 @@ export default function UnifiedSidebar() {
                       <div key={subcat.id}>
                         <Link
                           href="/operations/payroll"
+                          style={{ paddingLeft: "40px" }}
                           className={cn(
-                            "mt-2 mb-0 ml-2 mr-1 flex items-center rounded px-2 py-1",
-                            "w-[calc(100%-12px)] text-[9px] font-bold uppercase tracking-widest",
-                            "border-l border-sidebar-foreground/15 pl-3",
-                            "hover:bg-white/[0.06] transition-colors",
-                            payrollActive ? "text-sidebar-foreground/70" : "text-sidebar-foreground/40"
+                            "flex items-center min-w-0 w-full transition-colors",
+                            "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                            "text-[12px] px-4 py-[7px] md:py-[6px]",
+                            payrollActive ? "bg-sidebar-accent text-sidebar-primary font-medium border-r-3 border-sidebar-primary" : "text-sidebar-foreground/60"
                           )}
                         >
+                          <span className="mr-2 text-sidebar-foreground/30 select-none flex-shrink-0">–</span>
                           <span>Payroll</span>
                         </Link>
                       </div>
@@ -802,17 +804,18 @@ export default function UnifiedSidebar() {
                     <div key={subcat.id}>
                       <button
                         onClick={toggleSubcat}
+                        style={{ paddingLeft: "40px" }}
                         className={cn(
-                          "mt-2 mb-0 ml-2 mr-1 flex items-center justify-between rounded px-2 py-1",
-                          "w-[calc(100%-12px)] text-[9px] font-bold uppercase tracking-widest",
-                          "border-l border-sidebar-foreground/15 pl-3",
-                          "hover:bg-white/[0.06] transition-colors group",
-                          isActive ? "text-sidebar-foreground/70" : "text-sidebar-foreground/40"
+                          "flex items-center min-w-0 w-full transition-colors",
+                          "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                          "text-[12px] px-4 py-[7px] md:py-[6px]",
+                          isActive ? "text-sidebar-primary font-medium" : "text-sidebar-foreground/60",
                         )}
                       >
-                        <span>{subcat.label}</span>
+                        <span className="mr-2 text-sidebar-foreground/30 select-none flex-shrink-0">–</span>
+                        <span className="flex-1 text-left">{subcat.label}</span>
                         <ChevronDown className={cn(
-                          "w-2.5 h-2.5 flex-shrink-0 opacity-50 transition-transform duration-150",
+                          "w-3 h-3 flex-shrink-0 opacity-40 transition-transform duration-150 mr-2",
                           isExpanded ? "rotate-0" : "-rotate-90"
                         )} />
                       </button>
@@ -824,9 +827,6 @@ export default function UnifiedSidebar() {
                 })}
 
                 {/* Integrations link */}
-                <div className="mt-3 mb-0.5 ml-4 pl-3 border-l border-sidebar-foreground/15 flex items-center gap-1.5">
-                  <span className="text-[9px] font-bold uppercase tracking-widest text-sidebar-foreground/40">System</span>
-                </div>
                 <NavLink item={{ name: "Integrations", href: "/operations/integrations" }} depth={1} />
               </>
             )}
