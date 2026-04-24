@@ -11535,6 +11535,36 @@ export const modelingProjectActivity = pgTable('modeling_project_activity', {
   projectCreatedAtIdx: index('mp_activity_project_created_at_idx').on(table.projectId, table.createdAt),
 }));
 
+// ============================================================================
+// TRANSIENT RENT ROLL — Phase 2, Section 3.2 of VANTAGE_TRANSIENT_RENT_ROLL_SPEC.md
+// Inventory grouping: a marina, a hotel block, a campground loop.
+// Scoped to crm_properties (physical property), NOT modeling_projects — inventory
+// persists across underwriting scenarios/versions of the same property.
+//
+// Note: partial unique index on (org_id, property_id, name) WHERE deleted_at IS NULL
+// is enforced in migration 0013 — not declared in Drizzle because unique() does not
+// support partial indexes.
+// ============================================================================
+export const transientInventoryGroup = pgTable('transient_inventory_group', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  propertyId: varchar('property_id').notNull().references(() => crmProperties.id, { onDelete: 'restrict' }),
+  assetClassId: text('asset_class_id').notNull(),
+  name: text('name').notNull(),
+  description: text('description'),
+  sortOrder: integer('sort_order').notNull().default(0),
+  meta: jsonb('meta').notNull().default(sql`'{}'::jsonb`),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  createdBy: varchar('created_by').references(() => users.id),
+  updatedBy: varchar('updated_by').references(() => users.id),
+  deletedAt: timestamp('deleted_at'),
+}, (t) => ({
+  orgPropIdx: index('tig_org_prop_idx').on(t.orgId, t.propertyId),
+  orgIdx: index('tig_org_idx').on(t.orgId),
+  propertyIdx: index('tig_property_idx').on(t.propertyId),
+}));
+
 // Valuation Snapshots - Point-in-time valuation captures for historical tracking
 export const valuationSnapshotTriggerEnum = pgEnum("valuation_snapshot_trigger", [
   "manual",           // User manually triggered
@@ -13284,6 +13314,16 @@ export const insertModelingProjectActivitySchema = createInsertSchema(modelingPr
 });
 export type ModelingProjectActivityEntry = typeof modelingProjectActivity.$inferSelect;
 export type InsertModelingProjectActivity = z.infer<typeof insertModelingProjectActivitySchema>;
+
+// Transient inventory group schemas
+export const insertTransientInventoryGroupSchema = createInsertSchema(transientInventoryGroup).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  deletedAt: true,
+});
+export type TransientInventoryGroup = typeof transientInventoryGroup.$inferSelect;
+export type InsertTransientInventoryGroup = z.infer<typeof insertTransientInventoryGroupSchema>;
 
 // Valuation Snapshot schemas
 export const insertValuationSnapshotSchema = createInsertSchema(valuationSnapshots).omit({

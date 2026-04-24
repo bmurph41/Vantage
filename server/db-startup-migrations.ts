@@ -19629,6 +19629,34 @@ const MIGRATIONS: Migration[] = [
   { name: "workspace_members: add index wm_workspace_idx", sql: `CREATE INDEX IF NOT EXISTS wm_workspace_idx ON workspace_members (workspace_id)` },
   { name: "workspace_members: add index wm_user_idx", sql: `CREATE INDEX IF NOT EXISTS wm_user_idx ON workspace_members (user_id)` },
   { name: "workspace_members: add index wm_org_idx", sql: `CREATE INDEX IF NOT EXISTS wm_org_idx ON workspace_members (org_id)` },
+
+  // transient_inventory_group — Phase 2 Table A (matches migrations/0013_transient_inventory_group.sql)
+  {
+    name: "transient_inventory_group: create table",
+    sql: `CREATE TABLE IF NOT EXISTS transient_inventory_group (
+      id               varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+      org_id           varchar NOT NULL,
+      property_id      varchar NOT NULL,
+      asset_class_id   text    NOT NULL,
+      name             text    NOT NULL,
+      description      text,
+      sort_order       integer NOT NULL DEFAULT 0,
+      meta             jsonb   NOT NULL DEFAULT '{}'::jsonb,
+      created_at       timestamp NOT NULL DEFAULT now(),
+      updated_at       timestamp NOT NULL DEFAULT now(),
+      created_by       varchar,
+      updated_by       varchar,
+      deleted_at       timestamp,
+      CONSTRAINT tig_org_fk         FOREIGN KEY (org_id)      REFERENCES organizations(id),
+      CONSTRAINT tig_property_fk    FOREIGN KEY (property_id) REFERENCES crm_properties(id) ON DELETE RESTRICT,
+      CONSTRAINT tig_created_by_fk  FOREIGN KEY (created_by)  REFERENCES users(id),
+      CONSTRAINT tig_updated_by_fk  FOREIGN KEY (updated_by)  REFERENCES users(id)
+    )`,
+  },
+  { name: "transient_inventory_group: add index tig_org_prop_idx", sql: `CREATE INDEX IF NOT EXISTS tig_org_prop_idx ON transient_inventory_group (org_id, property_id)` },
+  { name: "transient_inventory_group: add index tig_org_idx", sql: `CREATE INDEX IF NOT EXISTS tig_org_idx ON transient_inventory_group (org_id)` },
+  { name: "transient_inventory_group: add index tig_property_idx", sql: `CREATE INDEX IF NOT EXISTS tig_property_idx ON transient_inventory_group (property_id)` },
+  { name: "transient_inventory_group: add partial unique index tig_org_prop_name_unique", sql: `CREATE UNIQUE INDEX IF NOT EXISTS tig_org_prop_name_unique ON transient_inventory_group (org_id, property_id, name) WHERE deleted_at IS NULL` },
 ];
 
 /**
