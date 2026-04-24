@@ -2831,3 +2831,14 @@ Fix path (deferred, separate workstream):
 3. Target boot time: <3 seconds. Current: ~10 seconds. Every second saved reduces the cycle-gap window proportionally.
 
 Priority: Not blocking transient rent roll build. Address before public launch — ties into the pre-launch checklist item "audit every raw pool.query() call site."
+
+## 2026-04-24 — Phase 2 Table B PR opened
+
+Draft PR #4 opened: https://github.com/bmurph41/MMTest/pull/4
+- Branch: feature/transient-rent-roll-phase2-unit-type
+- Base: feature/transient-rent-roll-phase2-inventory-group (stacked PR on top of PR #3)
+- Commit: 088c94d3 (transient_unit_type table + service + 20 tests)
+- Verification: 20/20 new tests, 16/16 Table A regression, 102/102 DCF tests, zero typecheck delta (824 == baseline)
+- Design deviations from spec (vs Table A): inventory_group_id NOT NULL (tighter than spec nullable), inventory_count omitted, dimensions jsonb NULLABLE without DEFAULT, DB-level CHECK on rate_basis + service whitelist (belt+suspenders), cross-parent consistency guard (org AND property match)
+- Stack: 088c94d3 (Table B) → 488975ee (Table A) → 09240a1c (flag refactor) → main
+- Next: Phase 2 Table C (transient_inventory_unit) as a follow-up PR stacked on Table B
