@@ -2800,3 +2800,19 @@ Draft PR #3 opened: https://github.com/bmurph41/MMTest/pull/3
 - Commits: 09240a1c (flag refactor), 488975ee (transient_inventory_group table + service + 16 tests)
 - Verification: 16/16 new tests, 102/102 DCF tests, zero typecheck delta (824 == baseline)
 - Next: Phase 2 Table B (transient_unit_type) as a follow-up PR on the same branch family
+
+## Outstanding — AI Advisor chat tool broken
+
+The AI Advisor chat widget inside Vantage is returning "Sorry, I encountered an error. Please try again." for every query, regardless of the question ("What are the biggest risks with this deal?", "Help me study comps", "Show me the last 5 market sales" all fail identically). The error string is the frontend's generic fallback, which means something on the backend is throwing consistently. Also appears disconnected from app context — it doesn't seem to know anything about the current deal, property, or user state.
+
+**Needs investigation and repair.** Likely diagnostic sequence:
+1. Open the AI Advisor panel, open browser DevTools → Network tab, send a query. Capture the failing request URL, status code, and response body. Likely `/api/v1/advisor/*` or similar.
+2. Check server logs for the error. Common culprits: missing ANTHROPIC_API_KEY env var, rate limit hit, broken auth middleware on the route, stale route registration after a refactor, or a service it depends on (context loader, RAG retriever) throwing.
+3. Grep for the advisor route handler: `grep -rn "advisor" server/routes/ server/services/ 2>&1 | head -20`
+4. Check whether the route is gated behind a feature flag that got flipped off.
+
+**Scope considerations:**
+- Once Vantage's advisor is fixed, port the same architecture to Bookd (separate codebase). The advisor tech stack — whatever it ends up being post-fix — should be the template.
+- Probable shared pieces when porting: context loader pattern, RAG setup, LLM provider wiring, streaming response handling, error surface. Keep the two deployments independent (separate API keys, separate rate limits) but share the code pattern.
+
+**Priority:** Not blocking transient rent roll build. Fix as a standalone workstream when convenient — ideally before the pre-launch validation pass, since an advisor that's broken undermines the demo story even if core DCF works.
