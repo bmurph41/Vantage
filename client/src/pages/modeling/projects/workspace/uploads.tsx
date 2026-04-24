@@ -453,55 +453,54 @@ export default function WorkspaceUploads({ projectId, onTabChange }: WorkspaceUp
       {onTabChange && <WorkflowNavigation currentTab="uploads" onNavigate={onTabChange} />}
 
       {/* Header */}
-      <div className="flex items-start justify-between">
-        <div>
-          <h2 className="text-xl font-semibold">Document Uploads</h2>
-          <p className="text-sm text-muted-foreground">
-            Upload P&L statements and rent rolls for AI-powered parsing and categorization
-          </p>
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex items-start gap-3">
+          <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border bg-muted/50">
+            <Upload className="h-4 w-4 text-muted-foreground" />
+          </div>
+          <div>
+            <h2 className="text-lg font-semibold leading-tight">Document Uploads</h2>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              Upload P&amp;L statements and rent rolls for AI-powered parsing and categorization
+            </p>
+          </div>
         </div>
         <Link href="/modeling/settings">
-          <Button variant="outline" size="sm" className="gap-2" data-testid="button-keyword-bank">
-            <BookKey className="h-4 w-4" />
+          <Button variant="outline" size="sm" className="gap-2 shrink-0 text-muted-foreground hover:text-foreground" data-testid="button-keyword-bank">
+            <BookKey className="h-3.5 w-3.5" />
             Keyword Bank
           </Button>
         </Link>
       </div>
 
       {/* Document Intelligence Callout */}
-      <Card className="border-amber-200 bg-amber-50/60 dark:border-amber-900 dark:bg-amber-950/20">
-        <CardContent className="py-3 px-4">
-          <div className="flex items-start gap-3">
-            <Brain className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-amber-900 dark:text-amber-200">AI Parsing &amp; Review happens in Document Intelligence</p>
-              <p className="text-xs text-amber-800/80 dark:text-amber-300/80 mt-0.5">
-                After uploading a file here, open <strong>Document Intelligence</strong> to run AI extraction, review and confirm line items, then sync them into the financial model.
-              </p>
-            </div>
-            <Link href={`/modeling/projects/${projectId}/doc-intel`}>
-              <Button size="sm" variant="outline" className="gap-1.5 shrink-0 border-amber-400 text-amber-900 dark:text-amber-200 hover:bg-amber-100 dark:hover:bg-amber-950/40">
-                <ArrowRight className="h-3.5 w-3.5" />
-                Open Review
-              </Button>
-            </Link>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="flex items-center gap-3 rounded-lg border border-amber-200/80 bg-amber-50/40 dark:border-amber-800/50 dark:bg-amber-950/15 px-4 py-3 border-l-[3px] border-l-amber-400 dark:border-l-amber-500">
+        <Brain className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
+        <div className="flex-1 min-w-0">
+          <span className="text-sm font-medium text-amber-900 dark:text-amber-200">AI Parsing &amp; Review happens in Document Intelligence. </span>
+          <span className="text-xs text-amber-800/70 dark:text-amber-300/70">
+            After uploading, open Document Intelligence to run AI extraction, review line items, and sync to the financial model.
+          </span>
+        </div>
+        <Link href={`/modeling/projects/${projectId}/doc-intel`}>
+          <Button size="sm" variant="outline" className="gap-1.5 shrink-0 h-7 px-3 text-xs border-amber-300 text-amber-800 dark:text-amber-300 hover:bg-amber-100/60 dark:hover:bg-amber-950/40 dark:border-amber-700">
+            Open Review
+            <ArrowRight className="h-3 w-3" />
+          </Button>
+        </Link>
+      </div>
 
       {/* PNL Facts Summary Banner */}
       {hasPnlFacts && pnlSummary && (
-        <div className="flex items-center gap-3 p-3 rounded-lg border border-green-200 bg-green-50 dark:border-green-900 dark:bg-green-950/30">
-          <TrendingUp className="h-5 w-5 text-green-600 flex-shrink-0" />
+        <div className="flex items-center gap-3 rounded-lg border border-green-200/80 bg-green-50/40 dark:border-green-800/50 dark:bg-green-950/15 px-4 py-2.5 border-l-[3px] border-l-green-500 dark:border-l-green-600">
+          <TrendingUp className="h-4 w-4 text-green-600 dark:text-green-400 shrink-0" />
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-green-800 dark:text-green-200">
-              Financial Model Synced
-            </p>
-            <p className="text-xs text-green-700 dark:text-green-300">
+            <span className="text-sm font-medium text-green-800 dark:text-green-200">Financial Model Synced. </span>
+            <span className="text-xs text-green-700/80 dark:text-green-300/80">
               {pnlSummary.factCount.toLocaleString()} line items across {pnlSummary.documentCount} document
               {pnlSummary.documentCount !== 1 ? 's' : ''}
               {pnlSummary.years.length > 0 && ` — ${pnlSummary.years.join(', ')}`}
-            </p>
+            </span>
           </div>
         </div>
       )}
@@ -590,9 +589,13 @@ export default function WorkspaceUploads({ projectId, onTabChange }: WorkspaceUp
       {/* Pending uploads */}
       {pendingUploads.length > 0 && (
         <Card>
-          <CardHeader>
-            <CardTitle>Pending Review</CardTitle>
-            <CardDescription>Documents awaiting AI processing or user review</CardDescription>
+          <CardHeader className="pb-4 border-b">
+            <div className="flex items-center gap-2">
+              <Clock className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-semibold">Pending Review</CardTitle>
+              <Badge variant="secondary" className="ml-auto text-xs">{pendingUploads.length}</Badge>
+            </div>
+            <CardDescription className="text-xs mt-0.5">Documents awaiting AI processing or user review</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
@@ -769,14 +772,13 @@ export default function WorkspaceUploads({ projectId, onTabChange }: WorkspaceUp
       {/* Completed uploads */}
       {completedUploads.length > 0 && (
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <CheckCircle2 className="h-5 w-5 text-green-500" />
-              Completed Imports
-            </CardTitle>
-            <CardDescription>
-              Documents that have been processed and imported into your P&L
-            </CardDescription>
+          <CardHeader className="pb-4 border-b">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4 text-green-500" />
+              <CardTitle className="text-sm font-semibold">Completed Imports</CardTitle>
+              <Badge variant="secondary" className="ml-auto text-xs">{completedUploads.length}</Badge>
+            </div>
+            <CardDescription className="text-xs mt-0.5">Documents that have been processed and imported into your P&amp;L</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
@@ -870,13 +872,15 @@ export default function WorkspaceUploads({ projectId, onTabChange }: WorkspaceUp
 
       {/* Empty state */}
       {uploads.length === 0 && !isLoading && (
-        <Card className="p-8 text-center">
-          <FileSpreadsheet className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-          <h3 className="text-lg font-semibold mb-2">No Documents Yet</h3>
-          <p className="text-muted-foreground mb-4">
-            Upload your first P&L statement or rent roll to get started with AI-powered analysis.
+        <div className="flex flex-col items-center justify-center py-12 text-center">
+          <div className="flex h-14 w-14 items-center justify-center rounded-full border bg-muted/40 mb-4">
+            <FileText className="h-6 w-6 text-muted-foreground/60" />
+          </div>
+          <h3 className="text-sm font-semibold text-foreground mb-1">No Documents Yet</h3>
+          <p className="text-xs text-muted-foreground max-w-xs">
+            Upload your first P&amp;L statement or rent roll above to get started with AI-powered analysis.
           </p>
-        </Card>
+        </div>
       )}
 
       {/* Delete confirmation */}
