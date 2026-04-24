@@ -4,8 +4,10 @@ export interface FeatureFlags {
   CONNECTOR_INTACCT_ENABLED: boolean;
   CONNECTOR_NETSUITE_ENABLED: boolean;
   FINANCIAL_KERNEL_UI_ENABLED: boolean;
-  TRANSIENT_RENT_ROLL_ENABLED: boolean;
-  TRANSIENT_RENT_ROLL_UI_ENABLED: boolean;
+  transientRentRoll: {
+    enabled: boolean;
+    ui: boolean;
+  };
 }
 
 function parseBoolean(value: string | undefined, defaultValue: boolean = false): boolean {
@@ -19,15 +21,25 @@ export const featureFlags: FeatureFlags = {
   CONNECTOR_INTACCT_ENABLED: parseBoolean(process.env.CONNECTOR_INTACCT_ENABLED, false),
   CONNECTOR_NETSUITE_ENABLED: parseBoolean(process.env.CONNECTOR_NETSUITE_ENABLED, false),
   FINANCIAL_KERNEL_UI_ENABLED: parseBoolean(process.env.FINANCIAL_KERNEL_UI_ENABLED, false),
-  TRANSIENT_RENT_ROLL_ENABLED: parseBoolean(process.env.TRANSIENT_RENT_ROLL_ENABLED, false),
-  TRANSIENT_RENT_ROLL_UI_ENABLED: parseBoolean(process.env.TRANSIENT_RENT_ROLL_UI_ENABLED, false),
+  transientRentRoll: {
+    enabled: parseBoolean(process.env.TRANSIENT_RENT_ROLL_ENABLED, false),
+    ui: parseBoolean(process.env.TRANSIENT_RENT_ROLL_UI_ENABLED, false),
+  },
 };
 
-export function isFeatureEnabled(flag: keyof FeatureFlags): boolean {
-  return featureFlags[flag];
+type BooleanKeys<T> = { [K in keyof T]: T[K] extends boolean ? K : never }[keyof T];
+export type FlagPath =
+  | BooleanKeys<FeatureFlags>
+  | `transientRentRoll.${keyof FeatureFlags['transientRentRoll']}`;
+
+export function isFeatureEnabled(flag: FlagPath): boolean {
+  if (flag === 'transientRentRoll.enabled') return featureFlags.transientRentRoll.enabled;
+  if (flag === 'transientRentRoll.ui') return featureFlags.transientRentRoll.ui;
+  const v = featureFlags[flag as BooleanKeys<FeatureFlags>];
+  return typeof v === 'boolean' ? v : false;
 }
 
-export function requireFeatureFlag(flag: keyof FeatureFlags) {
+export function requireFeatureFlag(flag: FlagPath) {
   return (req: any, res: any, next: any) => {
     if (!isFeatureEnabled(flag)) {
       return res.status(404).json({
@@ -39,10 +51,10 @@ export function requireFeatureFlag(flag: keyof FeatureFlags) {
   };
 }
 
-export function getPublicFeatureFlags(): Partial<FeatureFlags> {
+export function getPublicFeatureFlags() {
   return {
     INTEGRATIONS_PLATFORM_ENABLED: featureFlags.INTEGRATIONS_PLATFORM_ENABLED,
     FINANCIAL_KERNEL_UI_ENABLED: featureFlags.FINANCIAL_KERNEL_UI_ENABLED,
-    TRANSIENT_RENT_ROLL_UI_ENABLED: featureFlags.TRANSIENT_RENT_ROLL_UI_ENABLED,
+    transientRentRoll: { ui: featureFlags.transientRentRoll.ui },
   };
 }
