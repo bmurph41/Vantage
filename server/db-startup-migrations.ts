@@ -19692,6 +19692,42 @@ const MIGRATIONS: Migration[] = [
   { name: "transient_unit_type: add index tut_property_idx", sql: `CREATE INDEX IF NOT EXISTS tut_property_idx ON transient_unit_type (property_id)` },
   { name: "transient_unit_type: add index tut_inventory_group_idx", sql: `CREATE INDEX IF NOT EXISTS tut_inventory_group_idx ON transient_unit_type (inventory_group_id)` },
   { name: "transient_unit_type: add partial unique index tut_org_prop_code_unique", sql: `CREATE UNIQUE INDEX IF NOT EXISTS tut_org_prop_code_unique ON transient_unit_type (org_id, property_id, code) WHERE deleted_at IS NULL` },
+
+  // transient_inventory_unit — Phase 2 Table C (matches migrations/0015_transient_inventory_unit.sql)
+  {
+    name: "transient_inventory_unit: create table",
+    sql: `CREATE TABLE IF NOT EXISTS transient_inventory_unit (
+      id                   varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+      org_id               varchar NOT NULL,
+      property_id          varchar NOT NULL,
+      inventory_group_id   varchar NOT NULL,
+      unit_type_id         varchar NOT NULL,
+      identifier           text    NOT NULL,
+      status               text    NOT NULL DEFAULT 'active',
+      activation_date      date,
+      decommission_date    date,
+      attributes           jsonb   NOT NULL DEFAULT '{}'::jsonb,
+      created_at           timestamp NOT NULL DEFAULT now(),
+      updated_at           timestamp NOT NULL DEFAULT now(),
+      created_by           varchar,
+      updated_by           varchar,
+      deleted_at           timestamp,
+      CONSTRAINT tiu_org_fk               FOREIGN KEY (org_id)             REFERENCES organizations(id),
+      CONSTRAINT tiu_property_fk          FOREIGN KEY (property_id)        REFERENCES crm_properties(id)          ON DELETE RESTRICT,
+      CONSTRAINT tiu_inventory_group_fk   FOREIGN KEY (inventory_group_id) REFERENCES transient_inventory_group(id) ON DELETE RESTRICT,
+      CONSTRAINT tiu_unit_type_fk         FOREIGN KEY (unit_type_id)       REFERENCES transient_unit_type(id)     ON DELETE RESTRICT,
+      CONSTRAINT tiu_created_by_fk        FOREIGN KEY (created_by)         REFERENCES users(id),
+      CONSTRAINT tiu_updated_by_fk        FOREIGN KEY (updated_by)         REFERENCES users(id),
+      CONSTRAINT tiu_status_check         CHECK (status IN ('active','ooo','decommissioned')),
+      CONSTRAINT tiu_date_order_check     CHECK (decommission_date IS NULL OR activation_date IS NULL OR decommission_date >= activation_date)
+    )`,
+  },
+  { name: "transient_inventory_unit: add index tiu_org_prop_idx",        sql: `CREATE INDEX IF NOT EXISTS tiu_org_prop_idx ON transient_inventory_unit (org_id, property_id)` },
+  { name: "transient_inventory_unit: add index tiu_org_idx",             sql: `CREATE INDEX IF NOT EXISTS tiu_org_idx ON transient_inventory_unit (org_id)` },
+  { name: "transient_inventory_unit: add index tiu_property_idx",        sql: `CREATE INDEX IF NOT EXISTS tiu_property_idx ON transient_inventory_unit (property_id)` },
+  { name: "transient_inventory_unit: add index tiu_inventory_group_idx", sql: `CREATE INDEX IF NOT EXISTS tiu_inventory_group_idx ON transient_inventory_unit (inventory_group_id)` },
+  { name: "transient_inventory_unit: add index tiu_unit_type_idx",       sql: `CREATE INDEX IF NOT EXISTS tiu_unit_type_idx ON transient_inventory_unit (unit_type_id)` },
+  { name: "transient_inventory_unit: add partial unique index tiu_org_prop_ident_unique", sql: `CREATE UNIQUE INDEX IF NOT EXISTS tiu_org_prop_ident_unique ON transient_inventory_unit (org_id, property_id, identifier) WHERE deleted_at IS NULL` },
 ];
 
 /**
