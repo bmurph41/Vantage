@@ -2760,3 +2760,35 @@ Fixed 13 of 20 test failures; 7 remain, all in `server/schema-drift.test.ts`.
 Root cause: `is(value, PgTable)` type guard in `extractSchemaTables()` fails across Vitest's module interop boundary, so the test's mocked `testUsers` table is never recognized as a PgTable. Returns 0 tables regardless of mock setup. The 4 "expect 0" tests in this file pass degenerately. Not a blocker for transient rent roll work since the drift detector utility isn't on that code path. Fix requires either refactoring the test to use a shared drizzle-orm instance or shimming the type guard — nontrivial.
 
 **Current baseline:** 667 passing / 7 failing / 1 skipped (of 675 runnable; excluding 5 stray vitest matches in `.config/npm/node_global/` which are the Copilot CLI's own tests — should add `.config` to vitest exclude list).
+
+## Pre-Launch Testing Requirements (before going live to public)
+
+The 102 DCF unit tests are *not* sufficient for a launch gate. They prove the math is internally consistent; they don't prove the platform produces correct results on real deals. Complete these before any public launch:
+
+1. **End-to-end workflow tests with realistic data.** Full path: upload a real P&L → Document Intelligence extraction → review and correct → build Pro Forma → run DCF → Monte Carlo → exit scenarios. Catch: UI bugs, data pipeline breaks, extraction errors, silent calculation issues that only surface with real-shaped inputs.
+
+2. **Manual validation against trusted Excel models.** Take 3-5 of your own acquisition models (marina, STR, CRE — ideally one per asset class targeted at launch), rebuild them in Vantage, and compare outputs line by line with the Excel. Every difference must be explainable (methodology differences are fine; unexplained deltas are not). Document the methodology differences in platform docs so future users understand them.
+
+3. **Beta user pressure testing with real deals.** Candidates:
+   - Palm Harbor STR portfolio (Palm Paradise, Harbor Hideaway, Palm Retreat) — use for STR/short-term rental path validation
+   - Pinellas cleaning business CIM — use for small-business acquisition path validation
+   - Marina broker contacts — use for marina and CRE path validation (highest-stakes asset class for the platform)
+   Run 5-10 real deals through start-to-finish. Get feedback on what feels wrong, slow, or confusing. Iterate.
+
+4. **Regression protection during development.** The 102 DCF tests must pass on every PR that touches the modeling engine. Never merge red.
+
+5. **Data integrity audit.** Before launch, sample-check database records for: PII leakage across orgs (tenant isolation), RLS policies enforcing correctly, audit logs capturing the right events, financial calculations matching what's displayed in UI.
+
+6. **Security audit.** CSRF, auth middleware, tenant isolation middleware (which we just fixed tests for), rate limiting, error messages not leaking internal state.
+
+7. **Load/performance smoke test.** Monte Carlo with 10,000 iterations, DCF with 30-year hold period, document intelligence on 50-page P&L — each should complete in a reasonable time without memory issues.
+
+None of the above are Phase 1-7 of the transient rent roll build. Track them as a separate pre-launch workstream.
+
+## 2026-04-24 — RLS finding (pre-launch gap)
+
+Discovered during Phase 2 investigation: no Postgres-level RLS policies exist in this codebase. The phrase "RLS-guarded" in CLAUDE.md and across service files is a convention indicating "be careful, scope by org_id manually in raw SQL" — not an enforced database mechanism. No CREATE POLICY, no ENABLE ROW LEVEL SECURITY, no pgPolicy or enableRLS Drizzle helpers anywhere.
+
+This is a real pre-launch gap. Services that forget to include WHERE org_id = $1 will silently leak data across tenants. Add to the pre-launch testing checklist: audit every raw pool.query() call site for explicit org_id scoping, consider enabling real Postgres RLS before public launch.
+
+For Phase 2 work, the transient_inventory_group service follows the existing convention but adds TypeScript-level discipline: org_id is a required parameter on every service function (no defaults, no optional).
