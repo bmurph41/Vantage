@@ -2792,3 +2792,11 @@ Discovered during Phase 2 investigation: no Postgres-level RLS policies exist in
 This is a real pre-launch gap. Services that forget to include WHERE org_id = $1 will silently leak data across tenants. Add to the pre-launch testing checklist: audit every raw pool.query() call site for explicit org_id scoping, consider enabling real Postgres RLS before public launch.
 
 For Phase 2 work, the transient_inventory_group service follows the existing convention but adds TypeScript-level discipline: org_id is a required parameter on every service function (no defaults, no optional).
+
+## 2026-04-24 — Phase 2 Table A PR opened
+
+Draft PR #3 opened: https://github.com/bmurph41/MMTest/pull/3
+- Branch: feature/transient-rent-roll-phase2-inventory-group
+- Commits: 09240a1c (flag refactor), 488975ee (transient_inventory_group table + service + 16 tests)
+- Verification: 16/16 new tests, 102/102 DCF tests, zero typecheck delta (824 == baseline)
+- Next: Phase 2 Table B (transient_unit_type) as a follow-up PR on the same branch family
