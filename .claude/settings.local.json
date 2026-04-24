@@ -279,7 +279,10 @@
       "Skill(restart-dev)",
       "Bash(git check-ignore *)",
       "Skill(parser-audit)",
-      "Bash(bash /home/runner/workspace/.claude/skills/restart-dev/scripts/restart.sh)"
+      "Bash(bash /home/runner/workspace/.claude/skills/restart-dev/scripts/restart.sh)",
+      "Bash(git fetch *)",
+      "Bash(git checkout *)",
+      "Bash(git pull *)"
     ]
   }
 }

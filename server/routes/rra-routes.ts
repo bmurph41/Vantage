@@ -2156,7 +2156,8 @@ router.delete("/locations/:locationId/unlink-modeling-project/:modelingProjectId
 
 router.get("/locations/:locationId/linked-projects", async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const links = await rraService.getLinkedModelingProjects(req.params.locationId);
+    const orgId = getOrgId(req);
+    const links = await rraService.getLinkedModelingProjects(orgId, req.params.locationId);
     res.json(links);
   } catch (error) {
     next(error);

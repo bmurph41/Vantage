@@ -814,12 +814,6 @@ export class RRAService {
       ));
   }
 
-  async getLinkedModelingProjects(rraLocationId: string): Promise<any[]> {
-    return db.select()
-      .from(rraModelingProjectLinks)
-      .where(eq(rraModelingProjectLinks.rraLocationId, rraLocationId));
-  }
-
   async getLocationsByModelingProject(modelingProjectId: string): Promise<RraMarinaLocation[]> {
     const links = await db.select()
       .from(rraModelingProjectLinks)
