@@ -2842,3 +2842,40 @@ Draft PR #4 opened: https://github.com/bmurph41/MMTest/pull/4
 - Design deviations from spec (vs Table A): inventory_group_id NOT NULL (tighter than spec nullable), inventory_count omitted, dimensions jsonb NULLABLE without DEFAULT, DB-level CHECK on rate_basis + service whitelist (belt+suspenders), cross-parent consistency guard (org AND property match)
 - Stack: 088c94d3 (Table B) → 488975ee (Table A) → 09240a1c (flag refactor) → main
 - Next: Phase 2 Table C (transient_inventory_unit) as a follow-up PR stacked on Table B
+
+## 2026-04-24 — Phase 2 complete (Tables A, B, C all shipped)
+
+Draft PR #5 opened: https://github.com/bmurph41/MMTest/pull/5 (Table C — transient_inventory_unit)
+
+Phase 2 inventory hierarchy fully modeled: crm_property → transient_inventory_group → transient_unit_type → transient_inventory_unit
+
+Three-deep stacked PR chain on origin:
+- PR #3 (Table A) — feature/transient-rent-roll-phase2-inventory-group → main
+- PR #4 (Table B) — feature/transient-rent-roll-phase2-unit-type → PR #3's branch
+- PR #5 (Table C) — feature/transient-rent-roll-phase2-inventory-unit → PR #4's branch
+
+Merge sequence: merge PR #3 first, PR #4 auto-rebases to main, merge PR #4, PR #5 auto-rebases to main, merge PR #5.
+
+Combined stats across the three PRs:
+- Tables: transient_inventory_group (A), transient_unit_type (B), transient_inventory_unit (C)
+- Migrations: 0013, 0014, 0015
+- Service functions: 5 (A) + 5 (B) + 6 (C) = 16 total
+- Unit tests: 16 (A) + 20 (B) + 31 (C) = 67 total
+- DCF regression: 102/102 preserved across every PR
+- TypeScript: zero delta from 824-error baseline across every PR
+
+Design discipline established and preserved across all three tables:
+- orgId required top-level parameter on every service function
+- All SQL includes explicit WHERE org_id = $n (no Postgres RLS exists in this codebase)
+- Soft delete via deleted_at, reads filter IS NULL
+- Partial unique indexes SQL-only (Drizzle can't express WHERE clauses)
+- varchar IDs, plain timestamp (not timestamptz), ON DELETE RESTRICT on parent FKs
+- DB-layer CHECK + service-level whitelist for enum fields (belt+suspenders)
+- Parent-consistency guards: Table B verifies two-way (org + property), Table C verifies three-way (org + property + inventory_group)
+- Isolated updateStatus function on Table C (keeps lifecycle changes separate from field edits)
+- File header docs distinguishing status='decommissioned' (preserved) from deleted_at (hidden)
+
+Next session priorities (in rough order):
+1. Review and merge PR #3 (Table A) — PRs #4 and #5 auto-rebase after each merge
+2. Phase 3 start: transient_rate_plan + transient_rate_calendar_day + seasonality
+3. Defer: routes (not yet scoped), UI (Phase 7), the 824 pre-existing typecheck errors in shared/asset-class-model-config.ts, AI Advisor chat repair, slow-startup cleanup (1,015 migration stubs)
