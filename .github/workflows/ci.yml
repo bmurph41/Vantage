@@ -17,9 +17,7 @@ jobs:
           node-version: 20
           cache: 'npm'
       - run: npm ci
-      - run: npx tsc --noEmit
-        env:
-          NODE_OPTIONS: '--max-old-space-size=4096'
+      - run: npm run typecheck
 
   test:
     name: Unit Tests
