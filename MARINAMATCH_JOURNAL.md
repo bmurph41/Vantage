@@ -2816,3 +2816,18 @@ The AI Advisor chat widget inside Vantage is returning "Sorry, I encountered an 
 - Probable shared pieces when porting: context loader pattern, RAG setup, LLM provider wiring, streaming response handling, error surface. Keep the two deployments independent (separate API keys, separate rate limits) but share the code pattern.
 
 **Priority:** Not blocking transient rent roll build. Fix as a standalone workstream when convenient — ideally before the pre-launch validation pass, since an advisor that's broken undermines the demo story even if core DCF works.
+
+## 2026-04-24 — Slow startup root cause (~10s boots)
+
+Replit containers cycle roughly every 5 minutes. UptimeRobot was firing "down" alerts on the ~10-15 second gap during each cycle. Immediate mitigation: raise UptimeRobot threshold to 2 consecutive failed checks instead of 1 (eliminates false alarms from normal restarts).
+
+Root cause of the 10-second startup: server/db-startup-migrations.ts runs ~14,949 idempotent SQL statements on every boot — a direct consequence of the drift-resolution auto-generation on 2026-04-23 that produced 1,015 ADD COLUMN IF NOT EXISTS + CREATE INDEX IF NOT EXISTS stubs with placeholder 'text' column types.
+
+This is tolerable today but becomes a production-quality issue under real traffic. Every 5-minute container cycle = a 10-second window where boots are slow and new connections may time out. Users hitting the platform during a cycle gap see connection failures, not just UptimeRobot.
+
+Fix path (deferred, separate workstream):
+1. Replace the 1,015 'text' placeholder stubs with correct Postgres types (timestamp, numeric, boolean, jsonb, uuid, varchar, integer) so the stubs reflect reality rather than acting as dead no-ops.
+2. Consider moving bulk schema work out of db-startup-migrations.ts and into numbered migrations/*.sql files run once at deploy time, not every boot.
+3. Target boot time: <3 seconds. Current: ~10 seconds. Every second saved reduces the cycle-gap window proportionally.
+
+Priority: Not blocking transient rent roll build. Address before public launch — ties into the pre-launch checklist item "audit every raw pool.query() call site."
