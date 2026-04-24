@@ -11565,6 +11565,31 @@ export const transientInventoryGroup = pgTable('transient_inventory_group', {
   propertyIdx: index('tig_property_idx').on(t.propertyId),
 }));
 
+export const transientUnitType = pgTable('transient_unit_type', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  propertyId: varchar('property_id').notNull().references(() => crmProperties.id, { onDelete: 'restrict' }),
+  inventoryGroupId: varchar('inventory_group_id').notNull().references(() => transientInventoryGroup.id, { onDelete: 'restrict' }),
+  code: text('code').notNull(),
+  name: text('name').notNull(),
+  description: text('description'),
+  dimensions: jsonb('dimensions'),
+  baseRate: decimal('base_rate', { precision: 14, scale: 4 }),
+  rateBasis: text('rate_basis').notNull(),
+  maxOccupancy: integer('max_occupancy'),
+  sortOrder: integer('sort_order').notNull().default(0),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  createdBy: varchar('created_by').references(() => users.id),
+  updatedBy: varchar('updated_by').references(() => users.id),
+  deletedAt: timestamp('deleted_at'),
+}, (t) => ({
+  orgPropIdx: index('tut_org_prop_idx').on(t.orgId, t.propertyId),
+  orgIdx: index('tut_org_idx').on(t.orgId),
+  propertyIdx: index('tut_property_idx').on(t.propertyId),
+  inventoryGroupIdx: index('tut_inventory_group_idx').on(t.inventoryGroupId),
+}));
+
 // Valuation Snapshots - Point-in-time valuation captures for historical tracking
 export const valuationSnapshotTriggerEnum = pgEnum("valuation_snapshot_trigger", [
   "manual",           // User manually triggered
@@ -13324,6 +13349,16 @@ export const insertTransientInventoryGroupSchema = createInsertSchema(transientI
 });
 export type TransientInventoryGroup = typeof transientInventoryGroup.$inferSelect;
 export type InsertTransientInventoryGroup = z.infer<typeof insertTransientInventoryGroupSchema>;
+
+// Transient unit type schemas
+export const insertTransientUnitTypeSchema = createInsertSchema(transientUnitType).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  deletedAt: true,
+});
+export type TransientUnitType = typeof transientUnitType.$inferSelect;
+export type InsertTransientUnitType = z.infer<typeof insertTransientUnitTypeSchema>;
 
 // Valuation Snapshot schemas
 export const insertValuationSnapshotSchema = createInsertSchema(valuationSnapshots).omit({
