@@ -15,6 +15,7 @@ import { seedIntegrations } from "./integrations";
 import { seedMarinaTaxonomyPack } from "./services/coa-taxonomy-seed";
 import { seedCanonicalAssetClasses } from "./routes/admin/asset-classes-routes";
 import { runStartupMigrations } from "./db-startup-migrations";
+import { ensureKnowledgeBaseSchema } from "./services/knowledge-base-service";
 import { runSchemaDriftCheck } from "./schema-drift";
 import { docIntelService } from "./services/doc-intel-service";
 
@@ -468,6 +469,7 @@ server.listen({
       (async () => {
         try {
           await runStartupMigrations();
+          await ensureKnowledgeBaseSchema();
           const driftCount = await runSchemaDriftCheck();
           if (driftCount > 0) {
             if (isProduction) {

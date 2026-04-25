@@ -1628,6 +1628,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
+  // Users list — org-scoped, used by CRM assignment dropdowns
+  app.get("/api/users", authenticateUser, async (req: any, res) => {
+    try {
+      const orgUsers = await db
+        .select({
+          id: users.id,
+          name: users.name,
+          email: users.email,
+          role: users.role,
+          orgId: users.orgId,
+        })
+        .from(users)
+        .where(eq(users.orgId, req.user.orgId));
+      res.json(orgUsers);
+    } catch (error: any) {
+      console.error("[/api/users] Failed to fetch users:", error);
+      res.status(500).json({ error: "Failed to fetch users" });
+    }
+  });
+
   // Feature flags config endpoint (public for frontend gating)
   app.get("/api/config", (req, res) => {
     res.json({

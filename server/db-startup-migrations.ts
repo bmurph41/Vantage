@@ -17877,15 +17877,6 @@ const MIGRATIONS: Migration[] = [
   // no references in server routes or services. Dropped as part of schema cleanup
   // (task #101). IF NOT EXISTS / CASCADE make each migration safe to re-run.
 
-  // AI & Knowledge — no routes or services reference these Drizzle tables
-  { name: "drop: ai_knowledge_chunks",         sql: `DROP TABLE IF EXISTS ai_knowledge_chunks CASCADE` },
-  { name: "drop: ai_knowledge_documents",      sql: `DROP TABLE IF EXISTS ai_knowledge_documents CASCADE` },
-  { name: "drop: ai_global_knowledge",         sql: `DROP TABLE IF EXISTS ai_global_knowledge CASCADE` },
-  { name: "drop: ai_deal_scores",              sql: `DROP TABLE IF EXISTS ai_deal_scores CASCADE` },
-  { name: "drop: ai_conversation_messages",    sql: `DROP TABLE IF EXISTS ai_conversation_messages CASCADE` },
-  { name: "drop: ai_conversation_sessions",    sql: `DROP TABLE IF EXISTS ai_conversation_sessions CASCADE` },
-  { name: "drop: ai_anomalies",                sql: `DROP TABLE IF EXISTS ai_anomalies CASCADE` },
-
   // CRM Extensions — no active routes or storage layer references
   { name: "drop: deal_comparisons",              sql: `DROP TABLE IF EXISTS deal_comparisons CASCADE` },
   { name: "drop: crm_forecast_snapshots",        sql: `DROP TABLE IF EXISTS crm_forecast_snapshots CASCADE` },

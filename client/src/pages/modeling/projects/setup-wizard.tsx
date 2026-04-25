@@ -2086,7 +2086,7 @@ export default function SetupWizard() {
       </div>
 
       {/* Content */}
-      <div className="max-w-3xl mx-auto px-4 py-8 pb-32">
+      <div className="max-w-3xl mx-auto px-4 py-8 pb-48 md:pb-32">
         <AnimatePresence mode="wait">
           <motion.div
             key={currentStepId}
@@ -2153,7 +2153,7 @@ export default function SetupWizard() {
       </div>
 
       {/* Footer */}
-      <div className="fixed bottom-0 left-0 right-0 border-t bg-card">
+      <div className="fixed bottom-16 md:bottom-0 left-0 right-0 z-30 border-t bg-card">
         <div className="max-w-3xl mx-auto px-4 py-4 flex justify-between">
           <Button
             variant="ghost"
