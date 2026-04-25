@@ -342,7 +342,7 @@ export async function saveMessage(params: {
     INSERT INTO ai_conversation_messages
       (session_id, role, content, metadata)
     VALUES (
-      ${params.conversationId}::uuid, ${params.role}, ${params.content},
+      ${params.conversationId}, ${params.role}, ${params.content},
       ${JSON.stringify(meta)}::jsonb
     )
   `);
@@ -351,7 +351,7 @@ export async function saveMessage(params: {
 export async function getConversationHistory(conversationId: string): Promise<any[]> {
   const result = await db.execute(sql`
     SELECT role, content, created_at FROM ai_conversation_messages
-    WHERE session_id = ${conversationId}::uuid
+    WHERE session_id = ${conversationId}
     ORDER BY created_at ASC LIMIT 50
   `);
   return (result.rows as any[]).map(r => ({ role: r.role, content: r.content, createdAt: r.created_at }));
