@@ -21,7 +21,6 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as crypto from "crypto";
-import { pathToFileURL } from "url";
 import { db } from "../db";
 import { docIntelUploads } from "@shared/schema";
 import { not, like, sql, and, or, isNull } from "drizzle-orm";
@@ -188,34 +187,3 @@ export async function migrateDocIntelFilesToObjectStorage(): Promise<MigrationRe
   return result;
 }
 
-// Allow running as a standalone script (ESM-safe entry point detection)
-const isMain =
-  typeof process !== "undefined" &&
-  process.argv[1] != null &&
-  import.meta.url === pathToFileURL(process.argv[1]).href;
-
-if (isMain) {
-  (async () => {
-    console.log("Starting doc-intel local-to-object-storage migration…");
-    try {
-      const res = await migrateDocIntelFilesToObjectStorage();
-      console.log(
-        `Done. total=${res.total} uploaded=${res.uploaded} missing=${res.missing} errors=${res.errors}`
-      );
-      if (res.details.length > 0) {
-        console.log("\nDetails:");
-        for (const d of res.details) {
-          console.log(
-            `  [${d.outcome.toUpperCase()}] id=${d.id} file=${d.localPath}` +
-              (d.newStoragePath ? ` -> ${d.newStoragePath}` : "") +
-              (d.errorMessage ? ` (${d.errorMessage})` : "")
-          );
-        }
-      }
-    } catch (err) {
-      console.error("Migration failed:", err);
-      process.exit(1);
-    }
-    process.exit(0);
-  })();
-}
