@@ -83,25 +83,25 @@ export async function ensureKnowledgeBaseSchema(): Promise<void> {
 
     await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_conversations_org_user ON ai_conversations(org_id, user_id)`);
 
-    // ai_conversation_messages may already exist with a different schema (session_id vs conversation_id).
-    // Wrap in its own try/catch so type/column mismatches don't abort the rest of bootstrap.
+    // Use session_id varchar (not UUID FK) to match all INSERT/SELECT queries in this file
+    // and to avoid a UUID↔varchar type mismatch against ai_conversations.id (varchar PK).
     try {
       await db.execute(sql`
         CREATE TABLE IF NOT EXISTS ai_conversation_messages (
-          id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-          conversation_id UUID NOT NULL REFERENCES ai_conversations(id) ON DELETE CASCADE,
-          role            TEXT NOT NULL CHECK (role IN ('user', 'assistant', 'system')),
-          content         TEXT NOT NULL,
-          advisory_mode   TEXT,
-          page            TEXT,
-          rag_chunk_ids   JSONB DEFAULT '[]',
-          metadata        JSONB DEFAULT '{}',
-          created_at      TIMESTAMPTZ DEFAULT NOW()
+          id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          session_id    varchar NOT NULL,
+          role          TEXT NOT NULL CHECK (role IN ('user', 'assistant', 'system')),
+          content       TEXT NOT NULL,
+          advisory_mode TEXT,
+          page          TEXT,
+          rag_chunk_ids JSONB DEFAULT '[]',
+          metadata      JSONB DEFAULT '{}',
+          created_at    TIMESTAMPTZ DEFAULT NOW()
         )
       `);
-      await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_messages_conversation ON ai_conversation_messages(conversation_id)`);
-    } catch (_innerErr) {
-      // Existing table schema differs — index/FK creation skipped gracefully
+      await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_messages_session ON ai_conversation_messages(session_id)`);
+    } catch (innerErr) {
+      console.error('[KnowledgeBase] ai_conversation_messages table bootstrap error:', innerErr);
     }
 
     console.log('[KnowledgeBase] Schema ensured');
@@ -361,7 +361,7 @@ export async function listConversations(orgId: string, userId: string): Promise<
   const result = await db.execute(sql`
     SELECT c.id, c.advisory_mode, c.title, c.last_message_at, COUNT(m.id)::int as message_count
     FROM ai_conversations c
-    LEFT JOIN ai_conversation_messages m ON m.session_id = c.id::uuid
+    LEFT JOIN ai_conversation_messages m ON m.session_id = c.id
     WHERE c.org_id = ${orgId} AND c.user_id = ${userId}
     GROUP BY c.id ORDER BY c.last_message_at DESC NULLS LAST LIMIT 50
   `);
