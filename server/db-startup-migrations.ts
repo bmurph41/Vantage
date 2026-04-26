@@ -19719,6 +19719,51 @@ const MIGRATIONS: Migration[] = [
   { name: "transient_inventory_unit: add index tiu_inventory_group_idx", sql: `CREATE INDEX IF NOT EXISTS tiu_inventory_group_idx ON transient_inventory_unit (inventory_group_id)` },
   { name: "transient_inventory_unit: add index tiu_unit_type_idx",       sql: `CREATE INDEX IF NOT EXISTS tiu_unit_type_idx ON transient_inventory_unit (unit_type_id)` },
   { name: "transient_inventory_unit: add partial unique index tiu_org_prop_ident_unique", sql: `CREATE UNIQUE INDEX IF NOT EXISTS tiu_org_prop_ident_unique ON transient_inventory_unit (org_id, property_id, identifier) WHERE deleted_at IS NULL` },
+
+  // ── ai_conversation_messages: fix old column name conversation_id → session_id ──
+  // If the table was created before task #320 with column name `conversation_id`,
+  // the CREATE TABLE IF NOT EXISTS in ensureKnowledgeBaseSchema() is silently skipped,
+  // leaving `session_id` missing and causing all INSERTs/SELECTs to fail.
+  // This migration detects and fixes the stale schema in any affected environment.
+  {
+    name: "ai_conversation_messages: rename conversation_id to session_id if needed",
+    sql: `
+      DO $$ BEGIN
+        IF EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_schema = 'public'
+            AND table_name = 'ai_conversation_messages'
+            AND column_name = 'conversation_id'
+        ) AND NOT EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_schema = 'public'
+            AND table_name = 'ai_conversation_messages'
+            AND column_name = 'session_id'
+        ) THEN
+          ALTER TABLE ai_conversation_messages RENAME COLUMN conversation_id TO session_id;
+        END IF;
+      END; $$
+    `,
+  },
+  {
+    name: "ai_conversation_messages: add session_id if missing",
+    sql: `
+      DO $$ BEGIN
+        IF EXISTS (
+          SELECT 1 FROM information_schema.tables
+          WHERE table_schema = 'public'
+            AND table_name = 'ai_conversation_messages'
+        ) AND NOT EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_schema = 'public'
+            AND table_name = 'ai_conversation_messages'
+            AND column_name = 'session_id'
+        ) THEN
+          ALTER TABLE ai_conversation_messages ADD COLUMN session_id varchar NOT NULL DEFAULT '';
+        END IF;
+      END; $$
+    `,
+  },
 ];
 
 /**
