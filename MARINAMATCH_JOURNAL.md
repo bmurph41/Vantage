@@ -2879,3 +2879,44 @@ Next session priorities (in rough order):
 1. Review and merge PR #3 (Table A) — PRs #4 and #5 auto-rebase after each merge
 2. Phase 3 start: transient_rate_plan + transient_rate_calendar_day + seasonality
 3. Defer: routes (not yet scoped), UI (Phase 7), the 824 pre-existing typecheck errors in shared/asset-class-model-config.ts, AI Advisor chat repair, slow-startup cleanup (1,015 migration stubs)
+
+## 2026-04-26 — apiRequest fix + Portfolio Content-Type + AI Advisor verified
+
+### Shipped to production:
+- **96c83906** — fix(api): dual-signature support in apiRequest helper
+  - URL-first `apiRequest(url, options)` and method-first `apiRequest(method, url, data)` both work
+  - 323 callers across the codebase used URL-first; helper only supported method-first → runtime "X is not a valid HTTP method" errors
+  - Now dispatches based on whether arg 2 is a string or an object
+- **21b62124** — fix(portfolio): set Content-Type on Add/Edit Portfolio mutations
+  - URL-first signature requires caller to set Content-Type; previous code stringified body but didn't set header
+  - Express body-parser silently left req.body = {}, server returned 400 "propertyId is required"
+
+### Verified working in production:
+- AI Advisor table `ai_conversation_messages` exists with correct 9-column schema (`session_id varchar`)
+- Backend AI Advisor message persistence working (2 rows in table from prior testing)
+- Add to Portfolio modal successfully creates owned_assets records (tested with 948 Florida Ave., $541k STR)
+- Portfolio Dashboard renders the new asset, KPIs update
+
+### BACKLOG (deferred to focused future sessions):
+
+#### MarinaModal redesign (Add-to-Portfolio modal product debt):
+1. **Remove Marina-specific language throughout the flow.** Affected strings include "Add Marina to Portfolio", "Marina added to portfolio successfully", "Failed to add marina", "Marina updated successfully". Should be neutral or asset-class-aware ("Add Asset to Portfolio", "Asset added to portfolio").
+2. **Dynamic field labels by asset class.** "Total Slips" should only show for marinas. STR → "Bedrooms" or "Beds/Baths". Hotel → "Rooms". Golf course → "Holes". Multifamily → "Units". Self-storage → "Units" or "Sq Ft". Source the field config from `ASSET_REGISTRY[assetClassId]`.
+3. **Currency input formatting.** All dollar fields ($541,000 not 541000) — input mask + display formatting. Use shared currency-input component if one exists.
+4. **acquisitionPrice precision.** Server-side parseInt at server/routes/crm-routes.ts:11798/11823 drops cents. Likely fine for now but worth noting; switch to numeric/decimal parsing when handling cents matters.
+
+#### apiRequest cleanup (technical debt from tonight's fix):
+1. **Latent Content-Type bugs.** Other URL-first callers across the codebase that POST/PATCH JSON without setting Content-Type will hit the same 400 we just fixed in MarinaModal. Either: (a) auto-detect JSON bodies in apiRequest's URL-first branch and set Content-Type if body is a string starting with `{` or `[`, or (b) codemod all 323 callers to set the header explicitly. (a) is faster and lower-risk; (b) is the long-term clean fix.
+2. **Codemod from method-first to URL-first.** Eventually migrate all 1,223 method-first callers to the URL-first pattern (which the docket variant already uses), then remove the legacy branch from apiRequest. Bigger refactor; do in batches.
+
+#### AI Advisor product issues:
+1. **Vanishing stream.** Response streams in successfully (200, 31KB), but UI clears `streamingContent` when `done` arrives and the new `messages` entry doesn't render in time. User sees text appear then disappear. Frontend bug in client/src/components/ai-assistant.tsx around line 374-385.
+2. **Data-dump vs. advisor behavior.** Asking "what asset classes should I look at?" returns a long generic essay. A real advisor would qualify the user (location, capital, time horizon, active vs. passive) before answering. System-prompt redesign + multi-turn qualifying flow.
+
+#### Other:
+- Replit Agent's weekend work also pushed deploy-pipeline fixes (commits 79c7fea9, e488c931, 1fe5e3e0, 225eea31) addressing the schema-drift gate and Cloud Run cold-start issues we wrestled with on Friday. Those landed clean. Worth understanding what they did before the next deploy emergency.
+
+### Still alive in production:
+- AI Advisor (backend works, frontend rendering bug pending)
+- Add to Portfolio (works for all asset classes, language and field labels need redesign)
+- Phase 2 transient_* tables in DB (no routes/UI yet — Phase 2 product surface is next)
