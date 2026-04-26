@@ -92,6 +92,7 @@ export function MarinaModal({ open, onOpenChange, marina, mode }: MarinaModalPro
     mutationFn: async (data: any) => {
       return await apiRequest("/api/portfolio/marinas", {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
     },
@@ -110,6 +111,7 @@ export function MarinaModal({ open, onOpenChange, marina, mode }: MarinaModalPro
     mutationFn: async (data: any) => {
       return await apiRequest(`/api/portfolio/marinas/${marina.id}`, {
         method: "PATCH",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
     },
