@@ -66,26 +66,73 @@ export async function postJson(
   return body;
 }
 
+/**
+ * Make an authenticated API request with CSRF token handling.
+ *
+ * Two call signatures are supported:
+ *
+ * **URL-first (preferred — matches the docket variant in
+ * `client/src/docket/lib/queryClient.ts`, and used by the majority of callers
+ * across the codebase):**
+ * ```ts
+ * apiRequest(url, { method, body, headers })
+ * ```
+ * In this form, `body` is passed through to `fetch` as-is — caller is
+ * responsible for `JSON.stringify` and any `Content-Type` header.
+ *
+ * **Method-first (legacy — kept for backward compatibility; new code should
+ * use the URL-first form to stay consistent with the docket variant):**
+ * ```ts
+ * apiRequest(method, url, data)
+ * ```
+ * In this form, `data` is automatically `JSON.stringify`'d and the
+ * `Content-Type: application/json` header is set when `data` is truthy.
+ *
+ * Both signatures produce identical network requests for equivalent inputs:
+ * `credentials: "include"`, throw on non-2xx, and add `X-CSRF-Token` for
+ * non-GET/HEAD/OPTIONS methods when a CSRF cookie is present.
+ */
 export async function apiRequest(
-  method: string,
-  url: string,
+  methodOrUrl: string,
+  urlOrOptions?: string | RequestInit,
   data?: unknown | undefined,
 ): Promise<Response> {
+  let url: string;
+  let method: string;
+  let body: BodyInit | null | undefined;
   const headers: Record<string, string> = {};
-  
-  if (data) {
-    headers["Content-Type"] = "application/json";
+
+  if (typeof urlOrOptions === 'object' && urlOrOptions !== null) {
+    // URL-first: apiRequest(url, { method, body, headers })
+    url = methodOrUrl;
+    const options = urlOrOptions;
+    method = (options.method ?? 'GET').toString();
+    body = options.body ?? undefined;
+    if (options.headers) {
+      const incoming = options.headers as Record<string, string>;
+      for (const key of Object.keys(incoming)) {
+        headers[key] = incoming[key];
+      }
+    }
+  } else {
+    // Method-first: apiRequest(method, url, data)
+    method = methodOrUrl;
+    url = urlOrOptions as string;
+    if (data) {
+      headers["Content-Type"] = "application/json";
+      body = JSON.stringify(data);
+    }
   }
-  
+
   const csrfToken = getCsrfToken();
   if (csrfToken && !['GET', 'HEAD', 'OPTIONS'].includes(method.toUpperCase())) {
     headers["X-CSRF-Token"] = csrfToken;
   }
-  
+
   const res = await fetch(url, {
     method,
     headers,
-    body: data ? JSON.stringify(data) : undefined,
+    body,
     credentials: "include",
   });
 
