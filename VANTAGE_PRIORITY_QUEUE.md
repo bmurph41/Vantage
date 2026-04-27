@@ -24,18 +24,18 @@ This document is a **flat sequenced queue** in strict execution order, written f
 |---|---:|---:|
 | Phase A (Tier 0 security showstoppers) | 12 | 44 |
 | Phase B (Tier 0.5 institutional gates) | 15 | 108 |
-| Phase C (Beta-flow must-ship) | 19 | 100.5 |
+| Phase C (Beta-flow must-ship) | 19 (1 done) | 92.5 |
 | Phase D (Tier 1 active priorities) | 7 | 56 |
-| **Total to beta-ready** | **53** | **308** |
+| **Total to beta-ready** | **53** | **300** |
 | Phase E (post-beta visibility) | 60+ | not estimated |
 
 **Effort scale:** S = 0.5h, M = 2h, L = 8h, XL = 20h (midpoints used for totals).
 
-**Realistic timelines to beta-ready (308 hours):**
-- 30 hrs/week focused solo (no Bookd/STR/cleaning DD overlap): **~10.5 weeks** (~2.5 months)
-- 20 hrs/week (acknowledging Bookd, STR portfolio, cleaning company DD parallel work): **~15.5 weeks** (~3.5 months)
+**Realistic timelines to beta-ready (300 hours):**
+- 30 hrs/week focused solo (no Bookd/STR/cleaning DD overlap): **~10 weeks** (~2.5 months)
+- 20 hrs/week (acknowledging Bookd, STR portfolio, cleaning company DD parallel work): **~15 weeks** (~3.5 months)
 
-These are bottom-up estimates assuming linear single-threaded execution. Real friction (debugging, reviews, rework) typically multiplies by 1.3–1.7×, so plan for **~17–26 weeks** of real-world calendar time before inviting the first beta tester.
+These are bottom-up estimates assuming linear single-threaded execution. Real friction (debugging, reviews, rework) typically multiplies by 1.3–1.7×, so plan for **~17–25 weeks** of real-world calendar time before inviting the first beta tester.
 
 ---
 
@@ -297,7 +297,7 @@ Order rationale: input validation first (cheapest insurance against the highest-
 
 **Defines beta readiness per user's explicit definition: "CRE pro takes deal from CRM listing → modeling → DCF → portfolio in one continuous flow, plus AI Advisor answers one focused question."**
 
-**Phase C summary:** 19 items, midpoint effort ~100.5 hours.
+**Phase C summary:** 19 items (1 done), midpoint effort ~92.5 hours remaining.
 
 Order rationale: AI Advisor reliability first (frontend bug + system prompt) because it's the live-demo crown jewel. Then the deal-flow connectivity items (Deal Comparison, embedded financials, DD Findings panel). Then the data-trust fixes (keyMetrics fallback, asset-class-breakdown, snapshot reader). Then quality-of-life cleanups (asset-shape terms, Marina-language sweep, latent Content-Type bug). Test coverage and CI repair sit at the end as the safety net for everything else.
 
@@ -439,6 +439,7 @@ Order rationale: AI Advisor reliability first (frontend bug + system prompt) bec
 
 ### C18. Fix New Deal button + build deal-creation wizard ⚠️ BETA-BLOCKER
 **Source:** Beta self-testing 2026-04-27 (new finding)
+**Status:** ✅ DONE 2026-04-27 — Replit Agent fixed root cause in commit 5a8cdc58 (2-line prop name fix in deal-workspace.tsx; DealFormModal was receiving wrong prop names). Wizard already existed and worked — button just couldn't trigger modal.
 **Effort:** L
 **Mode:** [solo]
 **Description:** New Deal button on Deal Workspace is fully non-functional. Build a multi-step wizard for deal creation covering all basics (deal name, asset class, property linkage, key dates, team), saves and routes to the new deal's workspace. Sub-tasks: diagnose root cause, design wizard steps, build wizard, integrate with existing deal CRUD endpoints, verify workspace auto-initialization on save.
@@ -447,6 +448,7 @@ Order rationale: AI Advisor reliability first (frontend bug + system prompt) bec
 
 ### C19. Asset-class-aware Financial Model New Project wizard
 **Source:** Beta self-testing 2026-04-27 (new finding)
+**Status:** 🔄 IN PROGRESS — Replit Agent commit 035164b9 did UX layer (~80%): de-marina'd labels/icons, generic Quick Start templates, conditional marina-specific sections. Still pending: ASSET_REGISTRY integration, asset-class-model-config.ts integration (typecheck-baseline-resident), Ownership section removal, verification that wizard populates Modeling Project + CRM Deal + CRM Property correctly.
 **Effort:** XL
 **Mode:** [solo]
 **Description:** Financial Model New Project wizard is currently hardcoded marina-specific. Drive wizard fields and behavior from `ASSET_REGISTRY` (extends Phase 3A foundation). Both UX layer (field labels) AND underlying model behavior should adapt per asset class. Remove redundant 'Ownership' section (verify what's redundant before deleting). Verify wizard correctly populates: Modeling Project record, linked CRM Deal record, linked CRM Property record (name, address, asset class, key dates flow correctly to all three). Should integrate with `shared/asset-class-model-config.ts` (currently part of 824 typecheck baseline errors).
