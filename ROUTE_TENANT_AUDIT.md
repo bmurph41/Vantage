@@ -179,13 +179,12 @@ Not deep-audited in A9-1. Reading the routes-level scan, this file isn't in the 
 
 ## §5. Critical Findings (Severity-Ranked)
 
-### 🔴 SEV-1 — SQL Injection in distribution-approval-service.ts
+### ✅ SEV-1 — SQL Injection in distribution-approval-service.ts — FIXED 2026-04-27
 - **File:** `server/services/distribution-approval-service.ts`
-- **Lines:** 338, 371–385, 398
-- **Class:** SQL injection via raw template-literal interpolation cast as `any`
-- **Reachable from:** Routes that call `submitForApproval`, `approve`, `reject`, `execute`, `listDrafts`, `getDraft` (all through `req.user.orgId` paths but with user-controlled `draftId`/`fundId`/`status`)
-- **Fix complexity:** Mechanical. Replace template literals with parameterized `db.execute(sql\`SELECT ... WHERE id = ${draftId} AND org_id = ${orgId}\`)` (Drizzle `sql\`\`` template tag with interpolation already used safely at L106 in the same file's INSERT).
-- **A9-2 priority:** **highest**. Schedule for first fix in A9-2.
+- **Lines (original):** 106 (broken INSERT, missing values), 338, 371–385, 398
+- **Class:** SQL injection via raw template-literal interpolation cast as `any` (3 sites) + a 4th broken-functionality bug (createDraft INSERT had `$1...$13` placeholders but no values array, silently failing or inserting NULLs).
+- **Reachable from:** Routes that call `submitForApproval`, `approve`, `reject`, `execute`, `listDrafts`, `getDraft` (all through `req.user.orgId` paths but with user-controlled `draftId`/`fundId`/`status`).
+- **Fix shipped 2026-04-27 (A9-2 Phase 1):** All 4 sites converted to Drizzle's parameterized `db.execute(sql\`...\`)` template tag. `as any` casts removed from SQL paths. createDraft INSERT functionality restored — function now actually persists data instead of inserting NULLs/runtime-failing. updateDraft's hand-rolled `.replace(/'/g, "''")` quote-escaping deleted (unnecessary with proper parameterization). listDrafts conditional `${statusFilter}` string-concat replaced with `sql\`AND status = ${status}\`` fragment-or-empty pattern. Verified: typecheck preserved at 824 baseline, build succeeded, no SQL `${...}` interpolations remain outside the `sql\`\`` template tag.
 
 ### 🟡 SEV-2 — Post-fetch orgId checks in fund-management-routes.ts capital-account routes
 - **File:** `server/routes/fund-management-routes.ts`

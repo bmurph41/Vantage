@@ -449,7 +449,9 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
   const dealSource = form.watch("dealSource");
   const commissionType = form.watch("commissionType");
   const commissionRate = form.watch("commissionRate");
-  
+  const watchedPropertyType = form.watch("propertyType");
+  const isMarinaAsset = ['marina_business', 'slip', 'mooring', 'marina'].includes(watchedPropertyType || '');
+
   // Watch DD fields for auto-calculation
   const psaSignedDate = form.watch("psaSignedDate");
   const ddPeriodDays = form.watch("ddPeriodDays");
@@ -882,47 +884,39 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
   // Quick deal templates
   const dealTemplates = [
     {
-      name: "Storage Lease",
-      icon: Anchor,
-      color: "from-blue-500 to-blue-600",
-      data: {
-        type: "storage_lease",
-        propertyType: "slip",
-        commissionType: "percentage",
-        commissionRate: "3.0",
-        priority: "medium",
-      }
-    },
-    {
-      name: "Marina Acquisition",
-      icon: TrendingUp,
-      color: "from-purple-500 to-purple-600",
+      name: "Acquisition",
+      icon: Building2,
       data: {
         type: "marina_acquisition",
-        propertyType: "marina_business",
         commissionType: "percentage",
         commissionRate: "4.0",
         priority: "high",
       }
     },
     {
+      name: "Lease",
+      icon: FileText,
+      data: {
+        type: "storage_lease",
+        commissionType: "percentage",
+        commissionRate: "3.0",
+        priority: "medium",
+      }
+    },
+    {
       name: "New Listing",
-      icon: Anchor,
-      color: "from-cyan-500 to-cyan-600",
+      icon: TrendingUp,
       data: {
         type: "new_listing",
-        propertyType: "mooring",
         commissionType: "fixed",
         priority: "medium",
       }
     },
     {
-      name: "Business Acquisition",
+      name: "Business Deal",
       icon: Briefcase,
-      color: "from-emerald-500 to-emerald-600",
       data: {
         type: "business_acquisition",
-        assetClass: "business",
         commissionType: "percentage",
         commissionRate: "5.0",
         priority: "high",
@@ -949,7 +943,7 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
       open={isOpen}
       onOpenChange={onClose}
       title={deal ? 'Edit Deal' : 'Create Deal'}
-      icon={Anchor}
+      icon={Briefcase}
       size="xl"
       showProgressBar={true}
       primaryAction={{
@@ -967,13 +961,13 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
       <div data-testid="deal-form-modal">
         {!deal && dealAmount && (
           <div className="text-right mb-4">
-            <div className="text-xs text-gray-500 font-medium">Deal Value</div>
-            <div className="text-xl font-bold text-green-600">{formattedDealValue}</div>
+            <div className="text-xs text-muted-foreground font-medium">Deal Value</div>
+            <div className="text-xl font-bold text-foreground">{formattedDealValue}</div>
           </div>
         )}
         {!deal && (
           <div className="flex items-center gap-2 mb-4">
-            <div className="flex items-center gap-1.5 text-xs text-gray-500">
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <Zap className="w-3.5 h-3.5" />
               <span className="font-medium">Quick Start:</span>
             </div>
@@ -985,7 +979,7 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
                   type="button"
                   variant="outline"
                   size="sm"
-                  className={`text-xs h-7 bg-gradient-to-r ${template.color} text-white border-0 hover:opacity-90 transition-opacity`}
+                  className="text-xs h-7 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                   onClick={() => applyTemplate(template)}
                 >
                   <Icon className="w-3 h-3 mr-1" />
@@ -998,16 +992,16 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
         
         {/* Quick Stage Selector */}
         {deal && (
-          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-lg p-4 shadow-sm">
+          <div className="border rounded-lg p-4">
             <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-3">
-                <div className="bg-blue-500 p-2 rounded-lg">
-                  <TrendingUp className="w-5 h-5 text-white" />
+                <div className="bg-muted p-2 rounded-lg">
+                  <TrendingUp className="w-5 h-5 text-muted-foreground" />
                 </div>
                 <div>
-                  <div className="font-semibold text-gray-900">Move Deal</div>
+                  <div className="font-semibold text-sm">Move Deal</div>
                   {deal.currentStageEnteredAt && (
-                    <div className="text-xs text-gray-600 mt-0.5">
+                    <div className="text-xs text-muted-foreground mt-0.5">
                       {(() => {
                         const days = Math.floor((new Date().getTime() - new Date(deal.currentStageEnteredAt).getTime()) / (1000 * 60 * 60 * 24));
                         return `${days} ${days === 1 ? 'day' : 'days'} in this stage`;
@@ -1030,7 +1024,7 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
                     }} 
                     value={field.value}
                   >
-                    <SelectTrigger className="w-[260px] bg-white border-blue-300 font-medium shadow-sm hover:bg-blue-50 transition-colors" data-testid="select-quick-stage">
+                    <SelectTrigger className="w-[260px] font-medium" data-testid="select-quick-stage">
                       <SelectValue placeholder="Select stage" />
                     </SelectTrigger>
                     <SelectContent>
@@ -1063,7 +1057,7 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
                   Deal Details
                 </TabsTrigger>
                 <TabsTrigger value="marina" className="flex items-center gap-2" data-testid="tab-marina-property">
-                  <Anchor className="w-4 h-4" />
+                  <Building2 className="w-4 h-4" />
                   Property Details
                 </TabsTrigger>
                 <TabsTrigger value="commission" className="flex items-center gap-2" data-testid="tab-commission">
@@ -1089,7 +1083,7 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
                           <FormItem>
                             <FormLabel>Deal Title *</FormLabel>
                             <FormControl>
-                              <Input placeholder="e.g., Marina Slip A-12 Lease" {...field} data-testid="input-deal-title" />
+                              <Input placeholder="e.g., Office Building Acquisition" {...field} data-testid="input-deal-title" />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -1109,10 +1103,10 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
                                 </SelectTrigger>
                               </FormControl>
                               <SelectContent>
-                                <SelectItem value="storage_lease">Storage Lease</SelectItem>
-                                <SelectItem value="marina_acquisition">Marina Acquisition</SelectItem>
-                                <SelectItem value="business_acquisition">Business Acquisition</SelectItem>
+                                <SelectItem value="marina_acquisition">Acquisition</SelectItem>
+                                <SelectItem value="storage_lease">Lease</SelectItem>
                                 <SelectItem value="new_listing">New Listing</SelectItem>
+                                <SelectItem value="business_acquisition">Business Deal</SelectItem>
                                 <SelectItem value="other">Other</SelectItem>
                               </SelectContent>
                             </Select>
@@ -1271,8 +1265,8 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
                           </Link>
                         </div>
                         {showQuickContact && (
-                          <div className="rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/20 p-3 space-y-2">
-                            <p className="text-xs font-medium text-blue-700 dark:text-blue-300 flex items-center gap-1">
+                          <div className="rounded-lg border bg-muted/30 p-3 space-y-2">
+                            <p className="text-xs font-medium text-foreground flex items-center gap-1">
                               <UserPlus className="h-3 w-3" />
                               Quick Create Contact
                             </p>
@@ -1360,8 +1354,8 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
                           </Link>
                         </div>
                         {showQuickCompany && (
-                          <div className="rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/20 p-3 space-y-2">
-                            <p className="text-xs font-medium text-blue-700 dark:text-blue-300 flex items-center gap-1">
+                          <div className="rounded-lg border bg-muted/30 p-3 space-y-2">
+                            <p className="text-xs font-medium text-foreground flex items-center gap-1">
                               <Building2 className="h-3 w-3" />
                               Quick Create Company
                             </p>
@@ -1896,9 +1890,9 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
                   <CardHeader>
                     <CardTitle className="text-lg flex items-center gap-2">
                       <MapPin className="w-5 h-5" />
-                      Marina Property Information
+                      Property Information
                     </CardTitle>
-                    <CardDescription>Details about the marina property, slip, location, and lease terms</CardDescription>
+                    <CardDescription>Asset type, location details, and associated lease terms</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <FormField
@@ -1906,7 +1900,7 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
                       name="propertyType"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Property Type</FormLabel>
+                          <FormLabel>Asset / Property Type</FormLabel>
                           <FormControl>
                             <AssetClassSelect
                               value={field.value || ""}
@@ -1925,7 +1919,7 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
                       name="marinaName"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Marina Name</FormLabel>
+                          <FormLabel>Property / Location Name</FormLabel>
                           <FormControl>
                             <Input placeholder="e.g., Harbor Bay Marina" {...field} data-testid="input-marina-name" />
                           </FormControl>
@@ -1940,9 +1934,9 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
                         name="slipNumber"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Slip/Berth Number</FormLabel>
+                            <FormLabel>Unit / Suite / Berth #</FormLabel>
                             <FormControl>
-                              <Input placeholder="e.g., A-12" {...field} data-testid="input-slip-number" />
+                              <Input placeholder="e.g., A-12 or Suite 400" {...field} data-testid="input-slip-number" />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -1954,9 +1948,9 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
                         name="dockLocation"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Dock Location</FormLabel>
+                            <FormLabel>Section / Floor / Dock</FormLabel>
                             <FormControl>
-                              <Input placeholder="e.g., North Dock, Pier 5" {...field} data-testid="input-dock-location" />
+                              <Input placeholder="e.g., North Dock, Floor 3" {...field} data-testid="input-dock-location" />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -2156,13 +2150,14 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
                       <FileText className="w-5 h-5" />
                       Detailed Property Specifications
                     </CardTitle>
-                    <CardDescription>Comprehensive marina property details from offering memorandums</CardDescription>
+                    <CardDescription>Property details, financials, and offering memorandum data</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-6">
-                    {/* Physical Capacity */}
+                    {/* Physical Capacity — shown only for marina asset types */}
+                    {isMarinaAsset && (
                     <div>
                       <h4 className="font-semibold text-sm mb-3 flex items-center gap-2">
-                        <Anchor className="w-4 h-4" />
+                        <Building2 className="w-4 h-4" />
                         Physical Capacity
                       </h4>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -2240,6 +2235,7 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
                         />
                       </div>
                     </div>
+                    )}
 
                     {/* Property Details */}
                     <div className="pt-4 border-t">
@@ -2306,7 +2302,8 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
                       </div>
                     </div>
 
-                    {/* Facilities & Equipment */}
+                    {/* Facilities & Equipment — marina only */}
+                    {isMarinaAsset && (
                     <div className="pt-4 border-t">
                       <h4 className="font-semibold text-sm mb-3">Facilities & Equipment</h4>
                       <div className="space-y-3">
@@ -2375,6 +2372,7 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
                         />
                       </div>
                     </div>
+                    )}
 
                     {/* Recent Improvements */}
                     <div className="pt-4 border-t">

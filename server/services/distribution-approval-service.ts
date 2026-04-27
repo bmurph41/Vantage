@@ -17,7 +17,7 @@
 
 import { db } from '../db';
 import { fundCapitalMovements, fundInvestors, funds } from '@shared/schema';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, sql } from 'drizzle-orm';
 import { financialAuditService } from './financial-audit-service';
 import Decimal from 'decimal.js';
 
@@ -103,13 +103,19 @@ class DistributionApprovalService {
     };
 
     // Store in database
-    await db.execute(
-      `INSERT INTO distribution_approvals (
+    await db.execute(sql`
+      INSERT INTO distribution_approvals (
         id, org_id, fund_id, status, total_proceeds, distribution_type,
         deal_allocation_id, notes, years_held,
         created_by, created_at, required_approvals, approvals_json
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)` as any,
-    );
+      ) VALUES (
+        ${draft.id}, ${draft.orgId}, ${draft.fundId}, ${draft.status},
+        ${draft.totalProceeds}, ${draft.distributionType}, ${draft.dealAllocationId ?? null},
+        ${draft.notes ?? null}, ${draft.yearsHeld ?? null}, ${draft.createdBy},
+        ${draft.createdAt}, ${draft.requiredApprovals},
+        ${JSON.stringify(draft.approvals)}
+      )
+    `);
 
     await financialAuditService.logFromRequest(req, {
       fundId,
@@ -334,9 +340,11 @@ class DistributionApprovalService {
 
   private async getDraft(orgId: string, draftId: string, txn?: DbOrTx): Promise<DistributionDraft | null> {
     const d = txn || db;
-    const result = await d.execute(
-      `SELECT * FROM distribution_approvals WHERE id = '${draftId}' AND org_id = '${orgId}' LIMIT 1` as any
-    );
+    const result = await d.execute(sql`
+      SELECT * FROM distribution_approvals
+      WHERE id = ${draftId} AND org_id = ${orgId}
+      LIMIT 1
+    `);
     const row = (result.rows as any)?.[0];
     if (!row) return null;
 
@@ -368,21 +376,21 @@ class DistributionApprovalService {
 
   private async updateDraft(draft: DistributionDraft, txn?: DbOrTx): Promise<void> {
     const d = txn || db;
-    await d.execute(
-      `UPDATE distribution_approvals SET
-        status = '${draft.status}',
-        submitted_for_approval_at = ${draft.submittedForApprovalAt ? `'${draft.submittedForApprovalAt.toISOString()}'` : 'NULL'},
-        submitted_by = ${draft.submittedBy ? `'${draft.submittedBy}'` : 'NULL'},
-        approvals_json = '${JSON.stringify(draft.approvals)}',
-        rejected_by = ${draft.rejectedBy ? `'${draft.rejectedBy}'` : 'NULL'},
-        rejected_at = ${draft.rejectedAt ? `'${draft.rejectedAt.toISOString()}'` : 'NULL'},
-        rejection_reason = ${draft.rejectionReason ? `'${draft.rejectionReason.replace(/'/g, "''")}'` : 'NULL'},
-        executed_at = ${draft.executedAt ? `'${draft.executedAt.toISOString()}'` : 'NULL'},
-        executed_by = ${draft.executedBy ? `'${draft.executedBy}'` : 'NULL'},
-        waterfall_result = ${draft.waterfallResult ? `'${JSON.stringify(draft.waterfallResult).replace(/'/g, "''")}'` : 'NULL'},
-        investor_allocations = ${draft.investorAllocations ? `'${JSON.stringify(draft.investorAllocations).replace(/'/g, "''")}'` : 'NULL'}
-      WHERE id = '${draft.id}'` as any
-    );
+    await d.execute(sql`
+      UPDATE distribution_approvals SET
+        status = ${draft.status},
+        submitted_for_approval_at = ${draft.submittedForApprovalAt ?? null},
+        submitted_by = ${draft.submittedBy ?? null},
+        approvals_json = ${JSON.stringify(draft.approvals)},
+        rejected_by = ${draft.rejectedBy ?? null},
+        rejected_at = ${draft.rejectedAt ?? null},
+        rejection_reason = ${draft.rejectionReason ?? null},
+        executed_at = ${draft.executedAt ?? null},
+        executed_by = ${draft.executedBy ?? null},
+        waterfall_result = ${draft.waterfallResult ? JSON.stringify(draft.waterfallResult) : null},
+        investor_allocations = ${draft.investorAllocations ? JSON.stringify(draft.investorAllocations) : null}
+      WHERE id = ${draft.id}
+    `);
   }
 
   /**
@@ -393,10 +401,13 @@ class DistributionApprovalService {
     fundId: string,
     status?: DistributionStatus
   ): Promise<DistributionDraft[]> {
-    const statusFilter = status ? ` AND status = '${status}'` : '';
-    const result = await db.execute(
-      `SELECT * FROM distribution_approvals WHERE org_id = '${orgId}' AND fund_id = '${fundId}'${statusFilter} ORDER BY created_at DESC` as any
-    );
+    const statusCondition = status ? sql`AND status = ${status}` : sql``;
+    const result = await db.execute(sql`
+      SELECT * FROM distribution_approvals
+      WHERE org_id = ${orgId} AND fund_id = ${fundId}
+      ${statusCondition}
+      ORDER BY created_at DESC
+    `);
 
     return ((result.rows as any[]) || []).map(row => ({
       id: row.id,
