@@ -510,13 +510,13 @@
 
 - [security] [done] Fix SQL injection in security-compliance-service.ts — Lines 495-498: `sql.raw()` with unparameterized `filters.eventType` and `filters.severity` string concatenation; replace with Drizzle parameterized `eq()` / `and()` conditions or `$1`-style placeholders in pool.query() — *Verified 2026-04-27: query already uses parameterized Drizzle sql template; dead code from previous unsafe implementation removed.*
 
-- [security] [todo] Fix SQL injection in accounting-engine.ts — Lines 534-535, 870, 1176, 1934: `db.execute(sql.raw(...))` with string-concatenated WHERE clauses; refactor each to use Drizzle query builder or parameterized pool.query() with `$1, $2` placeholders
+- [security] [done] Fix SQL injection in accounting-engine.ts — Lines 534-535, 870, 1176, 1934: `db.execute(sql.raw(...))` with string-concatenated WHERE clauses; refactor each to use Drizzle query builder or parameterized pool.query() with `$1, $2` placeholders — *Verified 2026-04-27: zero sql.raw matches in file; all four flagged locations use safe pool.query(SQL, params) parameterized pattern with conditions[] of $N placeholder fragments. Audit stale, item already fixed.*
 
-- [security] [todo] Fix SQL injection in external-routes.ts — Line 337: `sql.raw(itemIds.map(id => \`'${id}'\`).join(','))` for array IN clause; replace with Drizzle `inArray()` operator or `ANY($1::text[])` parameterized pattern
+- [security] [done] Fix SQL injection in external-routes.ts — Line 337: `sql.raw(itemIds.map(id => \`'${id}'\`).join(','))` for array IN clause; replace with Drizzle `inArray()` operator or `ANY($1::text[])` parameterized pattern — *Verified 2026-04-27: zero sql.raw matches in file. Audit stale, item already fixed.*
 
-- [security] [todo] Fix SQL injection in storage.ts — Line 6115: `sql.raw(filters.storageTypes.map((t: string) => \`'${t}'\`).join(','))` for storage type filter; replace with `inArray()` or parameterized `ANY()` array
+- [security] [done] Fix SQL injection in storage.ts — Line 6115: `sql.raw(filters.storageTypes.map((t: string) => \`'${t}'\`).join(','))` for storage type filter; replace with `inArray()` or parameterized `ANY()` array — *Verified 2026-04-27: zero sql.raw matches in storage.ts; storageType filter at line 6196 uses Drizzle parameterized sql template (rateComps.storageTypes && filters.storageTypes::text[]). Audit stale, item already fixed.*
 
-- [security] [todo] Fix SQL injection in crm-enhancements.ts — Lines 228, 431, 448, 836, 1365, 1377, 1470: Multiple `sql.raw()` calls with user-derived input; audit each occurrence and replace with parameterized queries
+- [security] [done] Fix SQL injection in crm-enhancements.ts — Lines 228, 431, 448, 836, 1365, 1377, 1470: Multiple `sql.raw()` calls with user-derived input; audit each occurrence and replace with parameterized queries — *Verified 2026-04-27: zero sql.raw matches in server/services/crm-enhancements.ts. Audit stale, item already fixed.*
 
 ### 0B — Organization Isolation Fixes
 

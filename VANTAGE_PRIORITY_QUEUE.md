@@ -58,6 +58,7 @@ Order rationale: SQL injection first (highest blast radius — exploitable from 
 
 ### A2. Fix SQL injection in accounting-engine.ts
 **Source:** AGENT_QUEUE.md Tier 0A item 2
+**Status:** ✅ DONE 2026-04-27 — verified already fixed; audit stale.
 **Effort:** M
 **Mode:** [solo]
 **Description:** Lines 534-535, 870, 1176, 1934 use `db.execute(sql.raw(...))` with string-concatenated WHERE clauses; refactor each to use Drizzle query builder or parameterized `pool.query()` with `$1, $2` placeholders.
@@ -66,6 +67,7 @@ Order rationale: SQL injection first (highest blast radius — exploitable from 
 
 ### A3. Fix SQL injection in external-routes.ts
 **Source:** AGENT_QUEUE.md Tier 0A item 3
+**Status:** ✅ DONE 2026-04-27 — verified already fixed; audit stale.
 **Effort:** S
 **Mode:** [solo]
 **Description:** Line 337 uses `sql.raw(itemIds.map(id => \`'${id}'\`).join(','))` for an array IN clause; replace with Drizzle `inArray()` operator or `ANY($1::text[])` parameterized pattern.
@@ -74,6 +76,7 @@ Order rationale: SQL injection first (highest blast radius — exploitable from 
 
 ### A4. Fix SQL injection in storage.ts
 **Source:** AGENT_QUEUE.md Tier 0A item 4
+**Status:** ✅ DONE 2026-04-27 — verified already fixed; audit stale.
 **Effort:** S
 **Mode:** [solo]
 **Description:** Line 6115 uses `sql.raw(filters.storageTypes.map((t: string) => \`'${t}'\`).join(','))` for storage type filter; replace with `inArray()` or parameterized `ANY()` array.
@@ -82,6 +85,7 @@ Order rationale: SQL injection first (highest blast radius — exploitable from 
 
 ### A5. Fix SQL injection in crm-enhancements.ts
 **Source:** AGENT_QUEUE.md Tier 0A item 5
+**Status:** ✅ DONE 2026-04-27 — verified already fixed; audit stale.
 **Effort:** M
 **Mode:** [solo]
 **Description:** Lines 228, 431, 448, 836, 1365, 1377, 1470 — multiple `sql.raw()` calls with user-derived input; audit each occurrence and replace with parameterized queries.
