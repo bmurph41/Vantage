@@ -4,6 +4,7 @@ import {
   assetPerformanceSnapshots,
   crmProperties,
   projects,
+  modelingProjects,
   users,
   fuelSales,
   rentRolls,
@@ -455,6 +456,7 @@ export class OwnedAssetsService {
       totalAssets: assets.length,
       byStatus: {} as Record<string, number>,
       byHoldStrategy: {} as Record<string, number>,
+      byAssetClass: {} as Record<string, number>,
       totalAcquisitionValue: 0,
     };
 
@@ -466,6 +468,10 @@ export class OwnedAssetsService {
       if (asset.holdStrategy) {
         summary.byHoldStrategy[asset.holdStrategy] = (summary.byHoldStrategy[asset.holdStrategy] || 0) + 1;
       }
+
+      // Count by asset class (default to 'marina' to match column default)
+      const ac = asset.assetClass || 'marina';
+      summary.byAssetClass[ac] = (summary.byAssetClass[ac] || 0) + 1;
 
       // Sum acquisition prices
       summary.totalAcquisitionValue += asset.acquisitionPrice || 0;
@@ -483,18 +489,34 @@ export class OwnedAssetsService {
     dealData: {
       propertyId: string;
       projectId?: string;
+      modelingProjectId?: string;
       acquisitionPrice?: number;
       acquisitionDate: string;
       holdStrategy?: string;
     }
   ): Promise<OwnedAsset> {
+    // If a modeling project is linked, inherit its assetClass and the FK.
+    // Otherwise fall back to the column default ('marina') by leaving assetClass undefined.
+    let assetClass: string | undefined;
+    let modelingProjectId: string | null = dealData.modelingProjectId || null;
+    if (modelingProjectId) {
+      const [mp] = await db
+        .select({ id: modelingProjects.id, assetClass: modelingProjects.assetClass })
+        .from(modelingProjects)
+        .where(and(eq(modelingProjects.id, modelingProjectId), eq(modelingProjects.orgId, orgId)))
+        .limit(1);
+      if (mp?.assetClass) assetClass = mp.assetClass;
+    }
+
     return this.createOwnedAsset(orgId, userId, {
       propertyId: dealData.propertyId,
       projectId: dealData.projectId || null,
+      modelingProjectId,
       acquisitionDate: dealData.acquisitionDate,
       acquisitionPrice: dealData.acquisitionPrice || null,
       status: 'under_management',
       holdStrategy: (dealData.holdStrategy as any) || null,
+      ...(assetClass ? { assetClass } : {}),
       keyMetrics: {},
     });
   }

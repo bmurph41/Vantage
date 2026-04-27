@@ -19784,6 +19784,49 @@ const MIGRATIONS: Migration[] = [
   { name: "hold_strategy: add value development", sql: `ALTER TYPE hold_strategy ADD VALUE IF NOT EXISTS 'development'` },
   { name: "hold_strategy: add value distressed",  sql: `ALTER TYPE hold_strategy ADD VALUE IF NOT EXISTS 'distressed'` },
   { name: "hold_strategy: add value other",       sql: `ALTER TYPE hold_strategy ADD VALUE IF NOT EXISTS 'other'` },
+
+  // ── owned_assets: Phase 3A foundation columns for asset-class-aware Portfolio ──
+  // Both columns nullable; modeling_project_id has no FK in this phase
+  // (added in Phase 3B once the modal redesign lands).
+  {
+    name: "owned_assets: add asset_class column",
+    sql: `
+      DO $$ BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name='owned_assets' AND column_name='asset_class'
+        ) THEN
+          ALTER TABLE owned_assets ADD COLUMN asset_class varchar(50) DEFAULT 'marina';
+        END IF;
+      END; $$
+    `,
+  },
+  {
+    name: "owned_assets: add modeling_project_id column",
+    sql: `
+      DO $$ BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name='owned_assets' AND column_name='modeling_project_id'
+        ) THEN
+          ALTER TABLE owned_assets ADD COLUMN modeling_project_id varchar;
+        END IF;
+      END; $$
+    `,
+  },
+  {
+    name: "owned_assets: backfill asset_class for existing rows",
+    sql: `
+      DO $$ BEGIN
+        IF EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name='owned_assets' AND column_name='asset_class'
+        ) THEN
+          UPDATE owned_assets SET asset_class = 'marina' WHERE asset_class IS NULL;
+        END IF;
+      END; $$
+    `,
+  },
 ];
 
 /**
