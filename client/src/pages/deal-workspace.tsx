@@ -458,7 +458,7 @@ export default function DealWorkspace() {
       </div>
 
       {/* ── Modals ── */}
-      <DealFormModal open={isDealFormOpen} onOpenChange={setIsDealFormOpen} deal={editingDeal} />
+      <DealFormModal isOpen={isDealFormOpen} onClose={() => setIsDealFormOpen(false)} deal={editingDeal} />
       <LeadFormModal open={isLeadFormOpen} onOpenChange={setIsLeadFormOpen} lead={null} />
 
       {/* ── Floating comparison cart ── */}

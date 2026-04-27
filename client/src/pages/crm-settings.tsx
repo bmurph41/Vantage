@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Settings, Plus, Trash2, GripVertical, Users, Layers, Tag, Shield, Webhook } from "lucide-react";
+import { Settings, Plus, Trash2, GripVertical, Users, Layers, Tag, Shield, Webhook, ChevronRight, ArrowUp, ArrowDown, CheckCircle2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { lazy, Suspense } from "react";
 const WebhookManager = lazy(() => import("@/components/crm/webhook-manager").then(m => ({ default: m.WebhookManager })));
@@ -119,8 +119,9 @@ function CustomFieldsTab() {
 
 // Pipeline Stages Configuration — live DB-connected
 const STAGE_COLORS = [
-  '#94a3b8', '#60a5fa', '#a78bfa', '#f59e0b', '#fb923c',
-  '#34d399', '#10b981', '#f87171', '#e879f9', '#6b7280',
+  '#60a5fa', '#a78bfa', '#34d399', '#f59e0b', '#fb923c',
+  '#f87171', '#e879f9', '#10b981', '#6b7280', '#94a3b8',
+  '#0ea5e9', '#8b5cf6', '#22c55e', '#ef4444', '#f97316',
 ];
 
 function PipelineStagesTab() {
@@ -131,9 +132,9 @@ function PipelineStagesTab() {
     queryKey: ['/api/pipeline-stages'],
   });
 
-  // Local edit state mirrors DB stages so edits are instant
   const [editStages, setEditStages] = useState<PipelineStage[]>([]);
   const [hasChanges, setHasChanges] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (stages.length > 0) {
@@ -142,20 +143,14 @@ function PipelineStagesTab() {
     }
   }, [stages]);
 
-  // Fetch default pipeline for new stages
-  const { data: pipelines = [] } = useQuery<any[]>({
-    queryKey: ['/api/crm/pipelines'],
-  });
+  const { data: pipelines = [] } = useQuery<any[]>({ queryKey: ['/api/crm/pipelines'] });
 
   const createMutation = useMutation({
     mutationFn: async (stage: { name: string; color: string; probability: number; stageOrder: number }) => {
       let pipelineId = pipelines[0]?.id;
       if (!pipelineId) {
-        // Auto-create default pipeline if none exists
         const pRes = await apiRequest('POST', '/api/crm/pipelines', {
-          name: 'Default Pipeline',
-          description: 'Main deal pipeline',
-          pipelineType: 'sales',
+          name: 'Default Pipeline', description: 'Main deal pipeline', pipelineType: 'sales',
         });
         const newPipeline = await pRes.json();
         pipelineId = newPipeline.id;
@@ -166,7 +161,7 @@ function PipelineStagesTab() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/pipeline-stages'] });
-      toast({ title: 'Stage created' });
+      toast({ title: 'Stage added' });
     },
   });
 
@@ -178,9 +173,7 @@ function PipelineStagesTab() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: async (id: string) => {
-      await apiRequest('DELETE', `/api/crm/pipeline-stages/${id}`);
-    },
+    mutationFn: async (id: string) => { await apiRequest('DELETE', `/api/crm/pipeline-stages/${id}`); },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/pipeline-stages'] });
       toast({ title: 'Stage deleted' });
@@ -198,6 +191,7 @@ function PipelineStagesTab() {
   };
 
   const handleDelete = (stage: PipelineStage) => {
+    if (!confirm(`Delete stage "${stage.name}"? Deals in this stage will not be deleted.`)) return;
     setEditStages(prev => prev.filter(s => s.id !== stage.id));
     deleteMutation.mutate(stage.id);
   };
@@ -211,13 +205,23 @@ function PipelineStagesTab() {
     setHasChanges(true);
   };
 
+  const handleMove = (index: number, direction: 'up' | 'down') => {
+    setEditStages(prev => {
+      const arr = [...prev];
+      const swapIdx = direction === 'up' ? index - 1 : index + 1;
+      if (swapIdx < 0 || swapIdx >= arr.length) return arr;
+      [arr[index], arr[swapIdx]] = [arr[swapIdx], arr[index]];
+      return arr;
+    });
+    setHasChanges(true);
+  };
+
   const handleSave = async () => {
     try {
       await Promise.all(
         editStages.map((s, i) =>
           updateMutation.mutateAsync({
-            id: s.id,
-            name: s.name,
+            id: s.id, name: s.name,
             color: s.color || '#6b7280',
             probability: s.probability ?? 50,
             stageOrder: i + 1,
@@ -233,70 +237,251 @@ function PipelineStagesTab() {
   };
 
   if (isLoading) {
-    return <div className="space-y-3">{[1, 2, 3].map(i => <Skeleton key={i} className="h-12" />)}</div>;
+    return (
+      <div className="space-y-4">
+        <Skeleton className="h-24 w-full rounded-xl" />
+        <div className="space-y-2">{[1, 2, 3, 4, 5].map(i => <Skeleton key={i} className="h-11" />)}</div>
+      </div>
+    );
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="font-medium">Pipeline Stages</h3>
-          <p className="text-sm text-muted-foreground">Configure deal stages and default win probabilities. Changes here apply to all deals.</p>
+          <h3 className="font-semibold">Pipeline Stages</h3>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            {editStages.length} stages · drag to reorder · click a stage to edit
+          </p>
         </div>
-        <Button size="sm" onClick={handleAddStage} disabled={createMutation.isPending}>
-          <Plus className="h-4 w-4 mr-1" /> Add Stage
-        </Button>
+        <div className="flex items-center gap-2">
+          {hasChanges && (
+            <Button size="sm" onClick={handleSave} disabled={updateMutation.isPending} className="gap-1.5">
+              <CheckCircle2 className="h-3.5 w-3.5" />
+              {updateMutation.isPending ? 'Saving…' : 'Save Changes'}
+            </Button>
+          )}
+          <Button size="sm" variant="outline" onClick={handleAddStage} disabled={createMutation.isPending} className="gap-1.5">
+            <Plus className="h-3.5 w-3.5" /> Add Stage
+          </Button>
+        </div>
       </div>
 
-      <div className="border rounded-lg divide-y">
-        {editStages.length === 0 && (
-          <div className="p-8 text-center text-muted-foreground">
-            No stages configured yet. Click "Add Stage" to create your first pipeline stage.
-          </div>
-        )}
-        {editStages.map((stage, i) => (
-          <div key={stage.id} className="flex items-center gap-3 px-4 py-3">
-            <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab flex-shrink-0" />
-            <input
-              type="color"
-              value={stage.color || '#6b7280'}
-              onChange={(e) => handleFieldChange(i, 'color', e.target.value)}
-              className="w-6 h-6 rounded border-0 cursor-pointer flex-shrink-0 p-0"
-              title="Stage color"
-            />
-            <Input
-              value={stage.name}
-              className="flex-1 h-8"
-              onChange={(e) => handleFieldChange(i, 'name', e.target.value)}
-              placeholder="Stage name"
-            />
-            <div className="flex items-center gap-1 text-sm flex-shrink-0">
-              <Input
-                type="number"
-                value={stage.probability ?? 0}
-                className="w-16 h-8 text-center"
-                min={0}
-                max={100}
-                onChange={(e) => handleFieldChange(i, 'probability', parseInt(e.target.value) || 0)}
-              />
-              <span className="text-muted-foreground">%</span>
+      {/* ── Visual Pipeline Flow Strip ── */}
+      {editStages.length > 0 && (
+        <div className="bg-muted/40 border rounded-xl p-4">
+          <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground mb-3">
+            Pipeline Flow — {editStages.length} stages
+          </p>
+          <div className="overflow-x-auto pb-1">
+            <div className="flex items-stretch gap-0 min-w-max">
+              {editStages.map((stage, i) => {
+                const color = stage.color || '#6b7280';
+                const isLast = i === editStages.length - 1;
+                const isEditing = editingId === stage.id;
+                return (
+                  <div key={stage.id} className="flex items-stretch">
+                    <button
+                      onClick={() => setEditingId(isEditing ? null : stage.id)}
+                      className="group flex flex-col items-center justify-center px-4 py-2.5 rounded-lg border-2 transition-all hover:shadow-md min-w-[90px] max-w-[120px] bg-white dark:bg-card"
+                      style={{
+                        borderColor: isEditing ? color : 'transparent',
+                        boxShadow: isEditing ? `0 0 0 3px ${color}22` : undefined,
+                        borderLeftWidth: 3,
+                        borderLeftColor: color,
+                        borderLeftStyle: 'solid',
+                        borderTopColor: isEditing ? color : 'hsl(var(--border))',
+                        borderRightColor: isEditing ? color : 'hsl(var(--border))',
+                        borderBottomColor: isEditing ? color : 'hsl(var(--border))',
+                      }}
+                    >
+                      <div className="w-2.5 h-2.5 rounded-full mb-1.5 flex-shrink-0" style={{ backgroundColor: color }} />
+                      <span className="text-[11px] font-semibold text-center leading-tight line-clamp-2 text-foreground">
+                        {stage.name}
+                      </span>
+                      <span className="text-[10px] text-muted-foreground mt-1">{stage.probability ?? 0}%</span>
+                    </button>
+                    {!isLast && (
+                      <div className="flex items-center px-1 text-muted-foreground/40">
+                        <ChevronRight className="h-3 w-3" />
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => handleDelete(stage)}
-              disabled={deleteMutation.isPending}
-              className="flex-shrink-0"
-            >
-              <Trash2 className="h-4 w-4 text-muted-foreground" />
-            </Button>
           </div>
-        ))}
-      </div>
+          {/* Probability progression bar */}
+          <div className="mt-3 flex rounded-full overflow-hidden h-1.5">
+            {editStages.map((stage, i) => (
+              <div
+                key={stage.id}
+                className="flex-1 transition-all"
+                style={{ backgroundColor: stage.color || '#6b7280', opacity: 0.6 + (i / editStages.length) * 0.4 }}
+                title={`${stage.name}: ${stage.probability ?? 0}%`}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Editable Stage List ── */}
+      {editStages.length === 0 ? (
+        <div className="border-2 border-dashed rounded-xl p-10 text-center text-muted-foreground">
+          <Layers className="h-8 w-8 mx-auto mb-2 opacity-30" />
+          <p className="text-sm">No stages yet. Click "Add Stage" to build your pipeline.</p>
+        </div>
+      ) : (
+        <div className="border rounded-xl overflow-hidden">
+          {/* Column headers */}
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-muted/50 border-b text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+            <div className="w-5 flex-shrink-0" />
+            <div className="w-5 flex-shrink-0" />
+            <div className="flex-1">Stage Name</div>
+            <div className="w-24 text-center flex-shrink-0">Win Probability</div>
+            <div className="w-16 flex-shrink-0" />
+          </div>
+
+          <div className="divide-y">
+            {editStages.map((stage, i) => {
+              const color = stage.color || '#6b7280';
+              const isExpanded = editingId === stage.id;
+              return (
+                <div key={stage.id} className="group">
+                  <div
+                    className="flex items-center gap-2 px-3 py-2.5 hover:bg-muted/30 transition-colors cursor-pointer"
+                    onClick={() => setEditingId(isExpanded ? null : stage.id)}
+                  >
+                    {/* Order controls */}
+                    <div className="flex flex-col gap-0 flex-shrink-0 w-5 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleMove(i, 'up'); }}
+                        disabled={i === 0}
+                        className="h-3.5 w-5 flex items-center justify-center disabled:opacity-20 hover:text-primary"
+                      >
+                        <ArrowUp className="h-3 w-3" />
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleMove(i, 'down'); }}
+                        disabled={i === editStages.length - 1}
+                        className="h-3.5 w-5 flex items-center justify-center disabled:opacity-20 hover:text-primary"
+                      >
+                        <ArrowDown className="h-3 w-3" />
+                      </button>
+                    </div>
+
+                    {/* Color swatch */}
+                    <div
+                      className="w-5 h-5 rounded flex-shrink-0"
+                      style={{ backgroundColor: color }}
+                    />
+
+                    {/* Name */}
+                    <span className="flex-1 text-sm font-medium truncate">{stage.name}</span>
+
+                    {/* Probability bar */}
+                    <div className="w-24 flex items-center gap-1.5 flex-shrink-0">
+                      <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                        <div
+                          className="h-full rounded-full transition-all"
+                          style={{ width: `${stage.probability ?? 0}%`, backgroundColor: color }}
+                        />
+                      </div>
+                      <span className="text-xs text-muted-foreground w-8 text-right tabular-nums">
+                        {stage.probability ?? 0}%
+                      </span>
+                    </div>
+
+                    {/* Delete */}
+                    <div className="w-16 flex items-center justify-end gap-1 flex-shrink-0">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleDelete(stage); }}
+                        disabled={deleteMutation.isPending}
+                        className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-destructive/10 hover:text-destructive transition-all"
+                        title="Delete stage"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Expanded edit panel */}
+                  {isExpanded && (
+                    <div className="px-4 pb-3 pt-1 bg-muted/20 border-t border-dashed space-y-3">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <Label className="text-xs mb-1 block">Stage Name</Label>
+                          <Input
+                            value={stage.name}
+                            className="h-8 text-sm"
+                            onChange={(e) => handleFieldChange(i, 'name', e.target.value)}
+                            placeholder="e.g., Due Diligence"
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-xs mb-1 block">Win Probability (%)</Label>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="range"
+                              min={0}
+                              max={100}
+                              step={5}
+                              value={stage.probability ?? 0}
+                              onChange={(e) => handleFieldChange(i, 'probability', parseInt(e.target.value))}
+                              onClick={(e) => e.stopPropagation()}
+                              className="flex-1 h-2 accent-primary"
+                            />
+                            <Input
+                              type="number"
+                              value={stage.probability ?? 0}
+                              className="w-16 h-8 text-center text-sm"
+                              min={0} max={100}
+                              onChange={(e) => handleFieldChange(i, 'probability', parseInt(e.target.value) || 0)}
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                      <div>
+                        <Label className="text-xs mb-2 block">Stage Color</Label>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {STAGE_COLORS.map(c => (
+                            <button
+                              key={c}
+                              onClick={(e) => { e.stopPropagation(); handleFieldChange(i, 'color', c); }}
+                              className="w-6 h-6 rounded-full border-2 transition-all hover:scale-110"
+                              style={{
+                                backgroundColor: c,
+                                borderColor: stage.color === c ? 'hsl(var(--foreground))' : 'transparent',
+                                boxShadow: stage.color === c ? `0 0 0 1px ${c}` : undefined,
+                              }}
+                            />
+                          ))}
+                          <input
+                            type="color"
+                            value={stage.color || '#6b7280'}
+                            onChange={(e) => { e.stopPropagation(); handleFieldChange(i, 'color', e.target.value); }}
+                            onClick={(e) => e.stopPropagation()}
+                            className="w-6 h-6 rounded-full cursor-pointer border border-border p-0 bg-transparent"
+                            title="Custom color"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {hasChanges && (
-        <Button className="w-full" onClick={handleSave} disabled={updateMutation.isPending}>
-          {updateMutation.isPending ? 'Saving...' : 'Save Stage Configuration'}
+        <Button className="w-full gap-2" onClick={handleSave} disabled={updateMutation.isPending}>
+          <CheckCircle2 className="h-4 w-4" />
+          {updateMutation.isPending ? 'Saving…' : `Save ${editStages.length} Stage Configuration`}
         </Button>
       )}
     </div>
