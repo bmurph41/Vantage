@@ -1903,28 +1903,37 @@ input[type="range"]::-moz-range-track {
 
 
 /* ── Workspace Nav Design System ─────────────────────────────────────────── */
+
+/* Nav strip — replaces the old inline style background */
+.ws-nav-strip {
+  background: hsl(221, 35%, 97.5%);
+  border-top: 2px solid hsl(221, 65%, 13%);
+}
+
+/* Group rail buttons */
 .ws-nav-group {
   position: relative;
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 6px 14px 8px;
-  font-size: 12px;
+  padding: 5px 11px 7px;
+  font-size: 11.5px;
   font-weight: 500;
   letter-spacing: 0.01em;
   white-space: nowrap;
   border: none;
   background: transparent;
   color: hsl(var(--muted-foreground));
-  transition: color 0.15s ease;
+  transition: color 0.15s ease, background 0.15s ease;
   cursor: pointer;
+  border-radius: 6px 6px 0 0;
 }
 .ws-nav-group::after {
   content: '';
   position: absolute;
   bottom: 0;
-  left: 14px;
-  right: 14px;
+  left: 8px;
+  right: 8px;
   height: 2px;
   border-radius: 2px 2px 0 0;
   background: transparent;
@@ -1932,23 +1941,27 @@ input[type="range"]::-moz-range-track {
 }
 .ws-nav-group:hover {
   color: hsl(var(--foreground));
+  background: hsl(221, 50%, 94%);
 }
 .ws-nav-group:hover::after {
-  background: hsl(var(--border));
+  background: hsl(221, 40%, 80%);
 }
 .ws-nav-group-active {
-  color: hsl(221, 83%, 40%);
+  color: hsl(221, 83%, 35%);
   font-weight: 650;
+  background: hsl(221, 83%, 92%);
 }
 .ws-nav-group-active::after {
-  background: hsl(221, 83%, 40%);
+  background: hsl(221, 65%, 13%);
 }
+
+/* Sub-tab pills */
 .ws-nav-tab {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  height: 26px;
-  padding: 0 10px;
+  height: 24px;
+  padding: 0 9px;
   font-size: 11px;
   font-weight: 450;
   border-radius: 4px;
@@ -1960,19 +1973,20 @@ input[type="range"]::-moz-range-track {
 }
 .ws-nav-tab:hover {
   color: hsl(var(--foreground));
-  background: hsl(var(--muted) / 0.6);
+  background: hsl(221, 40%, 91%);
 }
 .ws-nav-tab[data-state=active] {
-  color: hsl(221, 83%, 38%);
-  background: hsl(221, 83%, 95%);
+  color: hsl(221, 83%, 32%);
+  background: hsl(221, 83%, 91%);
   font-weight: 600;
+  box-shadow: inset 0 0 0 1px hsl(221, 60%, 78%);
 }
 
 /* ── Override shadcn TabsTrigger active state in workspace nav ─────────────── */
 [data-testid="tabs-workspace"] [data-state=active] {
   background-color: hsl(221, 83%, 91%) !important;
   color: hsl(221, 83%, 32%) !important;
-  box-shadow: inset 0 0 0 1px hsl(221, 83%, 78%) !important;
+  box-shadow: inset 0 0 0 1px hsl(221, 60%, 78%) !important;
   font-weight: 600;
 }
 
@@ -1985,9 +1999,32 @@ input[type="range"]::-moz-range-track {
   animation: ws-subtab-in 0.15s ease forwards;
 }
 
-/* ── Nav strip top accent line ─────────────────────────────────────────────── */
-.ws-nav-strip {
-  border-top: 3px solid hsl(221, 83%, 40%);
+/* ── Section label inside workspace tabs (General Assumptions, etc.) ──────── */
+.ws-section-label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: hsl(221, 30%, 45%);
+  border-left: 2px solid hsl(221, 65%, 55%);
+  padding-left: 7px;
+  margin-top: 18px;
+  margin-bottom: 8px;
+}
+.ws-section-label .ws-section-rule {
+  flex: 1;
+  height: 1px;
+  background: hsl(221, 20%, 88%);
+}
+.dark .ws-section-label {
+  color: hsl(221, 40%, 65%);
+  border-left-color: hsl(221, 50%, 45%);
+}
+.dark .ws-section-label .ws-section-rule {
+  background: hsl(221, 15%, 28%);
 }
 
 /* ==========================================================================

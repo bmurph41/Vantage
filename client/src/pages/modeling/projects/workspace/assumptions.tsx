@@ -1686,9 +1686,9 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
             >
               <div className="space-y-2 p-1">
                 <div className="mb-2 last:mb-0">
-                  <div className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1.5 px-1 flex items-center gap-1.5">
+                  <div className="ws-section-label">
                     <span>Percentage-Based</span>
-                    <div className="flex-1 h-px bg-slate-100 dark:bg-slate-800" />
+                    <div className="ws-section-rule" />
                   </div>
                   <div className="space-y-1">
                     <div className="flex items-center gap-2 py-1.5 px-2 rounded-md bg-white dark:bg-slate-800/50 border border-transparent hover:border-slate-200 dark:hover:border-slate-600 transition-all">
@@ -1809,9 +1809,9 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
                 </div>
 
                 <div className="mb-2 last:mb-0">
-                  <div className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1.5 px-1 flex items-center gap-1.5">
+                  <div className="ws-section-label">
                     <span>Fixed Amounts</span>
-                    <div className="flex-1 h-px bg-slate-100 dark:bg-slate-800" />
+                    <div className="ws-section-rule" />
                   </div>
                   <div className="space-y-1">
                     <div className="flex items-center gap-2 py-1.5 px-2 rounded-md bg-white dark:bg-slate-800/50 border border-transparent hover:border-slate-200 dark:hover:border-slate-600 transition-all">
@@ -2007,9 +2007,9 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
               >
                 <div className="space-y-2 p-1">
                   <div className="mb-2 last:mb-0">
-                    <div className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1.5 px-1 flex items-center gap-1.5">
+                    <div className="ws-section-label">
                       <span>Fees & Costs</span>
-                      <div className="flex-1 h-px bg-slate-100 dark:bg-slate-800" />
+                      <div className="ws-section-rule" />
                     </div>
                     <div className="space-y-1">
                       <div className="flex items-center gap-2 py-1.5 px-2 rounded-md bg-white dark:bg-slate-800/50 border border-transparent hover:border-slate-200 dark:hover:border-slate-600 transition-all">
@@ -2060,9 +2060,9 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
                   </div>
 
                   <div className="mb-2 last:mb-0">
-                    <div className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1.5 px-1 flex items-center gap-1.5">
+                    <div className="ws-section-label">
                       <span>Working Capital</span>
-                      <div className="flex-1 h-px bg-slate-100 dark:bg-slate-800" />
+                      <div className="ws-section-rule" />
                     </div>
                     <div className="space-y-1">
                       <div className="flex items-center gap-2 py-1.5 px-2 rounded-md bg-white dark:bg-slate-800/50 border border-transparent hover:border-slate-200 dark:hover:border-slate-600 transition-all">

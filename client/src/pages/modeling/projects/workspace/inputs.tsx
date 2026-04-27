@@ -1386,9 +1386,10 @@ export default function InputsAssumptions({ project }: InputsAssumptionsProps) {
 
             {/* COA Revenue Fields */}
             <div>
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
-                Additional Revenue (from COA)
-              </p>
+              <div className="ws-section-label">
+                <span>Additional Revenue (from COA)</span>
+                <div className="ws-section-rule" />
+              </div>
               <COASection
                 category="revenue"
                 fieldGroups={coaFieldGroups}
@@ -1553,7 +1554,10 @@ export default function InputsAssumptions({ project }: InputsAssumptionsProps) {
                 const sectionTypes = config.unitMix.types.filter(t => t.section === section);
                 return (
                   <div key={section} className="mb-3">
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1.5">{section}</p>
+                    <div className="ws-section-label">
+                      <span>{section}</span>
+                      <div className="ws-section-rule" />
+                    </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                       {sectionTypes.map(unitType => (
                         <label

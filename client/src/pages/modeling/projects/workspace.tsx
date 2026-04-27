@@ -670,95 +670,94 @@ export default function ProjectWorkspace() {
   return (
     <div className="flex flex-col min-h-screen bg-background">
       {/* ── Persistent Project Header ─────────────────────────────────────── */}
-      <div className="sticky top-0 z-30 bg-white border-b border-border/40 shadow-sm">
-        {/* Breadcrumb row */}
-        <div className="flex items-center gap-1.5 px-6 pt-2.5 pb-0 text-[11px] text-muted-foreground">
-          <button
-            onClick={() => navigate('/modeling/projects')}
-            className="hover:text-foreground transition-colors font-medium"
-          >
-            Financial Model
-          </button>
-          <ChevronRight className="h-3 w-3 opacity-50 flex-shrink-0" />
-          <span className="text-foreground font-semibold truncate max-w-[260px]">{project.marinaName}</span>
-        </div>
+      <div className="sticky top-0 z-30 shadow-md">
 
-        {/* Main header row */}
-        <div className="flex items-center justify-between gap-4 px-6 py-2.5">
-          {/* Left: back + project identity */}
-          <div className="flex items-center gap-3 min-w-0">
+        {/* Zone 1 — Navy identity band */}
+        <div className="bg-[hsl(221,65%,13%)] px-6 py-1.5 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-2.5 min-w-0">
             <Button
               variant="ghost"
               size="icon"
-              className="h-7 w-7 shrink-0 -ml-1"
+              className="h-6 w-6 shrink-0 -ml-1 text-white/60 hover:text-white hover:bg-white/10"
               onClick={() => navigate('/modeling/projects')}
               data-testid="button-back-to-projects"
             >
-              <ArrowLeft className="h-4 w-4" />
+              <ArrowLeft className="h-3.5 w-3.5" />
             </Button>
-            <div className="min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="text-[15px] font-bold tracking-tight leading-none truncate" data-testid="text-project-name">
-                  {project.marinaName}
-                </h1>
-                {(project as any).dealId ? (
-                  <button
-                    onClick={() => navigate(`/crm/deals/${(project as any).dealId}`)}
-                    className="focus:outline-none focus:ring-1 focus:ring-primary/50 rounded"
-                    title="Open linked CRM deal"
-                  >
-                    <ProjectTypeBadge project={project} />
-                  </button>
-                ) : (project as any).propertyId ? (
-                  <button
-                    onClick={() => navigate(`/properties/${(project as any).propertyId}`)}
-                    className="focus:outline-none focus:ring-1 focus:ring-primary/50 rounded"
-                    title="Open linked property"
-                  >
-                    <ProjectTypeBadge project={project} />
-                  </button>
-                ) : (
+            <div className="flex items-center gap-2 min-w-0 flex-wrap">
+              <h1 className="text-[15px] font-bold text-white tracking-tight leading-none truncate" data-testid="text-project-name">
+                {project.marinaName}
+              </h1>
+              {(project as any).dealId ? (
+                <button
+                  onClick={() => navigate(`/crm/deals/${(project as any).dealId}`)}
+                  className="focus:outline-none opacity-80"
+                  title="Open linked CRM deal"
+                >
                   <ProjectTypeBadge project={project} />
-                )}
-                {(project as any).assetClass && (
-                  <Badge variant="outline" className="text-[10px] capitalize px-1.5 py-0">
-                    {(project as any).assetClass.replace(/_/g, " ")}
-                  </Badge>
-                )}
-                {(project.city || project.state) && (
-                  <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
-                    <MapPin className="h-3 w-3" />
-                    {[project.city, project.state].filter(Boolean).join(', ')}
-                  </span>
-                )}
-                {project.purchasePrice && (
-                  <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
-                    <DollarSign className="h-3 w-3" />
-                    {formatCurrencyValue(project.purchasePrice)}
-                  </span>
-                )}
-              </div>
+                </button>
+              ) : (project as any).propertyId ? (
+                <button
+                  onClick={() => navigate(`/properties/${(project as any).propertyId}`)}
+                  className="focus:outline-none opacity-80"
+                  title="Open linked property"
+                >
+                  <ProjectTypeBadge project={project} />
+                </button>
+              ) : (
+                <span className="opacity-75"><ProjectTypeBadge project={project} /></span>
+              )}
+              {(project as any).assetClass && (
+                <span className="text-[10px] text-white/45 capitalize hidden sm:inline">
+                  {(project as any).assetClass.replace(/_/g, " ")}
+                </span>
+              )}
+              {(project.city || project.state) && (
+                <span className="hidden md:flex items-center gap-1 text-[11px] text-white/40">
+                  <MapPin className="h-3 w-3 flex-shrink-0" />
+                  {[project.city, project.state].filter(Boolean).join(', ')}
+                </span>
+              )}
             </div>
           </div>
 
-          {/* Right: stage + actions */}
-          <div className="flex items-center gap-2 flex-shrink-0">
-            {/* Stage dot + label */}
-            <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-muted/60 border border-border/40">
-              <div className={[
-                'w-1.5 h-1.5 rounded-full flex-shrink-0',
-                ((project as any).uwStage === 'active_uw' || (project as any).uwStage === 'building_model') ? 'bg-blue-500 animate-pulse' :
-                (project as any).uwStage === 'loi_submitted' || (project as any).uwStage === 'under_contract' ? 'bg-amber-500' :
-                (project as any).uwStage === 'closed' ? 'bg-emerald-500' :
-                (project as any).uwStage === 'dead' ? 'bg-red-400' : 'bg-slate-400'
-              ].join(' ')} />
-              <span className="text-[9px] uppercase tracking-widest text-muted-foreground font-semibold">Stage</span>
+          {/* Right: KPI chip + stage pill */}
+          <div className="flex items-center gap-3 flex-shrink-0">
+            {project.purchasePrice && (
+              <div className="hidden sm:block text-right border-r border-white/10 pr-3">
+                <div className="text-[9px] text-white/35 uppercase tracking-wider font-medium">Ask Price</div>
+                <div className="text-[12px] font-semibold text-white/90 leading-none mt-0.5">
+                  {formatCurrencyValue(project.purchasePrice)}
+                </div>
+              </div>
+            )}
+            {/* Stage color pill — read-only visual, control stays in Zone 2 */}
+            <div className={[
+              'px-2.5 py-0.5 rounded-full text-[10px] font-semibold whitespace-nowrap ring-1',
+              ((project as any).uwStage === 'active_uw' || (project as any).uwStage === 'building_model')
+                ? 'bg-blue-500/20 text-blue-200 ring-blue-400/30'
+                : ((project as any).uwStage === 'loi_submitted' || (project as any).uwStage === 'under_contract')
+                ? 'bg-amber-500/20 text-amber-200 ring-amber-400/30'
+                : (project as any).uwStage === 'closed'
+                ? 'bg-emerald-500/20 text-emerald-200 ring-emerald-400/30'
+                : (project as any).uwStage === 'dead'
+                ? 'bg-red-500/20 text-red-200 ring-red-400/30'
+                : 'bg-slate-500/20 text-slate-300 ring-slate-400/30'
+            ].join(' ')}>
+              {uwStageLabels[(project as any).uwStage as keyof typeof uwStageLabels] ?? 'Not Started'}
             </div>
+          </div>
+        </div>
+
+        {/* Zone 2 — White action bar */}
+        <div className="bg-white border-b border-border/40 px-6 py-1 flex items-center justify-between gap-3">
+          {/* Left: stage controls */}
+          <div className="flex items-center gap-2">
             <Select
               value={(project as any).uwStage || "not_started"}
               onValueChange={(val) => uwStageMutation.isPending ? undefined : uwStageMutation.mutate({ uwStage: val, uwSubStatus: "" })}
             >
-              <SelectTrigger disabled={uwStageMutation.isPending} className="h-7 w-[140px] text-xs border border-border/60 bg-background font-medium shadow-sm hover:border-primary/40 transition-colors disabled:opacity-60">
+              <SelectTrigger disabled={uwStageMutation.isPending} className="h-7 w-[150px] text-xs border border-border/60 bg-background font-medium shadow-sm hover:border-primary/40 transition-colors disabled:opacity-60">
                 {uwStageMutation.isPending ? (
                   <span className="flex items-center gap-1.5">
                     <Loader2 className="h-3 w-3 animate-spin" />
@@ -789,37 +788,35 @@ export default function ProjectWorkspace() {
                 </SelectContent>
               </Select>
             )}
+          </div>
 
-            <div className="w-px h-5 bg-border/60 mx-1" />
-
-            {/* Save */}
+          {/* Right: action buttons */}
+          <div className="flex items-center gap-1.5">
             <Button
-              variant={saveSuccess ? "default" : "outline"}
               size="sm"
               onClick={() => saveProjectMutation.mutate()}
               disabled={saveProjectMutation.isPending}
-              className={saveSuccess ? "bg-green-600 hover:bg-green-700 text-white h-8 text-xs" : "h-8 text-xs"}
+              className={saveSuccess
+                ? "bg-emerald-600 hover:bg-emerald-700 text-white h-7 text-xs px-3"
+                : "bg-blue-600 hover:bg-blue-700 text-white h-7 text-xs px-3"}
               data-testid="button-save-project"
             >
               {saveSuccess ? <><Check className="h-3.5 w-3.5 mr-1.5" />Saved</> :
                saveProjectMutation.isPending ? <><Save className="h-3.5 w-3.5 mr-1.5 animate-pulse" />Saving...</> :
                <><Save className="h-3.5 w-3.5 mr-1.5" />Save</>}
             </Button>
-
-            {/* Create OM */}
             <Button
-              variant="outline"
+              variant="ghost"
               size="sm"
               onClick={handleCreateOm}
               disabled={createOmMutation.isPending}
-              className="h-8 text-xs"
+              className="h-7 text-xs text-muted-foreground hover:text-foreground"
               data-testid="button-create-om"
             >
               <FileText className="h-3.5 w-3.5 mr-1.5" />
               {createOmMutation.isPending ? 'Creating...' : 'Create OM'}
             </Button>
-
-            {/* Pin */}
+            <div className="w-px h-4 bg-border/50 mx-0.5" />
             <PinButton
               itemType="modeling_project"
               itemId={projectId}
@@ -828,11 +825,9 @@ export default function ProjectWorkspace() {
               link={`/modeling/projects/${projectId}`}
               icon="TrendingUp"
               color="#3B82F6"
-              variant="outline"
+              variant="ghost"
               showLabel
             />
-
-            {/* Star */}
             <FavoriteButton
               itemType="modeling_project"
               itemId={projectId!}
@@ -840,7 +835,7 @@ export default function ProjectWorkspace() {
               subtitle={`${project.city || ''} ${project.state || ''}`.trim() || undefined}
               link={`/modeling/projects/${projectId}`}
               icon="TrendingUp"
-              variant="outline"
+              variant="ghost"
               showLabel
             />
           </div>
@@ -849,7 +844,7 @@ export default function ProjectWorkspace() {
 
       <div className="flex flex-1 min-w-0">
       <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-0 flex-1 min-w-0 overflow-x-clip">
-        <div className="ws-nav-strip sticky top-[72px] z-20 px-6 border-b-2 border-border shadow-[0_3px_12px_-2px_rgba(0,0,0,0.10)]" style={{background:'hsl(221,50%,98%)'}}>
+        <div className="ws-nav-strip sticky top-[72px] z-20 px-6 border-b border-border/60 shadow-[0_2px_8px_-1px_rgba(0,0,0,0.08)]">
           {/* ── Group Rail ── */}
           <div className="flex items-center gap-1 overflow-x-auto pt-1.5 pb-0 px-0" data-testid="tab-groups">
             {TAB_GROUPS.map((group) => {
