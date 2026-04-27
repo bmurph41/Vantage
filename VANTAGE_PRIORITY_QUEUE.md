@@ -31,11 +31,11 @@ This document is a **flat sequenced queue** in strict execution order, written f
 
 **Effort scale:** S = 0.5h, M = 2h, L = 8h, XL = 20h (midpoints used for totals).
 
-**Realistic timelines to beta-ready (300 hours):**
-- 30 hrs/week focused solo (no Bookd/STR/cleaning DD overlap): **~10 weeks** (~2.5 months)
-- 20 hrs/week (acknowledging Bookd, STR portfolio, cleaning company DD parallel work): **~15 weeks** (~3.5 months)
+**Realistic timelines to beta-ready (308 hours):**
+- 30 hrs/week focused solo (no Bookd/STR/cleaning DD overlap): **~10.5 weeks** (~2.5 months)
+- 20 hrs/week (acknowledging Bookd, STR portfolio, cleaning company DD parallel work): **~15.5 weeks** (~3.5 months)
 
-These are bottom-up estimates assuming linear single-threaded execution. Real friction (debugging, reviews, rework) typically multiplies by 1.3–1.7×, so plan for **~17–25 weeks** of real-world calendar time before inviting the first beta tester.
+These are bottom-up estimates assuming linear single-threaded execution. Real friction (debugging, reviews, rework) typically multiplies by 1.3–1.7×, so plan for **~17–26 weeks** of real-world calendar time before inviting the first beta tester.
 
 ---
 
