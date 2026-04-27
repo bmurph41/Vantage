@@ -71,8 +71,10 @@ export default function MarinaMapPage() {
       setLocation(`/modeling/projects/${loc.id}`);
     } else if (loc.source === 'property') {
       setLocation(`/properties/${loc.id}`);
-    } else if (loc.source === 'comp' || loc.source === 'rate_comp') {
+    } else if (loc.source === 'comp') {
       setLocation(`/analysis/sales-comps/${loc.id}`);
+    } else if (loc.source === 'rate_comp') {
+      setLocation(`/analysis/rate-comps/${loc.id}`);
     }
   };
 
