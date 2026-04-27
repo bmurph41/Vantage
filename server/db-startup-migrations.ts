@@ -19843,11 +19843,28 @@ const MIGRATIONS: Migration[] = [
 const ADD_COLUMN_RE =
   /^\s*ALTER\s+TABLE\s+(\w+)\s+ADD\s+COLUMN\s+IF\s+NOT\s+EXISTS\s+"?(\w+)"?\s/i;
 
+// Guard so that repeated calls to runStartupMigrations (e.g. in tests or
+// during hot-reload) do not stack duplicate pool 'connect' / notice listeners.
+let _noticeListenerAttached = false;
+
 export async function runStartupMigrations(): Promise<void> {
   const startTime = Date.now();
   /** Migrations that ran but produced an unexpected DB error (not "already exists"/"cannot be cast"). */
   let failed = 0;
   let skipped = 0;
+
+  // Surface PostgreSQL RAISE NOTICE messages (e.g. row-count notices emitted by
+  // the ai_conversation_messages rename migration) in the application console.
+  // node-postgres delivers NOTICE payloads only as client-level events, so we
+  // must attach the handler via pool.on('connect') rather than on the query result.
+  if (!_noticeListenerAttached) {
+    _noticeListenerAttached = true;
+    pool.on('connect', (client) => {
+      client.on('notice', (msg) => {
+        console.log(`[startup-migrations] NOTICE: ${msg.message}`);
+      });
+    });
+  }
 
   console.log(`[startup-migrations] Running ${MIGRATIONS.length} idempotent migrations…`);
 
