@@ -282,7 +282,8 @@
       "Bash(bash /home/runner/workspace/.claude/skills/restart-dev/scripts/restart.sh)",
       "Bash(git fetch *)",
       "Bash(git checkout *)",
-      "Bash(git pull *)"
+      "Bash(git pull *)",
+      "Bash(echo \"TC_EXIT=$?\")"
     ]
   }
 }
