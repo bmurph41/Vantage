@@ -667,7 +667,7 @@ export function DetailDrawer({
                     {/* Contact Overview - Collapsible Sections */}
                     {entityType === "contact" && (
                       <div className="space-y-3">
-                        <CollapsibleSection title="About" icon={<User className="h-4 w-4 text-muted-foreground" />} defaultOpen={true}>
+                        <CollapsibleSection title="About" icon={<User className="h-4 w-4 text-muted-foreground" />} defaultOpen={true} useSectionLabel>
                           <div className="space-y-0.5">
                             <EditableFieldRow label="First Name" isEditing={isEditing}
                               value={<span data-testid="text-firstName">{entity?.firstName || "-"}</span>}
@@ -729,7 +729,7 @@ export function DetailDrawer({
                           </div>
                         </CollapsibleSection>
 
-                        <CollapsibleSection title="Communication" icon={<Mail className="h-4 w-4 text-muted-foreground" />} defaultOpen={true}>
+                        <CollapsibleSection title="Communication" icon={<Mail className="h-4 w-4 text-muted-foreground" />} defaultOpen={true} useSectionLabel>
                           <div className="space-y-0.5">
                             <EditableFieldRow label="Email" isEditing={isEditing}
                               value={
@@ -752,7 +752,7 @@ export function DetailDrawer({
                           </div>
                         </CollapsibleSection>
 
-                        <CollapsibleSection title="Social Profiles" icon={<Globe className="h-4 w-4 text-muted-foreground" />} defaultOpen={false}>
+                        <CollapsibleSection title="Social Profiles" icon={<Globe className="h-4 w-4 text-muted-foreground" />} defaultOpen={false} useSectionLabel>
                           <div className="space-y-0.5">
                             <EditableFieldRow label="LinkedIn" isEditing={isEditing}
                               value={
@@ -771,7 +771,7 @@ export function DetailDrawer({
                           </div>
                         </CollapsibleSection>
 
-                        <CollapsibleSection title="Address" icon={<MapPin className="h-4 w-4 text-muted-foreground" />} defaultOpen={false}>
+                        <CollapsibleSection title="Address" icon={<MapPin className="h-4 w-4 text-muted-foreground" />} defaultOpen={false} useSectionLabel>
                           <div className="space-y-0.5">
                             <EditableFieldRow label="Street Address" isEditing={isEditing}
                               value={<span data-testid="text-address">{entity?.address || "-"}</span>}
@@ -792,7 +792,7 @@ export function DetailDrawer({
                           </div>
                         </CollapsibleSection>
 
-                        <CollapsibleSection title="Personal Dates" icon={<Calendar className="h-4 w-4 text-muted-foreground" />} defaultOpen={false}>
+                        <CollapsibleSection title="Personal Dates" icon={<Calendar className="h-4 w-4 text-muted-foreground" />} defaultOpen={false} useSectionLabel>
                           <div className="space-y-0.5">
                             <EditableFieldRow label="Birthday" isEditing={isEditing}
                               value={<span data-testid="text-birthday">{entity?.birthday ? new Date(entity.birthday).toLocaleDateString() : "-"}</span>}
@@ -805,7 +805,7 @@ export function DetailDrawer({
                           </div>
                         </CollapsibleSection>
 
-                        <CollapsibleSection title="Investment Profile" icon={<Landmark className="h-4 w-4 text-muted-foreground" />} defaultOpen={false}>
+                        <CollapsibleSection title="Investment Profile" icon={<Landmark className="h-4 w-4 text-muted-foreground" />} defaultOpen={false} useSectionLabel>
                           <div className="space-y-0.5">
                             <EditableFieldRow label="Target Asset Classes" isEditing={isEditing}
                               value={<span data-testid="text-targetAssetClasses">{Array.isArray(entity?.targetAssetClasses) ? entity.targetAssetClasses.join(', ') : entity?.targetAssetClasses || "-"}</span>}
@@ -834,7 +834,7 @@ export function DetailDrawer({
                           </div>
                         </CollapsibleSection>
 
-                        <CollapsibleSection title="Relationship & Compliance" icon={<Scale className="h-4 w-4 text-muted-foreground" />} defaultOpen={false}>
+                        <CollapsibleSection title="Relationship & Compliance" icon={<Scale className="h-4 w-4 text-muted-foreground" />} defaultOpen={false} useSectionLabel>
                           <div className="space-y-0.5">
                             <EditableFieldRow label="Relationship Score" isEditing={isEditing}
                               value={
@@ -898,7 +898,7 @@ export function DetailDrawer({
                     {/* Company Overview - Collapsible Sections */}
                     {entityType === "company" && (
                       <div className="space-y-3">
-                        <CollapsibleSection title="About" icon={<Building2 className="h-4 w-4 text-muted-foreground" />} defaultOpen={true}>
+                        <CollapsibleSection title="About" icon={<Building2 className="h-4 w-4 text-muted-foreground" />} defaultOpen={true} useSectionLabel>
                           <div className="space-y-0.5">
                             <EditableFieldRow label="Company Name" isEditing={isEditing}
                               value={<span data-testid="text-name">{entity?.name || "-"}</span>}
@@ -954,7 +954,7 @@ export function DetailDrawer({
                           </div>
                         </CollapsibleSection>
 
-                        <CollapsibleSection title="Financial & Business" icon={<DollarSign className="h-4 w-4 text-muted-foreground" />} defaultOpen={true}>
+                        <CollapsibleSection title="Financial & Business" icon={<DollarSign className="h-4 w-4 text-muted-foreground" />} defaultOpen={true} useSectionLabel>
                           <div className="space-y-0.5">
                             <EditableFieldRow label="Annual Revenue" isEditing={isEditing}
                               value={<span data-testid="text-annualRevenue">{entity?.annualRevenue ? `$${Number(entity.annualRevenue).toLocaleString()}` : "-"}</span>}
@@ -995,7 +995,7 @@ export function DetailDrawer({
                           </div>
                         </CollapsibleSection>
 
-                        <CollapsibleSection title="Acquisition & Portfolio" icon={<Target className="h-4 w-4 text-muted-foreground" />} defaultOpen={true}>
+                        <CollapsibleSection title="Acquisition & Portfolio" icon={<Target className="h-4 w-4 text-muted-foreground" />} defaultOpen={true} useSectionLabel>
                           <div className="space-y-0.5">
                             <EditableFieldRow label="Acquisition Interest" isEditing={isEditing}
                               value={
@@ -1015,7 +1015,7 @@ export function DetailDrawer({
                           </div>
                         </CollapsibleSection>
 
-                        <CollapsibleSection title="Office Location" icon={<MapPin className="h-4 w-4 text-muted-foreground" />} defaultOpen={false}>
+                        <CollapsibleSection title="Office Location" icon={<MapPin className="h-4 w-4 text-muted-foreground" />} defaultOpen={false} useSectionLabel>
                           <div className="space-y-0.5">
                             <EditableFieldRow label="Address" isEditing={isEditing}
                               value={<span data-testid="text-address">{entity?.address || "-"}</span>}
@@ -1040,7 +1040,7 @@ export function DetailDrawer({
                           </div>
                         </CollapsibleSection>
 
-                        <CollapsibleSection title="Digital Presence" icon={<Globe className="h-4 w-4 text-muted-foreground" />} defaultOpen={false}>
+                        <CollapsibleSection title="Digital Presence" icon={<Globe className="h-4 w-4 text-muted-foreground" />} defaultOpen={false} useSectionLabel>
                           <div className="space-y-0.5">
                             <EditableFieldRow label="LinkedIn" isEditing={isEditing}
                               value={
@@ -1086,7 +1086,7 @@ export function DetailDrawer({
                     {/* Property Overview - Collapsible Sections */}
                     {entityType === "property" && (
                       <div className="space-y-3">
-                        <CollapsibleSection title="About" icon={<Anchor className="h-4 w-4 text-muted-foreground" />} defaultOpen={true}>
+                        <CollapsibleSection title="About" icon={<Anchor className="h-4 w-4 text-muted-foreground" />} defaultOpen={true} useSectionLabel>
                           <div className="space-y-0.5">
                             <EditableFieldRow label="Property Name" isEditing={isEditing}
                               value={<span data-testid="text-title">{entity?.title || entity?.name || "-"}</span>}
@@ -1152,7 +1152,7 @@ export function DetailDrawer({
                           </div>
                         </CollapsibleSection>
 
-                        <CollapsibleSection title="Location" icon={<MapPin className="h-4 w-4 text-muted-foreground" />} defaultOpen={true}>
+                        <CollapsibleSection title="Location" icon={<MapPin className="h-4 w-4 text-muted-foreground" />} defaultOpen={true} useSectionLabel>
                           <div className="space-y-0.5">
                             <EditableFieldRow label="Address" isEditing={isEditing}
                               value={<span data-testid="text-address">{entity?.address || "-"}</span>}
@@ -1173,7 +1173,7 @@ export function DetailDrawer({
                           </div>
                         </CollapsibleSection>
 
-                        <CollapsibleSection title="Marina Capacity" icon={<Ship className="h-4 w-4 text-muted-foreground" />} defaultOpen={true}>
+                        <CollapsibleSection title="Marina Capacity" icon={<Ship className="h-4 w-4 text-muted-foreground" />} defaultOpen={true} useSectionLabel>
                           <div className="space-y-0.5">
                             <EditableFieldRow label="Wet Slips" isEditing={isEditing}
                               value={<span data-testid="text-wetSlips">{entity?.wetSlips || "-"}</span>}
@@ -1198,7 +1198,7 @@ export function DetailDrawer({
                           </div>
                         </CollapsibleSection>
 
-                        <CollapsibleSection title="Amenities" icon={<Hash className="h-4 w-4 text-muted-foreground" />} defaultOpen={false}
+                        <CollapsibleSection title="Amenities" icon={<Hash className="h-4 w-4 text-muted-foreground" />} defaultOpen={false} useSectionLabel
                           badge={entity?.amenities?.length ? <Badge variant="outline" className="ml-1 text-xs">{entity.amenities.length}</Badge> : undefined}>
                           <div data-testid="text-amenities">
                             {entity?.amenities && Array.isArray(entity.amenities) && entity.amenities.length > 0 ? (
@@ -1211,7 +1211,7 @@ export function DetailDrawer({
                           </div>
                         </CollapsibleSection>
 
-                        <CollapsibleSection title="Financials" icon={<DollarSign className="h-4 w-4 text-muted-foreground" />} defaultOpen={true}>
+                        <CollapsibleSection title="Financials" icon={<DollarSign className="h-4 w-4 text-muted-foreground" />} defaultOpen={true} useSectionLabel>
                           <div className="space-y-0.5">
                             <EditableFieldRow label="Listing Price" isEditing={isEditing}
                               value={<span data-testid="text-listingPrice" className="font-medium text-green-600">{entity?.listingPrice ? `$${Number(entity.listingPrice).toLocaleString()}` : "-"}</span>}
@@ -1240,7 +1240,7 @@ export function DetailDrawer({
                           </div>
                         </CollapsibleSection>
 
-                        <CollapsibleSection title="Marina Features" icon={<Anchor className="h-4 w-4 text-muted-foreground" />} defaultOpen={false}>
+                        <CollapsibleSection title="Marina Features" icon={<Anchor className="h-4 w-4 text-muted-foreground" />} defaultOpen={false} useSectionLabel>
                           <div className="space-y-0.5">
                             <EditableFieldRow label="Total Slips" isEditing={isEditing}
                               value={<span data-testid="text-totalSlips">{entity?.totalSlips || "-"}</span>}
@@ -1294,7 +1294,7 @@ export function DetailDrawer({
                           </div>
                         </CollapsibleSection>
 
-                        <CollapsibleSection title="Transaction Details" icon={<BarChart3 className="h-4 w-4 text-muted-foreground" />} defaultOpen={false}>
+                        <CollapsibleSection title="Transaction Details" icon={<BarChart3 className="h-4 w-4 text-muted-foreground" />} defaultOpen={false} useSectionLabel>
                           <div className="space-y-0.5">
                             <EditableFieldRow label="Listing Status" isEditing={isEditing}
                               value={<span data-testid="text-listingStatus" className="capitalize">{entity?.listingStatus?.replace(/_/g, ' ') || "-"}</span>}
@@ -1337,7 +1337,7 @@ export function DetailDrawer({
                           </div>
                         </CollapsibleSection>
 
-                        <CollapsibleSection title="Sale History" icon={<TrendingUp className="h-4 w-4 text-muted-foreground" />} defaultOpen={false}>
+                        <CollapsibleSection title="Sale History" icon={<TrendingUp className="h-4 w-4 text-muted-foreground" />} defaultOpen={false} useSectionLabel>
                           <div className="space-y-0.5">
                             <EditableFieldRow label="Last Sale Date" isEditing={isEditing}
                               value={<span data-testid="text-lastSaleDate">{entity?.lastSaleDate ? new Date(entity.lastSaleDate).toLocaleDateString() : "-"}</span>}
@@ -1350,7 +1350,7 @@ export function DetailDrawer({
                           </div>
                         </CollapsibleSection>
 
-                        <CollapsibleSection title="Due Diligence Flags" icon={<AlertTriangle className="h-4 w-4 text-muted-foreground" />} defaultOpen={false}>
+                        <CollapsibleSection title="Due Diligence Flags" icon={<AlertTriangle className="h-4 w-4 text-muted-foreground" />} defaultOpen={false} useSectionLabel>
                           <div className="space-y-1 pt-1">
                             {[
                               { key: 'hasEnvIssues', label: 'Environmental Issues', editKey: 'hasEnvIssues' },

@@ -9,6 +9,7 @@ interface CollapsibleSectionProps {
   children: React.ReactNode;
   badge?: React.ReactNode;
   className?: string;
+  useSectionLabel?: boolean;
 }
 
 export function CollapsibleSection({
@@ -18,6 +19,7 @@ export function CollapsibleSection({
   children,
   badge,
   className,
+  useSectionLabel = false,
 }: CollapsibleSectionProps) {
   const [isOpen, setIsOpen] = useState(defaultOpen);
 
@@ -35,7 +37,14 @@ export function CollapsibleSection({
             <ChevronRight className="h-4 w-4 text-muted-foreground" />
           )}
           {icon}
-          <span className="text-sm font-semibold">{title}</span>
+          {useSectionLabel ? (
+            <span className="ws-section-label ws-section-label--compact flex-1">
+              {title}
+              <span className="ws-section-rule" />
+            </span>
+          ) : (
+            <span className="text-sm font-semibold">{title}</span>
+          )}
           {badge}
         </div>
       </button>

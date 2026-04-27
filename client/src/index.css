@@ -2019,6 +2019,10 @@ input[type="range"]::-moz-range-track {
   height: 1px;
   background: hsl(221, 20%, 88%);
 }
+.ws-section-label--compact {
+  margin-top: 0;
+  margin-bottom: 0;
+}
 .dark .ws-section-label {
   color: hsl(221, 40%, 65%);
   border-left-color: hsl(221, 50%, 45%);

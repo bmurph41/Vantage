@@ -62,9 +62,10 @@ interface CrmDetailSectionProps {
 export function CrmDetailSection({ title, children, className }: CrmDetailSectionProps) {
   return (
     <div className={cn("mb-6", className)}>
-      <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+      <div className="ws-section-label">
         {title}
-      </h3>
+        <span className="ws-section-rule" />
+      </div>
       {children}
     </div>
   );
