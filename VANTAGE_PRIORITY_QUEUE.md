@@ -22,11 +22,11 @@ This document is a **flat sequenced queue** in strict execution order, written f
 
 | | Items | Effort midpoint (hours) |
 |---|---:|---:|
-| Phase A (Tier 0 security showstoppers) | 11 | 36 |
+| Phase A (Tier 0 security showstoppers) | 12 | 44 |
 | Phase B (Tier 0.5 institutional gates) | 15 | 108 |
 | Phase C (Beta-flow must-ship) | 19 | 100.5 |
 | Phase D (Tier 1 active priorities) | 7 | 56 |
-| **Total to beta-ready** | **52** | **300** |
+| **Total to beta-ready** | **53** | **308** |
 | Phase E (post-beta visibility) | 60+ | not estimated |
 
 **Effort scale:** S = 0.5h, M = 2h, L = 8h, XL = 20h (midpoints used for totals).
@@ -121,14 +121,24 @@ Order rationale: SQL injection first (highest blast radius — exploitable from 
 
 ### A9. Audit all route files for missing orgId filters
 **Source:** AGENT_QUEUE.md Tier 0B item 4
+**Status:** 🔄 IN PROGRESS — A9-1 audit complete 2026-04-27 (see ROUTE_TENANT_AUDIT.md, 290 lines). A9-2 fixes pending.
 **Effort:** L
 **Mode:** [solo]
 **Description:** Grep all `server/routes/` for `.where(eq(...id, req.params...))` patterns that lack an accompanying orgId condition on org-scoped tables; fix each occurrence.
 **Why this position in queue:** Systematic sweep after A6–A8 establishes the pattern; ends 0B with broad coverage.
 **Dependencies:** A6, A7, A8 (pattern must be established first)
 
+### A9-2. Fix tenant-isolation vulnerabilities found in A9-1 audit
+**Source:** A9-1 audit document ROUTE_TENANT_AUDIT.md (new finding 2026-04-27)
+**Effort:** L (4–12h for SEV-1+SEV-2 only; XL if SEV-3 triage included)
+**Mode:** [solo]
+**Description:** Apply fixes for every '❌ vulnerable' row in ROUTE_TENANT_AUDIT.md. **Phase 1 (SEV-1, ~2h):** fix 3 SQL injection sites in `server/services/distribution-approval-service.ts` lines 338/371/398 — replace raw template-literal SQL strings cast as `any` with parameterized `db.execute(sql\`\`)` (the same file at L106 already shows the correct pattern). Investigate L106 INSERT for parameter-binding bug. Add a contract test exercising malicious `draftId`. **Phase 2 (SEV-2, ~1h):** refactor 5 capital-account routes in `fund-management-routes.ts` to hoist atomic fund-org verification above account fetch. **Phase 3 (SEV-3, L–XL):** manual line-by-line triage of 8 high-flag T1 files (crm-routes 51, budget-routes 25, broker-dashboard 24, infrastructure 22, crm-summary 17, operations-context 16, dd-routes 14, modeling-routes 14) to separate true vulnerabilities from parent-validation false-positives.
+**Why this position in queue:** SEV-1 is highest-severity finding from A9-1 (real SQL injection in shipping code, regression of A1–A5 audit's intent). Mechanical fix.
+**Dependencies:** A9-1 (just completed)
+
 ### A10. Wrap distribution execution in db.transaction()
 **Source:** AGENT_QUEUE.md Tier 0C item 1
+**Status:** ✅ DONE 2026-04-27 — verified clean during A9-1 audit; `execute()` at distribution-approval-service.ts:233 already wraps sequence in `db.transaction()`.
 **Effort:** M
 **Mode:** [solo]
 **Description:** `server/services/distribution-approval-service.ts` `execute()` method performs 4+ sequential DB operations (draft lookup, compliance checks, fund distribution processing, draft update, audit log) without transaction; wrap in `await db.transaction(async (tx) => { ... })` passing tx to each step.

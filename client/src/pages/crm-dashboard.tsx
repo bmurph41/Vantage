@@ -261,9 +261,6 @@ export default function CRMDashboard() {
           <Link href="/crm/leads">
             <Button size="sm"><TrendingUp className="w-4 h-4 mr-1.5" />New Lead</Button>
           </Link>
-          <Link href="/crm/deals">
-            <Button variant="outline" size="sm"><DollarSign className="w-4 h-4 mr-1.5" />New Deal</Button>
-          </Link>
         </div>
       </div>
 
