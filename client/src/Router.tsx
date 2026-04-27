@@ -4,6 +4,7 @@ import { Loader2, Anchor } from "lucide-react";
 import { CommandPalette } from "@/components/CommandPalette";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { useAuth, RequireRole } from "@/contexts/AuthContext";
+import { useToast } from "@/hooks/use-toast";
 import { EntitlementsProvider } from "@/contexts/EntitlementsContext";
 import { PackGate, type PackType } from "@/contexts/PackContext";
 import { AIAssistant } from "@/components/ai-assistant";
@@ -45,6 +46,21 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
 // Always redirect to dashboard
 function LandingOrDashboard() {
   return <Redirect to="/dashboard" />;
+}
+
+// Shown when a non-broker/admin user navigates directly to the Forecast page
+function ForecastAccessDenied() {
+  const { toast } = useToast();
+  const [, setLocation] = useLocation();
+  useEffect(() => {
+    toast({
+      title: "Access restricted",
+      description: "The Forecast page is available to Broker users only.",
+      variant: "destructive",
+    });
+    setLocation("/pipeline/deal-board");
+  }, []);
+  return null;
 }
 
 // Code-split less frequently used pages
@@ -1799,7 +1815,7 @@ function Router() {
       </Route>
       <Route path="/pipeline/forecast">
         {() => (
-          <RequireRole role={['broker', 'admin']} fallback={<Redirect to="/pipeline/deal-board" />}>
+          <RequireRole role={['broker', 'admin']} fallback={<ForecastAccessDenied />}>
             <GatedLayout pack="crm_pipeline">
               <Forecast />
             </GatedLayout>
@@ -1983,7 +1999,7 @@ function Router() {
       </Route>
       <Route path="/crm/forecast">
         {() => (
-          <RequireRole role={['broker', 'admin']} fallback={<Redirect to="/pipeline/deal-board" />}>
+          <RequireRole role={['broker', 'admin']} fallback={<ForecastAccessDenied />}>
             <GatedLayout pack="crm_pipeline">
               <Forecast />
             </GatedLayout>
