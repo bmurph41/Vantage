@@ -328,22 +328,16 @@ fundManagementRouter.get('/capital-accounts/:id', async (req: Request, res: Resp
 
     const db = await getDb();
 
-    const [account] = await db
-      .select()
+    // Atomic orgId check via fundsV2 join — capitalAccounts is indirectly org-scoped via fundId
+    const [row] = await db
+      .select({ account: capitalAccounts })
       .from(capitalAccounts)
-      .where(eq(capitalAccounts.id, req.params.id));
+      .innerJoin(fundsV2, eq(capitalAccounts.fundId, fundsV2.id))
+      .where(and(eq(capitalAccounts.id, req.params.id), eq(fundsV2.orgId, orgId)));
 
-    if (!account) return res.status(404).json({ error: 'Capital account not found' });
+    if (!row) return res.status(404).json({ error: 'Capital account not found' });
 
-    // Verify fund belongs to org
-    const [fund] = await db
-      .select()
-      .from(fundsV2)
-      .where(and(eq(fundsV2.id, account.fundId), eq(fundsV2.orgId, orgId)));
-
-    if (!fund) return res.status(404).json({ error: 'Fund not found' });
-
-    res.json(account);
+    res.json(row.account);
   } catch (error) {
     console.error('Error fetching capital account:', error);
     res.status(500).json({ error: 'Failed to fetch capital account' });
@@ -358,20 +352,14 @@ fundManagementRouter.get('/capital-accounts/:id/entries', async (req: Request, r
 
     const db = await getDb();
 
-    // Verify capital account belongs to this org via parent fund
+    // Atomic orgId check via fundsV2 join — capitalAccounts is indirectly org-scoped via fundId
     const [account] = await db
       .select({ id: capitalAccounts.id, fundId: capitalAccounts.fundId })
       .from(capitalAccounts)
-      .where(eq(capitalAccounts.id, req.params.id));
+      .innerJoin(fundsV2, eq(capitalAccounts.fundId, fundsV2.id))
+      .where(and(eq(capitalAccounts.id, req.params.id), eq(fundsV2.orgId, orgId)));
 
     if (!account) return res.status(404).json({ error: 'Capital account not found' });
-
-    const [fund] = await db
-      .select({ id: fundsV2.id })
-      .from(fundsV2)
-      .where(and(eq(fundsV2.id, account.fundId), eq(fundsV2.orgId, orgId)));
-
-    if (!fund) return res.status(404).json({ error: 'Capital account not found' });
 
     const pag = parsePagination(req.query as Record<string, any>, { pageSize: 50 });
     const [{ total }] = await db.select({ total: drizzleCount() }).from(capitalAccountEntries)
@@ -399,23 +387,17 @@ fundManagementRouter.post('/capital-accounts/:id/entries', async (req: Request, 
 
     const db = await getDb();
 
-    // Fetch current account
-    const [account] = await db
-      .select()
+    // Atomic orgId gate via fundsV2 join — capitalAccounts is indirectly org-scoped via fundId
+    const [row] = await db
+      .select({ account: capitalAccounts })
       .from(capitalAccounts)
-      .where(eq(capitalAccounts.id, req.params.id));
+      .innerJoin(fundsV2, eq(capitalAccounts.fundId, fundsV2.id))
+      .where(and(eq(capitalAccounts.id, req.params.id), eq(fundsV2.orgId, orgId)));
 
-    if (!account) return res.status(404).json({ error: 'Capital account not found' });
+    if (!row) return res.status(404).json({ error: 'Capital account not found' });
+    const account = row.account;
 
-    // Verify fund belongs to org
-    const [fund] = await db
-      .select()
-      .from(fundsV2)
-      .where(and(eq(fundsV2.id, account.fundId), eq(fundsV2.orgId, orgId)));
-
-    if (!fund) return res.status(404).json({ error: 'Fund not found' });
-
-    // Insert immutable entry
+    // Insert immutable entry — explicit fields override any req.body overrides for critical FKs
     const [entry] = await db
       .insert(capitalAccountEntries)
       .values({
@@ -465,20 +447,15 @@ fundManagementRouter.get('/capital-accounts/:id/statement', async (req: Request,
 
     const db = await getDb();
 
-    const [account] = await db
-      .select()
+    // Atomic orgId check via fundsV2 join — capitalAccounts is indirectly org-scoped via fundId
+    const [row] = await db
+      .select({ account: capitalAccounts })
       .from(capitalAccounts)
-      .where(eq(capitalAccounts.id, req.params.id));
+      .innerJoin(fundsV2, eq(capitalAccounts.fundId, fundsV2.id))
+      .where(and(eq(capitalAccounts.id, req.params.id), eq(fundsV2.orgId, orgId)));
 
-    if (!account) return res.status(404).json({ error: 'Capital account not found' });
-
-    // Verify fund belongs to org
-    const [fund] = await db
-      .select()
-      .from(fundsV2)
-      .where(and(eq(fundsV2.id, account.fundId), eq(fundsV2.orgId, orgId)));
-
-    if (!fund) return res.status(404).json({ error: 'Fund not found' });
+    if (!row) return res.status(404).json({ error: 'Capital account not found' });
+    const account = row.account;
 
     // Aggregate entries by type
     const entries = await db

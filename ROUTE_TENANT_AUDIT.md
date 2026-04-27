@@ -186,14 +186,20 @@ Not deep-audited in A9-1. Reading the routes-level scan, this file isn't in the 
 - **Reachable from:** Routes that call `submitForApproval`, `approve`, `reject`, `execute`, `listDrafts`, `getDraft` (all through `req.user.orgId` paths but with user-controlled `draftId`/`fundId`/`status`).
 - **Fix shipped 2026-04-27 (A9-2 Phase 1):** All 4 sites converted to Drizzle's parameterized `db.execute(sql\`...\`)` template tag. `as any` casts removed from SQL paths. createDraft INSERT functionality restored — function now actually persists data instead of inserting NULLs/runtime-failing. updateDraft's hand-rolled `.replace(/'/g, "''")` quote-escaping deleted (unnecessary with proper parameterization). listDrafts conditional `${statusFilter}` string-concat replaced with `sql\`AND status = ${status}\`` fragment-or-empty pattern. Verified: typecheck preserved at 824 baseline, build succeeded, no SQL `${...}` interpolations remain outside the `sql\`\`` template tag.
 
-### 🟡 SEV-2 — Post-fetch orgId checks in fund-management-routes.ts capital-account routes
+### ✅ SEV-2 — Post-fetch orgId checks in fund-management-routes.ts capital-account routes — FIXED 2026-04-27
 - **File:** `server/routes/fund-management-routes.ts`
-- **Lines:** 324, 354, 406, 451, 471 (5 sites)
-- **Class:** TOCTOU — fetch first, verify orgId after
-- **Reachable from:** `/capital-accounts/:id` (and 4 sibling routes)
-- **Severity:** Medium. Real attack requires DB write access (which is already game-over). But the audit-A8 spec called this out specifically as an institutional-gate concern.
-- **Fix complexity:** Mechanical. Either join or hoist the fund-org check above the account fetch.
-- **A9-2 priority:** medium.
+- **Original audit listed 5 sites:** L263, L296, L324, L354, L394
+- **Triage result during A9-2 Phase 2 Substep 1+2:**
+  - L263 (GET `/capital-accounts/fund/:fundId`) — **audit false-positive**. Already used parent-validation pattern correctly (atomic fund.orgId check at L271-274 before child query at L279-286). No fix needed.
+  - L296 (POST `/capital-accounts`) — **audit false-positive**. Already used parent-validation pattern correctly (atomic fund.orgId check at L304-307 before insert at L311-314). No fix needed.
+  - L324 (GET `/capital-accounts/:id`) — **true SEV-2**. Fixed.
+  - L354 (GET `/capital-accounts/:id/entries`) — **true SEV-2**. Fixed.
+  - L394 (POST `/capital-accounts/:id/entries`) — **true SEV-2**. Fixed.
+- **Newly discovered during Substep 1 read of file:** L461 (GET `/capital-accounts/:id/statement`) — same SEV-2 post-fetch pattern that the original audit missed. Fixed in same commit.
+- **Net:** 4 true SEV-2 sites identified across audit + sweep, all 4 fixed.
+- **Fix shipped 2026-04-27 (A9-2 Phase 2):** Pattern B applied — `.innerJoin(fundsV2, eq(capitalAccounts.fundId, fundsV2.id))` with atomic `eq(fundsV2.orgId, orgId)` in WHERE. Combined the fetch + orgId-validation into a single query per route. `capitalAccounts` and `capitalAccountEntries` are indirectly org-scoped (no direct `org_id` column) — JOIN through `fundsV2` was the correct approach. The DB never returns rows for cross-tenant resources; same 404 response shape preserved on misses. POST route's downstream insert and recalculation logic unchanged because `account.fundId` and `account.investorId` are now extracted from the gate-validated row.
+- **Substep 5 sweep result:** Zero new SEV-2 patterns elsewhere in the file. All other `.where(eq())` queries either atomically scoped or inside org-validated route bodies.
+- **Minor observation (NOT vulnerable, deferred for consistency):** 4 reporting routes (L685 `/funds/:fundId/pme`, L699 `/funds/:fundId/attribution`, L713 `/funds/:fundId/j-curve`, L727 `/vintage-cohorts`) skip the `if (!orgId) return 401` guard that every other route in the file uses. They go straight to `(req as any).user?.orgId` without the guard. If orgId is undefined, it's bound as NULL by Drizzle and the underlying query returns empty (graceful degradation, no data leak). Style inconsistency only.
 
 ### 🟡 SEV-3 — High flag-count files needing A9-2 manual triage
 - **Files:** `crm-routes.ts` (51), `budget-routes.ts` (25), `broker-dashboard-routes.ts` (24), `infrastructure-routes.ts` (22), `crm-summary-routes.ts` (17), `operations-context-routes.ts` (16), `dd-routes.ts` (14), `modeling-routes.ts` (14)
