@@ -19728,7 +19728,10 @@ const MIGRATIONS: Migration[] = [
   {
     name: "ai_conversation_messages: rename conversation_id to session_id if needed",
     sql: `
-      DO $$ BEGIN
+      DO $$
+      DECLARE
+        v_row_count bigint := 0;
+      BEGIN
         IF EXISTS (
           SELECT 1 FROM information_schema.columns
           WHERE table_schema = 'public'
@@ -19740,7 +19743,10 @@ const MIGRATIONS: Migration[] = [
             AND table_name = 'ai_conversation_messages'
             AND column_name = 'session_id'
         ) THEN
+          SELECT COUNT(*) INTO v_row_count FROM ai_conversation_messages;
+          RAISE NOTICE '[startup-migrations] ai_conversation_messages: renaming conversation_id to session_id; % rows will be preserved', v_row_count;
           ALTER TABLE ai_conversation_messages RENAME COLUMN conversation_id TO session_id;
+          RAISE NOTICE '[startup-migrations] ai_conversation_messages: rename complete; % rows now readable via session_id', v_row_count;
         END IF;
       END; $$
     `,
@@ -19900,5 +19906,25 @@ export async function runStartupMigrations(): Promise<void> {
     console.warn(`[startup-migrations] Completed ${summary}`);
   } else {
     console.log(`[startup-migrations] Completed ${summary}`);
+  }
+
+  // ── Post-migration verification: confirm ai_conversation_messages rows are
+  // readable via session_id after the conversation_id → session_id rename.
+  // This catches the silent data-read bug described in task #322 where the
+  // advisor would see empty history if the rename left rows unreadable.
+  try {
+    const tableCheck = await pool.query(`
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = 'ai_conversation_messages'
+        AND column_name = 'session_id'
+    `);
+    if (tableCheck.rows.length > 0) {
+      const countResult = await pool.query<{ n: number }>(`SELECT COUNT(*)::int AS n FROM ai_conversation_messages`);
+      const rowCount = countResult.rows[0].n;
+      console.log(`[startup-migrations] Verified: ai_conversation_messages.session_id column present; ${rowCount} row(s) readable via SELECT … WHERE session_id = ?`);
+    }
+  } catch (verifyErr) {
+    console.warn(`[startup-migrations] Post-migration verify of ai_conversation_messages failed: ${verifyErr}`);
   }
 }

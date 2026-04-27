@@ -4,7 +4,7 @@ import {
   RadarChart, PolarGrid, PolarAngleAxis, Radar, ResponsiveContainer,
   BarChart, Bar, XAxis, YAxis, Tooltip as ReTooltip, LineChart, Line, CartesianGrid
 } from "recharts";
-import { ASSET_REGISTRY, type AssetRegistryEntry } from "@/lib/asset-registry";
+import type { AssetRegistryEntry } from "@/lib/asset-registry";
 
 
 // ═══════════════════════════════════════════════════════════════════════════════
