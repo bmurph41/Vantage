@@ -47,12 +47,12 @@ import {
   BarChart3,
   Wallet,
 } from "lucide-react";
-import { MarinaModal } from "@/components/portfolio/MarinaModal";
+import { AssetModal } from "@/components/portfolio/AssetModal";
 import MarinaMapEmbed from "@/components/marina-map/MarinaMapEmbed";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency, formatPercent } from "@/lib/utils";
 
-interface OwnedMarina {
+interface OwnedAsset {
   id: string;
   name: string;
   location: string;
@@ -70,7 +70,6 @@ interface OwnedMarina {
 }
 
 interface PortfolioSummary {
-  totalMarinas: number;
   totalAssets: number;
   totalValue: number;
   totalEbitda: number;
@@ -142,39 +141,39 @@ function KpiBar({ summary, totalCost, unrealizedGain, gainPercent, avgCapRate }:
   );
 }
 
-function AssetCard({ marina, onEdit, onDelete, navigate }: {
-  marina: OwnedMarina;
-  onEdit: (m: OwnedMarina) => void;
-  onDelete: (m: OwnedMarina) => void;
+function AssetCard({ asset, onEdit, onDelete, navigate }: {
+  asset: OwnedAsset;
+  onEdit: (m: OwnedAsset) => void;
+  onDelete: (m: OwnedAsset) => void;
   navigate: (path: string) => void;
 }) {
-  const gain = (marina.currentValue || 0) - (marina.acquisitionPrice || 0);
-  const gainPct = marina.acquisitionPrice ? ((gain / marina.acquisitionPrice) * 100).toFixed(1) : null;
-  const capRate = marina.currentValue && marina.annualEbitda
-    ? ((marina.annualEbitda / marina.currentValue) * 100).toFixed(1)
+  const gain = (asset.currentValue || 0) - (asset.acquisitionPrice || 0);
+  const gainPct = asset.acquisitionPrice ? ((gain / asset.acquisitionPrice) * 100).toFixed(1) : null;
+  const capRate = asset.currentValue && asset.annualEbitda
+    ? ((asset.annualEbitda / asset.currentValue) * 100).toFixed(1)
     : null;
-  const occupiedSlips = Math.round((marina.slips || 0) * ((marina.occupancy || 0) / 100));
+  const occupiedSlips = Math.round((asset.slips || 0) * ((asset.occupancy || 0) / 100));
 
   return (
     <Card
       className="group hover:shadow-lg hover:border-primary/30 transition-all duration-200 cursor-pointer flex flex-col overflow-hidden"
-      onClick={() => navigate(`/portfolio/${marina.id}`)}
+      onClick={() => navigate(`/portfolio/${asset.id}`)}
     >
       <div className="h-2 w-full bg-gradient-to-r from-primary/70 to-primary/20" />
       <CardHeader className="pb-3 pt-4">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
             <CardTitle className="text-base font-semibold leading-tight group-hover:text-primary transition-colors truncate">
-              {marina.name}
+              {asset.name}
             </CardTitle>
             <div className="flex items-center gap-1 mt-1 text-xs text-muted-foreground">
               <MapPin className="h-3 w-3 shrink-0" />
-              <span className="truncate">{marina.location}, {marina.state}</span>
+              <span className="truncate">{asset.location}, {asset.state}</span>
             </div>
           </div>
           <div className="flex items-center gap-1 shrink-0">
-            <Badge variant={statusVariant[marina.status] || "secondary"} className="text-xs whitespace-nowrap">
-              {statusLabel[marina.status] || marina.status?.replace(/_/g, " ") || "Unknown"}
+            <Badge variant={statusVariant[asset.status] || "secondary"} className="text-xs whitespace-nowrap">
+              {statusLabel[asset.status] || asset.status?.replace(/_/g, " ") || "Unknown"}
             </Badge>
             <DropdownMenu>
               <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
@@ -183,29 +182,29 @@ function AssetCard({ marina, onEdit, onDelete, navigate }: {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-                <DropdownMenuItem onClick={() => navigate(`/portfolio/${marina.id}`)}>
+                <DropdownMenuItem onClick={() => navigate(`/portfolio/${asset.id}`)}>
                   <Eye className="h-4 w-4 mr-2" />
                   View Details
                 </DropdownMenuItem>
-                {marina.propertyId && (
-                  <DropdownMenuItem onClick={() => navigate(`/crm/properties/${marina.propertyId}`)}>
+                {asset.propertyId && (
+                  <DropdownMenuItem onClick={() => navigate(`/crm/properties/${asset.propertyId}`)}>
                     <Building2 className="h-4 w-4 mr-2" />
                     View Property
                   </DropdownMenuItem>
                 )}
-                {marina.projectId && (
-                  <DropdownMenuItem onClick={() => navigate(`/modeling/projects/${marina.projectId}`)}>
+                {asset.projectId && (
+                  <DropdownMenuItem onClick={() => navigate(`/modeling/projects/${asset.projectId}`)}>
                     <ExternalLink className="h-4 w-4 mr-2" />
                     View Model
                   </DropdownMenuItem>
                 )}
-                <DropdownMenuItem onClick={() => onEdit(marina)}>
+                <DropdownMenuItem onClick={() => onEdit(asset)}>
                   <Pencil className="h-4 w-4 mr-2" />
                   Edit
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
-                  onClick={() => onDelete(marina)}
+                  onClick={() => onDelete(asset)}
                   className="text-destructive focus:text-destructive"
                 >
                   <Trash2 className="h-4 w-4 mr-2" />
@@ -221,12 +220,12 @@ function AssetCard({ marina, onEdit, onDelete, navigate }: {
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-0.5">
             <div className="text-xs text-muted-foreground">Acq. Price</div>
-            <div className="text-sm font-semibold">{formatCurrency(marina.acquisitionPrice)}</div>
-            <div className="text-xs text-muted-foreground">{formatDate(marina.acquisitionDate)}</div>
+            <div className="text-sm font-semibold">{formatCurrency(asset.acquisitionPrice)}</div>
+            <div className="text-xs text-muted-foreground">{formatDate(asset.acquisitionDate)}</div>
           </div>
           <div className="space-y-0.5">
             <div className="text-xs text-muted-foreground">Current Value</div>
-            <div className="text-sm font-semibold">{formatCurrency(marina.currentValue)}</div>
+            <div className="text-sm font-semibold">{formatCurrency(asset.currentValue)}</div>
             {gainPct && (
               <div className={`text-xs flex items-center gap-0.5 ${gain >= 0 ? "text-green-600" : "text-red-600"}`}>
                 {gain >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
@@ -236,28 +235,28 @@ function AssetCard({ marina, onEdit, onDelete, navigate }: {
           </div>
           <div className="space-y-0.5">
             <div className="text-xs text-muted-foreground">Annual EBITDA</div>
-            <div className="text-sm font-semibold">{formatCurrency(marina.annualEbitda)}</div>
+            <div className="text-sm font-semibold">{formatCurrency(asset.annualEbitda)}</div>
             {capRate && <div className="text-xs text-muted-foreground">{capRate}% cap rate</div>}
           </div>
           <div className="space-y-0.5">
             <div className="text-xs text-muted-foreground">Annual Revenue</div>
-            <div className="text-sm font-semibold">{formatCurrency(marina.annualRevenue)}</div>
+            <div className="text-sm font-semibold">{formatCurrency(asset.annualRevenue)}</div>
           </div>
         </div>
 
-        {marina.slips && (
+        {asset.slips && (
           <div className="space-y-1.5">
             <div className="flex items-center justify-between text-xs">
               <span className="text-muted-foreground flex items-center gap-1">
                 <Anchor className="h-3 w-3" />
-                {occupiedSlips} / {marina.slips} slips occupied
+                {occupiedSlips} / {asset.slips} slips occupied
               </span>
-              <span className={`font-medium ${(marina.occupancy || 0) >= 85 ? "text-green-600" : (marina.occupancy || 0) >= 70 ? "text-amber-600" : "text-red-500"}`}>
-                {formatPercent(marina.occupancy)}
+              <span className={`font-medium ${(asset.occupancy || 0) >= 85 ? "text-green-600" : (asset.occupancy || 0) >= 70 ? "text-amber-600" : "text-red-500"}`}>
+                {formatPercent(asset.occupancy)}
               </span>
             </div>
             <Progress
-              value={marina.occupancy || 0}
+              value={asset.occupancy || 0}
               className="h-1.5"
             />
           </div>
@@ -318,9 +317,9 @@ export default function Portfolio() {
 
   const [modalOpen, setModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<"create" | "edit">("create");
-  const [selectedMarina, setSelectedMarina] = useState<OwnedMarina | null>(null);
+  const [selectedAsset, setSelectedAsset] = useState<OwnedAsset | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [marinaToDelete, setMarinaToDelete] = useState<OwnedMarina | null>(null);
+  const [assetToDelete, setAssetToDelete] = useState<OwnedAsset | null>(null);
   const [mapSource, setMapSource] = useState<'owned' | 'pipeline' | 'all'>('all');
   const [sortBy, setSortBy] = useState<'name' | 'value' | 'ebitda' | 'occupancy'>('name');
 
@@ -334,7 +333,7 @@ export default function Portfolio() {
     navigate(tab === "assets" ? "/portfolio" : `/portfolio?tab=${tab}`, { replace: true });
   };
 
-  const { data: marinas, isLoading } = useQuery<OwnedMarina[]>({
+  const { data: assets, isLoading } = useQuery<OwnedAsset[]>({
     queryKey: ["/api/portfolio/marinas"],
   });
 
@@ -345,36 +344,35 @@ export default function Portfolio() {
       queryClient.invalidateQueries({ queryKey: ["/api/portfolio/available-properties"] });
       toast({ title: "Asset removed from portfolio" });
       setDeleteDialogOpen(false);
-      setMarinaToDelete(null);
+      setAssetToDelete(null);
     },
     onError: (error: any) => {
       toast({ title: "Failed to remove asset", description: error.message, variant: "destructive" });
     },
   });
 
-  const handleAddAsset = () => { setSelectedMarina(null); setModalMode("create"); setModalOpen(true); };
-  const handleEditMarina = (marina: OwnedMarina) => { setSelectedMarina(marina); setModalMode("edit"); setModalOpen(true); };
-  const handleDeleteMarina = (marina: OwnedMarina) => { setMarinaToDelete(marina); setDeleteDialogOpen(true); };
-  const confirmDelete = () => { if (marinaToDelete) deleteMutation.mutate(marinaToDelete.id); };
+  const handleAddAsset = () => { setSelectedAsset(null); setModalMode("create"); setModalOpen(true); };
+  const handleEditAsset = (asset: OwnedAsset) => { setSelectedAsset(asset); setModalMode("edit"); setModalOpen(true); };
+  const handleDeleteAsset = (asset: OwnedAsset) => { setAssetToDelete(asset); setDeleteDialogOpen(true); };
+  const confirmDelete = () => { if (assetToDelete) deleteMutation.mutate(assetToDelete.id); };
 
   const summary: PortfolioSummary = {
-    totalMarinas: marinas?.length || 0,
-    totalAssets: marinas?.length || 0,
-    totalValue: marinas?.reduce((s, m) => s + (m.currentValue || m.acquisitionPrice || 0), 0) || 0,
-    totalEbitda: marinas?.reduce((s, m) => s + (m.annualEbitda || 0), 0) || 0,
-    totalSlips: marinas?.reduce((s, m) => s + (m.slips || 0), 0) || 0,
-    totalUnits: marinas?.reduce((s, m) => s + (m.slips || 0), 0) || 0,
-    avgOccupancy: marinas?.length ? marinas.reduce((s, m) => s + (m.occupancy || 0), 0) / marinas.length : 0,
-    totalRevenue: marinas?.reduce((s, m) => s + (m.annualRevenue || 0), 0) || 0,
+    totalAssets: assets?.length || 0,
+    totalValue: assets?.reduce((s, m) => s + (m.currentValue || m.acquisitionPrice || 0), 0) || 0,
+    totalEbitda: assets?.reduce((s, m) => s + (m.annualEbitda || 0), 0) || 0,
+    totalSlips: assets?.reduce((s, m) => s + (m.slips || 0), 0) || 0,
+    totalUnits: assets?.reduce((s, m) => s + (m.slips || 0), 0) || 0,
+    avgOccupancy: assets?.length ? assets.reduce((s, m) => s + (m.occupancy || 0), 0) / assets.length : 0,
+    totalRevenue: assets?.reduce((s, m) => s + (m.annualRevenue || 0), 0) || 0,
   };
-  const totalCost = marinas?.reduce((s, m) => s + (m.acquisitionPrice || 0), 0) || 0;
+  const totalCost = assets?.reduce((s, m) => s + (m.acquisitionPrice || 0), 0) || 0;
   const unrealizedGain = summary.totalValue - totalCost;
   const gainPercent = totalCost > 0 ? ((unrealizedGain / totalCost) * 100).toFixed(1) : "0";
   const avgCapRate = summary.totalValue > 0 ? ((summary.totalEbitda / summary.totalValue) * 100).toFixed(1) : "0";
   const revenuePerUnit = (summary.totalUnits || summary.totalSlips) > 0
     ? Math.round(summary.totalRevenue / (summary.totalUnits || summary.totalSlips)) : 0;
 
-  const sortedMarinas = [...(marinas || [])].sort((a, b) => {
+  const sortedAssets = [...(assets || [])].sort((a, b) => {
     if (sortBy === 'value') return (b.currentValue || 0) - (a.currentValue || 0);
     if (sortBy === 'ebitda') return (b.annualEbitda || 0) - (a.annualEbitda || 0);
     if (sortBy === 'occupancy') return (b.occupancy || 0) - (a.occupancy || 0);
@@ -455,7 +453,7 @@ export default function Portfolio() {
             </TabsTrigger>
           </TabsList>
 
-          {activeTab === "assets" && (marinas?.length || 0) > 0 && (
+          {activeTab === "assets" && (assets?.length || 0) > 0 && (
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <span>Sort by:</span>
               {(["name", "value", "ebitda", "occupancy"] as const).map((s) => (
@@ -472,16 +470,16 @@ export default function Portfolio() {
         </div>
 
         <TabsContent value="assets" className="mt-4">
-          {!marinas || marinas.length === 0 ? (
+          {!assets || assets.length === 0 ? (
             <EmptyPortfolio onAdd={handleAddAsset} />
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {sortedMarinas.map((marina) => (
+              {sortedAssets.map((asset) => (
                 <AssetCard
-                  key={marina.id}
-                  marina={marina}
-                  onEdit={handleEditMarina}
-                  onDelete={handleDeleteMarina}
+                  key={asset.id}
+                  asset={asset}
+                  onEdit={handleEditAsset}
+                  onDelete={handleDeleteAsset}
                   navigate={navigate}
                 />
               ))}
@@ -575,43 +573,43 @@ export default function Portfolio() {
             <FinancialSummaryCard label="Revenue per Unit" value={formatCurrency(revenuePerUnit)} />
           </div>
 
-          {marinas && marinas.length > 0 && (
+          {assets && assets.length > 0 && (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {[...marinas]
+              {[...assets]
                 .sort((a, b) => (b.currentValue || 0) - (a.currentValue || 0))
-                .map((marina) => {
-                  const gain = (marina.currentValue || 0) - (marina.acquisitionPrice || 0);
-                  const pct = marina.acquisitionPrice ? ((gain / marina.acquisitionPrice) * 100).toFixed(1) : null;
-                  const capRate = marina.currentValue && marina.annualEbitda
-                    ? ((marina.annualEbitda / marina.currentValue) * 100).toFixed(1)
+                .map((asset) => {
+                  const gain = (asset.currentValue || 0) - (asset.acquisitionPrice || 0);
+                  const pct = asset.acquisitionPrice ? ((gain / asset.acquisitionPrice) * 100).toFixed(1) : null;
+                  const capRate = asset.currentValue && asset.annualEbitda
+                    ? ((asset.annualEbitda / asset.currentValue) * 100).toFixed(1)
                     : null;
                   return (
                     <Card
-                      key={marina.id}
+                      key={asset.id}
                       className="hover:shadow-md hover:border-primary/20 transition-all cursor-pointer"
-                      onClick={() => navigate(`/portfolio/${marina.id}`)}
+                      onClick={() => navigate(`/portfolio/${asset.id}`)}
                     >
                       <CardHeader className="pb-2">
                         <div className="flex items-center justify-between">
-                          <CardTitle className="text-sm font-semibold">{marina.name}</CardTitle>
+                          <CardTitle className="text-sm font-semibold">{asset.name}</CardTitle>
                           {capRate && (
                             <Badge variant="outline" className="text-xs">{capRate}% cap</Badge>
                           )}
                         </div>
                         <CardDescription className="text-xs flex items-center gap-1">
                           <MapPin className="h-3 w-3" />
-                          {marina.location}, {marina.state}
+                          {asset.location}, {asset.state}
                         </CardDescription>
                       </CardHeader>
                       <CardContent className="pt-0">
                         <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
                           <div>
                             <div className="text-muted-foreground">Cost Basis</div>
-                            <div className="font-semibold">{formatCurrency(marina.acquisitionPrice)}</div>
+                            <div className="font-semibold">{formatCurrency(asset.acquisitionPrice)}</div>
                           </div>
                           <div>
                             <div className="text-muted-foreground">Current Value</div>
-                            <div className="font-semibold">{formatCurrency(marina.currentValue)}</div>
+                            <div className="font-semibold">{formatCurrency(asset.currentValue)}</div>
                           </div>
                           <div>
                             <div className="text-muted-foreground">Gain / Loss</div>
@@ -622,7 +620,7 @@ export default function Portfolio() {
                           </div>
                           <div>
                             <div className="text-muted-foreground">Annual EBITDA</div>
-                            <div className="font-semibold">{formatCurrency(marina.annualEbitda)}</div>
+                            <div className="font-semibold">{formatCurrency(asset.annualEbitda)}</div>
                           </div>
                         </div>
                       </CardContent>
@@ -632,7 +630,7 @@ export default function Portfolio() {
             </div>
           )}
 
-          {(!marinas || marinas.length === 0) && (
+          {(!assets || assets.length === 0) && (
             <div className="text-center py-16 text-muted-foreground">
               <Wallet className="h-10 w-10 mx-auto mb-3 opacity-40" />
               <p>No financial data available. Add assets to get started.</p>
@@ -654,32 +652,32 @@ export default function Portfolio() {
             />
           </div>
 
-          {marinas && marinas.length > 0 && (
+          {assets && assets.length > 0 && (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {[...marinas]
+              {[...assets]
                 .sort((a, b) => (b.occupancy || 0) - (a.occupancy || 0))
-                .map((marina) => {
-                  const occ = marina.occupancy || 0;
-                  const occupied = Math.round((marina.slips || 0) * (occ / 100));
-                  const vacant = (marina.slips || 0) - occupied;
-                  const revPerSlip = marina.slips && marina.annualRevenue
-                    ? Math.round(marina.annualRevenue / marina.slips) : 0;
+                .map((asset) => {
+                  const occ = asset.occupancy || 0;
+                  const occupied = Math.round((asset.slips || 0) * (occ / 100));
+                  const vacant = (asset.slips || 0) - occupied;
+                  const revPerSlip = asset.slips && asset.annualRevenue
+                    ? Math.round(asset.annualRevenue / asset.slips) : 0;
                   return (
                     <Card
-                      key={marina.id}
+                      key={asset.id}
                       className="hover:shadow-md hover:border-primary/20 transition-all cursor-pointer"
-                      onClick={() => navigate(`/portfolio/${marina.id}`)}
+                      onClick={() => navigate(`/portfolio/${asset.id}`)}
                     >
                       <CardHeader className="pb-2">
                         <div className="flex items-center justify-between">
-                          <CardTitle className="text-sm font-semibold">{marina.name}</CardTitle>
+                          <CardTitle className="text-sm font-semibold">{asset.name}</CardTitle>
                           <span className={`text-sm font-bold ${occ >= 85 ? "text-green-600" : occ >= 70 ? "text-amber-600" : "text-red-500"}`}>
                             {formatPercent(occ)}
                           </span>
                         </div>
                         <CardDescription className="text-xs flex items-center gap-1">
                           <MapPin className="h-3 w-3" />
-                          {marina.location}, {marina.state}
+                          {asset.location}, {asset.state}
                         </CardDescription>
                       </CardHeader>
                       <CardContent className="pt-0 space-y-2">
@@ -687,7 +685,7 @@ export default function Portfolio() {
                         <div className="grid grid-cols-3 gap-2 text-xs">
                           <div className="text-center">
                             <div className="text-muted-foreground">Total</div>
-                            <div className="font-semibold">{marina.slips || "—"}</div>
+                            <div className="font-semibold">{asset.slips || "—"}</div>
                           </div>
                           <div className="text-center">
                             <div className="text-muted-foreground text-green-600">Occupied</div>
@@ -710,7 +708,7 @@ export default function Portfolio() {
             </div>
           )}
 
-          {(!marinas || marinas.length === 0) && (
+          {(!assets || assets.length === 0) && (
             <div className="text-center py-16 text-muted-foreground">
               <BarChart3 className="h-10 w-10 mx-auto mb-3 opacity-40" />
               <p>No performance data available. Add assets to get started.</p>
@@ -719,10 +717,10 @@ export default function Portfolio() {
         </TabsContent>
       </Tabs>
 
-      <MarinaModal
+      <AssetModal
         open={modalOpen}
         onOpenChange={setModalOpen}
-        marina={selectedMarina}
+        asset={selectedAsset}
         mode={modalMode}
       />
 
@@ -731,7 +729,7 @@ export default function Portfolio() {
           <AlertDialogHeader>
             <AlertDialogTitle>Remove Asset from Portfolio?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will remove "{marinaToDelete?.name}" from your portfolio. The property will still exist in your CRM but won't be tracked as an owned asset.
+              This will remove "{assetToDelete?.name}" from your portfolio. The property will still exist in your CRM but won't be tracked as an owned asset.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

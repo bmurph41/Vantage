@@ -33,7 +33,7 @@ import MarinaBudgetTab from "@/components/operations/MarinaBudgetTab";
 import MarinaMapEmbed from "@/components/marina-map/MarinaMapEmbed";
 import { Map } from "lucide-react";
 
-interface OwnedMarina {
+interface OwnedAsset {
   id: string;
   name: string;
   location: string;
@@ -51,7 +51,7 @@ interface OwnedMarina {
 }
 
 interface PortfolioSummary {
-  totalMarinas: number;
+  totalAssets: number;
   totalValue: number;
   totalEbitda: number;
   totalSlips: number;
@@ -117,24 +117,24 @@ function KPICard({
   );
 }
 
-export default function OwnedMarinas() {
+export default function OwnedAssets() {
   const [, navigate] = useLocation();
   const [activeTab, setActiveTab] = useState("overview");
 
-  const { data: marinas, isLoading } = useQuery<OwnedMarina[]>({
+  const { data: assets, isLoading } = useQuery<OwnedAsset[]>({
     queryKey: ["/api/operations/owned-marinas"],
   });
 
   const summary: PortfolioSummary = {
-    totalMarinas: marinas?.length || 0,
-    totalValue: marinas?.reduce((sum, m) => sum + (m.currentValue || m.acquisitionPrice || 0), 0) || 0,
-    totalEbitda: marinas?.reduce((sum, m) => sum + (m.annualEbitda || 0), 0) || 0,
-    totalSlips: marinas?.reduce((sum, m) => sum + (m.slips || 0), 0) || 0,
+    totalAssets: assets?.length || 0,
+    totalValue: assets?.reduce((sum, m) => sum + (m.currentValue || m.acquisitionPrice || 0), 0) || 0,
+    totalEbitda: assets?.reduce((sum, m) => sum + (m.annualEbitda || 0), 0) || 0,
+    totalSlips: assets?.reduce((sum, m) => sum + (m.slips || 0), 0) || 0,
     avgOccupancy:
-      marinas && marinas.length > 0
-        ? marinas.reduce((sum, m) => sum + (m.occupancy || 0), 0) / marinas.length
+      assets && assets.length > 0
+        ? assets.reduce((sum, m) => sum + (m.occupancy || 0), 0) / assets.length
         : 0,
-    totalRevenue: marinas?.reduce((sum, m) => sum + (m.annualRevenue || 0), 0) || 0,
+    totalRevenue: assets?.reduce((sum, m) => sum + (m.annualRevenue || 0), 0) || 0,
   };
 
   if (isLoading) {
@@ -184,7 +184,7 @@ export default function OwnedMarinas() {
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         <KPICard
           label="Owned Assets"
-          value={String(summary.totalMarinas)}
+          value={String(summary.totalAssets)}
           icon={Building2}
           color="blue"
         />
@@ -241,7 +241,7 @@ export default function OwnedMarinas() {
               <CardDescription>All owned assets and their key metrics</CardDescription>
             </CardHeader>
             <CardContent>
-              {(!marinas || marinas.length === 0) ? (
+              {(!assets || assets.length === 0) ? (
                 <div className="text-center py-12 text-muted-foreground">
                   <Building2 className="h-12 w-12 mx-auto mb-4 opacity-50" />
                   <p className="text-lg font-medium mb-2">No owned assets yet</p>
@@ -268,44 +268,44 @@ export default function OwnedMarinas() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {marinas.map((marina) => (
-                        <TableRow key={marina.id} data-testid={`row-marina-${marina.id}`}>
-                          <TableCell className="font-medium">{marina.name}</TableCell>
+                      {assets.map((asset) => (
+                        <TableRow key={asset.id} data-testid={`row-marina-${asset.id}`}>
+                          <TableCell className="font-medium">{asset.name}</TableCell>
                           <TableCell>
                             <div className="flex items-center gap-1 text-muted-foreground">
                               <MapPin className="h-3 w-3" />
-                              {marina.location}, {marina.state}
+                              {asset.location}, {asset.state}
                             </div>
                           </TableCell>
                           <TableCell className="text-right">
-                            <div>{formatCurrency(marina.acquisitionPrice)}</div>
+                            <div>{formatCurrency(asset.acquisitionPrice)}</div>
                             <div className="text-xs text-muted-foreground">
-                              {formatDate(marina.acquisitionDate)}
+                              {formatDate(asset.acquisitionDate)}
                             </div>
                           </TableCell>
                           <TableCell className="text-right font-medium">
-                            {formatCurrency(marina.currentValue)}
+                            {formatCurrency(asset.currentValue)}
                           </TableCell>
                           <TableCell className="text-right">
-                            {formatCurrency(marina.annualEbitda)}
+                            {formatCurrency(asset.annualEbitda)}
                           </TableCell>
-                          <TableCell className="text-right">{marina.slips || "-"}</TableCell>
+                          <TableCell className="text-right">{asset.slips || "-"}</TableCell>
                           <TableCell className="text-right">
-                            {formatPercent(marina.occupancy)}
+                            {formatPercent(asset.occupancy)}
                           </TableCell>
                           <TableCell>
                             <Badge
-                              variant={marina.status === "active" ? "default" : "secondary"}
+                              variant={asset.status === "active" ? "default" : "secondary"}
                             >
-                              {marina.status}
+                              {asset.status}
                             </Badge>
                           </TableCell>
                           <TableCell>
-                            {marina.projectId && (
+                            {asset.projectId && (
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => navigate(`/modeling/projects/${marina.projectId}`)}
+                                onClick={() => navigate(`/modeling/projects/${asset.projectId}`)}
                               >
                                 <ExternalLink className="h-4 w-4" />
                               </Button>
@@ -328,7 +328,7 @@ export default function OwnedMarinas() {
               <CardDescription>Financial performance trends across your portfolio</CardDescription>
             </CardHeader>
             <CardContent>
-              {(!marinas || marinas.length === 0) ? (
+              {(!assets || assets.length === 0) ? (
                 <div className="text-center py-12 text-muted-foreground">
                   <BarChart3 className="h-12 w-12 mx-auto mb-4 opacity-50" />
                   <p className="text-lg font-medium mb-2">No marina data available</p>
@@ -338,9 +338,9 @@ export default function OwnedMarinas() {
                 <div className="space-y-8">
                   {(() => {
                     const CHART_COLORS = ['#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'];
-                    const revenueData = marinas.map(m => ({ name: m.name, revenue: m.annualRevenue || 0 }));
-                    const marginData = marinas.map(m => ({ name: m.name, margin: m.annualRevenue ? ((m.annualEbitda || 0) / m.annualRevenue) * 100 : 0 }));
-                    const occupancyData = marinas.map(m => ({ name: m.name, occupancy: m.occupancy || 0 }));
+                    const revenueData = assets.map(m => ({ name: m.name, revenue: m.annualRevenue || 0 }));
+                    const marginData = assets.map(m => ({ name: m.name, margin: m.annualRevenue ? ((m.annualEbitda || 0) / m.annualRevenue) * 100 : 0 }));
+                    const occupancyData = assets.map(m => ({ name: m.name, occupancy: m.occupancy || 0 }));
 
                     return (
                       <>
@@ -416,7 +416,7 @@ export default function OwnedMarinas() {
                           </CardHeader>
                           <CardContent>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                              {marinas.map((m, i) => {
+                              {assets.map((m, i) => {
                                 const acquisition = m.acquisitionPrice || 0;
                                 const current = m.currentValue || acquisition;
                                 const appreciation = acquisition > 0 ? ((current - acquisition) / acquisition) * 100 : 0;

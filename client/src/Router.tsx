@@ -149,13 +149,13 @@ const MarketingAutomation = lazy(() => import("@/pages/marketing-automation"));
 const CrmActivitiesPage = lazy(() => import("@/pages/crm-activities"));
 const CalendarSettings = lazy(() => import("@/pages/calendar-settings"));
 const CustomerAnalytics = lazy(() => import("@/pages/operations/CustomerAnalytics"));
-const OwnedMarinas = lazy(() => import("@/pages/operations/OwnedMarinas"));
+const OwnedAssets = lazy(() => import("@/pages/operations/OwnedAssets"));
 const CommercialTenants = lazy(() => import("@/pages/operations/commercial-tenants"));
 const Portfolio = lazy(() => import("@/pages/Portfolio"));
 const MarinalyticsPage = lazy(() => import("@/pages/marinalytics"));
 const MarinaMapPage = lazy(() => import("@/pages/marina-map"));
 const FinancialAnalysis = lazy(() => import("@/pages/analysis/financial-analysis"));
-const MarinaDetail = lazy(() => import("@/pages/portfolio/MarinaDetail"));
+const AssetDetail = lazy(() => import("@/pages/portfolio/AssetDetail"));
 // Rent Roll V2 - Layouts (lazy with preloading)
 const RentRollV2ProjectLayout = lazy(() => import("@/modules/rent-roll-v2/layouts/ProjectLayout"));
 const RentRollV2PortfolioLayout = lazy(() => import("@/modules/rent-roll-v2/layouts/PortfolioLayout"));
@@ -1288,7 +1288,7 @@ function Router() {
       <Route path="/portfolio/:id">
         {() => (
           <GatedLayout pack="operations">
-            <MarinaDetail />
+            <AssetDetail />
           </GatedLayout>
         )}
       </Route>

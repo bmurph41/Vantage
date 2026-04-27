@@ -11,10 +11,10 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2, Building2, Calendar, DollarSign, Target, FileText, Link2, Pencil } from "lucide-react";
 import { ASSET_REGISTRY, type AssetRegistryEntry } from "@/lib/asset-registry";
 
-interface MarinaModalProps {
+interface AssetModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  marina?: any;
+  asset?: any;
   mode: "create" | "edit";
 }
 
@@ -72,7 +72,7 @@ function CurrencyInput({
   );
 }
 
-export function MarinaModal({ open, onOpenChange, marina, mode }: MarinaModalProps) {
+export function AssetModal({ open, onOpenChange, asset, mode }: AssetModalProps) {
   const { toast } = useToast();
   const [entryMode, setEntryMode] = useState<EntryMode>("manual");
   const [formData, setFormData] = useState({
@@ -123,30 +123,30 @@ export function MarinaModal({ open, onOpenChange, marina, mode }: MarinaModalPro
     ASSET_REGISTRY[formData.assetClass] || ASSET_REGISTRY["marina"];
 
   useEffect(() => {
-    if (marina && mode === "edit") {
-      setEntryMode(marina.modelingProjectId ? "linked" : "manual");
+    if (asset && mode === "edit") {
+      setEntryMode(asset?.modelingProjectId ? "linked" : "manual");
       setFormData({
-        propertyId: marina.propertyId || "",
-        modelingProjectId: marina.modelingProjectId || "",
-        assetClass: marina.assetClass || "marina",
-        acquisitionDate: marina.acquisitionDate ? marina.acquisitionDate.split("T")[0] : "",
-        acquisitionPrice: marina.acquisitionPrice?.toString() || "",
-        status: marina.status || "under_management",
-        holdStrategy: marina.holdStrategy || "",
-        exitTargetDate: marina.exitTargetDate ? marina.exitTargetDate.split("T")[0] : "",
-        notes: marina.notes || "",
+        propertyId: asset?.propertyId || "",
+        modelingProjectId: asset?.modelingProjectId || "",
+        assetClass: asset?.assetClass || "marina",
+        acquisitionDate: asset?.acquisitionDate ? asset?.acquisitionDate.split("T")[0] : "",
+        acquisitionPrice: asset?.acquisitionPrice?.toString() || "",
+        status: asset?.status || "under_management",
+        holdStrategy: asset?.holdStrategy || "",
+        exitTargetDate: asset?.exitTargetDate ? asset?.exitTargetDate.split("T")[0] : "",
+        notes: asset?.notes || "",
         keyMetrics: {
-          currentValue: marina.keyMetrics?.currentValue?.toString() || marina.currentValue?.toString() || "",
-          annualRevenue: marina.keyMetrics?.annualRevenue?.toString() || marina.annualRevenue?.toString() || "",
-          annualEbitda: marina.keyMetrics?.annualEbitda?.toString() || marina.annualEbitda?.toString() || "",
-          occupancy: marina.keyMetrics?.occupancy?.toString() || marina.occupancy?.toString() || "",
-          slips: marina.keyMetrics?.slips?.toString() || marina.slips?.toString() || "",
+          currentValue: asset?.keyMetrics?.currentValue?.toString() || asset?.currentValue?.toString() || "",
+          annualRevenue: asset?.keyMetrics?.annualRevenue?.toString() || asset?.annualRevenue?.toString() || "",
+          annualEbitda: asset?.keyMetrics?.annualEbitda?.toString() || asset?.annualEbitda?.toString() || "",
+          occupancy: asset?.keyMetrics?.occupancy?.toString() || asset?.occupancy?.toString() || "",
+          slips: asset?.keyMetrics?.slips?.toString() || asset?.slips?.toString() || "",
           // Prefer split rev streams; fall back to legacy lump-sum annualRevenue in rev1
           rev1:
-            marina.keyMetrics?.revenueStreams?.rev1?.toString() ||
-            (marina.keyMetrics?.revenueStreams ? "" : marina.keyMetrics?.annualRevenue?.toString() || marina.annualRevenue?.toString() || ""),
-          rev2: marina.keyMetrics?.revenueStreams?.rev2?.toString() || "",
-          rev3: marina.keyMetrics?.revenueStreams?.rev3?.toString() || "",
+            asset?.keyMetrics?.revenueStreams?.rev1?.toString() ||
+            (asset?.keyMetrics?.revenueStreams ? "" : asset?.keyMetrics?.annualRevenue?.toString() || asset?.annualRevenue?.toString() || ""),
+          rev2: asset?.keyMetrics?.revenueStreams?.rev2?.toString() || "",
+          rev3: asset?.keyMetrics?.revenueStreams?.rev3?.toString() || "",
         },
       });
     } else if (mode === "create") {
@@ -170,7 +170,7 @@ export function MarinaModal({ open, onOpenChange, marina, mode }: MarinaModalPro
         },
       });
     }
-  }, [marina, mode, open]);
+  }, [asset, mode, open]);
 
   // When the user picks a modeling project in linked mode, copy its assetClass
   // into formData (server is authoritative on create; this keeps the UI honest).
@@ -203,7 +203,7 @@ export function MarinaModal({ open, onOpenChange, marina, mode }: MarinaModalPro
 
   const updateMutation = useMutation({
     mutationFn: async (data: any) => {
-      return await apiRequest(`/api/portfolio/marinas/${marina.id}`, {
+      return await apiRequest(`/api/portfolio/marinas/${asset?.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
@@ -387,7 +387,7 @@ export function MarinaModal({ open, onOpenChange, marina, mode }: MarinaModalPro
                   ))}
                 </SelectContent>
               </Select>
-              {mode === "edit" && marina?.modelingProjectId && (
+              {mode === "edit" && asset?.modelingProjectId && (
                 <p className="text-xs text-muted-foreground">
                   Changing asset class does not update the linked modeling project.
                 </p>
@@ -432,11 +432,11 @@ export function MarinaModal({ open, onOpenChange, marina, mode }: MarinaModalPro
             </div>
           )}
 
-          {mode === "edit" && marina && (
+          {mode === "edit" && asset && (
             <div className="p-3 bg-muted rounded-md">
-              <div className="font-medium">{marina.name}</div>
+              <div className="font-medium">{asset?.name}</div>
               <div className="text-sm text-muted-foreground">
-                {marina.address || `${marina.location}, ${marina.state}`}
+                {asset?.address || `${asset?.location}, ${asset?.state}`}
               </div>
             </div>
           )}

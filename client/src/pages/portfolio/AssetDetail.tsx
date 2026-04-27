@@ -29,7 +29,7 @@ import {
 } from "lucide-react";
 import { formatCurrency, formatPercent } from "@/lib/utils";
 
-interface MarinaDetails {
+interface AssetDetails {
   id: string;
   propertyId: string;
   projectId?: string;
@@ -111,23 +111,23 @@ function MetricCard({
   );
 }
 
-export default function MarinaDetail() {
+export default function AssetDetail() {
   const { id } = useParams<{ id: string }>();
   const [, navigate] = useLocation();
 
-  const { data: marina, isLoading, error } = useQuery<MarinaDetails>({
+  const { data: asset, isLoading, error } = useQuery<AssetDetails>({
     queryKey: [`/api/portfolio/marinas/${id}`],
     enabled: !!id,
   });
 
   const { data: salesComps, isLoading: loadingSalesComps } = useQuery<SalesComp[]>({
-    queryKey: ["/api/analysis/sales-comps", { state: marina?.state }],
-    enabled: !!marina?.state,
+    queryKey: ["/api/analysis/sales-comps", { state: asset?.state }],
+    enabled: !!asset?.state,
   });
 
   const { data: rateComps, isLoading: loadingRateComps } = useQuery<RateComp[]>({
-    queryKey: ["/api/analysis/rate-comps", { state: marina?.state }],
-    enabled: !!marina?.state,
+    queryKey: ["/api/analysis/rate-comps", { state: asset?.state }],
+    enabled: !!asset?.state,
   });
 
   if (isLoading) {
@@ -150,7 +150,7 @@ export default function MarinaDetail() {
     );
   }
 
-  if (error || !marina) {
+  if (error || !asset) {
     return (
       <div className="container mx-auto p-6">
         <Card>
@@ -170,13 +170,13 @@ export default function MarinaDetail() {
     );
   }
 
-  const capRate = marina.currentValue && marina.annualEbitda 
-    ? ((marina.annualEbitda / marina.currentValue) * 100).toFixed(1) 
+  const capRate = asset.currentValue && asset.annualEbitda 
+    ? ((asset.annualEbitda / asset.currentValue) * 100).toFixed(1) 
     : "-";
 
-  const unrealizedGain = (marina.currentValue || 0) - (marina.acquisitionPrice || 0);
-  const gainPercent = marina.acquisitionPrice && marina.currentValue
-    ? (((marina.currentValue - marina.acquisitionPrice) / marina.acquisitionPrice) * 100).toFixed(1)
+  const unrealizedGain = (asset.currentValue || 0) - (asset.acquisitionPrice || 0);
+  const gainPercent = asset.acquisitionPrice && asset.currentValue
+    ? (((asset.currentValue - asset.acquisitionPrice) / asset.acquisitionPrice) * 100).toFixed(1)
     : "0";
 
   return (
@@ -189,23 +189,23 @@ export default function MarinaDetail() {
           <div>
             <h1 className="text-2xl font-bold flex items-center gap-2">
               <Building2 className="h-6 w-6" />
-              {marina.name}
+              {asset.name}
             </h1>
             <div className="flex items-center gap-2 text-muted-foreground">
               <MapPin className="h-4 w-4" />
-              {marina.address || `${marina.city}, ${marina.state} ${marina.zip || ""}`}
+              {asset.address || `${asset.city}, ${asset.state} ${asset.zip || ""}`}
             </div>
           </div>
         </div>
         <div className="flex gap-2">
-          {marina.propertyId && (
-            <Button variant="outline" onClick={() => navigate(`/crm/properties/${marina.propertyId}`)}>
+          {asset.propertyId && (
+            <Button variant="outline" onClick={() => navigate(`/crm/properties/${asset.propertyId}`)}>
               <ExternalLink className="h-4 w-4 mr-2" />
               View Property
             </Button>
           )}
-          {marina.projectId && (
-            <Button variant="outline" onClick={() => navigate(`/modeling/projects/${marina.projectId}`)}>
+          {asset.projectId && (
+            <Button variant="outline" onClick={() => navigate(`/modeling/projects/${asset.projectId}`)}>
               <BarChart3 className="h-4 w-4 mr-2" />
               View Model
             </Button>
@@ -214,19 +214,19 @@ export default function MarinaDetail() {
       </div>
 
       <div className="flex items-center gap-2">
-        <Badge variant={marina.status === "under_management" ? "default" : "secondary"}>
-          {marina.status?.replace(/_/g, " ")}
+        <Badge variant={asset.status === "under_management" ? "default" : "secondary"}>
+          {asset.status?.replace(/_/g, " ")}
         </Badge>
-        {marina.holdStrategy && (
+        {asset.holdStrategy && (
           <Badge variant="outline">
             <Target className="h-3 w-3 mr-1" />
-            {marina.holdStrategy.replace(/_/g, " ")}
+            {asset.holdStrategy.replace(/_/g, " ")}
           </Badge>
         )}
-        {marina.acquisitionDate && (
+        {asset.acquisitionDate && (
           <Badge variant="outline">
             <Calendar className="h-3 w-3 mr-1" />
-            Acquired {formatDate(marina.acquisitionDate)}
+            Acquired {formatDate(asset.acquisitionDate)}
           </Badge>
         )}
       </div>
@@ -234,12 +234,12 @@ export default function MarinaDetail() {
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
         <MetricCard
           label="Current Value"
-          value={formatCurrency(marina.currentValue)}
+          value={formatCurrency(asset.currentValue)}
           icon={DollarSign}
         />
         <MetricCard
           label="Acquisition Price"
-          value={formatCurrency(marina.acquisitionPrice)}
+          value={formatCurrency(asset.acquisitionPrice)}
           icon={DollarSign}
         />
         <MetricCard
@@ -250,7 +250,7 @@ export default function MarinaDetail() {
         />
         <MetricCard
           label="Annual EBITDA"
-          value={formatCurrency(marina.annualEbitda)}
+          value={formatCurrency(asset.annualEbitda)}
           icon={TrendingUp}
         />
         <MetricCard
@@ -260,9 +260,9 @@ export default function MarinaDetail() {
         />
         <MetricCard
           label="Total Slips"
-          value={String(marina.slips || 0)}
+          value={String(asset.slips || 0)}
           icon={Anchor}
-          subtitle={`${marina.occupancy || 0}% occupied`}
+          subtitle={`${asset.occupancy || 0}% occupied`}
         />
       </div>
 
@@ -286,25 +286,25 @@ export default function MarinaDetail() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <div className="text-sm text-muted-foreground">Address</div>
-                    <div className="font-medium">{marina.address || "-"}</div>
+                    <div className="font-medium">{asset.address || "-"}</div>
                   </div>
                   <div>
                     <div className="text-sm text-muted-foreground">City</div>
-                    <div className="font-medium">{marina.city || "-"}</div>
+                    <div className="font-medium">{asset.city || "-"}</div>
                   </div>
                   <div>
                     <div className="text-sm text-muted-foreground">State</div>
-                    <div className="font-medium">{marina.state || "-"}</div>
+                    <div className="font-medium">{asset.state || "-"}</div>
                   </div>
                   <div>
                     <div className="text-sm text-muted-foreground">ZIP</div>
-                    <div className="font-medium">{marina.zip || "-"}</div>
+                    <div className="font-medium">{asset.zip || "-"}</div>
                   </div>
                 </div>
-                {marina.exitTargetDate && (
+                {asset.exitTargetDate && (
                   <div>
                     <div className="text-sm text-muted-foreground">Exit Target</div>
-                    <div className="font-medium">{formatDate(marina.exitTargetDate)}</div>
+                    <div className="font-medium">{formatDate(asset.exitTargetDate)}</div>
                   </div>
                 )}
               </CardContent>
@@ -321,21 +321,21 @@ export default function MarinaDetail() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <div className="text-sm text-muted-foreground">Annual Revenue</div>
-                    <div className="font-medium">{formatCurrency(marina.annualRevenue)}</div>
+                    <div className="font-medium">{formatCurrency(asset.annualRevenue)}</div>
                   </div>
                   <div>
                     <div className="text-sm text-muted-foreground">Annual EBITDA</div>
-                    <div className="font-medium">{formatCurrency(marina.annualEbitda)}</div>
+                    <div className="font-medium">{formatCurrency(asset.annualEbitda)}</div>
                   </div>
                   <div>
                     <div className="text-sm text-muted-foreground">Occupancy</div>
-                    <div className="font-medium">{marina.occupancy || 0}%</div>
+                    <div className="font-medium">{asset.occupancy || 0}%</div>
                   </div>
                   <div>
                     <div className="text-sm text-muted-foreground">Revenue/Slip</div>
                     <div className="font-medium">
-                      {marina.slips && marina.annualRevenue 
-                        ? formatCurrency(marina.annualRevenue / marina.slips) 
+                      {asset.slips && asset.annualRevenue 
+                        ? formatCurrency(asset.annualRevenue / asset.slips) 
                         : "-"}
                     </div>
                   </div>
@@ -343,7 +343,7 @@ export default function MarinaDetail() {
               </CardContent>
             </Card>
 
-            {marina.notes && (
+            {asset.notes && (
               <Card className="md:col-span-2">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -352,7 +352,7 @@ export default function MarinaDetail() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-muted-foreground whitespace-pre-wrap">{marina.notes}</p>
+                  <p className="text-muted-foreground whitespace-pre-wrap">{asset.notes}</p>
                 </CardContent>
               </Card>
             )}
@@ -364,7 +364,7 @@ export default function MarinaDetail() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <DollarSign className="h-5 w-5" />
-                Sales Comparables in {marina.state}
+                Sales Comparables in {asset.state}
               </CardTitle>
               <CardDescription>
                 Recent sales in the same state for benchmarking
@@ -380,7 +380,7 @@ export default function MarinaDetail() {
               ) : !salesComps || salesComps.length === 0 ? (
                 <div className="text-center py-12 text-muted-foreground">
                   <Waves className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p>No sales comparables found for {marina.state}</p>
+                  <p>No sales comparables found for {asset.state}</p>
                   <Button 
                     variant="outline" 
                     className="mt-4"
@@ -435,7 +435,7 @@ export default function MarinaDetail() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <DollarSign className="h-5 w-5" />
-                Rate Comparables in {marina.state}
+                Rate Comparables in {asset.state}
               </CardTitle>
               <CardDescription>
                 Current rental rates at nearby properties
@@ -451,7 +451,7 @@ export default function MarinaDetail() {
               ) : !rateComps || rateComps.length === 0 ? (
                 <div className="text-center py-12 text-muted-foreground">
                   <Anchor className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p>No rate comparables found for {marina.state}</p>
+                  <p>No rate comparables found for {asset.state}</p>
                   <Button 
                     variant="outline" 
                     className="mt-4"
