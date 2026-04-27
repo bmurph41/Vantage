@@ -86,18 +86,27 @@ const formatDate = (date: string | null): string => {
 };
 
 const statusLabel: Record<string, string> = {
+  pending_acquisition: "Pending Acquisition",
+  under_contract: "Under Contract",
   under_management: "Under Management",
   stabilizing: "Stabilizing",
   value_add: "Value-Add",
+  optimization: "Optimization",
   disposition: "Disposition",
+  disposed: "Disposed",
   other: "Other",
 };
 
 const statusVariant: Record<string, "default" | "secondary" | "outline" | "destructive"> = {
+  pending_acquisition: "secondary",
+  under_contract: "secondary",
   under_management: "default",
-  stabilizing: "secondary",
-  value_add: "outline",
-  disposition: "destructive",
+  stabilizing: "default",
+  value_add: "default",
+  optimization: "default",
+  disposition: "outline",
+  disposed: "outline",
+  other: "outline",
 };
 
 function KpiBar({ summary, totalCost, unrealizedGain, gainPercent, avgCapRate }: {

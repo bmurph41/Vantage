@@ -193,8 +193,8 @@ export const ddTemplateTypeEnum = pgEnum("dd_template_type", ["environmental", "
 // Persona and Dashboard enums
 export const personaTypeEnum = pgEnum("persona_type", ["pe_investor", "broker", "operator", "advisor"]);
 export const widgetCategoryEnum = pgEnum("widget_category", ["analytics", "pipeline", "operations", "finance", "tasks", "market_intel"]);
-export const assetStatusEnum = pgEnum("asset_status", ["under_management", "optimization", "exit"]);
-export const holdStrategyEnum = pgEnum("hold_strategy", ["core", "value_add", "opportunistic"]);
+export const assetStatusEnum = pgEnum("asset_status", ["pending_acquisition", "under_contract", "under_management", "stabilizing", "value_add", "optimization", "exit", "disposition", "disposed", "other"]);
+export const holdStrategyEnum = pgEnum("hold_strategy", ["core", "core_plus", "value_add", "opportunistic", "development", "distressed", "other"]);
 export const nwcBucketTypeEnum = pgEnum("nwc_bucket_type", ["current_asset", "current_liability", "nwc_adjustment"]);
 
 // Prospecting enums

@@ -263,10 +263,15 @@ export function MarinaModal({ open, onOpenChange, marina, mode }: MarinaModalPro
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="under_management">Under Management</SelectItem>
                   <SelectItem value="pending_acquisition">Pending Acquisition</SelectItem>
-                  <SelectItem value="disposed">Disposed</SelectItem>
                   <SelectItem value="under_contract">Under Contract</SelectItem>
+                  <SelectItem value="under_management">Under Management</SelectItem>
+                  <SelectItem value="stabilizing">Stabilizing</SelectItem>
+                  <SelectItem value="value_add">Value-Add</SelectItem>
+                  <SelectItem value="optimization">Optimization</SelectItem>
+                  <SelectItem value="disposition">Disposition</SelectItem>
+                  <SelectItem value="disposed">Disposed</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -285,9 +290,12 @@ export function MarinaModal({ open, onOpenChange, marina, mode }: MarinaModalPro
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="core">Core (Long-term Hold)</SelectItem>
+                  <SelectItem value="core_plus">Core Plus</SelectItem>
                   <SelectItem value="value_add">Value-Add</SelectItem>
                   <SelectItem value="opportunistic">Opportunistic</SelectItem>
                   <SelectItem value="development">Development</SelectItem>
+                  <SelectItem value="distressed">Distressed</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
                 </SelectContent>
               </Select>
             </div>

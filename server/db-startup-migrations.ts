@@ -19764,6 +19764,26 @@ const MIGRATIONS: Migration[] = [
       END; $$
     `,
   },
+
+  // ── asset_status enum: grow from 3 values to canonical 9-value set ──
+  // Existing values (under_management, optimization, exit) are preserved.
+  // 'exit' stays in the enum for backward compatibility — removing requires destructive type rebuild.
+  // Each ADD VALUE runs in its own pool.query (no wrapping txn) since
+  // ALTER TYPE ADD VALUE cannot run in a transaction with other commits.
+  { name: "asset_status: add value pending_acquisition", sql: `ALTER TYPE asset_status ADD VALUE IF NOT EXISTS 'pending_acquisition'` },
+  { name: "asset_status: add value under_contract",      sql: `ALTER TYPE asset_status ADD VALUE IF NOT EXISTS 'under_contract'` },
+  { name: "asset_status: add value stabilizing",         sql: `ALTER TYPE asset_status ADD VALUE IF NOT EXISTS 'stabilizing'` },
+  { name: "asset_status: add value value_add",           sql: `ALTER TYPE asset_status ADD VALUE IF NOT EXISTS 'value_add'` },
+  { name: "asset_status: add value disposition",         sql: `ALTER TYPE asset_status ADD VALUE IF NOT EXISTS 'disposition'` },
+  { name: "asset_status: add value disposed",            sql: `ALTER TYPE asset_status ADD VALUE IF NOT EXISTS 'disposed'` },
+  { name: "asset_status: add value other",               sql: `ALTER TYPE asset_status ADD VALUE IF NOT EXISTS 'other'` },
+
+  // ── hold_strategy enum: grow from 3 values to canonical 7-value set ──
+  // 'value_add' already exists and is preserved.
+  { name: "hold_strategy: add value core_plus",   sql: `ALTER TYPE hold_strategy ADD VALUE IF NOT EXISTS 'core_plus'` },
+  { name: "hold_strategy: add value development", sql: `ALTER TYPE hold_strategy ADD VALUE IF NOT EXISTS 'development'` },
+  { name: "hold_strategy: add value distressed",  sql: `ALTER TYPE hold_strategy ADD VALUE IF NOT EXISTS 'distressed'` },
+  { name: "hold_strategy: add value other",       sql: `ALTER TYPE hold_strategy ADD VALUE IF NOT EXISTS 'other'` },
 ];
 
 /**

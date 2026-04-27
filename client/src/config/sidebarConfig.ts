@@ -489,7 +489,7 @@ export const sidebarConfig: SidebarGroup[] = [
         label: 'Overview',
         isUniversal: true,
         items: [
-          { id: 'ops-portfolio', label: 'Portfolio', href: '/operations/portfolio', icon: Anchor, matchRoutes: ['/operations/portfolio', '/portfolio'], requiredModules: [FEATURE_MODULES.OPS_PORTFOLIO] },
+          { id: 'ops-portfolio', label: 'Portfolio', href: '/portfolio', icon: Anchor, matchRoutes: ['/operations/portfolio', '/portfolio'], requiredModules: [FEATURE_MODULES.OPS_PORTFOLIO] },
         ],
       },
       // ── Universal subcategories ──
