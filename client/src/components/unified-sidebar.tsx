@@ -737,24 +737,12 @@ export default function UnifiedSidebar() {
                   });
                   return (
                     <div>
-                      <button
-                        onClick={toggle}
-                        style={{ paddingLeft: "40px" }}
-                        className={cn(
-                          "flex items-center min-w-0 w-full transition-colors",
-                          "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-                          "text-[12px] px-4 py-[7px] md:py-[6px]",
-                          isActive ? "text-sidebar-primary font-medium" : "text-sidebar-foreground/60",
-                        )}
-                      >
-                        <span className="mr-2 text-sidebar-foreground/30 select-none flex-shrink-0">–</span>
-                        <span className="flex-1 text-left">Asset Classes</span>
-                        <ChevronDown className={cn(
-                          "w-3 h-3 flex-shrink-0 opacity-40 transition-transform duration-150 mr-2",
-                          isExpanded ? "rotate-0" : "-rotate-90"
-                        )} />
-                      </button>
-                      {isExpanded && enabledAssetClasses.map((ac) => (
+                      <div className="mx-4 mt-2 mb-1 flex items-center gap-2" style={{ paddingLeft: "24px" }}>
+                        <div className="flex-1 border-t border-sidebar-border/40" />
+                        <span className="text-[10px] uppercase tracking-widest text-sidebar-foreground/30 select-none flex-shrink-0">Asset Classes</span>
+                        <div className="flex-1 border-t border-sidebar-border/40" />
+                      </div>
+                      {enabledAssetClasses.map((ac) => (
                         <NavLink
                           key={ac.key}
                           item={{ name: ac.label, href: `/operations/asset/${ac.key}` }}
@@ -829,7 +817,7 @@ export default function UnifiedSidebar() {
                         )} />
                       </button>
                       {isExpanded && subcat.items.map((item) => (
-                        <NavLink key={item.name} item={item} depth={1} />
+                        <NavLink key={item.name} item={item} depth={2} />
                       ))}
                     </div>
                   );
