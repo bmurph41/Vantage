@@ -162,7 +162,7 @@ type BootstrapData = {
 
 export default function UnifiedSidebar() {
   const [location] = useLocation();
-  const { user } = useAuth();
+  const { user, hasRole } = useAuth();
   const [operationsExpanded, setOperationsExpanded] = useState(false); // Default collapsed for Operations
   const [crmExpanded, setCrmExpanded] = useState(false);
   const [pipelineExpanded, setPipelineExpanded] = useState(false); // Pipeline deals section
@@ -941,9 +941,11 @@ export default function UnifiedSidebar() {
             />
             {pipelineExpanded && hasPack('crm_pipeline') && (
               <div className="border-l-2 border-blue-500/40 ml-2 mr-1 bg-white/[0.04] rounded-br-sm pb-1 mb-2">
-                {pipelineDealNav.map((item) => (
-                  <NavLink key={item.name} item={item} />
-                ))}
+                {pipelineDealNav
+                  .filter(item => item.name !== 'Forecast' || hasRole(['broker', 'admin']))
+                  .map((item) => (
+                    <NavLink key={item.name} item={item} />
+                  ))}
               </div>
             )}
           </div>

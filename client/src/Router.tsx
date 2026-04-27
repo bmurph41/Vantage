@@ -3,7 +3,7 @@ import { Switch, Route, useLocation, Redirect } from "wouter";
 import { Loader2, Anchor } from "lucide-react";
 import { CommandPalette } from "@/components/CommandPalette";
 import { Breadcrumb } from "@/components/Breadcrumb";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth, RequireRole } from "@/contexts/AuthContext";
 import { EntitlementsProvider } from "@/contexts/EntitlementsContext";
 import { PackGate, type PackType } from "@/contexts/PackContext";
 import { AIAssistant } from "@/components/ai-assistant";
@@ -1799,9 +1799,11 @@ function Router() {
       </Route>
       <Route path="/pipeline/forecast">
         {() => (
-          <GatedLayout pack="crm_pipeline">
-            <Forecast />
-          </GatedLayout>
+          <RequireRole role={['broker', 'admin']} fallback={<Redirect to="/pipeline/deal-board" />}>
+            <GatedLayout pack="crm_pipeline">
+              <Forecast />
+            </GatedLayout>
+          </RequireRole>
         )}
       </Route>
 
@@ -1981,9 +1983,11 @@ function Router() {
       </Route>
       <Route path="/crm/forecast">
         {() => (
-          <GatedLayout pack="crm_pipeline">
-            <Forecast />
-          </GatedLayout>
+          <RequireRole role={['broker', 'admin']} fallback={<Redirect to="/pipeline/deal-board" />}>
+            <GatedLayout pack="crm_pipeline">
+              <Forecast />
+            </GatedLayout>
+          </RequireRole>
         )}
       </Route>
       <Route path="/crm/forms">
