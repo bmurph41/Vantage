@@ -712,7 +712,7 @@ function AddLeaseSheet({ propertyId, open, onClose }: AddLeaseSheetProps) {
         <form onSubmit={handleSubmit} className="space-y-5">
           {/* Tenant Info */}
           <div className="space-y-3">
-            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Tenant Details</h3>
+            <h3 className="ws-section-label">Tenant Details<span className="ws-section-rule" /></h3>
             <div className="grid grid-cols-2 gap-3">
               <div className="col-span-2 space-y-1">
                 <Label htmlFor="add-tenantName" className="text-xs">Tenant Name <span className="text-red-500">*</span></Label>
@@ -771,7 +771,7 @@ function AddLeaseSheet({ propertyId, open, onClose }: AddLeaseSheetProps) {
 
           {/* Dates */}
           <div className="space-y-3">
-            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Lease Dates</h3>
+            <h3 className="ws-section-label">Lease Dates<span className="ws-section-rule" /></h3>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
                 <Label htmlFor="add-commencementDate" className="text-xs">Commencement <span className="text-red-500">*</span></Label>
@@ -810,7 +810,7 @@ function AddLeaseSheet({ propertyId, open, onClose }: AddLeaseSheetProps) {
 
           {/* Initial Rent Term */}
           <div className="space-y-3">
-            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Initial Rent Term (optional)</h3>
+            <h3 className="ws-section-label">Initial Rent Term (optional)<span className="ws-section-rule" /></h3>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
                 <Label htmlFor="add-baseRentValue" className="text-xs">Base Rent</Label>
@@ -1299,7 +1299,7 @@ function LeaseDetailSheet({ leaseId, propertyId, open, onClose }: { leaseId: str
             {editing && editForm && editTerm ? (
               <form onSubmit={handleSave} className="space-y-5">
                 <div className="space-y-3">
-                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Tenant Details</h3>
+                  <h3 className="ws-section-label">Tenant Details<span className="ws-section-rule" /></h3>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="col-span-2 space-y-1">
                       <Label className="text-xs">Tenant Name <span className="text-red-500">*</span></Label>
@@ -1350,7 +1350,7 @@ function LeaseDetailSheet({ leaseId, propertyId, open, onClose }: { leaseId: str
                 <Separator />
 
                 <div className="space-y-3">
-                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Lease Dates</h3>
+                  <h3 className="ws-section-label">Lease Dates<span className="ws-section-rule" /></h3>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
                       <Label className="text-xs">Commencement <span className="text-red-500">*</span></Label>
@@ -1386,9 +1386,7 @@ function LeaseDetailSheet({ leaseId, propertyId, open, onClose }: { leaseId: str
 
                 {/* Rent Term Editing */}
                 <div className="space-y-3">
-                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
-                    <DollarSign className="h-3.5 w-3.5" /> Rent Term (Term 1)
-                  </h3>
+                  <h3 className="ws-section-label"><DollarSign className="h-3.5 w-3.5" /> Rent Term (Term 1)<span className="ws-section-rule" /></h3>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
                       <Label className="text-xs">Base Rent</Label>
@@ -1500,9 +1498,7 @@ function LeaseDetailSheet({ leaseId, propertyId, open, onClose }: { leaseId: str
                 {/* Rent Terms */}
                 <div className="mb-5">
                   <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
-                      <DollarSign className="h-3.5 w-3.5" /> Rent Terms
-                    </h3>
+                    <h3 className="ws-section-label ws-section-label--compact"><DollarSign className="h-3.5 w-3.5" /> Rent Terms<span className="ws-section-rule" /></h3>
                     <Button
                       variant="ghost" size="sm"
                       className="h-6 px-2 text-xs gap-1"
@@ -1719,9 +1715,7 @@ function LeaseDetailSheet({ leaseId, propertyId, open, onClose }: { leaseId: str
                 {/* Charge Lines (Recoveries) */}
                 <div className="mb-5">
                   <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
-                      <Layers className="h-3.5 w-3.5" /> Recoveries & Charges
-                    </h3>
+                    <h3 className="ws-section-label ws-section-label--compact"><Layers className="h-3.5 w-3.5" /> Recoveries & Charges<span className="ws-section-rule" /></h3>
                     <Button
                       variant="ghost" size="sm"
                       className="h-6 px-2 text-xs gap-1"
@@ -1917,9 +1911,7 @@ function LeaseDetailSheet({ leaseId, propertyId, open, onClose }: { leaseId: str
                 {/* Abatements / Concessions */}
                 <div className="mb-5">
                   <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
-                      <Tag className="h-3.5 w-3.5" /> Abatements & Concessions
-                    </h3>
+                    <h3 className="ws-section-label ws-section-label--compact"><Tag className="h-3.5 w-3.5" /> Abatements & Concessions<span className="ws-section-rule" /></h3>
                     <Button
                       variant="ghost" size="sm"
                       className="h-6 px-2 text-xs gap-1"
@@ -2085,9 +2077,7 @@ function LeaseDetailSheet({ leaseId, propertyId, open, onClose }: { leaseId: str
                 {/* TI Programs */}
                 {detail.tiPrograms?.length > 0 && (
                   <div className="mb-5">
-                    <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                      <Building className="h-3.5 w-3.5" /> Tenant Improvement (TI)
-                    </h3>
+                    <h3 className="ws-section-label ws-section-label--compact mb-2"><Building className="h-3.5 w-3.5" /> Tenant Improvement (TI)<span className="ws-section-rule" /></h3>
                     {detail.tiPrograms.map((ti: any) => (
                       <div key={ti.id} className="rounded-lg border p-3 space-y-2">
                         <div className="grid grid-cols-2 gap-3">
@@ -2128,9 +2118,7 @@ function LeaseDetailSheet({ leaseId, propertyId, open, onClose }: { leaseId: str
                 {/* Recovery Models */}
                 {detail.recoveryModels?.length > 0 && (
                   <div className="mb-5">
-                    <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                      <RefreshCw className="h-3.5 w-3.5" /> Recovery Model
-                    </h3>
+                    <h3 className="ws-section-label ws-section-label--compact mb-2"><RefreshCw className="h-3.5 w-3.5" /> Recovery Model<span className="ws-section-rule" /></h3>
                     {detail.recoveryModels.map((rm: any) => (
                       <div key={rm.id} className="rounded-lg border p-3 space-y-2">
                         <div className="grid grid-cols-2 gap-3">
@@ -2177,9 +2165,7 @@ function LeaseDetailSheet({ leaseId, propertyId, open, onClose }: { leaseId: str
                 {/* Notes */}
                 {detail.notes && (
                   <div className="mb-5">
-                    <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                      <FileText className="h-3.5 w-3.5" /> Notes
-                    </h3>
+                    <h3 className="ws-section-label ws-section-label--compact mb-2"><FileText className="h-3.5 w-3.5" /> Notes<span className="ws-section-rule" /></h3>
                     <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">{detail.notes}</p>
                   </div>
                 )}

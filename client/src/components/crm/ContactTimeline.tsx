@@ -242,7 +242,7 @@ export function ContactTimeline({ contactId, compact = false }: ContactTimelineP
               <div key={dateKey}>
                 {/* Date header */}
                 <div className="flex items-center gap-2 mb-3">
-                  <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                  <div className="ws-section-label ws-section-label--compact">
                     {format(new Date(dateKey), "MM/dd/yyyy")}
                   </div>
                   <div className="flex-1 h-px bg-gray-200" />

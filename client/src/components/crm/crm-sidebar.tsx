@@ -146,10 +146,10 @@ return (
   }) => (
     <button
       onClick={onToggle}
-      className="flex items-center justify-between w-full px-4 py-2 text-[11px] font-semibold text-gray-400 uppercase tracking-wider hover:text-gray-600 transition-colors"
+      className="flex items-center justify-between w-full px-4 py-2 hover:text-gray-600 transition-colors"
       data-testid={`toggle-${title.toLowerCase()}`}
     >
-      <span>{title}</span>
+      <span className="ws-section-label ws-section-label--compact">{title}</span>
       <div className="flex items-center gap-1.5">
         {count != null && count > 0 && (
           <span className="text-[10px] font-normal text-gray-400">{count}</span>
@@ -233,7 +233,7 @@ return (
       <nav className="flex-1 overflow-y-auto py-3">
         {/* Core Section */}
         <div className="mb-3">
-          <p className="px-4 pb-1 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Core</p>
+          <div className="ws-section-label ws-section-label--compact mx-4 pb-1">Core<span className="ws-section-rule" /></div>
           {coreNavWithBadges.map(item => (
             <NavLink key={item.name} item={item} />
           ))}
