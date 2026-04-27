@@ -156,9 +156,9 @@ export default function MarinaDetail() {
         <Card>
           <CardContent className="p-12 text-center">
             <Building2 className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-            <h3 className="text-lg font-medium mb-2">Marina Not Found</h3>
+            <h3 className="text-lg font-medium mb-2">Asset Not Found</h3>
             <p className="text-muted-foreground mb-4">
-              The marina you're looking for doesn't exist or you don't have access to it.
+              The asset you're looking for doesn't exist or you don't have access to it.
             </p>
             <Button onClick={() => navigate("/portfolio")}>
               <ArrowLeft className="h-4 w-4 mr-2" />
@@ -367,7 +367,7 @@ export default function MarinaDetail() {
                 Sales Comparables in {marina.state}
               </CardTitle>
               <CardDescription>
-                Recent marina sales in the same state for benchmarking
+                Recent sales in the same state for benchmarking
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -394,7 +394,7 @@ export default function MarinaDetail() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Marina</TableHead>
+                        <TableHead>Property</TableHead>
                         <TableHead>Location</TableHead>
                         <TableHead className="text-right">Sale Date</TableHead>
                         <TableHead className="text-right">Sale Price</TableHead>
@@ -438,7 +438,7 @@ export default function MarinaDetail() {
                 Rate Comparables in {marina.state}
               </CardTitle>
               <CardDescription>
-                Current slip rental rates at nearby marinas
+                Current rental rates at nearby properties
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -465,7 +465,7 @@ export default function MarinaDetail() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Marina</TableHead>
+                        <TableHead>Property</TableHead>
                         <TableHead>Location</TableHead>
                         <TableHead className="text-right">Effective Date</TableHead>
                         <TableHead className="text-right">Avg Monthly Rate</TableHead>

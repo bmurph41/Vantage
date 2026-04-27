@@ -275,7 +275,7 @@ function EmptyPortfolio({ onAdd }: { onAdd: () => void }) {
       </div>
       <h3 className="text-lg font-semibold mb-2">No owned assets yet</h3>
       <p className="text-muted-foreground mb-6 max-w-sm">
-        Add marinas and properties to your portfolio to track performance, returns, and financials.
+        Add assets to your portfolio to track performance, returns, and financials.
       </p>
       <Button onClick={onAdd}>
         <Plus className="h-4 w-4 mr-2" />
