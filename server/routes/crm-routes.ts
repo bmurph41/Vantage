@@ -11901,18 +11901,6 @@ export function registerCRMRoutes(
     }
   });
 
-  // Get portfolio summary
-  app.get('/api/portfolio/summary', authenticateUser, async (req: any, res) => {
-    try {
-      const orgId = req.user.orgId;
-      const summary = await ownedAssetsService.getPortfolioSummary(orgId);
-      res.json(summary);
-    } catch (error: any) {
-      console.error('Failed to fetch portfolio summary:', error);
-      res.status(500).json({ error: 'Failed to fetch portfolio summary' });
-    }
-  });
-
   // Portfolio breakdown by asset class
   app.get('/api/portfolio/asset-class-breakdown', authenticateUser, async (req: any, res) => {
     try {
@@ -11937,6 +11925,18 @@ export function registerCRMRoutes(
     } catch (error: any) {
       console.error('Failed to fetch portfolio breakdown:', error);
       res.status(500).json({ error: 'Failed to fetch portfolio breakdown' });
+    }
+  });
+
+  // Owned-assets summary (status / hold-strategy / total acquisition value)
+  app.get('/api/portfolio/owned-assets-summary', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const summary = await ownedAssetsService.getPortfolioSummary(orgId);
+      res.json(summary);
+    } catch (error: any) {
+      console.error('Failed to fetch owned-assets summary:', error);
+      res.status(500).json({ error: 'Failed to fetch owned-assets summary' });
     }
   });
 

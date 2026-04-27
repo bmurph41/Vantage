@@ -13,10 +13,16 @@ import { Link } from "wouter";
 import { useEnabledOpsModules } from "@/hooks/use-enabled-ops-modules";
 
 interface PortfolioSummary {
-  totalAssets: number;
   totalRevenueMTD: number;
   totalNoiMTD: number;
   averageOccupancy: number;
+}
+
+interface OwnedAssetsSummary {
+  totalAssets: number;
+  byStatus: Record<string, number>;
+  byHoldStrategy: Record<string, number>;
+  totalAcquisitionValue: number;
 }
 
 interface ModuleKPI {
@@ -169,6 +175,12 @@ export default function OperationsHome() {
     refetchOnWindowFocus: false,
   });
 
+  const { data: ownedAssetsSummary } = useQuery<OwnedAssetsSummary>({
+    queryKey: ["/api/portfolio/owned-assets-summary"],
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+
   const { data: moduleKPIs, isLoading: kpiLoading } = useQuery<ModuleKPISummary>({
     queryKey: ["/api/operations-context/modules/kpi-summary"],
     staleTime: 2 * 60 * 1000,
@@ -248,7 +260,7 @@ export default function OperationsHome() {
                 <div>
                   <p className="text-xs text-gray-500 uppercase tracking-wider">Total Assets</p>
                   <p className="text-2xl font-bold text-gray-900 mt-1">
-                    {portfolioSummary?.totalAssets ?? assets.length}
+                    {ownedAssetsSummary?.totalAssets ?? 0}
                   </p>
                 </div>
                 <div className="p-2.5 bg-blue-50 rounded-lg">

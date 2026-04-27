@@ -1634,20 +1634,6 @@ export function registerModelingRoutes(
   // PORTFOLIO ROLL-UPS - Aggregate Views Across Modeling Projects
   // ============================================================================
 
-  // Get portfolio summary
-  app.get('/api/portfolio/summary', authenticateUser, async (req: any, res) => {
-    try {
-      const orgId = req.user.orgId;
-      const projectIds = req.query.projectIds ? (req.query.projectIds as string).split(',') : undefined;
-      const { portfolioRollupService } = await import('../services/portfolio-rollup-service');
-      const summary = await portfolioRollupService.getPortfolioSummary(orgId, projectIds);
-      res.json(summary);
-    } catch (error: any) {
-      console.error('Failed to get portfolio summary:', error);
-      res.status(500).json({ error: 'Failed to get portfolio summary' });
-    }
-  });
-
   // Get project rollups with filters
   app.get('/api/portfolio/projects', authenticateUser, async (req: any, res) => {
     try {
