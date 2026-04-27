@@ -765,6 +765,15 @@ export default function UnifiedSidebar() {
                   );
                 })()}
 
+                {/* Divider separating portfolio asset classes from management modules */}
+                {opsSubcategoryGroups.length > 0 && (
+                  <div className="mx-4 mt-1 mb-1 flex items-center gap-2" style={{ paddingLeft: "24px" }}>
+                    <div className="flex-1 border-t border-sidebar-border/40" />
+                    <span className="text-[10px] uppercase tracking-widest text-sidebar-foreground/30 select-none flex-shrink-0">Management</span>
+                    <div className="flex-1 border-t border-sidebar-border/40" />
+                  </div>
+                )}
+
                 {/* Subcategory-grouped modules — each section is independently collapsible.
                     The 'people' subcategory is rendered as a flat Payroll link (no dropdown). */}
                 {opsSubcategoryGroups.map((subcat) => {
