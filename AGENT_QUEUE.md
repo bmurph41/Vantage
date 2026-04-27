@@ -526,11 +526,11 @@
 
 ### 0B — Organization Isolation Fixes
 
-- [security] [todo] Add orgId filter to fund-management-routes.ts PUT /fund-deals/:id — Line 217: `.where(eq(fundDealsV2.id, req.params.id))` has NO orgId check; add `and(eq(fundDealsV2.id, req.params.id), eq(fundDealsV2.orgId, orgId))` or validate fund ownership atomically
+- [security] [done] Add orgId filter to fund-management-routes.ts PUT /fund-deals/:id — Line 217: `.where(eq(fundDealsV2.id, req.params.id))` has NO orgId check; add `and(eq(fundDealsV2.id, req.params.id), eq(fundDealsV2.orgId, orgId))` or validate fund ownership atomically — *Verified 2026-04-27: /fund-deals routes do not exist anywhere in codebase (grep '/fund-deals' returned zero matches). Audit-claimed line 217 is /investor-verification POST. fundDealsV2 schema table exists but no routes reach it. Vulnerability removed by route deletion. Comprehensive tenant-isolation audit deferred to A9.*
 
-- [security] [todo] Add orgId filter to fund-management-routes.ts DELETE /fund-deals/:id — Line 239: same issue as PUT; add orgId to WHERE clause
+- [security] [done] Add orgId filter to fund-management-routes.ts DELETE /fund-deals/:id — Line 239: same issue as PUT; add orgId to WHERE clause — *Verified 2026-04-27: /fund-deals DELETE route does not exist. Audit-claimed line 239 is /investor-verification PUT (which has proper orgId filter). Vulnerability removed by route deletion. Comprehensive tenant-isolation audit deferred to A9.*
 
-- [security] [todo] Add orgId filter to capital account endpoints — Lines 600, 678, 730: GET /capital-accounts/:fundId, GET /capital-accounts/:id/entries, POST /capital-accounts/:id/entries all fetch data without orgId in the primary query; add atomic orgId validation (not post-fetch check which has race condition)
+- [security] [done] Add orgId filter to capital account endpoints — Lines 600, 678, 730: GET /capital-accounts/:fundId, GET /capital-accounts/:id/entries, POST /capital-accounts/:id/entries all fetch data without orgId in the primary query; add atomic orgId validation (not post-fetch check which has race condition) — *Verified 2026-04-27: audit-claimed line numbers (600, 678, 730) do not point to capital account routes. Line 600 area is /management-fees with proper orgId filter; line 678 area is /funds/:fundId/pme passing orgId to service; line 730 area is /vintage-cohorts. Actual capital account routes (fund-management-routes.ts:263/296/324 and lp-routes.ts:317/344) were not audited at original cited lines. Comprehensive tenant-isolation audit deferred to A9 — and A9 should specifically include verifying calculatePME, getVintageCohorts, and lp-routes capital account endpoints filter by orgId in their queries.*
 
 - [security] [todo] Audit all route files for missing orgId filters — Grep all `server/routes/` for `.where(eq(...id, req.params...))` patterns that lack an accompanying orgId condition on org-scoped tables; fix each occurrence
 

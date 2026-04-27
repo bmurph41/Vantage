@@ -94,6 +94,7 @@ Order rationale: SQL injection first (highest blast radius — exploitable from 
 
 ### A6. Add orgId filter to fund-management-routes.ts PUT /fund-deals/:id
 **Source:** AGENT_QUEUE.md Tier 0B item 1
+**Status:** ✅ DONE 2026-04-27 — verified routes deleted; vulnerability gone.
 **Effort:** S
 **Mode:** [solo]
 **Description:** Line 217: `.where(eq(fundDealsV2.id, req.params.id))` has NO orgId check; add `and(eq(fundDealsV2.id, req.params.id), eq(fundDealsV2.orgId, orgId))` or validate fund ownership atomically.
@@ -102,6 +103,7 @@ Order rationale: SQL injection first (highest blast radius — exploitable from 
 
 ### A7. Add orgId filter to fund-management-routes.ts DELETE /fund-deals/:id
 **Source:** AGENT_QUEUE.md Tier 0B item 2
+**Status:** ✅ DONE 2026-04-27 — verified routes deleted; vulnerability gone.
 **Effort:** S
 **Mode:** [solo]
 **Description:** Line 239: same issue as PUT; add orgId to WHERE clause.
@@ -110,6 +112,7 @@ Order rationale: SQL injection first (highest blast radius — exploitable from 
 
 ### A8. Add orgId filter to capital account endpoints
 **Source:** AGENT_QUEUE.md Tier 0B item 3
+**Status:** ✅ DONE 2026-04-27 — verified original cited lines do not point to capital account routes; comprehensive audit deferred to A9.
 **Effort:** M
 **Mode:** [solo]
 **Description:** Lines 600, 678, 730: GET /capital-accounts/:fundId, GET /capital-accounts/:id/entries, POST /capital-accounts/:id/entries all fetch data without orgId in the primary query; add atomic orgId validation (not post-fetch check which has race condition).
