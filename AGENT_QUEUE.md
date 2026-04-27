@@ -7,6 +7,12 @@
 - [feature] [in-progress] Implement Email Send Integration for Workflow Automation — see agents/specs/email-send-integration-spec.md
 - [feature] [in-progress] Implement Google Maps & Google Places API integration with encrypted key storage — AES-256-GCM encrypted key in DB (pattern: enc:iv:ciphertext), server-side proxy routes for autocomplete (/api/google-places/autocomplete), place details (/api/google-places/details/:placeId), and geocoding (/api/google-places/geocode), reusable GooglePlaceSearch frontend component (debounced, no Google SDK), and Settings UI for key entry/masking — see attached_assets/Pasted-Implement-Google-Maps-Google-Places-API-integration-wit_1774924110030.txt for full spec
 
+- [feature] [todo] Fix Financial Model wizard asset class entitlement gating — when user clicks 'Create Project' in the Financial Model wizard, asset classes not in their subscription tier should be visually grayed out + disabled, with tooltip explaining upgrade requirement. All 36 asset classes still visible. Investigate first whether platformAssetClasses or the entitlement modules system already exposes 'tier → asset classes' mapping; if not, build the mapping. Discovered during user beta self-testing 2026-04-27.
+
+- [feature] [todo] Fix New Deal button + build deal-creation wizard — New Deal button on Deal Workspace is fully non-functional. Build a multi-step wizard for deal creation covering all basics (likely: deal name, asset class, property linkage, key dates, team), then save and route to the new deal's workspace. Sub-tasks: diagnose root cause of broken button, design wizard steps, build wizard, integrate with existing deal CRUD endpoints, verify workspace auto-initialization on save. BETA-BLOCKER. Discovered during user beta self-testing 2026-04-27.
+
+- [feature] [todo] Make Financial Model New Project wizard asset-class-aware — wizard is currently hardcoded marina-specific. Drive wizard fields and behavior from ASSET_REGISTRY (extends Phase 3A foundation). Remove redundant 'Ownership' section (verify what's redundant before deleting). Verify wizard correctly populates Modeling Project + linked CRM Deal + CRM Property records (name, address, asset class, key dates flow to all three). Should integrate with shared/asset-class-model-config.ts (currently part of 824 typecheck baseline errors). Discovered during user beta self-testing 2026-04-27.
+
 ## 🟠 TIER 2 — AI ADVISOR
 
 - [spec] [in-progress] Spec entity injection for AI Advisor — auto-inject current Deal Room context into AI prompts

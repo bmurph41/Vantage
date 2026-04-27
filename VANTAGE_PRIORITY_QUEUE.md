@@ -24,18 +24,18 @@ This document is a **flat sequenced queue** in strict execution order, written f
 |---|---:|---:|
 | Phase A (Tier 0 security showstoppers) | 11 | 36 |
 | Phase B (Tier 0.5 institutional gates) | 15 | 108 |
-| Phase C (Beta-flow must-ship) | 16 | 70.5 |
+| Phase C (Beta-flow must-ship) | 19 | 100.5 |
 | Phase D (Tier 1 active priorities) | 7 | 56 |
-| **Total to beta-ready** | **49** | **270** |
+| **Total to beta-ready** | **52** | **300** |
 | Phase E (post-beta visibility) | 60+ | not estimated |
 
 **Effort scale:** S = 0.5h, M = 2h, L = 8h, XL = 20h (midpoints used for totals).
 
-**Realistic timelines to beta-ready (270 hours):**
-- 30 hrs/week focused solo (no Bookd/STR/cleaning DD overlap): **~9 weeks** (~2 months)
-- 20 hrs/week (acknowledging Bookd, STR portfolio, cleaning company DD parallel work): **~13.5 weeks** (~3 months)
+**Realistic timelines to beta-ready (300 hours):**
+- 30 hrs/week focused solo (no Bookd/STR/cleaning DD overlap): **~10 weeks** (~2.5 months)
+- 20 hrs/week (acknowledging Bookd, STR portfolio, cleaning company DD parallel work): **~15 weeks** (~3.5 months)
 
-These are bottom-up estimates assuming linear single-threaded execution. Real friction (debugging, reviews, rework) typically multiplies by 1.3–1.7×, so plan for **~15–23 weeks** of real-world calendar time before inviting the first beta tester.
+These are bottom-up estimates assuming linear single-threaded execution. Real friction (debugging, reviews, rework) typically multiplies by 1.3–1.7×, so plan for **~17–25 weeks** of real-world calendar time before inviting the first beta tester.
 
 ---
 
@@ -284,7 +284,7 @@ Order rationale: input validation first (cheapest insurance against the highest-
 
 **Defines beta readiness per user's explicit definition: "CRE pro takes deal from CRM listing → modeling → DCF → portfolio in one continuous flow, plus AI Advisor answers one focused question."**
 
-**Phase C summary:** 16 items, midpoint effort ~70.5 hours.
+**Phase C summary:** 19 items, midpoint effort ~100.5 hours.
 
 Order rationale: AI Advisor reliability first (frontend bug + system prompt) because it's the live-demo crown jewel. Then the deal-flow connectivity items (Deal Comparison, embedded financials, DD Findings panel). Then the data-trust fixes (keyMetrics fallback, asset-class-breakdown, snapshot reader). Then quality-of-life cleanups (asset-shape terms, Marina-language sweep, latent Content-Type bug). Test coverage and CI repair sit at the end as the safety net for everything else.
 
@@ -415,6 +415,30 @@ Order rationale: AI Advisor reliability first (frontend bug + system prompt) bec
 **Description:** Per PIPELINE_ENHANCEMENT_MASTER.md BUG-01: `client/src/pages/pipeline.tsx` `handleDragEnd` does not call `/api/pipeline/automation/evaluate` after the deal mutation succeeds. Result: workflow automations never trigger on drag. Fix: invoke the evaluate endpoint with `{ dealId, fromStageId, toStageId, orgId }` in the mutation `onSuccess` callback.
 **Why this position in queue:** Beta tester's CRM workflow depends on stage-change automations. If automations never fire, the workflow engine looks broken in the demo.
 **Dependencies:** none
+
+### C17. Asset class entitlement gating on Financial Model wizard
+**Source:** Beta self-testing 2026-04-27 (new finding)
+**Effort:** M
+**Mode:** [solo]
+**Description:** Issue surfaced when clicking 'Create Project' in the Financial Model wizard. Asset classes not in user's subscription tier should be visually grayed out + disabled, with tooltip/upgrade CTA explaining the upgrade requirement. All 36 asset classes still visible. Investigate first whether `platformAssetClasses` or the entitlement modules system already exposes a 'tier → asset classes' mapping; if not, build the mapping.
+**Why this position in queue:** Beta tester encountered this. Annoying but not blocking — they could still create projects in available classes. Smaller scope than C18/C19.
+**Dependencies:** none
+
+### C18. Fix New Deal button + build deal-creation wizard ⚠️ BETA-BLOCKER
+**Source:** Beta self-testing 2026-04-27 (new finding)
+**Effort:** L
+**Mode:** [solo]
+**Description:** New Deal button on Deal Workspace is fully non-functional. Build a multi-step wizard for deal creation covering all basics (deal name, asset class, property linkage, key dates, team), saves and routes to the new deal's workspace. Sub-tasks: diagnose root cause, design wizard steps, build wizard, integrate with existing deal CRUD endpoints, verify workspace auto-initialization on save.
+**Why this position in queue:** Real beta-blocker. Without working deal creation, the entire CRM-to-modeling-to-portfolio flow (the explicit beta-readiness definition) is broken at step 1. This jumps the C-queue priority.
+**Dependencies:** none
+
+### C19. Asset-class-aware Financial Model New Project wizard
+**Source:** Beta self-testing 2026-04-27 (new finding)
+**Effort:** XL
+**Mode:** [solo]
+**Description:** Financial Model New Project wizard is currently hardcoded marina-specific. Drive wizard fields and behavior from `ASSET_REGISTRY` (extends Phase 3A foundation). Both UX layer (field labels) AND underlying model behavior should adapt per asset class. Remove redundant 'Ownership' section (verify what's redundant before deleting). Verify wizard correctly populates: Modeling Project record, linked CRM Deal record, linked CRM Property record (name, address, asset class, key dates flow correctly to all three). Should integrate with `shared/asset-class-model-config.ts` (currently part of 824 typecheck baseline errors).
+**Why this position in queue:** Largest scope of the three new items (multi-day refactor). Improves UX and removes hardcoded marina assumptions but doesn't block beta as severely as C18. Best handled in a fresh-eyes session.
+**Dependencies:** Phase 3A foundation (already shipped). C18 should ship first so the deal flow exists for the wizard to integrate against.
 
 ---
 
