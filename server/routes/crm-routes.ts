@@ -11776,30 +11776,44 @@ export function registerCRMRoutes(
       const orgId = req.user.orgId;
       const userId = req.user.id;
       
-      const { propertyId, projectId, acquisitionDate, acquisitionPrice, status, holdStrategy, exitTargetDate, keyMetrics, notes } = req.body;
-      
+      const { propertyId, projectId, modelingProjectId, assetClass, acquisitionDate, acquisitionPrice, status, holdStrategy, exitTargetDate, keyMetrics, notes } = req.body;
+
       if (!propertyId) {
         return res.status(400).json({ error: 'propertyId is required' });
       }
       if (!acquisitionDate) {
         return res.status(400).json({ error: 'acquisitionDate is required' });
       }
-      
+
       // Verify property exists and belongs to org
       const [property] = await db.select().from(crmProperties).where(and(eq(crmProperties.id, propertyId), eq(crmProperties.orgId, orgId))).limit(1);
       if (!property) {
         return res.status(404).json({ error: 'Property not found' });
       }
-      
+
       // Check if property is already in portfolio
       const [existingAsset] = await db.select().from(ownedAssets).where(and(eq(ownedAssets.propertyId, propertyId), eq(ownedAssets.orgId, orgId))).limit(1);
       if (existingAsset) {
         return res.status(409).json({ error: 'Property is already in portfolio' });
       }
-      
+
+      // Server is authoritative on assetClass when a modeling project is linked.
+      let resolvedAssetClass: string | undefined =
+        typeof assetClass === 'string' && assetClass.trim() ? assetClass.trim() : undefined;
+      if (modelingProjectId) {
+        const [mp] = await db
+          .select({ assetClass: modelingProjects.assetClass })
+          .from(modelingProjects)
+          .where(and(eq(modelingProjects.id, modelingProjectId), eq(modelingProjects.orgId, orgId)))
+          .limit(1);
+        if (mp?.assetClass) resolvedAssetClass = mp.assetClass;
+      }
+
       const asset = await ownedAssetsService.createOwnedAsset(orgId, userId, {
         propertyId,
         projectId: projectId || null,
+        modelingProjectId: modelingProjectId || null,
+        ...(resolvedAssetClass ? { assetClass: resolvedAssetClass } : {}),
         acquisitionDate,
         acquisitionPrice: acquisitionPrice ? parseInt(acquisitionPrice) : null,
         status: status || 'under_management',
@@ -11822,8 +11836,8 @@ export function registerCRMRoutes(
       const orgId = req.user.orgId;
       const { id } = req.params;
       
-      const { acquisitionDate, acquisitionPrice, status, holdStrategy, exitTargetDate, keyMetrics, notes, projectId } = req.body;
-      
+      const { acquisitionDate, acquisitionPrice, status, holdStrategy, exitTargetDate, keyMetrics, notes, projectId, modelingProjectId, assetClass } = req.body;
+
       const updateData: any = {};
       if (acquisitionDate !== undefined) updateData.acquisitionDate = acquisitionDate;
       if (acquisitionPrice !== undefined) updateData.acquisitionPrice = acquisitionPrice ? parseInt(acquisitionPrice) : null;
@@ -11833,6 +11847,10 @@ export function registerCRMRoutes(
       if (keyMetrics !== undefined) updateData.keyMetrics = keyMetrics;
       if (notes !== undefined) updateData.notes = notes;
       if (projectId !== undefined) updateData.projectId = projectId;
+      if (modelingProjectId !== undefined) updateData.modelingProjectId = modelingProjectId || null;
+      if (assetClass !== undefined && typeof assetClass === 'string' && assetClass.trim()) {
+        updateData.assetClass = assetClass.trim();
+      }
       
       const asset = await ownedAssetsService.updateOwnedAsset(id, orgId, updateData);
       if (!asset) {
@@ -11904,6 +11922,44 @@ export function registerCRMRoutes(
     } catch (error: any) {
       console.error('Failed to fetch available properties:', error);
       res.status(500).json({ error: 'Failed to fetch available properties' });
+    }
+  });
+
+  // List modeling projects available to link from the Portfolio modal.
+  // Returns ALL projects in the org with a flag indicating whether each is
+  // already linked to an owned asset (still selectable — the modal surfaces it).
+  app.get('/api/portfolio/available-modeling-projects', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const rows = await db
+        .select({
+          id: modelingProjects.id,
+          name: modelingProjects.marinaName,
+          assetClass: modelingProjects.assetClass,
+          linkedOwnedAssetId: ownedAssets.id,
+        })
+        .from(modelingProjects)
+        .leftJoin(
+          ownedAssets,
+          and(
+            eq(ownedAssets.modelingProjectId, modelingProjects.id),
+            eq(ownedAssets.orgId, orgId)
+          )
+        )
+        .where(eq(modelingProjects.orgId, orgId))
+        .orderBy(desc(modelingProjects.createdAt));
+
+      res.json(
+        rows.map(r => ({
+          id: r.id,
+          name: r.name,
+          assetClass: r.assetClass || 'marina',
+          isLinkedToOwnedAsset: r.linkedOwnedAssetId !== null,
+        }))
+      );
+    } catch (error: any) {
+      console.error('Failed to fetch available modeling projects:', error);
+      res.status(500).json({ error: 'Failed to fetch available modeling projects' });
     }
   });
 

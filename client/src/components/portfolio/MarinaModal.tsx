@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -6,9 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Building2, Calendar, DollarSign, Target, FileText } from "lucide-react";
+import { Loader2, Building2, Calendar, DollarSign, Target, FileText, Link2, Pencil } from "lucide-react";
+import { ASSET_REGISTRY, type AssetRegistryEntry } from "@/lib/asset-registry";
 
 interface MarinaModalProps {
   open: boolean;
@@ -26,10 +27,58 @@ interface AvailableProperty {
   slips: number;
 }
 
+interface AvailableModelingProject {
+  id: string;
+  name: string;
+  assetClass: string;
+  isLinkedToOwnedAsset: boolean;
+}
+
+type EntryMode = "linked" | "manual";
+
+// Local currency input helper. Displays $X,XXX,XXX on blur, raw digits on focus.
+// Stores plain numeric strings in parent state — formatting is presentation only.
+function CurrencyInput({
+  value,
+  onChange,
+  placeholder,
+  id,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  id?: string;
+}) {
+  const [focused, setFocused] = useState(false);
+  const formatted =
+    focused || !value
+      ? value
+      : new Intl.NumberFormat("en-US", {
+          style: "currency",
+          currency: "USD",
+          maximumFractionDigits: 0,
+        }).format(Number(value));
+  return (
+    <Input
+      id={id}
+      type="text"
+      inputMode="decimal"
+      value={focused ? value : formatted}
+      onChange={(e) => onChange(e.target.value.replace(/[^0-9.]/g, ""))}
+      onFocus={() => setFocused(true)}
+      onBlur={() => setFocused(false)}
+      placeholder={placeholder}
+    />
+  );
+}
+
 export function MarinaModal({ open, onOpenChange, marina, mode }: MarinaModalProps) {
   const { toast } = useToast();
+  const [entryMode, setEntryMode] = useState<EntryMode>("manual");
   const [formData, setFormData] = useState({
     propertyId: "",
+    modelingProjectId: "",
+    assetClass: "marina",
     acquisitionDate: "",
     acquisitionPrice: "",
     status: "under_management",
@@ -42,6 +91,9 @@ export function MarinaModal({ open, onOpenChange, marina, mode }: MarinaModalPro
       annualEbitda: "",
       occupancy: "",
       slips: "",
+      rev1: "",
+      rev2: "",
+      rev3: "",
     },
   });
 
@@ -50,10 +102,33 @@ export function MarinaModal({ open, onOpenChange, marina, mode }: MarinaModalPro
     enabled: mode === "create" && open,
   });
 
+  const { data: availableModelingProjects, isLoading: loadingModelingProjects } =
+    useQuery<AvailableModelingProject[]>({
+      queryKey: ["/api/portfolio/available-modeling-projects"],
+      enabled: open,
+    });
+
+  // Group ASSET_REGISTRY entries by their `group` field for the manual-mode selector
+  const assetClassGroups = useMemo(() => {
+    const groups: Record<string, Array<[string, AssetRegistryEntry]>> = {};
+    Object.entries(ASSET_REGISTRY).forEach(([key, entry]) => {
+      if (!groups[entry.group]) groups[entry.group] = [];
+      groups[entry.group].push([key, entry]);
+    });
+    return groups;
+  }, []);
+
+  // Resolve current registry entry for dynamic labels (defaults to marina if unknown)
+  const registry: AssetRegistryEntry =
+    ASSET_REGISTRY[formData.assetClass] || ASSET_REGISTRY["marina"];
+
   useEffect(() => {
     if (marina && mode === "edit") {
+      setEntryMode(marina.modelingProjectId ? "linked" : "manual");
       setFormData({
         propertyId: marina.propertyId || "",
+        modelingProjectId: marina.modelingProjectId || "",
+        assetClass: marina.assetClass || "marina",
         acquisitionDate: marina.acquisitionDate ? marina.acquisitionDate.split("T")[0] : "",
         acquisitionPrice: marina.acquisitionPrice?.toString() || "",
         status: marina.status || "under_management",
@@ -66,11 +141,20 @@ export function MarinaModal({ open, onOpenChange, marina, mode }: MarinaModalPro
           annualEbitda: marina.keyMetrics?.annualEbitda?.toString() || marina.annualEbitda?.toString() || "",
           occupancy: marina.keyMetrics?.occupancy?.toString() || marina.occupancy?.toString() || "",
           slips: marina.keyMetrics?.slips?.toString() || marina.slips?.toString() || "",
+          // Prefer split rev streams; fall back to legacy lump-sum annualRevenue in rev1
+          rev1:
+            marina.keyMetrics?.revenueStreams?.rev1?.toString() ||
+            (marina.keyMetrics?.revenueStreams ? "" : marina.keyMetrics?.annualRevenue?.toString() || marina.annualRevenue?.toString() || ""),
+          rev2: marina.keyMetrics?.revenueStreams?.rev2?.toString() || "",
+          rev3: marina.keyMetrics?.revenueStreams?.rev3?.toString() || "",
         },
       });
     } else if (mode === "create") {
+      setEntryMode("manual");
       setFormData({
         propertyId: "",
+        modelingProjectId: "",
+        assetClass: "marina",
         acquisitionDate: "",
         acquisitionPrice: "",
         status: "under_management",
@@ -88,6 +172,16 @@ export function MarinaModal({ open, onOpenChange, marina, mode }: MarinaModalPro
     }
   }, [marina, mode, open]);
 
+  // When the user picks a modeling project in linked mode, copy its assetClass
+  // into formData (server is authoritative on create; this keeps the UI honest).
+  useEffect(() => {
+    if (entryMode !== "linked" || !formData.modelingProjectId || !availableModelingProjects) return;
+    const mp = availableModelingProjects.find(p => p.id === formData.modelingProjectId);
+    if (mp && mp.assetClass && mp.assetClass !== formData.assetClass) {
+      setFormData(prev => ({ ...prev, assetClass: mp.assetClass }));
+    }
+  }, [entryMode, formData.modelingProjectId, availableModelingProjects]);
+
   const createMutation = useMutation({
     mutationFn: async (data: any) => {
       return await apiRequest("/api/portfolio/marinas", {
@@ -99,11 +193,11 @@ export function MarinaModal({ open, onOpenChange, marina, mode }: MarinaModalPro
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/portfolio/marinas"] });
       queryClient.invalidateQueries({ queryKey: ["/api/portfolio/available-properties"] });
-      toast({ title: "Marina added to portfolio successfully" });
+      toast({ title: "Asset added to portfolio successfully" });
       onOpenChange(false);
     },
     onError: (error: any) => {
-      toast({ title: "Failed to add marina", description: error.message, variant: "destructive" });
+      toast({ title: "Failed to add asset", description: error.message, variant: "destructive" });
     },
   });
 
@@ -117,26 +211,38 @@ export function MarinaModal({ open, onOpenChange, marina, mode }: MarinaModalPro
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/portfolio/marinas"] });
-      toast({ title: "Marina updated successfully" });
+      toast({ title: "Asset updated successfully" });
       onOpenChange(false);
     },
     onError: (error: any) => {
-      toast({ title: "Failed to update marina", description: error.message, variant: "destructive" });
+      toast({ title: "Failed to update asset", description: error.message, variant: "destructive" });
     },
   });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    const keyMetrics: Record<string, number> = {};
+    const keyMetrics: Record<string, any> = {};
     if (formData.keyMetrics.currentValue) keyMetrics.currentValue = parseFloat(formData.keyMetrics.currentValue);
-    if (formData.keyMetrics.annualRevenue) keyMetrics.annualRevenue = parseFloat(formData.keyMetrics.annualRevenue);
     if (formData.keyMetrics.annualEbitda) keyMetrics.annualEbitda = parseFloat(formData.keyMetrics.annualEbitda);
     if (formData.keyMetrics.occupancy) keyMetrics.occupancy = parseFloat(formData.keyMetrics.occupancy);
     if (formData.keyMetrics.slips) keyMetrics.slips = parseFloat(formData.keyMetrics.slips);
 
+    // Revenue streams: store split values + a derived total in annualRevenue for back-compat
+    const r1 = formData.keyMetrics.rev1 ? parseFloat(formData.keyMetrics.rev1) : 0;
+    const r2 = formData.keyMetrics.rev2 ? parseFloat(formData.keyMetrics.rev2) : 0;
+    const r3 = formData.keyMetrics.rev3 ? parseFloat(formData.keyMetrics.rev3) : 0;
+    const hasAnyStream =
+      !!formData.keyMetrics.rev1 || !!formData.keyMetrics.rev2 || !!formData.keyMetrics.rev3;
+    if (hasAnyStream) {
+      keyMetrics.revenueStreams = { rev1: r1, rev2: r2, rev3: r3 };
+      keyMetrics.annualRevenue = r1 + r2 + r3;
+    }
+
     const payload = {
       propertyId: formData.propertyId || undefined,
+      modelingProjectId: entryMode === "linked" ? (formData.modelingProjectId || null) : null,
+      assetClass: formData.assetClass || undefined,
       acquisitionDate: formData.acquisitionDate || undefined,
       acquisitionPrice: formData.acquisitionPrice || undefined,
       status: formData.status || undefined,
@@ -165,17 +271,130 @@ export function MarinaModal({ open, onOpenChange, marina, mode }: MarinaModalPro
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Building2 className="h-5 w-5" />
-            {mode === "create" ? "Add Marina to Portfolio" : "Edit Marina"}
+            {mode === "create" ? "Add Asset to Portfolio" : `Edit ${registry.label}`}
           </DialogTitle>
           <DialogDescription>
-            {mode === "create" 
-              ? "Select a property from your CRM to add to your portfolio"
-              : "Update marina details and financial metrics"
+            {mode === "create"
+              ? "Link an existing modeling project or manually add an asset to your portfolio"
+              : "Update asset details and financial metrics"
             }
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Mode toggle: linked modeling project vs manual entry */}
+          <div className="space-y-2">
+            <Label>Entry Mode</Label>
+            <div className="grid grid-cols-2 gap-2">
+              <Button
+                type="button"
+                variant={entryMode === "linked" ? "default" : "outline"}
+                onClick={() => setEntryMode("linked")}
+                className="justify-start gap-2"
+                data-testid="entry-mode-linked"
+              >
+                <Link2 className="h-4 w-4" />
+                Link Modeling Project
+              </Button>
+              <Button
+                type="button"
+                variant={entryMode === "manual" ? "default" : "outline"}
+                onClick={() => setEntryMode("manual")}
+                className="justify-start gap-2"
+                data-testid="entry-mode-manual"
+              >
+                <Pencil className="h-4 w-4" />
+                Manual Entry
+              </Button>
+            </div>
+          </div>
+
+          {/* Linked mode: choose a modeling project */}
+          {entryMode === "linked" && (
+            <div className="space-y-2">
+              <Label htmlFor="modelingProjectId">Modeling Project {mode === "create" ? "*" : ""}</Label>
+              {loadingModelingProjects ? (
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Loading modeling projects...
+                </div>
+              ) : availableModelingProjects && availableModelingProjects.length > 0 ? (
+                <Select
+                  value={formData.modelingProjectId}
+                  onValueChange={(value) => setFormData({ ...formData, modelingProjectId: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a modeling project" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableModelingProjects.map((project) => {
+                      const ac = ASSET_REGISTRY[project.assetClass];
+                      const acLabel = ac?.label || project.assetClass;
+                      const inPortfolio = project.isLinkedToOwnedAsset && project.id !== formData.modelingProjectId;
+                      return (
+                        <SelectItem
+                          key={project.id}
+                          value={project.id}
+                          className={inPortfolio ? "opacity-60" : ""}
+                        >
+                          <div className="flex flex-col">
+                            <span className="font-medium">
+                              {project.name} — {acLabel}
+                              {inPortfolio && (
+                                <span className="ml-1 text-xs text-muted-foreground">(in portfolio)</span>
+                              )}
+                            </span>
+                          </div>
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <div className="text-sm text-muted-foreground p-3 bg-muted rounded-md">
+                  No modeling projects exist for this org. Switch to Manual Entry to add an asset directly.
+                </div>
+              )}
+              {mode === "edit" && (
+                <p className="text-xs text-muted-foreground">
+                  Asset class is set at creation and does not change with project link.
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Manual mode: pick asset class directly */}
+          {entryMode === "manual" && (
+            <div className="space-y-2">
+              <Label htmlFor="assetClass">Asset Class *</Label>
+              <Select
+                value={formData.assetClass}
+                onValueChange={(value) => setFormData({ ...formData, assetClass: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select an asset class" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(assetClassGroups).map(([groupName, entries]) => (
+                    <SelectGroup key={groupName}>
+                      <SelectLabel>{groupName}</SelectLabel>
+                      {entries.map(([key, entry]) => (
+                        <SelectItem key={key} value={key}>
+                          <span>{entry.icon} {entry.label}</span>
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  ))}
+                </SelectContent>
+              </Select>
+              {mode === "edit" && marina?.modelingProjectId && (
+                <p className="text-xs text-muted-foreground">
+                  Changing asset class does not update the linked modeling project.
+                </p>
+              )}
+            </div>
+          )}
+
           {mode === "create" && (
             <div className="space-y-2">
               <Label htmlFor="propertyId">Select Property *</Label>
@@ -242,12 +461,10 @@ export function MarinaModal({ open, onOpenChange, marina, mode }: MarinaModalPro
                 <DollarSign className="h-3 w-3" />
                 Acquisition Price
               </Label>
-              <Input
+              <CurrencyInput
                 id="acquisitionPrice"
-                type="number"
-                placeholder="e.g. 5000000"
                 value={formData.acquisitionPrice}
-                onChange={(e) => setFormData({ ...formData, acquisitionPrice: e.target.value })}
+                onChange={(v) => setFormData({ ...formData, acquisitionPrice: v })}
               />
             </div>
           </div>
@@ -319,52 +536,33 @@ export function MarinaModal({ open, onOpenChange, marina, mode }: MarinaModalPro
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="currentValue">Current Value</Label>
-                <Input
+                <CurrencyInput
                   id="currentValue"
-                  type="number"
-                  placeholder="e.g. 6000000"
                   value={formData.keyMetrics.currentValue}
-                  onChange={(e) => setFormData({
+                  onChange={(v) => setFormData({
                     ...formData,
-                    keyMetrics: { ...formData.keyMetrics, currentValue: e.target.value }
-                  })}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="annualRevenue">Annual Revenue</Label>
-                <Input
-                  id="annualRevenue"
-                  type="number"
-                  placeholder="e.g. 1200000"
-                  value={formData.keyMetrics.annualRevenue}
-                  onChange={(e) => setFormData({
-                    ...formData,
-                    keyMetrics: { ...formData.keyMetrics, annualRevenue: e.target.value }
+                    keyMetrics: { ...formData.keyMetrics, currentValue: v }
                   })}
                 />
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="annualEbitda">Annual EBITDA</Label>
-                <Input
+                <CurrencyInput
                   id="annualEbitda"
-                  type="number"
-                  placeholder="e.g. 400000"
                   value={formData.keyMetrics.annualEbitda}
-                  onChange={(e) => setFormData({
+                  onChange={(v) => setFormData({
                     ...formData,
-                    keyMetrics: { ...formData.keyMetrics, annualEbitda: e.target.value }
+                    keyMetrics: { ...formData.keyMetrics, annualEbitda: v }
                   })}
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="occupancy">Occupancy (%)</Label>
+                <Label htmlFor="occupancy">{registry.occLabel}</Label>
                 <Input
                   id="occupancy"
                   type="number"
-                  placeholder="e.g. 85"
                   min="0"
                   max="100"
                   value={formData.keyMetrics.occupancy}
@@ -376,17 +574,53 @@ export function MarinaModal({ open, onOpenChange, marina, mode }: MarinaModalPro
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="slips">Total Slips</Label>
+                <Label htmlFor="slips">Total {registry.sizeLabel}</Label>
                 <Input
                   id="slips"
                   type="number"
-                  placeholder="e.g. 150"
                   value={formData.keyMetrics.slips}
                   onChange={(e) => setFormData({
                     ...formData,
                     keyMetrics: { ...formData.keyMetrics, slips: e.target.value }
                   })}
                 />
+              </div>
+            </div>
+
+            {/* Revenue stream breakdown — labels driven by ASSET_REGISTRY */}
+            <div className="mt-4 space-y-3">
+              <Label className="text-sm font-medium">Revenue Streams</Label>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                {[0, 1, 2].map((i) => {
+                  const key = (`rev${i + 1}`) as "rev1" | "rev2" | "rev3";
+                  return (
+                    <div key={key} className="space-y-2">
+                      <Label htmlFor={key}>{registry.rev[i]}</Label>
+                      <CurrencyInput
+                        id={key}
+                        value={formData.keyMetrics[key]}
+                        onChange={(v) => setFormData({
+                          ...formData,
+                          keyMetrics: { ...formData.keyMetrics, [key]: v }
+                        })}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="flex items-center justify-between border-t pt-2 text-sm">
+                <span className="text-muted-foreground">Total Annual Revenue</span>
+                <span className="font-medium font-mono">
+                  {new Intl.NumberFormat("en-US", {
+                    style: "currency",
+                    currency: "USD",
+                    maximumFractionDigits: 0,
+                  }).format(
+                    (Number(formData.keyMetrics.rev1) || 0) +
+                    (Number(formData.keyMetrics.rev2) || 0) +
+                    (Number(formData.keyMetrics.rev3) || 0)
+                  )}
+                </span>
               </div>
             </div>
           </div>
