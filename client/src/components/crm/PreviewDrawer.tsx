@@ -409,7 +409,7 @@ function KeyDetails({ data, entityType }: { data: any; entityType: EntityType })
 
   return (
     <div className="space-y-0.5">
-      <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Details</p>
+      <div className="ws-section-label">Details<span className="ws-section-rule" /></div>
       {fields.filter(f => f.value).map((f, i) => (
         <div key={i} className="flex items-center gap-3 py-1.5">
           <f.icon className="h-3.5 w-3.5 text-gray-400 flex-shrink-0" />
@@ -475,7 +475,7 @@ function TopAssociations({
 
   return (
     <div className="space-y-3">
-      <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Associations</p>
+      <div className="ws-section-label">Associations<span className="ws-section-rule" /></div>
       {sections.map((section) => {
         const sConfig = entityConfig[section.type];
         const SIcon = sConfig.icon;
@@ -518,7 +518,7 @@ function RecentActivity({ data }: { data: any }) {
 
   return (
     <div className="space-y-2">
-      <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Recent Activity</p>
+      <div className="ws-section-label">Recent Activity<span className="ws-section-rule" /></div>
       <div className="space-y-0">
         {activities.map((a: any, i: number) => {
           const AIcon = activityIcons[a.type || a.eventType] || Activity;

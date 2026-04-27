@@ -258,11 +258,11 @@ export default function CRMDashboard() {
         </div>
         <div className="flex gap-2 flex-shrink-0">
           <ExportPdfButton contentRef={reportRef} filename="crm-dashboard" title="CRM Dashboard" />
-          <Link href="/crm/deals">
-            <Button size="sm"><DollarSign className="w-4 h-4 mr-1.5" />New Deal</Button>
-          </Link>
           <Link href="/crm/leads">
-            <Button variant="outline" size="sm"><TrendingUp className="w-4 h-4 mr-1.5" />New Lead</Button>
+            <Button size="sm"><TrendingUp className="w-4 h-4 mr-1.5" />New Lead</Button>
+          </Link>
+          <Link href="/crm/deals">
+            <Button variant="outline" size="sm"><DollarSign className="w-4 h-4 mr-1.5" />New Deal</Button>
           </Link>
         </div>
       </div>

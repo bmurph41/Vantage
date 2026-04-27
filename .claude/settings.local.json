@@ -284,7 +284,8 @@
       "Bash(git checkout *)",
       "Bash(git pull *)",
       "Bash(echo \"TC_EXIT=$?\")",
-      "Bash(gawk ' *)"
+      "Bash(gawk ' *)",
+      "Bash(awk '{print $NF, $5}')"
     ]
   }
 }

@@ -1416,7 +1416,7 @@ export function DetailDrawer({
                       entityId={entityId}
                     />
                     <div>
-                      <h3 className="text-sm font-medium mb-3">Attached Files</h3>
+                      <div className="ws-section-label">Attached Files<span className="ws-section-rule" /></div>
                       <FileList
                         entityType={entityType}
                         entityId={entityId}
@@ -1432,7 +1432,7 @@ export function DetailDrawer({
                 <TabsContent value="contacts" className="mt-4">
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
-                      <h3 className="text-sm font-medium">Contacts ({companyContacts.length})</h3>
+                      <div className="ws-section-label">Contacts ({companyContacts.length})<span className="ws-section-rule" /></div>
                     </div>
                     {companyContacts.length === 0 ? (
                       <div className="text-center py-8 text-muted-foreground">
@@ -1478,7 +1478,7 @@ export function DetailDrawer({
                 <TabsContent value="properties" className="mt-4">
                   <div className="space-y-3">
                     <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-sm font-medium">Properties ({companyProperties.length})</h3>
+                      <div className="ws-section-label">Properties ({companyProperties.length})<span className="ws-section-rule" /></div>
                       <Button
                         variant="outline"
                         size="sm"
@@ -1622,7 +1622,7 @@ export function DetailDrawer({
 
                               {/* Financial Info */}
                               <div>
-                                <h4 className="text-xs font-medium text-muted-foreground mb-2">Financial & Business</h4>
+                                <div className="ws-section-label">Financial & Business<span className="ws-section-rule" /></div>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                   <div className="space-y-1">
                                     <Label className="text-xs text-muted-foreground">Annual Revenue</Label>
@@ -1641,7 +1641,7 @@ export function DetailDrawer({
 
                               {/* Acquisition & Portfolio */}
                               <div>
-                                <h4 className="text-xs font-medium text-muted-foreground mb-2">Acquisition & Portfolio</h4>
+                                <div className="ws-section-label">Acquisition & Portfolio<span className="ws-section-rule" /></div>
                                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                                   <div className="space-y-1">
                                     <Label className="text-xs text-muted-foreground">Interest</Label>
@@ -1788,7 +1788,7 @@ export function DetailDrawer({
 
                               {/* Capacity */}
                               <div>
-                                <h4 className="text-xs font-medium text-muted-foreground mb-2">Marina Capacity</h4>
+                                <div className="ws-section-label">Marina Capacity<span className="ws-section-rule" /></div>
                                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                                   <div className="space-y-1">
                                     <Label className="text-xs text-muted-foreground">Wet Slips</Label>
@@ -1811,7 +1811,7 @@ export function DetailDrawer({
 
                               {/* Financials */}
                               <div>
-                                <h4 className="text-xs font-medium text-muted-foreground mb-2">Financials</h4>
+                                <div className="ws-section-label">Financials<span className="ws-section-rule" /></div>
                                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                                   <div className="space-y-1">
                                     <Label className="text-xs text-muted-foreground">Occupancy</Label>
