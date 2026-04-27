@@ -149,7 +149,6 @@ const MarketingAutomation = lazy(() => import("@/pages/marketing-automation"));
 const CrmActivitiesPage = lazy(() => import("@/pages/crm-activities"));
 const CalendarSettings = lazy(() => import("@/pages/calendar-settings"));
 const CustomerAnalytics = lazy(() => import("@/pages/operations/CustomerAnalytics"));
-const OwnedAssets = lazy(() => import("@/pages/operations/OwnedAssets"));
 const CommercialTenants = lazy(() => import("@/pages/operations/commercial-tenants"));
 const Portfolio = lazy(() => import("@/pages/Portfolio"));
 const MarinalyticsPage = lazy(() => import("@/pages/marinalytics"));

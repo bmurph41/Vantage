@@ -11809,13 +11809,22 @@ export function registerCRMRoutes(
         if (mp?.assetClass) resolvedAssetClass = mp.assetClass;
       }
 
+      let parsedAcquisitionPrice: number | null = null;
+      if (acquisitionPrice !== undefined && acquisitionPrice !== null && acquisitionPrice !== '') {
+        const parsed = parseInt(acquisitionPrice, 10);
+        if (Number.isNaN(parsed)) {
+          return res.status(400).json({ error: 'acquisitionPrice must be numeric' });
+        }
+        parsedAcquisitionPrice = parsed;
+      }
+
       const asset = await ownedAssetsService.createOwnedAsset(orgId, userId, {
         propertyId,
         projectId: projectId || null,
         modelingProjectId: modelingProjectId || null,
         ...(resolvedAssetClass ? { assetClass: resolvedAssetClass } : {}),
         acquisitionDate,
-        acquisitionPrice: acquisitionPrice ? parseInt(acquisitionPrice) : null,
+        acquisitionPrice: parsedAcquisitionPrice,
         status: status || 'under_management',
         holdStrategy: holdStrategy || null,
         exitTargetDate: exitTargetDate || null,
@@ -11840,7 +11849,17 @@ export function registerCRMRoutes(
 
       const updateData: any = {};
       if (acquisitionDate !== undefined) updateData.acquisitionDate = acquisitionDate;
-      if (acquisitionPrice !== undefined) updateData.acquisitionPrice = acquisitionPrice ? parseInt(acquisitionPrice) : null;
+      if (acquisitionPrice !== undefined) {
+        if (acquisitionPrice === null || acquisitionPrice === '') {
+          updateData.acquisitionPrice = null;
+        } else {
+          const parsed = parseInt(acquisitionPrice, 10);
+          if (Number.isNaN(parsed)) {
+            return res.status(400).json({ error: 'acquisitionPrice must be numeric' });
+          }
+          updateData.acquisitionPrice = parsed;
+        }
+      }
       if (status !== undefined) updateData.status = status;
       if (holdStrategy !== undefined) updateData.holdStrategy = holdStrategy;
       if (exitTargetDate !== undefined) updateData.exitTargetDate = exitTargetDate;
