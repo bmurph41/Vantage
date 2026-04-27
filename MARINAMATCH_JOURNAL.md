@@ -2920,3 +2920,59 @@ Next session priorities (in rough order):
 - AI Advisor (backend works, frontend rendering bug pending)
 - Add to Portfolio (works for all asset classes, language and field labels need redesign)
 - Phase 2 transient_* tables in DB (no routes/UI yet — Phase 2 product surface is next)
+
+## 2026-04-27 (Mon) — Portfolio surface modernization (8 commits)
+
+### Shipped to production
+
+**Tactical fixes (early session):**
+- 96c83906 — fix(api): dual-signature support in apiRequest helper. Detects URL-first vs method-first signature at call time. Resolves "X is not a valid HTTP method" runtime errors in 323 callers that used the URL-first pattern matching the docket variant.
+- 21b62124 — fix(portfolio): Content-Type on Add/Edit Portfolio mutations. Without this header, Express body-parser left req.body = {} and the server returned 400 "propertyId is required".
+
+**Phase 2 (route triage):**
+- 13d9daa5 — Phase 2A. Grew asset_status enum from 3 to 10 values (preserving 'exit' for backward compat) and hold_strategy enum from 3 to 7 values. Fixed dead sidebar link `/operations/portfolio` → `/portfolio`. 11 idempotent ALTER TYPE migrations.
+- 77f7b469 — Phase 2B. Resolved triple registration of GET /api/portfolio/summary. Three handlers were registering the same path; only portfolio-summary-routes.ts:17 was reachable. Owned-assets summary moved to its own URL /api/portfolio/owned-assets-summary. OperationsHome.tsx updated to query the new path; dropped the silent `?? assets.length` fallback.
+
+**Phase 3 (asset-class redesign):**
+- Phase 3A foundation. Added ownedAssets.assetClass (varchar 50, default 'marina') and ownedAssets.modelingProjectId (varchar, nullable, no FK). Extracted ASSET_REGISTRY + AssetRegistryEntry from client/src/pages/marina-map.tsx into client/src/lib/asset-registry.ts. ~25 asset classes across 6 groups. Server endpoints surface assetClass; getPortfolioSummary aggregates byAssetClass; convertDealToOwnedAsset copies assetClass from linked modeling project.
+- 01f66c2a — Phase 3B. Asset-class-aware Add/Edit Portfolio modal. Mode toggle (Link Modeling Project / Manual Entry). Linked mode auto-populates assetClass from project; manual mode shows ASSET_REGISTRY-grouped picker. Dynamic title (Edit ${registry.label}), sizeLabel (Total Slips → Total Keys/Rooms/Holes/Sq Ft), occLabel. New CurrencyInput helper formats $X,XXX,XXX on blur, raw on focus. Annual Revenue replaced by 3 revenue-stream inputs (registry.rev[0/1/2]) with auto-derived total. Storage in keyMetrics.revenueStreams jsonb; legacy annualRevenue still written as sum for backward compat. New endpoint /api/portfolio/available-modeling-projects.
+- c0f07ed3 — Phase 3C-Lite. User-visible Marina-language sweep on Portfolio surface (text only, no renames). 7 strings across 2 files: empty-state, error pages, comp table descriptions and headers.
+- 5f6ece21 — Phase 3C-2-narrow. File/type/variable renames. MarinaModal → AssetModal, MarinaDetail → AssetDetail, OwnedMarinas → OwnedAssets. OwnedMarina interface → OwnedAsset. Full variable rename pass in Portfolio.tsx (marinas → assets, selectedMarina → selectedAsset, etc.). Importer updates in Router.tsx and Portfolio.tsx. git mv preserved file history. Build clean, typecheck baseline (824) preserved.
+
+### Other artifacts committed
+
+- PORTFOLIO_INVENTORY.md (522 lines) — complete code inventory of the Portfolio surface
+- PORTFOLIO_TRIAGE.md (276 lines) — 14 findings prioritized with severity/effort/disposition
+- Phase 2A and 2B fixed findings #7, #8, #12, #1 from triage. Phase 3A/B/C are net-new redesign (not in triage's 14).
+
+### Backlog discovered during session
+
+**Pre-existing CI failure (not caused by us):**
+- GitHub Actions CI has been red on main since at least commit 19cff6f2. `npm run typecheck` exits 1 with 824 baseline TS errors. Production deploys via Replit Republish which uses a separate pipeline (check:schema && build); Replit's pipeline passes. Cleanup item: either fix CI to match Replit's actual pipeline OR fix the 824 typecheck baseline.
+- 7 tests in server/schema-drift.test.ts failing with `expected +0 to be 2`. Pre-existing (verified by checking out pre-Phase-3A schema.ts; same failures). Likely a vi.mock hoisting issue or stale Drizzle internal change. Out of tonight's scope.
+
+**OwnedAssets.tsx (renamed from OwnedMarinas) is dead code:**
+- Lazy-imported in Router.tsx but the only route to it is a Redirect to /portfolio. Contains user-visible Marina text (chart titles, table headers, empty-state) that wasn't swept because the file is unreachable. Either delete the file entirely or wire up the route, then sweep the strings.
+
+**MarinaMapEmbed.tsx Marina-language is shared between Portfolio and standalone marina-map page:**
+- Filter chip "Owned Marinas (N)", search placeholder "Search marinas by name...", error fallback "Failed to load marina data...", loading "Loading marina locations..." — all unconditional, would affect both contexts. Safe Portfolio-context-only changes require either prop-driven SOURCE_LABELS or a full rename. Defer.
+
+**Asset-shape-specific terms still hardcoded in some places:**
+- Total Slips, slips occupied, Revenue/Slip, table columns referencing slips. These survive in some Portfolio.tsx prose. Future phase: drive these from ASSET_REGISTRY[asset.assetClass].sizeLabel.
+
+**Latent Content-Type bugs:**
+- The apiRequest URL-first branch (which we use for 323 callers) doesn't auto-set Content-Type. Phase 3B's MarinaModal Content-Type fix is a one-off; other callers will hit the same 400 if exercised. Cleanup: either codemod 323 callers to set the header explicitly, or auto-detect JSON-string bodies in apiRequest's URL-first branch.
+
+**AI Advisor frontend issues (backend verified working):**
+- Vanishing stream: streaming text appears then disappears when 'done' event arrives because setStreamingContent('') clears before setMessages re-renders (client/src/components/ai-assistant.tsx ~line 374-385).
+- Data-dump vs advisor: long generic essays instead of qualifying users (location, capital, time horizon, active/passive). System prompt redesign + multi-turn qualifying flow needed.
+
+**Triage findings still open:**
+- #2 — /api/portfolio/asset-class-breakdown reads modeling_projects, not owned_assets (Medium)
+- #3 — No breadcrumb for /portfolio routes (Low)
+- #4 — assetPerformanceSnapshots write-only; no frontend reads them (Medium)
+- #5 — acquisition_price is integer, drops cents (Backlog)
+- #6 — keyMetrics three-way fallback creates inconsistent KPIs across pages (High, needs product alignment)
+- #10 — Zero tests for in-scope Portfolio code (High; multiplier on every other fix's risk)
+- #14 — Financials/Performance tabs are inline Card grids (blocks #4)
+
