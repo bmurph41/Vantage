@@ -508,7 +508,7 @@
 
 ### 0A — SQL Injection Remediation
 
-- [security] [todo] Fix SQL injection in security-compliance-service.ts — Lines 495-498: `sql.raw()` with unparameterized `filters.eventType` and `filters.severity` string concatenation; replace with Drizzle parameterized `eq()` / `and()` conditions or `$1`-style placeholders in pool.query()
+- [security] [done] Fix SQL injection in security-compliance-service.ts — Lines 495-498: `sql.raw()` with unparameterized `filters.eventType` and `filters.severity` string concatenation; replace with Drizzle parameterized `eq()` / `and()` conditions or `$1`-style placeholders in pool.query() — *Verified 2026-04-27: query already uses parameterized Drizzle sql template; dead code from previous unsafe implementation removed.*
 
 - [security] [todo] Fix SQL injection in accounting-engine.ts — Lines 534-535, 870, 1176, 1934: `db.execute(sql.raw(...))` with string-concatenated WHERE clauses; refactor each to use Drizzle query builder or parameterized pool.query() with `$1, $2` placeholders
 

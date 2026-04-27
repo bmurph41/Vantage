@@ -470,34 +470,6 @@ class SecurityComplianceService {
     const limit = filters.limit || 100;
     const offset = filters.offset || 0;
 
-    // Build dynamic WHERE clauses
-    const conditions: string[] = ['org_id = $1'];
-    const params: any[] = [orgId];
-    let paramIdx = 2;
-
-    if (filters.eventType) {
-      conditions.push(`event_type = $${paramIdx}`);
-      params.push(filters.eventType);
-      paramIdx++;
-    }
-    if (filters.severity) {
-      conditions.push(`severity = $${paramIdx}`);
-      params.push(filters.severity);
-      paramIdx++;
-    }
-    if (filters.startDate) {
-      conditions.push(`created_at >= $${paramIdx}`);
-      params.push(filters.startDate);
-      paramIdx++;
-    }
-    if (filters.endDate) {
-      conditions.push(`created_at <= $${paramIdx}`);
-      params.push(filters.endDate);
-      paramIdx++;
-    }
-
-    // Use parameterized Drizzle sql template for dynamic filtering
-    const whereClause = conditions.join(' AND ');
     const result = await db.execute(sql`
       SELECT id, org_id, user_id, event_type, ip_address, user_agent,
              metadata, severity, created_at

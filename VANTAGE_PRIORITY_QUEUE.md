@@ -49,6 +49,7 @@ Order rationale: SQL injection first (highest blast radius — exploitable from 
 
 ### A1. Fix SQL injection in security-compliance-service.ts
 **Source:** AGENT_QUEUE.md Tier 0A item 1
+**Status:** ✅ DONE 2026-04-27 — vulnerability already fixed; dead code from previous unsafe implementation removed.
 **Effort:** S
 **Mode:** [solo]
 **Description:** Lines 495-498 use `sql.raw()` with unparameterized `filters.eventType` and `filters.severity` string concatenation; replace with Drizzle parameterized `eq()` / `and()` conditions or `$1`-style placeholders in `pool.query()`.
