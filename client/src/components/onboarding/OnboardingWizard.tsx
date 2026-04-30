@@ -738,9 +738,7 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
         : result?.modelingProject?.id;
       
       if (projectId) {
-        if (state.assetClass === 'marina') {
-          await saveStorageConfig(projectId);
-        }
+        await saveStorageConfig(projectId);
         await uploadStagedFiles(projectId);
         queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'config'] });
         queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'documents'] });
