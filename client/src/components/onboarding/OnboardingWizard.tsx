@@ -14,6 +14,7 @@ import { AddressAutocompleteInput, type NormalizedAddress } from "@/components/u
 import { US_REGIONS } from "@shared/salescomps-constants";
 import { PROFIT_CENTER_CATALOG, AMENITY_CATALOG } from '@shared/marina-catalog';
 import { getAssetClassCatalog } from '@shared/asset-class-catalog';
+import { getModelConfig } from '@shared/asset-class-model-config';
 import { getWizardConfig, getDocumentTypesForAsset } from '@shared/wizard-enhancement-config';
 import { useEntitlements } from '@/contexts/EntitlementsContext';
 import { useAssetClasses } from '@/hooks/use-asset-classes';
@@ -301,7 +302,16 @@ interface WizardState {
   ownership: WizardOwnership;
 }
 
-const MARINA_ONLY_STEPS = new Set(["Profit Centers", "Amenities", "Storage"]);
+function shouldShowStep(title: string, assetClass: string | null): boolean {
+  const cfg = getModelConfig(assetClass);
+  const catalog = getAssetClassCatalog(assetClass);
+  switch (title) {
+    case 'Profit Centers': return cfg.profitCenters.showTab;
+    case 'Storage':        return cfg.tabs.physicalStorage;
+    case 'Amenities':      return catalog.hasAmenities;
+    default:               return true;
+  }
+}
 
 function getOnboardingSteps(assetClass: string | null) {
   const allSteps = [
@@ -316,9 +326,7 @@ function getOnboardingSteps(assetClass: string | null) {
     { title: "Features", icon: Sparkles },
     { title: "Get Started", icon: Check },
   ];
-  const filtered = assetClass && assetClass !== 'marina'
-    ? allSteps.filter(s => !MARINA_ONLY_STEPS.has(s.title))
-    : allSteps;
+  const filtered = allSteps.filter(s => shouldShowStep(s.title, assetClass));
   return filtered.map((s, i) => ({ ...s, id: i + 1 }));
 }
 
@@ -332,9 +340,7 @@ function getNewProjectSteps(assetClass: string | null) {
     { title: "Storage", icon: Warehouse },
     { title: "Documents", icon: Upload },
   ];
-  const filtered = assetClass && assetClass !== 'marina'
-    ? allSteps.filter(s => !MARINA_ONLY_STEPS.has(s.title))
-    : allSteps;
+  const filtered = allSteps.filter(s => shouldShowStep(s.title, assetClass));
   return filtered.map((s, i) => ({ ...s, id: i + 1 }));
 }
 
@@ -443,25 +449,14 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
 
   // Asset-class-aware terminology
   const getAssetTerms = (ac: string | null) => {
-    const terms: Record<string, { property: string; placeholder: string; heading: string }> = {
-      marina: { property: "Marina Name", placeholder: "e.g., Sunset Bay Marina", heading: "Tell us about your marina" },
-      multifamily: { property: "Property Name", placeholder: "e.g., Sunset Ridge Apartments", heading: "Tell us about your property" },
-      retail: { property: "Property Name", placeholder: "e.g., Shoppes at Sunset", heading: "Tell us about your property" },
-      office: { property: "Property Name", placeholder: "e.g., Sunset Tower Office", heading: "Tell us about your property" },
-      industrial: { property: "Property Name", placeholder: "e.g., Sunset Distribution Center", heading: "Tell us about your property" },
-      self_storage: { property: "Facility Name", placeholder: "e.g., Sunset Self Storage", heading: "Tell us about your facility" },
-      hotel: { property: "Hotel Name", placeholder: "e.g., The Sunset Hotel", heading: "Tell us about your hotel" },
-      str: { property: "Property Name", placeholder: "e.g., Sunset Beach House", heading: "Tell us about your property" },
-      medical_office: { property: "Property Name", placeholder: "e.g., Sunset Medical Plaza", heading: "Tell us about your property" },
-      mixed_use: { property: "Property Name", placeholder: "e.g., Sunset Mixed-Use Center", heading: "Tell us about your property" },
-      laundromat: { property: "Business Name", placeholder: "e.g., Sunset Wash & Fold", heading: "Tell us about your laundromat" },
-      sfr: { property: "Property Name", placeholder: "e.g., 123 Sunset Lane", heading: "Tell us about your rental" },
-      duplex: { property: "Property Name", placeholder: "e.g., 456 Oak Street", heading: "Tell us about your duplex" },
-      triplex: { property: "Property Name", placeholder: "e.g., 789 Elm Avenue", heading: "Tell us about your triplex" },
-      quad: { property: "Property Name", placeholder: "e.g., 321 Pine Drive", heading: "Tell us about your fourplex" },
-      business: { property: "Business Name", placeholder: "e.g., Sunset Enterprises", heading: "Tell us about your business" },
-    };
-    return terms[ac || "marina"] || terms.marina;
+    const cfg = getModelConfig(ac);
+    const baseNoun = cfg.terms.property;
+    const capitalized = baseNoun.charAt(0).toUpperCase() + baseNoun.slice(1);
+    const headingNoun = cfg.terms.entityNoun ?? baseNoun;
+    const property = cfg.terms.entityNameLabel ?? `${capitalized} Name`;
+    const placeholder = cfg.terms.namePlaceholder ?? `e.g., Sunset Bay ${capitalized}`;
+    const heading = `Tell us about your ${headingNoun}`;
+    return { property, placeholder, heading };
   };
 
   const getInitialState = useCallback((): WizardState => ({
