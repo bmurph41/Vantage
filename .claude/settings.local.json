@@ -285,7 +285,8 @@
       "Bash(git pull *)",
       "Bash(echo \"TC_EXIT=$?\")",
       "Bash(gawk ' *)",
-      "Bash(awk '{print $NF, $5}')"
+      "Bash(awk '{print $NF, $5}')",
+      "Bash(NODE_OPTIONS=\"--max-old-space-size=4096\" npm run build)"
     ]
   }
 }

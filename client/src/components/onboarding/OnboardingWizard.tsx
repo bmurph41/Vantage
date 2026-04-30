@@ -15,6 +15,9 @@ import { US_REGIONS } from "@shared/salescomps-constants";
 import { PROFIT_CENTER_CATALOG, AMENITY_CATALOG } from '@shared/marina-catalog';
 import { getAssetClassCatalog } from '@shared/asset-class-catalog';
 import { getWizardConfig, getDocumentTypesForAsset } from '@shared/wizard-enhancement-config';
+import { useEntitlements } from '@/contexts/EntitlementsContext';
+import { useAssetClasses } from '@/hooks/use-asset-classes';
+import { mapAssetClassModules, getSuggestedPackageSlug } from '@/config/assetClassModuleMap';
 import { 
   Building2, 
   Anchor, 
@@ -53,7 +56,8 @@ import {
   KeyRound,
   ChevronDown,
   Box,
-  BarChart3
+  BarChart3,
+  Lock
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { toast } from "@/hooks/use-toast";
@@ -401,6 +405,41 @@ const features = [
 export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboarding", onProjectCreated }: OnboardingWizardProps) {
   const [, navigate] = useLocation();
   const queryClient = useQueryClient();
+
+  // C17: Entitlement gating for asset class picker
+  const { getMissingModules } = useEntitlements();
+  const { assetClasses: dbAssetClasses } = useAssetClasses();
+
+  // Lookup: short id → enabledModules array from platform_asset_classes.
+  // Wizard items whose id is missing from this map default to ungated
+  // (shortKeys=[] → requiredModules=[] → getMissingModules([])=[] → isLocked=false).
+  // This is the C17 decision: do not block users on asset classes that have no
+  // DB row yet (str/duplex/triplex/quad). Phase C follow-up: re-seed the seed
+  // and remove the ungated-default by either adding rows or pruning wizard items.
+  const assetClassEnabledModules = useMemo(() => {
+    const map = new Map<string, string[]>();
+    for (const ac of dbAssetClasses) {
+      map.set(ac.key, (ac.enabledModules ?? []) as string[]);
+    }
+    return map;
+  }, [dbAssetClasses]);
+
+  // Dev-only warning: surface wizard ids that have no entitlement gating because
+  // they don't exist in platform_asset_classes. Fires once after data loads.
+  useEffect(() => {
+    if (process.env.NODE_ENV !== 'production' && dbAssetClasses.length > 0) {
+      const missing = wizardAssetClasses.filter(
+        ac => !assetClassEnabledModules.has(ac.id)
+      );
+      if (missing.length > 0) {
+        console.warn(
+          '[OnboardingWizard] Wizard asset class ids missing from ' +
+          'platform_asset_classes.key (no entitlement gating applied): ' +
+          missing.map(m => m.id).join(', ')
+        );
+      }
+    }
+  }, [dbAssetClasses, assetClassEnabledModules]);
 
   // Asset-class-aware terminology
   const getAssetTerms = (ac: string | null) => {
@@ -1135,16 +1174,26 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
       <div>
         <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2 block">Asset Class</Label>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-[320px] overflow-y-auto pr-1">
-          {wizardAssetClasses.map((ac) => (
+          {wizardAssetClasses.map((ac) => {
+            // C17 gating: missing wizard ids default to ungated (see assetClassEnabledModules comment above)
+            const shortKeys = assetClassEnabledModules.get(ac.id) ?? [];
+            const requiredModules = mapAssetClassModules(shortKeys);
+            const missing = getMissingModules(requiredModules);
+            const isLocked = missing.length > 0;
+            const suggestedSlug = isLocked ? getSuggestedPackageSlug(missing) : null;
+            const upgradeHref = `/settings/billing?upgrade=${suggestedSlug ?? ''}&feature=asset_class_${ac.id}`;
+            return (
             <div
               key={ac.id}
+              aria-disabled={isLocked || undefined}
               className={cn(
                 "flex items-center gap-2.5 p-2.5 rounded-lg border cursor-pointer transition-all text-left",
                 state.assetClass === ac.id
                   ? "border-[#1E4FAB] bg-[#1E4FAB]/5 ring-1 ring-[#1E4FAB]/20"
-                  : "hover:bg-muted/50 hover:border-gray-300"
+                  : "hover:bg-muted/50 hover:border-gray-300",
+                isLocked && "opacity-50 cursor-not-allowed"
               )}
-              onClick={() => setState(s => ({ ...s, assetClass: ac.id as WizardAssetClass }))}
+              onClick={isLocked ? undefined : () => setState(s => ({ ...s, assetClass: ac.id as WizardAssetClass }))}
             >
               <div className={cn(
                 "p-1.5 rounded-md shrink-0",
@@ -1152,12 +1201,25 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
               )}>
                 <ac.icon className={cn("h-4 w-4", state.assetClass === ac.id ? "text-[#1E4FAB]" : "text-gray-500")} />
               </div>
-              <div className="min-w-0">
-                <p className={cn("text-xs font-medium truncate", state.assetClass === ac.id && "text-[#1E4FAB]")}>{ac.name}</p>
+              <div className="min-w-0 flex-1">
+                <p className={cn("text-xs font-medium truncate flex items-center gap-1", state.assetClass === ac.id && "text-[#1E4FAB]")}>
+                  <span className="truncate">{ac.name}</span>
+                  {isLocked && <Lock className="h-3.5 w-3.5 text-muted-foreground shrink-0" aria-hidden="true" />}
+                </p>
                 <p className="text-[10px] text-muted-foreground truncate">{ac.description}</p>
+                {isLocked && (
+                  <a
+                    href={upgradeHref}
+                    onClick={(e) => e.stopPropagation()}
+                    className="text-primary underline text-[10px]"
+                  >
+                    Upgrade
+                  </a>
+                )}
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
         {state.assetClass && (
           <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground bg-gray-50 rounded-md px-3 py-1.5">
