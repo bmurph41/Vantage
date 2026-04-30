@@ -52,30 +52,15 @@ export interface AssetClassModelConfig {
   // ─── Unit Mix / Storage Types ───────────────────────────
   // What appears in the "Storage Leases" / "Unit Mix" tab
   unitMix: {
-    tabLabel: 'Listings & Units',
-    tabIcon: 'home',
-    showTab: true,
-    countColumnLabel: 'Listings',
-    rateColumnLabel: 'Avg Nightly Rate',
-    rateType: 'nightly',
-    sfColumnLabel: 'Avg SF',
-    showSF: true,
-    types: [
-      { id: 'studio', name: 'Studio', icon: 'home', section: 'Standard', hasSeasons: true, defaultFields: { avgSF: 450, count: 0 } },
-      { id: '1br_1ba', name: '1 Bed / 1 Bath', icon: 'home', section: 'Standard', hasSeasons: true, defaultFields: { avgSF: 650, count: 0 } },
-      { id: '2br_1ba', name: '2 Bed / 1 Bath', icon: 'home', section: 'Standard', hasSeasons: true, defaultFields: { avgSF: 900, count: 0 } },
-      { id: '2br_2ba', name: '2 Bed / 2 Bath', icon: 'home', section: 'Standard', hasSeasons: true, defaultFields: { avgSF: 1000, count: 0 } },
-      { id: '2br_1half', name: '2 Bed / 1.5 Bath', icon: 'home', section: 'Standard', hasSeasons: true, defaultFields: { avgSF: 950, count: 0 } },
-      { id: '3br_2ba', name: '3 Bed / 2 Bath', icon: 'home', section: 'Larger', hasSeasons: true, defaultFields: { avgSF: 1200, count: 0 } },
-      { id: '3br_2half', name: '3 Bed / 2.5 Bath', icon: 'home', section: 'Larger', hasSeasons: true, defaultFields: { avgSF: 1300, count: 0 } },
-      { id: '3br_3ba', name: '3 Bed / 3 Bath', icon: 'home', section: 'Larger', hasSeasons: true, defaultFields: { avgSF: 1400, count: 0 } },
-      { id: '4br_2ba', name: '4 Bed / 2 Bath', icon: 'home', section: 'Larger', hasSeasons: true, defaultFields: { avgSF: 1600, count: 0 } },
-      { id: '4br_2half', name: '4 Bed / 2.5 Bath', icon: 'home', section: 'Large', hasSeasons: true, defaultFields: { avgSF: 1700, count: 0 } },
-      { id: '4br_3half', name: '4 Bed / 3.5 Bath', icon: 'home', section: 'Large', hasSeasons: true, defaultFields: { avgSF: 1900, count: 0 } },
-      { id: '4br_3ba', name: '4 Bed / 3 Bath', icon: 'home', section: 'Large', hasSeasons: true, defaultFields: { avgSF: 1800, count: 0 } },
-      { id: '5br_plus', name: '5+ Bed', icon: 'home', section: 'Large', hasSeasons: true, defaultFields: { avgSF: 2200, count: 0 } },
-      { id: 'custom', name: 'Custom Layout', icon: 'edit', section: 'Custom', hasSeasons: true, defaultFields: { avgSF: 0, count: 0 } },
-    ],
+    tabLabel: string;
+    tabIcon: string;
+    showTab: boolean;
+    countColumnLabel: string;
+    rateColumnLabel: string;
+    rateType: 'monthly' | 'nightly' | 'hourly' | 'annual' | 'per-use' | string;
+    sfColumnLabel: string;
+    showSF: boolean;
+    types: UnitMixTypeConfig[];
   },
 
   // ─── Profit Centers / Departments ───────────────────────
@@ -96,7 +81,7 @@ export interface AssetClassModelConfig {
   kpis: KPIConfig[];
 
   // ─── Tab Visibility ─────────────────────────────────────
-  tabs: { storageLeases: true, commercialLeases: false, profitCenters: false },
+  tabs: { storageLeases: boolean; commercialLeases: boolean; profitCenters: boolean },
 
   // ─── Rental Mode (for small residential) ──────────────
   rentalModes?: ('long_term' | 'short_term')[];  // available modes for this asset class

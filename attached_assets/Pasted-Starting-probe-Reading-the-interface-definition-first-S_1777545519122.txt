@@ -1,0 +1,134 @@
+Starting probe. Reading the interface definition first.
+
+  Searched for 12 patterns, read 1 file (ctrl+o to expand)                                                                                                                      
+                                       
+● (b-probe) Report — AssetClassModelConfig Literal Widening Safety                                                                                                              
+                                                           
+  Narrowed fields in the interface (lines 22–112)                                                                                                                               
+                                                                                                                                                                                
+  Over-narrowed (LITERAL value types where general types were intended):                                                                                                        
+                                                                                                                                                                                
+  ┌──────────────────────────┬───────────────────────────────────────────────────────────────────────┬─────────────────────────────────────────────────────────────────────┐    
+  │        Field path        │                         Current literal type                          │                           Should widen to                           │
+  ├──────────────────────────┼───────────────────────────────────────────────────────────────────────┼─────────────────────────────────────────────────────────────────────┤    
+  │ unitMix.tabLabel         │ 'Listings & Units'                                                    │ string                                                              │
+  ├──────────────────────────┼───────────────────────────────────────────────────────────────────────┼─────────────────────────────────────────────────────────────────────┤
+  │ unitMix.tabIcon          │ 'home'                                                                │ string                                                              │    
+  ├──────────────────────────┼───────────────────────────────────────────────────────────────────────┼─────────────────────────────────────────────────────────────────────┤
+  │ unitMix.showTab          │ true                                                                  │ boolean                                                             │    
+  ├──────────────────────────┼───────────────────────────────────────────────────────────────────────┼─────────────────────────────────────────────────────────────────────┤
+  │ unitMix.countColumnLabel │ 'Listings'                                                            │ string                                                              │
+  ├──────────────────────────┼───────────────────────────────────────────────────────────────────────┼─────────────────────────────────────────────────────────────────────┤    
+  │ unitMix.rateColumnLabel  │ 'Avg Nightly Rate'                                                    │ string                                                              │
+  ├──────────────────────────┼───────────────────────────────────────────────────────────────────────┼─────────────────────────────────────────────────────────────────────┤    
+  │ unitMix.rateType         │ 'nightly'                                                             │ 'monthly' | 'nightly' | 'hourly' | 'annual' | 'per-use' (or string) │
+  ├──────────────────────────┼───────────────────────────────────────────────────────────────────────┼─────────────────────────────────────────────────────────────────────┤    
+  │ unitMix.sfColumnLabel    │ 'Avg SF'                                                              │ string                                                              │
+  ├──────────────────────────┼───────────────────────────────────────────────────────────────────────┼─────────────────────────────────────────────────────────────────────┤    
+  │ unitMix.showSF           │ true                                                                  │ boolean                                                             │
+  ├──────────────────────────┼───────────────────────────────────────────────────────────────────────┼─────────────────────────────────────────────────────────────────────┤    
+  │ unitMix.types            │ tuple of 14 literal-id objects ({id:'studio',…}, {id:'1br_1ba',…}, …) │ UnitMixTypeConfig[]                                                 │
+  ├──────────────────────────┼───────────────────────────────────────────────────────────────────────┼─────────────────────────────────────────────────────────────────────┤    
+  │ tabs.storageLeases       │ true                                                                  │ boolean                                                             │
+  ├──────────────────────────┼───────────────────────────────────────────────────────────────────────┼─────────────────────────────────────────────────────────────────────┤    
+  │ tabs.commercialLeases    │ false                                                                 │ boolean                                                             │
+  ├──────────────────────────┼───────────────────────────────────────────────────────────────────────┼─────────────────────────────────────────────────────────────────────┤    
+  │ tabs.profitCenters       │ false                                                                 │ boolean                                                             │
+  └──────────────────────────┴───────────────────────────────────────────────────────────────────────┴─────────────────────────────────────────────────────────────────────┘
+
+  Already correctly general (LEAVE AS-IS):                                                                                                                                      
+   
+  ┌──────────────────────────────────┬───────────────────────────────────────────────────────────────────┬──────────────────────┐                                               
+  │              Field               │                               Type                                │         Note         │
+  ├──────────────────────────────────┼───────────────────────────────────────────────────────────────────┼──────────────────────┤                                               
+  │ terms.*                          │ string                                                            │ All 9 sub-fields ✓   │
+  ├──────────────────────────────────┼───────────────────────────────────────────────────────────────────┼──────────────────────┤
+  │ valuationMetric                  │ 'cap_rate' | 'grm' | 'ebitda_multiple'                            │ Proper 3-way union ✓ │                                               
+  ├──────────────────────────────────┼───────────────────────────────────────────────────────────────────┼──────────────────────┤                                               
+  │ valuationLabel                   │ string                                                            │ ✓                    │                                               
+  ├──────────────────────────────────┼───────────────────────────────────────────────────────────────────┼──────────────────────┤                                               
+  │ hasSeasonal                      │ boolean                                                           │ ✓                    │
+  ├──────────────────────────────────┼───────────────────────────────────────────────────────────────────┼──────────────────────┤                                               
+  │ seasonConfig.type                │ 'marina' | 'hospitality' | 'str' | 'none'                         │ Proper union ✓       │
+  ├──────────────────────────────────┼───────────────────────────────────────────────────────────────────┼──────────────────────┤                                               
+  │ profitCenters.tabLabel / showTab │ string / boolean                                                  │ ✓                    │
+  ├──────────────────────────────────┼───────────────────────────────────────────────────────────────────┼──────────────────────┤                                               
+  │ KPIConfig.format                 │ 'currency' | 'percent' | 'number' | 'multiple'                    │ Proper union ✓       │
+  ├──────────────────────────────────┼───────────────────────────────────────────────────────────────────┼──────────────────────┤                                               
+  │ InputFieldDef.type               │ 'number' | 'percent' | 'currency' | 'select' | 'text' | 'integer' │ ✓                    │
+  ├──────────────────────────────────┼───────────────────────────────────────────────────────────────────┼──────────────────────┤                                               
+  │ DepartmentConfig.category        │ 'core' | 'ancillary' | 'specialty'                                │ ✓                    │
+  ├──────────────────────────────────┼───────────────────────────────────────────────────────────────────┼──────────────────────┤                                               
+  │ rentalModes / defaultRentalMode  │ ('long_term' | 'short_term')[] / 'long_term' | 'short_term'       │ ✓                    │
+  └──────────────────────────────────┴───────────────────────────────────────────────────────────────────┴──────────────────────┘                                               
+                                                            
+  Per-field consumer analysis                                                                                                                                                   
+                                                            
+  unitMix.tabLabel                                                                                                                                                              
+  - inputs.tsx:1377, 1543 — {config.unitMix.tabLabel} rendered as text (INFORMATIONAL)
+  - asset-class-model-config.ts:4392 — storageLabel: config.unitMix.tabLabel \|\| 'Unit Mix' (INFORMATIONAL)                                                                    
+  - No === branching. 0 LOAD-BEARING / 3 INFORMATIONAL.                                                     
+                                                                                                                                                                                
+  unitMix.tabIcon                                                                                                                                                               
+  - asset-class-model-config.ts:4393 — passed through as storageIcon (INFORMATIONAL)                                                                                            
+  - 0 / 1.                                                                                                                                                                      
+                                                                                                                                                                                
+  unitMix.showTab                                                                                                                                                               
+  - inputs.tsx:1538 — {config.unitMix.showTab && …} truthy gate (INFORMATIONAL — works on boolean)
+  - 0 / 1.                                                                                                                                                                      
+                             
+  unitMix.countColumnLabel / rateColumnLabel / sfColumnLabel                                                                                                                    
+  - All used as display labels in inputs.tsx / unit-mix-leases.tsx. No === branching. 0 LOAD-BEARING.                                                                           
+                                                                                                                                                                                
+  unitMix.rateType                                                                                                                                                              
+  - Grep across full repo for config.unitMix.rateType, mc.unitMix.rateType, modelConfig.unitMix.rateType: zero hits. Other rateType strings in the codebase belong to entirely  
+  separate scopes (use-market-rates.ts for SOFR/Prime/Treasury, PropertyIntegrationPanel.tsx for entry-level monthly/annual labels, comp-set-selector.tsx for rate comps). None 
+  reach the model config.                                                                                                                                                      
+  - 0 LOAD-BEARING / 0 INFORMATIONAL. Pure dead literal — completely safe.                                                                                                      
+                       
+  unitMix.showSF                                                                                                                                                                
+  - No external consumer found. 0 / 0.
+                                                                                                                                                                                
+  unitMix.types              
+  - growth-rates/index.tsx:694, assumptions.tsx:409,419, inputs.tsx:878,1538,1553,1554, rent-roll-config.ts:275 — all .map()/.filter() over the array, accessing                
+  .id/.name/.section/.icon/.hasSeasons/.defaultFields.                                                                                                                          
+  - No t.id === 'studio'-style branching anywhere in the 7 consumers. Iteration only.
+  - The UnitMixTypeConfig interface (lines 114–133) already describes the right shape.                                                                                          
+  - 0 LOAD-BEARING / 7 INFORMATIONAL. Safe to widen to UnitMixTypeConfig[].                                                                                                     
+                                                                                                                                                                                
+  tabs.storageLeases / commercialLeases / profitCenters                                                                                                                         
+  - Read once at asset-class-model-config.ts:4388–4390 inside getTabOverrides(), projected to plain boolean showStorageLeases/showCommercialLeases/showProfitCenters.           
+  - Downstream consumer workspace.tsx:872–875 reads only the projected booleans (tabOverrides.showStorageLeases), never the raw config.tabs.*.                                  
+  - No === true checks. 0 LOAD-BEARING / 3 INFORMATIONAL.                                                                                     
+                                                                                                                                                                                
+  Concrete config typing                                                                                                                                                        
+                                                                                                                                                                                
+  MODEL_CONFIG_REGISTRY: Record<string, AssetClassModelConfig> (line 4337) and the 31 individual configs (MARINA_CONFIG: AssetClassModelConfig, etc.) are typed directly against
+   the interface — not against any narrower derived type. They're failing TS2322 today because of the over-narrow interface (e.g., MARINA's tabLabel: 'Storage Leases' ≠
+  interface's 'Listings & Units'). Widening the interface makes all 31 configs compile against the same widened types — no per-config type changes needed.                      
+                                         
+  Discriminated-union audit (looking for hidden load-bearing usage)                                                                                                             
+                             
+  seasonConfig.type is branched on at unit-mix-leases.tsx:321 and inputs.tsx:1514 (config.seasonConfig.type === 'marina' / === 'str'). This field is already a proper union     
+  ('marina' | 'hospitality' | 'str' | 'none') — not over-narrowed — so it remains untouched and the branches keep their narrowing. ✓
+                                                                                                                                                                                
+  KPIConfig.format is branched on heavily (om-builder, pro-forma-charts, acquisition-comparison: format === 'currency' | 'percent' | 'number'). Also already a proper union —   
+  not over-narrowed. ✓       
+                                                                                                                                                                                
+  valuationMetric already a proper union — not over-narrowed. ✓
+
+  No type guards (is XYZ) anywhere on the narrowed fields. No discriminator-based switches on tabLabel/tabIcon/rateType/etc.                                                    
+                             
+  Recommendation: SAFE TO WIDEN ALL over-narrowed fields                                                                                                                        
+                                         
+  The 12 over-narrowed fields (unitMix.tabLabel, tabIcon, showTab, countColumnLabel, rateColumnLabel, rateType, sfColumnLabel, showSF, types, plus                              
+  tabs.{storageLeases,commercialLeases,profitCenters}) have zero load-bearing literal-discriminated consumers anywhere in the codebase. Every consumer either:
+  - Renders the value as display text/icon, or                                                                                                                                  
+  - Iterates the array, or                                                                                                                                                      
+  - Uses the boolean as a truthy gate
+                                                                                                                                                                                
+  Widen them all in one pass. Expected impact: clears most of the 798 file-local errors, with no runtime behavior change and no downstream type-safety regression. The proper
+  unions already in place (valuationMetric, seasonConfig.type, KPIConfig.format, rentalModes, defaultRentalMode, InputFieldDef.type, DepartmentConfig.category) preserve all    
+  genuine literal-narrowing where it's actually used.
+                                                                                                                                                                                
+  No exceptions, no carve-outs. Ready for the (b-int) interface refactor on your "go".
