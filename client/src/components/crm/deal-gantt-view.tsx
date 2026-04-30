@@ -43,8 +43,8 @@ const PIXELS_PER_DAY: Record<ZoomLevel, number> = {
 
 const SLA_ROW_BG: Record<string, string> = {
   ok: "",
-  warning: "bg-amber-50/50",
-  overdue: "bg-red-50/50",
+  warning: "bg-amber-50/50 dark:bg-amber-900/20",
+  overdue: "bg-red-50/50 dark:bg-red-900/20",
 };
 
 export default function DealGanttView({ pipelineId, className = "" }: DealGanttViewProps) {
@@ -194,7 +194,7 @@ export default function DealGanttView({ pipelineId, className = "" }: DealGanttV
 
   if (!deals.length) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 text-gray-400">
+      <div className="flex flex-col items-center justify-center py-20 text-gray-400 dark:text-gray-500">
         <Calendar className="h-12 w-12 mb-4 opacity-40" />
         <p className="text-sm font-medium">No deals in this pipeline</p>
         <p className="text-xs mt-1">Add deals with key dates to see the timeline view</p>
@@ -217,7 +217,7 @@ export default function DealGanttView({ pipelineId, className = "" }: DealGanttV
       />
 
       {/* Legend */}
-      <div className="flex items-center gap-4 px-4 py-1.5 border-b bg-gray-50 text-[11px] text-gray-500 print:hidden">
+      <div className="flex items-center gap-4 px-4 py-1.5 border-b bg-gray-50 dark:bg-gray-800 text-[11px] text-gray-500 dark:text-gray-400 print:hidden">
         <div className="flex items-center gap-1.5">
           <div className="w-2.5 h-2.5 rotate-45 bg-purple-500" /> Key Date
         </div>
@@ -238,30 +238,30 @@ export default function DealGanttView({ pipelineId, className = "" }: DealGanttV
       {/* Gantt body */}
       <div className="flex-1 overflow-hidden flex">
         {/* Left panel: deal names */}
-        <div className="w-40 md:w-60 min-w-[160px] md:min-w-[240px] flex-shrink-0 border-r bg-white overflow-y-auto">
+        <div className="w-40 md:w-60 min-w-[160px] md:min-w-[240px] flex-shrink-0 border-r bg-white dark:bg-gray-900 overflow-y-auto">
           {/* Header */}
-          <div className="sticky top-0 z-10 bg-gray-50 border-b px-3 py-2 text-xs font-medium text-gray-500 uppercase tracking-wider h-9 flex items-center">
+          <div className="sticky top-0 z-10 bg-gray-50 dark:bg-gray-800 border-b px-3 py-2 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider h-9 flex items-center">
             Deal
           </div>
           {groupedDeals.map((group) => (
             <div key={group.label}>
               {group.label && groupBy !== "deal" && (
-                <div className="px-3 py-1.5 bg-gray-100 ws-section-label ws-section-label--compact border-b">
+                <div className="px-3 py-1.5 bg-gray-100 dark:bg-gray-800 ws-section-label ws-section-label--compact border-b dark:border-gray-700 text-gray-600 dark:text-gray-300">
                   {group.label}
                 </div>
               )}
               {group.deals.map((deal) => (
                 <div
                   key={deal.id}
-                  className={`flex items-center px-3 py-2 border-b cursor-pointer hover:bg-blue-50/40 transition-colors h-12 ${
-                    hoveredDealId === deal.id ? "bg-blue-50/40" : SLA_ROW_BG[deal.slaStatus]
+                  className={`flex items-center px-3 py-2 border-b dark:border-gray-700 cursor-pointer hover:bg-blue-50/40 dark:hover:bg-blue-900/20 transition-colors h-12 ${
+                    hoveredDealId === deal.id ? "bg-blue-50/40 dark:bg-blue-900/20" : SLA_ROW_BG[deal.slaStatus]
                   }`}
                   onMouseEnter={() => setHoveredDealId(deal.id)}
                   onMouseLeave={() => setHoveredDealId(null)}
                   onClick={() => setLocation(`/deals/${deal.id}`)}
                 >
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-gray-900 truncate leading-tight">{deal.title}</p>
+                    <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate leading-tight">{deal.title}</p>
                     <div className="flex items-center gap-1.5 mt-0.5">
                       {deal.value && (
                         <span className="text-[10px] font-medium text-emerald-600">
@@ -290,14 +290,14 @@ export default function DealGanttView({ pipelineId, className = "" }: DealGanttV
         <div className="flex-1 overflow-auto" ref={scrollRef}>
           <div style={{ width: `${totalWidth}px`, minWidth: "100%" }} className="relative">
             {/* Time axis header */}
-            <div className="sticky top-0 z-10 bg-gray-50 border-b flex h-9">
+            <div className="sticky top-0 z-10 bg-gray-50 dark:bg-gray-800 border-b dark:border-gray-700 flex h-9">
               {gridColumns.map((col, i) => {
                 const leftPx = getXPx(col.start);
                 const widthPx = getXPx(col.end) - leftPx;
                 return (
                   <div
                     key={i}
-                    className="text-center text-[11px] font-medium text-gray-500 border-r border-gray-200 flex items-center justify-center shrink-0"
+                    className="text-center text-[11px] font-medium text-gray-500 dark:text-gray-400 border-r border-gray-200 dark:border-gray-700 flex items-center justify-center shrink-0"
                     style={{ width: `${widthPx}px`, position: "absolute", left: `${leftPx}px`, height: "100%" }}
                   >
                     {col.label}
@@ -318,7 +318,7 @@ export default function DealGanttView({ pipelineId, className = "" }: DealGanttV
               return (
                 <div
                   key={`grid-${i}`}
-                  className="absolute top-9 bottom-0 border-l border-gray-100 pointer-events-none"
+                  className="absolute top-9 bottom-0 border-l border-gray-100 dark:border-gray-700/50 pointer-events-none"
                   style={{ left: `${leftPx}px` }}
                 />
               );
@@ -328,7 +328,7 @@ export default function DealGanttView({ pipelineId, className = "" }: DealGanttV
             {groupedDeals.map((group) => (
               <div key={group.label}>
                 {group.label && groupBy !== "deal" && (
-                  <div className="h-[26px] bg-gray-100 border-b" />
+                  <div className="h-[26px] bg-gray-100 dark:bg-gray-800 border-b dark:border-gray-700" />
                 )}
                 {group.deals.map((deal) => {
                   const dealEvents = eventsByDeal.get(deal.id) || [];
@@ -341,8 +341,8 @@ export default function DealGanttView({ pipelineId, className = "" }: DealGanttV
                   return (
                     <div
                       key={deal.id}
-                      className={`relative border-b h-12 ${
-                        hoveredDealId === deal.id ? "bg-blue-50/30" : SLA_ROW_BG[deal.slaStatus]
+                      className={`relative border-b dark:border-gray-700 h-12 ${
+                        hoveredDealId === deal.id ? "bg-blue-50/30 dark:bg-blue-900/20" : SLA_ROW_BG[deal.slaStatus]
                       }`}
                       onMouseEnter={() => setHoveredDealId(deal.id)}
                       onMouseLeave={() => setHoveredDealId(null)}
@@ -438,7 +438,7 @@ export default function DealGanttView({ pipelineId, className = "" }: DealGanttV
                               style={{
                                 left: `${x - 6}px`,
                                 borderColor: ev.color,
-                                backgroundColor: ev.status === "approved" ? ev.color : "white",
+                                backgroundColor: ev.status === "approved" ? ev.color : "transparent",
                               }}
                               title={ev.title}
                             />
