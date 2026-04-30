@@ -412,16 +412,18 @@ function UnifiedLayout({ children }: { children: React.ReactNode }) {
       </div>
       <CommandPalette />
       <AIAssistant />
-      <Suspense fallback={null}>
-        <OnboardingWizard 
-          open={showOnboarding} 
-          onOpenChange={(open) => {
-            if (!open) completeOnboarding();
-            setShowOnboarding(open);
-          }}
-          userName={user?.name?.split(' ')[0] || user?.email?.split('@')[0]}
-        />
-      </Suspense>
+      <EntitlementsProvider>
+        <Suspense fallback={null}>
+          <OnboardingWizard 
+            open={showOnboarding} 
+            onOpenChange={(open) => {
+              if (!open) completeOnboarding();
+              setShowOnboarding(open);
+            }}
+            userName={user?.name?.split(' ')[0] || user?.email?.split('@')[0]}
+          />
+        </Suspense>
+      </EntitlementsProvider>
     </div>
   );
 }

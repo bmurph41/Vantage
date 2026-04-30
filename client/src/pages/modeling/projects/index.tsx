@@ -31,6 +31,7 @@ import ModelingAnalytics from './analytics';
 import { DealTemplateSelector } from '@/components/modeling/DealTemplateSelector';
 import { ModelingEmptyState } from '@/components/ui/_primitives/enhanced-empty-state';
 import { OnboardingWizard } from '@/components/onboarding/OnboardingWizard';
+import { EntitlementsProvider } from '@/contexts/EntitlementsContext';
 import { computeDealSignal, getSignalBadgeProps } from '@/lib/dealSignal';
 import { useDisplayMode } from '@/stores/display-mode-store';
 import QuickAnalysisDashboard from '@/components/analysis/QuickAnalysisDashboard';
@@ -550,12 +551,14 @@ export default function ModelingProjectsPage() {
         project={selectedProject}
       />
 
-      <OnboardingWizard
-        open={isNewProjectWizardOpen}
-        onOpenChange={setIsNewProjectWizardOpen}
-        mode="new_project"
-        onProjectCreated={handleProjectCreated}
-      />
+      <EntitlementsProvider>
+        <OnboardingWizard
+          open={isNewProjectWizardOpen}
+          onOpenChange={setIsNewProjectWizardOpen}
+          mode="new_project"
+          onProjectCreated={handleProjectCreated}
+        />
+      </EntitlementsProvider>
 
       <DealTemplateSelector
         open={isTemplateOpen}
