@@ -85,7 +85,7 @@ function irrColor(v: number | undefined | null): string {
 
 function SectionHeader({ children }: { children: React.ReactNode }) {
   return (
-    <h3 className="text-[11px] font-semibold uppercase tracking-wider text-amber-400 mb-2 mt-4 first:mt-0">
+    <h3 className="ws-section-label first:mt-0">
       {children}
     </h3>
   );
@@ -495,7 +495,7 @@ export default function GlobalAssumptionsSidebar({ projectId, project: projectPr
 
           {/* Live Output -- sticky bottom */}
           <div className="border-t border-slate-600 bg-[#142038] px-3 py-3 flex-shrink-0">
-            <h3 className="text-[11px] font-semibold uppercase tracking-wider text-amber-400 mb-2">
+            <h3 className="ws-section-label">
               Live Output
             </h3>
             <OutputRow

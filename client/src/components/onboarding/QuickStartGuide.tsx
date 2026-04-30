@@ -262,7 +262,7 @@ export function QuickStartGuide() {
 
               return (
                 <div key={category}>
-                  <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+                  <h4 className="ws-section-label ws-section-label--compact mb-2">
                     {CATEGORY_LABELS[category]}
                   </h4>
                   <div className="space-y-1">

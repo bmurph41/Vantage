@@ -322,7 +322,7 @@ export default function DealComparisonPage() {
             return (
               <Card key={group}>
                 <CardHeader className="py-3 px-4 bg-muted/30">
-                  <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  <CardTitle className="ws-section-label ws-section-label--compact">
                     {group}
                   </CardTitle>
                 </CardHeader>
@@ -419,7 +419,7 @@ function DDTimelineCompareRow({ deals }: { deals: Deal[] }) {
   return (
     <Card>
       <CardHeader className="py-3 px-4 bg-muted/30">
-        <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+        <CardTitle className="ws-section-label ws-section-label--compact">
           <ClockIcon className="h-3 w-3" /> Due Diligence Timelines
         </CardTitle>
       </CardHeader>
@@ -534,7 +534,7 @@ function BrokerFeedbackCompareRow({ deals }: { deals: Deal[] }) {
   return (
     <Card>
       <CardHeader className="py-3 px-4 bg-muted/30">
-        <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+        <CardTitle className="ws-section-label ws-section-label--compact">
           <Scale className="h-3 w-3" /> Broker Feedback
         </CardTitle>
       </CardHeader>

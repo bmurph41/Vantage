@@ -305,7 +305,7 @@ export function ExtractionReview({ jobId, projectId, onPopulate }: Props) {
             ? 'border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/20'
             : 'border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/20'
         }`}>
-          <p className={`text-xs font-semibold uppercase tracking-wider mb-1.5 ${
+          <p className={`ws-section-label ws-section-label--compact mb-1.5 ${
             jobStatus.reconciliationReport.blocking
               ? 'text-red-700 dark:text-red-400'
               : 'text-amber-700 dark:text-amber-400'

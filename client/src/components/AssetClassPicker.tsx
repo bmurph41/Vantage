@@ -118,7 +118,7 @@ export function AssetClassPicker({
           const items = visibleList.filter((a) => a.group === group);
           return (
             <div key={group}>
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+              <p className="ws-section-label ws-section-label--compact mb-2">
                 {group}
               </p>
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">

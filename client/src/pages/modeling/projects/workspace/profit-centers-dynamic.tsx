@@ -210,7 +210,7 @@ export default function ProfitCentersDynamic({ project }: ProfitCentersDynamicPr
     return (
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{label}</Label>
+          <Label className="ws-section-label ws-section-label--compact">{label}</Label>
           <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={() => addCustomLine(deptId, lineType)}>
             <Plus className="h-3 w-3 mr-1" /> Add
           </Button>
@@ -315,7 +315,7 @@ export default function ProfitCentersDynamic({ project }: ProfitCentersDynamicPr
           if (catDepts.length === 0) return null;
           return (
             <div key={cat}>
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2 mt-4">
+              <p className="ws-section-label mb-2">
                 {catLabels[cat] || cat}
               </p>
               {catDepts.map(dept => {

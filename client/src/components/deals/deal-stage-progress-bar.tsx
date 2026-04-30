@@ -117,7 +117,7 @@ export function DealStageProgressBar({ stageEvents, canonicalStages }: Props) {
     <TooltipProvider>
       <div className="rounded-md border border-slate-200 bg-white px-3 py-2.5">
         <div className="flex items-center justify-between mb-2">
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+          <span className="ws-section-label ws-section-label--compact">
             Stage Progression
           </span>
           <span className="text-[10px] font-mono text-slate-400">

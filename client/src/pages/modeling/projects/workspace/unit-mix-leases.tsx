@@ -217,7 +217,7 @@ export default function UnitMixLeases({ project }: UnitMixLeasesProps) {
           <Card key={section}>
             <CardHeader className="py-3 px-4">
               <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+                <CardTitle className="ws-section-label ws-section-label--compact">
                   {section}
                 </CardTitle>
                 <Badge variant="secondary" className="text-xs">

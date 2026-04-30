@@ -1138,7 +1138,7 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
 
       {/* Deal Structure */}
       <div>
-        <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2 block">Deal Structure</Label>
+        <Label className="ws-section-label ws-section-label--compact mb-2 block">Deal Structure</Label>
         <RadioGroup
           value={state.dealStructure || ""}
           onValueChange={(value) => setState(s => ({ ...s, dealStructure: value as DealStructure }))}
@@ -1172,7 +1172,7 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
 
       {/* Asset Class */}
       <div>
-        <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2 block">Asset Class</Label>
+        <Label className="ws-section-label ws-section-label--compact mb-2 block">Asset Class</Label>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-[320px] overflow-y-auto pr-1">
           {wizardAssetClasses.map((ac) => {
             // C17 gating: missing wizard ids default to ungated (see assetClassEnabledModules comment above)

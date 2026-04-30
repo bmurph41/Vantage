@@ -2069,7 +2069,7 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                 {(linePositions.managementFee === 'above' || linePositions.capex === 'above' || linePositions.reserves === 'above') && (
                   <>
                     <TableRow className="border-t bg-amber-50/30 dark:bg-amber-950/10">
-                      <TableCell colSpan={100} className="sticky left-0 z-10 text-xs font-semibold uppercase tracking-wider text-amber-600 dark:text-amber-400 py-1">
+                      <TableCell colSpan={100} className="sticky left-0 z-10 ws-section-label ws-section-label--compact py-1">
                         Above-the-Line Adjustments
                       </TableCell>
                     </TableRow>
@@ -2256,7 +2256,7 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                 <>
                   {(linePositions.managementFee === 'below' || linePositions.capex === 'below' || linePositions.reserves === 'below') && (
                     <TableRow className="border-t-2 bg-muted/30">
-                      <TableCell colSpan={100} className="sticky left-0 z-10 text-xs font-semibold uppercase tracking-wider text-muted-foreground py-1">
+                      <TableCell colSpan={100} className="sticky left-0 z-10 ws-section-label ws-section-label--compact py-1">
                         Below-the-Line Adjustments
                       </TableCell>
                     </TableRow>

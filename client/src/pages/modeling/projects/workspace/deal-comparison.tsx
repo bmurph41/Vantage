@@ -217,7 +217,7 @@ function MetricSection({
   return (
     <Card>
       <CardHeader className="py-2.5 px-4 bg-muted/30">
-        <CardTitle className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{title}</CardTitle>
+        <CardTitle className="ws-section-label ws-section-label--compact">{title}</CardTitle>
       </CardHeader>
       <CardContent className="p-0">
         <table className="w-full">
@@ -803,7 +803,7 @@ function DealDetailsTab({ deals, navigate }: { deals: DealComparisonDeal[]; navi
       {/* Stage & links */}
       <Card>
         <CardHeader className="py-2.5 px-4 bg-muted/30">
-          <CardTitle className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Stage & Links</CardTitle>
+          <CardTitle className="ws-section-label ws-section-label--compact">Stage & Links</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           <table className="w-full">

@@ -1565,7 +1565,7 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
               {'criteriaMatches' in dealSignal && (dealSignal as any).criteriaMatches && (dealSignal as any).criteriaMatches.length > 0 && (
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Investment Criteria Match</p>
+                    <p className="ws-section-label ws-section-label--compact">Investment Criteria Match</p>
                     <span className="text-xs text-muted-foreground">
                       {(dealSignal as any).criteriaMatches.filter((m: any) => m.met).length}/{(dealSignal as any).criteriaMatches.length} criteria met
                     </span>
@@ -1595,7 +1595,7 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
 
                 {dealSignal.reasons.length > 0 && (
                   <div className={cn("rounded-lg p-3 space-y-1.5", dealSignal.bgColor)}>
-                    <p className={cn("text-xs font-semibold uppercase tracking-wider", dealSignal.color)}>Key Factors</p>
+                    <p className={cn("ws-section-label ws-section-label--compact", dealSignal.color)}>Key Factors</p>
                     {dealSignal.reasons.map((reason, i) => (
                       <div key={i} className="flex items-start gap-2 text-sm">
                         <span className={cn("mt-0.5 flex-shrink-0 text-xs", dealSignal.color)}>
@@ -1608,7 +1608,7 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
                 )}
 
                 <div className="rounded-lg p-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 space-y-2">
-                  <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Data Sources</p>
+                  <p className="ws-section-label ws-section-label--compact">Data Sources</p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-xs">
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Going-In Cap</span>

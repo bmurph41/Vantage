@@ -365,7 +365,7 @@ export default function FinancialAnalysisDashboard() {
                       <thead>
                         <tr className="border-b border-slate-100">
                           {['Marina Name', 'State', 'Purchase Price', 'Revenue', 'NOI', 'Cap Rate', 'Units', 'Status'].map((h, i) => (
-                            <th key={h} className={`py-2.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400 ${i > 1 ? 'text-right' : i === 7 ? 'text-center' : 'text-left'}`}>
+                            <th key={h} className={`py-2.5 px-3 ws-section-label ws-section-label--compact ${i > 1 ? 'text-right' : i === 7 ? 'text-center' : 'text-left'}`}>
                               {h}
                             </th>
                           ))}

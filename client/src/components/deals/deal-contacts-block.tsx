@@ -225,7 +225,7 @@ function KeyContactList({ contacts }: { contacts: DealContactEntry[] }) {
     if (members.length === 0) return null;
     return (
       <div className="space-y-2">
-        <h5 className={cn("text-xs font-semibold uppercase tracking-wider", color)}>{title}</h5>
+        <h5 className={cn("ws-section-label ws-section-label--compact", color)}>{title}</h5>
         <div className="space-y-1.5">
           {members.map((c) => (
             <div key={c.id} className="flex items-center gap-3 text-xs py-1 border-b border-gray-100 last:border-0">
