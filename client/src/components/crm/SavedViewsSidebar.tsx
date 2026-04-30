@@ -126,7 +126,7 @@ export function SavedViewsSidebar({ objectType, activeViewId, onSelectView, curr
     <div className="w-56 border-r bg-white dark:bg-gray-900 flex flex-col h-full">
       <div className="p-3 border-b">
         <div className="flex items-center justify-between mb-2">
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+          <h3 className="ws-section-label ws-section-label--compact flex items-center gap-1.5">
             <Filter className="h-3 w-3" />
             Views
           </h3>

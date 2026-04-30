@@ -246,7 +246,7 @@ export default function DealGanttView({ pipelineId, className = "" }: DealGanttV
           {groupedDeals.map((group) => (
             <div key={group.label}>
               {group.label && groupBy !== "deal" && (
-                <div className="px-3 py-1.5 bg-gray-100 text-[11px] font-semibold text-gray-600 uppercase tracking-wider border-b">
+                <div className="px-3 py-1.5 bg-gray-100 ws-section-label ws-section-label--compact border-b">
                   {group.label}
                 </div>
               )}
