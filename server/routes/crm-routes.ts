@@ -13996,7 +13996,7 @@ export function registerCRMRoutes(
           // Only include pipelineId/stageId if they exist (omit undefined fields)
           const [deal] = await tx.insert(crmDeals).values({
             title: data.marinaName,
-            type: 'marina_acquisition',
+            type: `${normalizedAssetClass}_acquisition`,
             marinaName: data.marinaName,
             city: data.city,
             state: data.state,
@@ -14006,10 +14006,10 @@ export function registerCRMRoutes(
             ownerId: userId,
             orgId,
           }).returning();
-          
+
           dealIdToUse = deal.id;
         }
-        
+
         // Create the modeling project and link it to the deal.
         // normalizedAssetClass overrides data.assetClass with the canonical lowercase key.
         const [project] = await tx.insert(modelingProjects).values({
@@ -14019,7 +14019,20 @@ export function registerCRMRoutes(
           createdBy: userId,
           dealId: dealIdToUse,
         }).returning();
-        
+
+        // Back-fill the deal with the project ID and asset class.
+        // (Deal was created before project, so these fields couldn't
+        // be set at deal-insert time. Only update deals we just created;
+        // pre-existing deals being linked should not be modified.)
+        if (!data.dealId) {
+          await tx.update(crmDeals)
+            .set({
+              modelingProjectId: project.id,
+              assetClass: normalizedAssetClass,
+            })
+            .where(eq(crmDeals.id, dealIdToUse));
+        }
+
         return project;
       });
       

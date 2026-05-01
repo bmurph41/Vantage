@@ -676,7 +676,7 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
                 city: marina.address.city,
                 state: marina.address.state,
                 zipCode: marina.address.zip,
-                propertyType: 'marina',
+                propertyType: data.assetClass || 'marina',
                 status: 'prospect',
               });
             } catch (e) {
@@ -712,7 +712,7 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
             city: data.marinaAddress.city,
             state: data.marinaAddress.state,
             zipCode: data.marinaAddress.zip,
-            propertyType: 'marina',
+            propertyType: data.assetClass || 'marina',
             status: 'prospect',
           });
         } catch (e) {
