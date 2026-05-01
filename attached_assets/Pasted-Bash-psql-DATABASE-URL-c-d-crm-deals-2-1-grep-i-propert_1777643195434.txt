@@ -1,0 +1,323 @@
+Bash(psql "$DATABASE_URL" -c "\d crm_deals" 2>&1 | grep -i "property\|modeling\|asset_class\|^ type" | head -30)
+  ⎿   type                       | text                        |           |          |                                                                                         
+      property_type              | text                        |           |          |
+      property_details           | jsonb                       |           |          | '{}'::jsonb                                                                             
+     … +3 lines (ctrl+o to expand)                                                                                                                                              
+                                                                                                                                                                                
+● Bash(psql "$DATABASE_URL" -c "\d crm_deals" 2>&1 | grep -E "^ [a-z]" | head -80)                                                                                              
+  ⎿   id                         | character varying           |           | not null | gen_random_uuid()                                                                       
+      title                      | text                        |           | not null |                                                                                         
+      type                       | text                        |           |          |                                                                                         
+     … +39 lines (ctrl+o to expand)                                                                                                                                             
+                                                                                                                                                                                
+● Bash(psql "$DATABASE_URL" -c "\d crm_deals" 2>&1 | tail -20)                                                                                                                  
+  ⎿      "crm_deals_broker_profile_idx" btree (broker_profile_id) WHERE broker_profile_id IS NOT NULL                                                                           
+         "crm_deals_closed_broker_idx" btree (broker_profile_id, closed_at DESC) WHERE is_closed = true AND broker_profile_id IS NOT NULL                                       
+         "crm_deals_created_at" btree (created_at)                                                                                                                              
+     … +16 lines (ctrl+o to expand)                                                                                                                                             
+                                                                                                                                                                                
+● Bash(psql "$DATABASE_URL" -c "SELECT id, type, asset_class, modeling_project_id, marina_name, created_at FROM crm_deals WHERE org_id = 'cd3719c3-ef82-4ccc-acb9-261c8…)       
+  ⎿                    id                  |        type        | asset_class | modeling_project_id |       marina_name       |         created_at                              
+     --------------------------------------+--------------------+-------------+---------------------+-------------------------+----------------------------                     
+      48a78ac6-3bdb-448c-ab46-35355d91dcd0 | marina_acquisition | marina      |                     | 948 Florida Ave.        | 2026-05-01 11:56:13.157633                      
+     … +5 lines (ctrl+o to expand)                                                                                                                                              
+                                                                                                                                                                                
+● Bash(psql "$DATABASE_URL" -c "SELECT id, type, title, city, state, created_at FROM crm_properties WHERE org_id = 'cd3719c3-ef82-4ccc-acb9-261c80fb64b4' ORDER BY crea…)       
+  ⎿                    id                  |  type  |            title             |       city       | state |         created_at                                              
+     --------------------------------------+--------+------------------------------+------------------+-------+----------------------------                                     
+      0374e275-53f8-4a49-bf5f-3c8e8af78a9f | marina | Ocean Cleaning Services      | Palm Harbor      | FL    | 2026-04-19 22:47:20.994619                                      
+     … +5 lines (ctrl+o to expand)                                              
+                                                                                                                                                                                
+● Discovery complete. Read-only report below.                                                                                                                                   
+                                                                                                                                                                                
+  ---                                                                                                                                                                           
+  DISCOVERY 1 — Wizard submit handler (client-side)                                                                                                                             
+                                                                                                                                                                                
+  File: client/src/components/onboarding/OnboardingWizard.tsx                                                                                                                   
+                                                                                                                                                                                
+  createDealMutation (lines 639–783)                                                                                                                                            
+                                                                                                                                                                                
+  The mutation has TWO branches (portfolio + single). Each branch fires:                                                                                                        
+  1. POST /api/modeling/projects (with assetClass, marina-flavored payload)                                                                                                     
+  2. POST /api/properties (with hardcoded propertyType: 'marina')                                                                                                               
+                                                                 
+  Verbatim payload for SINGLE branch (lines 695–705):                                                                                                                           
+  const projectRes = await apiRequest('POST', '/api/modeling/projects', {                                                                                                       
+    marinaName: data.marinaName,                                         
+    address: data.marinaAddress.line1 || undefined,                                                                                                                             
+    city: data.marinaAddress.city || undefined,                                                                                                                                 
+    state: data.marinaAddress.state || undefined,                                                                                                                               
+    zipCode: data.marinaAddress.zip || undefined,                                                                                                                               
+    region: data.region || undefined,                                                                                                                                           
+    dealOutcome: data.dealStatus || 'active',                                                                                                                                   
+    assetClass: data.assetClass || "marina",   // ← LINE 703: fallback default
+    customMetrics: { dealType: data.dealType },                                                                                                                                 
+  });                                                                                                                                                                           
+                                                                                                                                                                                
+  Then property creation (lines 709–717):                                                                                                                                       
+  await apiRequest('POST', '/api/properties', {                                                                                                                                 
+    name: data.marinaName,                     
+    address: data.marinaAddress.line1,                                                                                                                                          
+    city: data.marinaAddress.city,    
+    state: data.marinaAddress.state,                                                                                                                                            
+    zipCode: data.marinaAddress.zip,                                                                                                                                            
+    propertyType: 'marina',   // ← LINE 715: HARDCODED — BUG #2
+    status: 'prospect',                                                                                                                                                         
+  });                                                                                                                                                                           
+     
+  Portfolio branch is identical at line 668 (assetClass: data.assetClass || "marina") and line 679 (propertyType: 'marina' — duplicate of bug #2).                              
+                                                                                                                                                                                
+  'marina' literal grep classification                                                                                                                                          
+                                                                                                                                                                                
+  ┌──────────────────┬─────────────────────────────────────────────────────────────┬────────────────────────────────────────────────┐                                           
+  │       Line       │                           Literal                           │                 Classification                 │
+  ├──────────────────┼─────────────────────────────────────────────────────────────┼────────────────────────────────────────────────┤
+  │ 79               │ WizardAssetClass = "marina" | ...                           │ (c) type union — irrelevant                    │
+  ├──────────────────┼─────────────────────────────────────────────────────────────┼────────────────────────────────────────────────┤
+  │ 363              │ asset-pack catalog entry                                    │ (a) correct (user can pick marina)             │                                           
+  ├──────────────────┼─────────────────────────────────────────────────────────────┼────────────────────────────────────────────────┤                                           
+  │ 668              │ assetClass: data.assetClass || "marina"                     │ (b) fallback default — minor bug, ITEM 4-style │                                           
+  ├──────────────────┼─────────────────────────────────────────────────────────────┼────────────────────────────────────────────────┤                                           
+  │ 679              │ propertyType: 'marina' (portfolio loop)                     │ (b) HARDCODED — BUG #2                         │
+  ├──────────────────┼─────────────────────────────────────────────────────────────┼────────────────────────────────────────────────┤                                           
+  │ 703              │ assetClass: data.assetClass || "marina"                     │ (b) fallback default — minor bug               │
+  ├──────────────────┼─────────────────────────────────────────────────────────────┼────────────────────────────────────────────────┤                                           
+  │ 715              │ propertyType: 'marina' (single)                             │ (b) HARDCODED — BUG #2                         │
+  ├──────────────────┼─────────────────────────────────────────────────────────────┼────────────────────────────────────────────────┤                                           
+  │ 1454             │ state.assetClass === "marina" (Submerged Land Lease option) │ (c) correct conditional                        │
+  ├──────────────────┼─────────────────────────────────────────────────────────────┼────────────────────────────────────────────────┤                                           
+  │ 2322, 2336, 2384 │ state.assetClass === "marina" (UI conditionals)             │ (c) correct conditionals                       │
+  └──────────────────┴─────────────────────────────────────────────────────────────┴────────────────────────────────────────────────┘                                           
+                  
+  ---                                                                                                                                                                           
+  DISCOVERY 2 — Server route handler
+                                                                                                                                                                                
+  File: server/routes/crm-routes.ts, lines 13935–14063
+                                                                                                                                                                                
+  Handler structure                                                                                                                                                             
+  
+  1. Authenticate, parse body via insertModelingProjectSchema                                                                                                                   
+  2. Resolve canonical asset class (entitlement check — already shipped fix)
+  3. DB transaction:                                                                                                                                                            
+    - If data.dealId not provided (always true from wizard), fetch default pipeline/stage
+    - INSERT crmDeals (lines 13997–14008)                                                                                                                                       
+    - INSERT modelingProjects with dealId: dealIdToUse (lines 14015–14021)                                                                                                      
+  4. After tx, look up existing crm_property by location; if not found, createPendingProperty(...) with compMetadata.fromModelingProjectId back-link                            
+                                                                                                                                                                                
+  crmDeals INSERT — line 13997                                                                                                                                                  
+                                                                                                                                                                                
+  const [deal] = await tx.insert(crmDeals).values({
+    title: data.marinaName,                                                                                                                                                     
+    type: 'marina_acquisition',          // ← LINE 13999: HARDCODED — BUG #1
+    marinaName: data.marinaName,                                                                                                                                                
+    city: data.city,                                                                                                                                                            
+    state: data.state,                                                                                                                                                          
+    stage: 'modeling',                                                                                                                                                          
+    ...(pipelineId && { pipelineId }),
+    ...(stageId && { stageId }),                                                                                                                                                
+    ownerId: userId,
+    orgId,                                                                                                                                                                      
+    // assetClass: NOT SET → DB default 'marina' fires — BUG #4                                                                                                                 
+    // modelingProjectId: NOT SET (deal is created BEFORE project, can't be at this point) — BUG #3                                                                             
+    // propertyId: column does NOT exist on crm_deals — BUG #5 IS MIS-STATED (see synthesis)                                                                                    
+  }).returning();                                                                                                                                                               
+                                                                                                                                                                                
+  modelingProjects INSERT — line 14015                                                                                                                                          
+                  
+  const [project] = await tx.insert(modelingProjects).values({                                                                                                                  
+    ...data as any,
+    assetClass: normalizedAssetClass,                                                                                                                                           
+    orgId,
+    createdBy: userId,                                                                                                                                                          
+    dealId: dealIdToUse,        // ← deal→project link populated
+  }).returning();                                                                                                                                                               
+  Project→deal link is set; deal→project link is NOT set back. The handler creates dealId first, then project.id, so at the deal INSERT the project doesn't exist yet. A
+  back-fill tx.update(crmDeals).set({ modelingProjectId: project.id, assetClass: normalizedAssetClass }).where(eq(crmDeals.id, dealIdToUse)) after the project insert (still    
+  inside the same transaction) is the natural fix.                                                                                                                          
+                                                                                                                                                                                
+  Other relevant findings
+                                                                                                                                                                                
+  - The bundled crm_properties write happens via the separate POST /api/properties call from the client (server/routes/crm-routes.ts:5687), which respects the body's           
+  type/propertyType (line 5697: req.body.type || req.body.propertyType || 'marina'). The fallback || 'marina' here is a minor server-side bug but only triggers when the client 
+  sends nothing — today the client always sends 'marina' (BUG #2), so the fallback is masked.                                                                                   
+  - The 'marina' portfolio child INSERT at line 14097 in the PATCH handler (type: "marina") is a separate occurrence in a different code path (portfolio update). Not in (d-1)
+  scope per spec — (d-2) covers portfolio fan-out.                                                                                                                              
+  - The pending-property creator (line 14037) uses marinaName/city/state — column names on crm_pending_properties, fine.
+                                                                                                                                                                                
+  ---             
+  DISCOVERY 3 — Per-bug fix-location trace                                                                                                                                      
+                                          
+  #: 1                                                                                                                                                                      
+  Bug: crm_deals.type hardcoded                                                                                                                                                 
+  File:line: server/routes/crm-routes.ts:13999                                                                                                                              
+  Current: type: 'marina_acquisition'                                                                                                                                           
+  Correct source: Derive from normalizedAssetClass (e.g., ${normalizedAssetClass}_acquisition) OR pass data.dealType from wizard customMetrics.dealType                     
+  Fix size: XS (one-liner)                                                                                                                                                      
+  Side: server                                                                                                                                                              
+  ────────────────────────────────────────                                                                                                                                      
+  #: 2                                                                                                                                                                          
+  Bug: crm_properties.type hardcoded
+  File:line: client/src/components/onboarding/OnboardingWizard.tsx:679, 715                                                                                                     
+  Current: propertyType: 'marina'
+  Correct source: data.assetClass (or state.assetClass)
+  Fix size: XS (two-liner — same fix at both call sites)
+  Side: client
+  ────────────────────────────────────────
+  #: 3                                                                                                                                                                          
+  Bug: crmDeals.modelingProjectId never populated
+  File:line: server/routes/crm-routes.ts:13997 (deal INSERT) + line 14021 (after project INSERT)                                                                                
+  Current: column NULL
+  Correct source: project.id after the modeling-project insert
+  Fix size: S (reorder: add tx.update(crmDeals).set({ modelingProjectId: project.id }).where(eq(...)) after line 14021, before return project)
+  Side: server
+  ────────────────────────────────────────
+  #: 4                                                                                                                                                                          
+  Bug: crmDeals.assetClass never populated
+  File:line: server/routes/crm-routes.ts:13997                                                                                                                                  
+  Current: column gets DB default 'marina'
+  Correct source: normalizedAssetClass (already computed at line 13971)
+  Fix size: XS (add one field to INSERT values)
+  Side: server
+  ────────────────────────────────────────
+  #: 5                                                                                                                                                                          
+  Bug: crmDeals.propertyId never populated
+  File:line: Column does NOT exist on crm_deals                                                                                                                                 
+  Current: —      
+  Correct source: —
+  Fix size: MIS-STATED — needs scoping decision (see synthesis)
+  Side: —
+
+  Detail on bug #3 reorder                                                                                                                                                      
+  
+  The deal INSERT runs before the project INSERT (the project INSERT needs dealId). So modelingProjectId cannot be set at deal-insert time. The fix is a back-fill UPDATE after 
+  project is created, INSIDE the same transaction. Pseudo:
+  const [project] = await tx.insert(modelingProjects).values({...}).returning();                                                                                                
+  if (newlyCreatedDeal) {                                                       
+    await tx.update(crmDeals)
+      .set({ modelingProjectId: project.id, assetClass: normalizedAssetClass })                                                                                                 
+      .where(eq(crmDeals.id, dealIdToUse));                                    
+  }                                                                                                                                                                             
+  return project; 
+  Bundles bugs #3 and #4 into a single UPDATE.                                                                                                                                  
+                  
+  Risks per fix                                                                                                                                                                 
+  
+  - #1: Anything that branches on crm_deals.type === 'marina_acquisition' would behave differently for non-marina rows. Need a grep for that literal across server + client     
+  before committing.
+  - #2: crm_properties.type (server crm-routes.ts:5697) currently has its own || 'marina' fallback — fixing the client cleanly defeats it; consider also dropping the server    
+  fallback so missing-type fails loudly.                                                                                                                                        
+  - #3 + #4: New writes only (UPDATE inside the same transaction is safe; old rows still NULL/'marina'). Any UI that reads crm_deals.modelingProjectId and assumed NULL=unlinked
+   will start seeing populated values — verify there's no IS NULL filter that should now mean "unlinked" but didn't before.                                                     
+  - #5: Schema change — column doesn't exist. See synthesis.
+                                                                                                                                                                                
+  ---             
+  DISCOVERY 4 — Today's persistence empirically                                                                                                                                 
+                                                                                                                                                                                
+  crm_deals (org cd3719c3..., latest 5):
+    id                    | type               | asset_class | modeling_project_id | marina_name             | created_at                                                       
+    48a78ac6-... (TODAY)  | marina_acquisition | marina      | NULL                | 948 Florida Ave.        | 2026-05-01 11:56
+    b0d56808-...          | marina_acquisition | marina      | NULL                | Ocean Cleaning Services | 2026-04-19                                                       
+    cd1aedcf-...          | marina_acquisition | marina      | NULL                | Test Marina             | 2026-04-15                                                       
+    02224914-...          | marina_acquisition | marina      | NULL                | Oakdale Yacht Club      | 2026-03-13                                                       
+    5bc291f7-...          | marina_acquisition | marina      | NULL                | 948 Florida Ave.        | 2026-02-24                                                       
+                                                                                                                                                                                
+  crm_properties (org cd3719c3..., latest 5):                                                                                                                                   
+    id          | type    | title                        | created_at                                                                                                           
+    0374e275-...| marina  | Ocean Cleaning Services      | 2026-04-19                                                                                                           
+    61a542ba-...| marina  | 948 Florida Ave.             | 2026-02-21
+    7dac1bcd-...| marina  | Sunset Harbor Village Marina | 2026-02-18                                                                                                           
+    bede1fd7-...| marina  | Keystone Point Marina        | 2026-02-16                                                                                                           
+    e0ff7b12-...| marina  | Oakdale Yacht Club           | 2026-02-14                                                                                                           
+                                                                                                                                                                                
+  Empirical confirmation:
+  - ✅ BUG #1 confirmed — most recent crm_deals row (today, "948 Florida Ave." duplex per your wizard run) has type='marina_acquisition'                                        
+  - ✅ BUG #2 confirmed — every crm_properties row has type='marina' (note: today's wizard run did NOT create a new crm_properties row — see callout below)                     
+  - ✅ BUG #3 confirmed — every row has modeling_project_id = NULL                                                                                         
+  - ✅ BUG #4 confirmed — every row has asset_class = 'marina' (DB default firing; wizard never sets it on the deal)                                                            
+  - ⚠️  BUG #5 — column does NOT exist on crm_deals. Not verifiable as stated.                                                                                                   
+                                                                                                                                                                                
+  Side observation: today's wizard run created crm_deals row 48a78ac6 (2026-05-01 11:56) but no matching crm_properties row. The latest property row is from 2026-04-19. This   
+  means the wizard's POST /api/properties is failing silently (the 409 duplicate-detection path at crm-routes.ts:5718 likely fires for "948 Florida Ave." since it already      
+  exists in crm_properties from 2026-02-21). Logged in the wizard as console.warn('CRM property creation failed (non-blocking):', e) — never surfaced to user. This is a        
+  separate finding worth a future ticket but outside (d-1) scope.                                                                                                               
+                  
+  ---
+  SYNTHESIS
+
+  Per-bug summary
+
+  ┌───────────────────────────────────┬─────────────────────────────────────────────────────┬───────────────────┬────────────────────────────────────────────┬─────────────┐    
+  │                Bug                │                      File:line                      │   DB-confirmed    │                 Fix shape                  │   Effort    │ 
+  ├───────────────────────────────────┼─────────────────────────────────────────────────────┼───────────────────┼────────────────────────────────────────────┼─────────────┤    
+  │ 1. crm_deals.type hardcoded       │ server/routes/crm-routes.ts:13999                   │ YES (today's row) │ one-liner: derive from                     │ XS          │ 
+  │                                   │                                                     │                   │ normalizedAssetClass or pass data.dealType │             │    
+  ├───────────────────────────────────┼─────────────────────────────────────────────────────┼───────────────────┼────────────────────────────────────────────┼─────────────┤    
+  │ 2. crm_properties.type hardcoded  │ client/.../OnboardingWizard.tsx:679, 715            │ YES (all rows)    │ two-liner (same fix both sites): use       │ XS          │    
+  │                                   │                                                     │                   │ data.assetClass                            │             │    
+  ├───────────────────────────────────┼─────────────────────────────────────────────────────┼───────────────────┼────────────────────────────────────────────┼─────────────┤    
+  │ 3. crmDeals.modelingProjectId     │ server/routes/crm-routes.ts:13997 (insert) + line   │ YES (all rows)    │ reorder: add tx.update(crmDeals) AFTER     │ S           │ 
+  │ NULL                              │ 14021 (back-fill)                                   │                   │ project insert                             │             │    
+  ├───────────────────────────────────┼─────────────────────────────────────────────────────┼───────────────────┼────────────────────────────────────────────┼─────────────┤ 
+  │ 4. crmDeals.assetClass = default  │ server/routes/crm-routes.ts:13997                   │ YES (all rows)    │ bundle into the same UPDATE as #3          │ XS          │    
+  │ 'marina'                          │                                                     │                   │                                            │ (combined)  │    
+  ├───────────────────────────────────┼─────────────────────────────────────────────────────┼───────────────────┼────────────────────────────────────────────┼─────────────┤
+  │ 5. crmDeals.propertyId never      │ column does not exist                               │ NOT VERIFIABLE AS │ scoping decision needed                    │ —           │    
+  │ populated                         │                                                     │  STATED           │                                            │             │    
+  └───────────────────────────────────┴─────────────────────────────────────────────────────┴───────────────────┴────────────────────────────────────────────┴─────────────┘
+                                                                                                                                                                                
+  Bug #5 scoping callout
+
+  The bug list says "column exists" but \d crm_deals shows no property_id column. The deal↔property relationship runs through the deal_property_address junction table (FK from 
+  crm_deals.id). Three possible interpretations:
+                                                                                                                                                                                
+  - (a) The bug-reporter meant propertyType — a marina-only enum text column ('slip' | 'boat' | 'mooring' | 'dry_storage'). If so, the fix is the same shape as bug #1 (derive  
+  from asset class, or remove since asset_class supersedes it).
+  - (b) The bug-reporter intended a new property_id column to be added so the wizard can directly link crm_deals → crm_properties. That's a schema migration + handler change — 
+  substantial, not XS/S.                                                                                                                                                        
+  - (c) The intended back-link is the junction deal_property_address row creation (handler doesn't currently insert one). Junction insert is straightforward but requires
+  deciding the address payload.                                                                                                                                                 
+                  
+  Recommendation: treat bug #5 as a separate substep (d-1.5 or punt to d-2); do not bundle into the (d-1) commit. Brett should clarify intent before fix.                       
+                  
+  Recommended commit grouping                                                                                                                                                   
+                  
+  One commit, two files for bugs 1–4:                                                                                                                                           
+                  
+  fix(wizard-persistence): make crm_deals + crm_properties asset-class-aware                                                                                                    
+                                                                                                                                                                                
+  - client OnboardingWizard.tsx: 'marina' propertyType → data.assetClass (bug 2)                                                                                                
+  - server crm-routes.ts: derive crm_deals.type from asset class (bug 1)                                                                                                        
+  - server crm-routes.ts: back-fill crm_deals.modelingProjectId + assetClass                                                                                                    
+    via tx.update after modelingProjects insert (bugs 3, 4)                                                                                                                     
+                                                                                                                                                                                
+  All four fixes touch only 2 files, all are inside small surgical edits, and the back-fill UPDATE neatly bundles bugs #3 + #4. Splitting client/server adds friction for no    
+  benefit since they're a single observable behavior (wizard creates deal correctly).                                                                                           
+                                                                                                                                                                                
+  Risk callouts                                                                                                                                                                 
+  
+  1. Pre-fix grep needed for 'marina_acquisition' literal across client/server — if any feature gate, filter, or stage rule depends on it, that's invisible coupling. Bug #1 fix
+   changes the type column for new rows, which could route differently in any such code.
+  2. Pre-fix grep needed for crm_deals.modelingProjectId IS NULL filters — if any view/UI assumed NULL = unlinked, populating new rows changes behavior.                        
+  3. Existing data is unaffected by all four fixes (no migration). Old rows keep 'marina_acquisition' / 'marina' / NULL forever. If desired, a one-shot back-fill UPDATE to     
+  repair historical rows can be a follow-up substep, but is not required.                                                                                                       
+  4. No tests are likely to assert these literals (server route handler had no test file under server/routes/__tests__ per recent journal entries). Confirm before fix.         
+  5. Server || 'marina' fallback at crm-routes.ts:5697 should likely also be removed alongside fix #2, otherwise the bug can silently re-emerge if any caller forgets to pass   
+  type.                                                                                                                                                                         
+                                                                                                                                                                                
+  Sequencing recommendation                                                                                                                                                     
+                  
+  1. (d-1.0) Pre-fix verification: grep for 'marina_acquisition' literal across client/ + server/; grep for modelingProjectId.*IS NULL\|isNull(crmDeals.modelingProjectId) to   
+  surface any callers that would be affected. ~10 min.
+  2. (d-1.1) Single commit landing bugs 1–4 as scoped above. ~30 min including local verification.                                                                              
+  3. (d-1.2) Re-run the wizard end-to-end with a non-marina class (duplex), re-query the same DB SELECTs above, confirm type, asset_class, modeling_project_id populate         
+  correctly. ~10 min.                                                                                                                                                           
+  4. (d-1.3) Bug #5 scoping discussion with Brett — decide between (a) propertyType rename, (b) new property_id column, or (c) deal_property_address junction insert. File a    
+  separate substep based on the decision.                                                                                                                                       
+  5. (d-2) Portfolio fan-out + property dedupe race (already scoped separately).
+                                                                                                                                                                                
+  No edits made. Stopping for review.                                                                                                                                           
+                                                                                                                                                                                
+✻ Cooked for 3m 0s                                                                                                                                                              
+                                                                                
+※ recap: Goal: fix the wizard's create-project persistence so non-marina deals save correctly. Discovery is done — 4 of 5 bugs confirmed in DB and located at file:line; bug 5's
+   column doesn't exist. Next: clarify bug 5 intent with you, then ship the single commit covering bugs 1–4. (disable recaps in /config)             

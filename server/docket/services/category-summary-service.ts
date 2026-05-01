@@ -4,7 +4,16 @@ import { articles, categorySummaries, summaryEdits } from "@shared/docket-schema
 import { eq, and, gte, lte, sql } from "drizzle-orm";
 import type { CategorySummary, InsertCategorySummary } from "@shared/docket-schema";
 
-const openai = new OpenAI();
+let _openai: OpenAI | null = null;
+function getOpenAI(): OpenAI {
+  if (!_openai) {
+    if (!process.env.OPENAI_API_KEY) {
+      throw new Error("OPENAI_API_KEY is not set");
+    }
+    _openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  }
+  return _openai;
+}
 
 const CATEGORIES = [
   'Macro',
@@ -127,7 +136,7 @@ Focus on:
 Return ONLY valid JSON, no other text.`;
 
   try {
-    const response = await openai.chat.completions.create({
+    const response = await getOpenAI().chat.completions.create({
       model: "gpt-4o",
       messages: [{
         role: "user",

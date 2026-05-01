@@ -3052,3 +3052,103 @@ future sessions. Do not start work on these without an explicit Brett ask.
 - Effort: S (15-30 min); bundles naturally with Phase D Storage UI work
 - Consolidated into project_storage_step_generalize.md (no new memory file)
 
+
+## 2026-05-01 — [FILE ONLY] Wizard property creation silently fails on duplicate
+
+**Phase D — Wizard property creation silently fails on duplicate**
+[FILE ONLY — DO NOT IMPLEMENT]
+
+OnboardingWizard.tsx createDealMutation calls POST /api/properties after
+creating the modeling project. On duplicate (existing crm_properties row
+matching name+location), the server returns 409. The client swallows the
+error in a try/catch with `console.warn('CRM property creation failed
+(non-blocking):', e)` (lines 682-684 portfolio branch, 718-720 single
+branch) and never surfaces it to the user.
+
+Result: wizard appears to succeed, modeling project is created, but
+crm_properties row is not created. The deal lives without a property
+back-link.
+
+Empirical confirmation from C19 (d-1) DB query 2026-05-01:
+- crm_deals row 48a78ac6 created today (2026-05-01 11:56) — wizard run
+  for "948 Florida Ave."
+- Latest crm_properties row for that address: 2026-02-21 (3 months prior)
+- No new crm_properties row from today's wizard run → silent 409 swallowed
+
+Server-side reference:
+- POST /api/properties duplicate detection: server/routes/crm-routes.ts:5703-5725
+- Returns 409 with a `duplicates` array containing { id, title, address, status }
+- Supports `skipDuplicateCheck=true` flag to force-create
+
+Fix should distinguish:
+- **True duplicate** → reuse the existing property (link the deal to it
+  via whatever back-link mechanism Bug #5 from (d-1) resolves to:
+  property_id column, deal_property_address junction, or other)
+- **Genuine error** (network, 500, validation) → surface to user via
+  toast like the modeling-project failure path
+
+Implementation surface:
+- client/src/components/onboarding/OnboardingWizard.tsx:672-684 (portfolio
+  branch property POST)
+- client/src/components/onboarding/OnboardingWizard.tsx:708-720 (single
+  branch property POST)
+- Detect 409 specifically, parse `duplicates[0].id` from response, link
+  to deal
+- For non-409 errors, propagate to onError toast
+
+Pairs naturally with (d-1) Bug #5 resolution — both touch the deal↔property
+back-link mechanism. Sequence: resolve Bug #5 scoping first (column vs
+junction vs propertyType), then this fix uses the resolved mechanism.
+
+Severity: MEDIUM — affects re-running wizard for same address (common
+during testing and for users iterating on the same deal).
+
+Effort estimate: S (1-2h) — assuming Bug #5 mechanism is already decided.
+Without Bug #5 decision, blocked.
+
+Surfaced during C19 (d-1) discovery 2026-05-01.
+
+
+## 2026-05-01 — C19 (d-1) substep 0 follow-ups (3 items, FILE ONLY)
+
+Surfaced during pre-fix verification of C19 (d-1). All three are
+behavior changes induced *post*-(d-1) ship — masked today because every
+crm_deals row has type='marina_acquisition' and every crm_properties
+row has type='marina'. After (d-1) populates these fields correctly per
+asset class, these latent issues become visible.
+
+[FILE ONLY — DO NOT IMPLEMENT]
+
+### ITEM 1 — Playbook templates only suggest for marina deals post-(d-1)
+- File: server/routes/playbook-routes.ts:352, 387
+- Severity: LOW; Phase D
+- Two seeded playbook templates ("Marina Acquisition", "Due Diligence")
+  carry dealType: 'marina_acquisition'. Today every wizard-created deal
+  matches; after (d-1), only marina deals will. Decision needed:
+  (a) generic-fallback playbooks per asset class, (b) partial matcher
+  (\*_acquisition → all suggest), or (c) leave as-is (non-marina deals
+  get no suggested playbook — acceptable for beta).
+- Memory: project_playbook_templates_marina_only.md
+
+### ITEM 2 — SavedViewsSidebar "Properties" preset is mislabeled
+- File: client/src/components/crm/SavedViewsSidebar.tsx:60
+- Severity: LOW; Phase C
+- The saved CRM filter labeled "Properties" actually filters to
+  propertyType === 'marina'. After (d-1), only marina properties match
+  — confusing for users with mixed portfolios. Options: (a) rename to
+  "Marinas", (b) remove the propertyType filter, (c) add per-asset-class
+  saved views.
+- Memory: project_savedviews_properties_mislabeled.md
+
+### ITEM 3 — Manual + New Deal modal hardcodes marina_acquisition
+- Files: client/src/components/modals/deal-form-modal.tsx:890, 1106
+- Severity: MEDIUM; future C19 follow-up
+- Manual CRM deal-create modal hardcodes dealTemplates "Acquisition"
+  type: "marina_acquisition" (line 890) and SelectItem
+  value="marina_acquisition" → "Acquisition" label (line 1106).
+  Wizard fix in (d-1) doesn't cover this surface; deals created from
+  the manual modal still land as marina_acquisition regardless of asset
+  class (if an asset-class picker even exists in this modal — verify).
+- Fix shape: same as (d-1), derive from selected asset class. Effort: S.
+- Memory: project_deal_form_modal_marina_hardcode.md
+
