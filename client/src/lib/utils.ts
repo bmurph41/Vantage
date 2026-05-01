@@ -8,7 +8,7 @@ export function cn(...inputs: ClassValue[]) {
 let _globalRoundingDigits = 0;
 let _globalEbitdaRoundingDigits = 0;
 let _globalLineItemRoundingDigits = 0;
-let _globalPercentRoundingDecimals = 1;
+let _globalPercentRoundingDecimals = 2;
 let _globalDebtServiceRoundingDigits = 0;
 
 export function setGlobalRoundingDigits(digits: number) {

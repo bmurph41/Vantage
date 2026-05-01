@@ -18,7 +18,7 @@ export function useDisplayPreferences() {
   const roundingDigits = prefs?.priceRoundingDigits ?? 0;
   const ebitdaRoundingDigits = prefs?.ebitdaRoundingDigits ?? 0;
   const lineItemRoundingDigits = prefs?.lineItemRoundingDigits ?? 0;
-  const percentRoundingDecimals = prefs?.percentRoundingDecimals ?? 1;
+  const percentRoundingDecimals = prefs?.percentRoundingDecimals ?? 2;
   const bottomLineMetric = prefs?.bottomLineMetric ?? 'noi';
   const metricLabel = bottomLineMetric === 'ebitda' ? 'EBITDA' : 'NOI';
 

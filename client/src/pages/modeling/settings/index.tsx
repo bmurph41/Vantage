@@ -458,7 +458,7 @@ export default function ModelingSettings() {
               />
               <RoundingRow
                 label="Percentages"
-                value={displayPrefs?.percentRoundingDecimals ?? 1}
+                value={displayPrefs?.percentRoundingDecimals ?? 2}
                 options={PERCENT_ROUNDING_OPTIONS}
                 onUpdate={(val) => updatePrefsMutation.mutate({ percentRoundingDecimals: val })}
                 isPending={updatePrefsMutation.isPending}

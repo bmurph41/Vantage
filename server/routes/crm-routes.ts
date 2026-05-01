@@ -13185,7 +13185,7 @@ export function registerCRMRoutes(
       const [prefs] = await db.select().from(modelingDisplayPreferences)
         .where(eq(modelingDisplayPreferences.orgId, orgId))
         .limit(1);
-      res.json(prefs || { priceRoundingDigits: 0, ebitdaRoundingDigits: 0, lineItemRoundingDigits: 0, percentRoundingDecimals: 1, bottomLineMetric: 'noi' });
+      res.json(prefs || { priceRoundingDigits: 0, ebitdaRoundingDigits: 0, lineItemRoundingDigits: 0, percentRoundingDecimals: 2, debtServiceRoundingDigits: 0, bottomLineMetric: 'noi' });
     } catch (error: any) {
       console.error('Failed to get display preferences:', error);
       res.status(500).json({ error: 'Failed to get display preferences' });
@@ -13195,7 +13195,7 @@ export function registerCRMRoutes(
   app.patch('/api/modeling/display-preferences', authenticateUser, async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
-      const { priceRoundingDigits, ebitdaRoundingDigits, lineItemRoundingDigits, percentRoundingDecimals, bottomLineMetric } = req.body;
+      const { priceRoundingDigits, ebitdaRoundingDigits, lineItemRoundingDigits, percentRoundingDecimals, debtServiceRoundingDigits, bottomLineMetric } = req.body;
 
       const updates: Record<string, any> = { updatedAt: new Date() };
 
@@ -13225,6 +13225,13 @@ export function registerCRMRoutes(
           return res.status(400).json({ error: 'percentRoundingDecimals must be a number between 0 and 4' });
         }
         updates.percentRoundingDecimals = percentRoundingDecimals;
+      }
+
+      if (debtServiceRoundingDigits !== undefined) {
+        if (typeof debtServiceRoundingDigits !== 'number' || debtServiceRoundingDigits < -1 || debtServiceRoundingDigits > 6) {
+          return res.status(400).json({ error: 'debtServiceRoundingDigits must be a number between -1 and 6' });
+        }
+        updates.debtServiceRoundingDigits = debtServiceRoundingDigits;
       }
 
       if (bottomLineMetric !== undefined) {

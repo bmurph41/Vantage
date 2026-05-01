@@ -897,16 +897,16 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
             <div key={m.label} className={`px-4 py-3 ${m.bg}`}>
               <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-1">{m.label}</p>
               <p className={`text-base font-bold tabular-nums ${m.color}`}>
-                {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(m.value)}
+                {formatCurrency(m.value)}
               </p>
               {m.label === 'NOI' && totalRevenue > 0 && (
                 <p className="text-[10px] text-muted-foreground mt-0.5">
-                  {(netIncome / totalRevenue * 100).toFixed(1)}% margin
+                  {formatPercent(netIncome / totalRevenue * 100)} margin
                 </p>
               )}
               {m.label === 'Gross Profit' && totalRevenue > 0 && (
                 <p className="text-[10px] text-muted-foreground mt-0.5">
-                  {(grossProfit / totalRevenue * 100).toFixed(1)}% margin
+                  {formatPercent(grossProfit / totalRevenue * 100)} margin
                 </p>
               )}
             </div>

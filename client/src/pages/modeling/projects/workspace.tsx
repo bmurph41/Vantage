@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useParams, useLocation, useSearch } from 'wouter';
+import { useParams, useLocation, useSearch, Link } from 'wouter';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
@@ -864,6 +864,15 @@ export default function ProjectWorkspace() {
               );
             })}
             <div className="flex-1" />
+            <Link href="/modeling/settings">
+              <button
+                title="Display & Formatting Settings"
+                className="flex items-center gap-1 px-2 py-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors text-[11px] shrink-0"
+              >
+                <SlidersHorizontal className="h-3 w-3" />
+                <span className="hidden md:inline">Display</span>
+              </button>
+            </Link>
           </div>
           {/* ── Sub-tab Rail ── */}
           <div className="overflow-x-auto">

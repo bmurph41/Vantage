@@ -26,6 +26,7 @@ import {
 } from 'recharts';
 import { apiRequest } from '@/lib/queryClient';
 import { queryClient } from '@/lib/queryClient';
+import { formatCurrency as globalFormatCurrency, formatPercent as globalFormatPercent } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 import { ExportPdfButton } from '@/components/ui/export-pdf-button';
 import { WorkspaceEmptyState } from '@/components/workspace/WorkspaceEmptyState';
@@ -60,7 +61,7 @@ const SOURCE_LABELS: Record<string, string> = {
 const COMPARE_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
 
 function formatCurrency(value: number): string {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(value);
+  return globalFormatCurrency(value);
 }
 
 function formatCurrencyCompact(value: number): string {
@@ -72,12 +73,12 @@ function formatCurrencyCompact(value: number): string {
 
 function formatPercent(value: number | null | undefined): string {
   if (value === null || value === undefined) return 'N/A';
-  return `${(value).toFixed(2)}%`;
+  return globalFormatPercent(value);
 }
 
 function formatPercentDecimal(value: number | null | undefined): string {
   if (value === null || value === undefined) return 'N/A';
-  return `${(value * 100).toFixed(2)}%`;
+  return globalFormatPercent(value * 100);
 }
 
 function formatMultiple(value: number | null | undefined): string {
@@ -760,7 +761,7 @@ interface TaxInputs {
   targetDiscountRate: number;
 }
 
-function pct(v: number) { return `${(v * 100).toFixed(2)}%`; }
+function pct(v: number) { return globalFormatPercent(v * 100); }
 
 function TaxAnalysisPanel({ projectId, pf }: { projectId: string; pf: any }) {
   const purchasePrice = pf?.purchasePrice || 0;
