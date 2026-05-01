@@ -1571,7 +1571,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use(authenticateUser, enforceTenant, integrationsRouter);
   app.use("/api/vantage", authenticateUser, vantageRouter);
   app.use("/api/om", authenticateUser, requireEntitlement("ai_narratives"), omRouter);
-  app.use(authenticateUser, requireEntitlement("ai_narratives"), omBuilderRouter);
+  app.use("/api/om-builder", authenticateUser, requireEntitlement("ai_narratives"), omBuilderRouter);
   app.use("/api/document-builder", authenticateUser, documentBuilderRouter);
   app.use("/api/v1/document-extraction", authenticateUser, requireEntitlement("document_intelligence"), documentExtractionRouter);
   app.use(authenticateUser, coaRoutes);

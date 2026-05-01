@@ -22,7 +22,7 @@ const generateOMSchema = z.object({
 });
 
 // Asset-class-specific OM templates from the registry
-router.get('/api/om-builder/asset-templates', async (req: Request, res: Response) => {
+router.get('/asset-templates', async (req: Request, res: Response) => {
   try {
     const assetClass = req.query.assetClass as string | undefined;
     const templates = assetClass
@@ -35,7 +35,7 @@ router.get('/api/om-builder/asset-templates', async (req: Request, res: Response
   }
 });
 
-router.get('/api/om-builder/asset-templates/:id', async (req: Request, res: Response) => {
+router.get('/asset-templates/:id', async (req: Request, res: Response) => {
   try {
     const template = getOMTemplateById(req.params.id);
     if (!template) {
@@ -48,7 +48,7 @@ router.get('/api/om-builder/asset-templates/:id', async (req: Request, res: Resp
   }
 });
 
-router.get('/api/om-builder/templates', async (req: Request, res: Response) => {
+router.get('/templates', async (req: Request, res: Response) => {
   try {
     const orgId = getOrgId(req);
     const templates = await omBuilderService.getTemplates(orgId || undefined);
@@ -60,7 +60,7 @@ router.get('/api/om-builder/templates', async (req: Request, res: Response) => {
 });
 
 // Get enriched OM data by modeling project ID (includes comps, demographics)
-router.get('/api/om-builder/project/:projectId/data', async (req: Request, res: Response) => {
+router.get('/project/:projectId/data', async (req: Request, res: Response) => {
   try {
     const { projectId } = req.params;
 
@@ -123,7 +123,7 @@ router.get('/api/om-builder/project/:projectId/data', async (req: Request, res: 
   }
 });
 
-router.get('/api/om-builder/:dealId/data', async (req: Request, res: Response) => {
+router.get('/:dealId/data', async (req: Request, res: Response) => {
   try {
     const { dealId } = req.params;
     const data = await omBuilderService.aggregateOMData(dealId);
@@ -139,7 +139,7 @@ router.get('/api/om-builder/:dealId/data', async (req: Request, res: Response) =
   }
 });
 
-router.post('/api/om-builder/:dealId/generate', async (req: Request, res: Response) => {
+router.post('/:dealId/generate', async (req: Request, res: Response) => {
   try {
     const { dealId } = req.params;
     
@@ -164,7 +164,7 @@ router.post('/api/om-builder/:dealId/generate', async (req: Request, res: Respon
   }
 });
 
-router.get('/api/om-builder/:dealId/documents', async (req: Request, res: Response) => {
+router.get('/:dealId/documents', async (req: Request, res: Response) => {
   try {
     const { dealId } = req.params;
     const documents = await omBuilderService.getDocumentsByDeal(dealId);
@@ -175,7 +175,7 @@ router.get('/api/om-builder/:dealId/documents', async (req: Request, res: Respon
   }
 });
 
-router.get('/api/om-builder/documents/:documentId', async (req: Request, res: Response) => {
+router.get('/documents/:documentId', async (req: Request, res: Response) => {
   try {
     const { documentId } = req.params;
     const document = await omBuilderService.getDocument(documentId);
@@ -196,7 +196,7 @@ const exportPdfSchema = z.object({
   companyName: z.string().optional(),
 });
 
-router.post('/api/om-builder/documents/:documentId/export-pdf', async (req: Request, res: Response) => {
+router.post('/documents/:documentId/export-pdf', async (req: Request, res: Response) => {
   try {
     const { documentId } = req.params;
     
@@ -211,7 +211,7 @@ router.post('/api/om-builder/documents/:documentId/export-pdf', async (req: Requ
   }
 });
 
-router.get('/api/om-builder/documents/:documentId/pdf', async (req: Request, res: Response) => {
+router.get('/documents/:documentId/pdf', async (req: Request, res: Response) => {
   try {
     const { documentId } = req.params;
     const templateType = req.query.templateType as string | undefined;
@@ -238,7 +238,7 @@ router.get('/api/om-builder/documents/:documentId/pdf', async (req: Request, res
   }
 });
 
-router.get('/api/om-builder/documents/:documentId/download-pdf', async (req: Request, res: Response) => {
+router.get('/documents/:documentId/download-pdf', async (req: Request, res: Response) => {
   try {
     const { documentId } = req.params;
     const templateType = req.query.templateType as string | undefined;
@@ -269,7 +269,7 @@ router.get('/api/om-builder/documents/:documentId/download-pdf', async (req: Req
 // In-memory brand settings store (would be DB in production)
 const brandSettingsStore = new Map<string, any>();
 
-router.get('/api/om-builder/brand-settings', async (req: Request, res: Response) => {
+router.get('/brand-settings', async (req: Request, res: Response) => {
   try {
     const orgId = getOrgId(req) || 'default';
     const settings = brandSettingsStore.get(orgId) || {
@@ -286,7 +286,7 @@ router.get('/api/om-builder/brand-settings', async (req: Request, res: Response)
   }
 });
 
-router.put('/api/om-builder/brand-settings', async (req: Request, res: Response) => {
+router.put('/brand-settings', async (req: Request, res: Response) => {
   try {
     const orgId = getOrgId(req) || 'default';
     const { primaryColor, secondaryColor, fontFamily, logoUrl, companyName } = req.body;
@@ -308,7 +308,7 @@ router.put('/api/om-builder/brand-settings', async (req: Request, res: Response)
   }
 });
 
-router.delete('/api/om-builder/documents/:documentId', async (req: Request, res: Response) => {
+router.delete('/documents/:documentId', async (req: Request, res: Response) => {
   try {
     const { documentId } = req.params;
     await omBuilderService.deleteDocument(documentId);
