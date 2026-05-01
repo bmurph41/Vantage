@@ -135,9 +135,9 @@ export function OverviewDynamic({ project, pricingData, financials, onTabChange 
   const hasAnyValue = kpiValues.some((k) => k.value !== null);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {/* Header */}
-      <div className="flex items-center justify-between px-6">
+      <div className="flex items-center justify-between px-6 py-2">
         <div className="flex items-center gap-2">
           <Building2 className="h-4 w-4 text-muted-foreground" />
           <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
@@ -155,7 +155,7 @@ export function OverviewDynamic({ project, pricingData, financials, onTabChange 
       </div>
 
       {/* KPI Grid — always rendered; null values show "—" */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 px-6">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 px-6 pb-2">
         {kpiValues.map((kpi) => (
           <KPICard
             key={kpi.key}
@@ -197,9 +197,9 @@ function KPICard({
 
   return (
     <Card className="hover:shadow-sm transition-shadow">
-      <CardContent className="p-4">
-        <div className="flex items-start justify-between mb-1">
-          <span className="text-xs text-muted-foreground leading-tight">{label}</span>
+      <CardContent className="p-5 pb-6">
+        <div className="flex items-start justify-between mb-2">
+          <span className="text-xs text-muted-foreground leading-tight tracking-wide">{label}</span>
           {description && (
             <TooltipProvider>
               <Tooltip>
@@ -213,7 +213,7 @@ function KPICard({
             </TooltipProvider>
           )}
         </div>
-        <div className={`text-xl font-bold tabular-nums ${value === null ? 'text-muted-foreground/40' : healthColor}`}>
+        <div className={`text-2xl font-bold tabular-nums ${value === null ? 'text-muted-foreground/40' : healthColor}`}>
           {formatKPIValue(value, format)}
         </div>
       </CardContent>

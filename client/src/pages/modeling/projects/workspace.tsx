@@ -902,7 +902,7 @@ export default function ProjectWorkspace() {
           </div>
         </div>
 
-        <TabsContent value="overview" className="mt-8 space-y-4">
+        <TabsContent value="overview" className="mt-8 space-y-6">
           <OverviewDynamic project={project} pricingData={pricingData} financials={financials} onTabChange={handleTabChange} />
           <DDTimelineSection dealId={project?.dealId ? String(project.dealId) : null} />
           {projectId && <BrokerFeedbackPanel targetType="modeling-project" targetId={projectId} />}
