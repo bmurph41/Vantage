@@ -103,32 +103,33 @@ export function EntitlementsProvider({
         });
         if (response.ok) {
           const data = await response.json();
-          if (data && data.tier) {
-            // Map billing tier to package slug
+          const sub = data?.subscription;
+          if (sub && sub.tier) {
+            // Map billing tier to package slug (identity for the five real tiers)
             const tierToSlug: Record<string, string> = {
-              starter: 'owner-operator',
-              growth: 'growth',
+              starter: 'starter',
+              investor: 'investor',
+              broker: 'broker',
+              'owner-operator': 'owner-operator',
               institutional: 'institutional',
-              enterprise: 'enterprise',
             };
+            const slug = tierToSlug[sub.tier] || sub.tier;
+            const pkg = getPackageBySlug(slug);
             setSubscriptionState({
-              packageSlug: tierToSlug[data.tier] || data.tier,
-              status: data.status || 'active',
-              trialEndsAt: data.trialEndsAt || null,
-              addons: data.addons || [],
+              ...defaultSubscription,
+              packageSlug: slug,
+              packageName: pkg?.name ?? null,
+              status: sub.status || 'active',
+              trialEndsAt: sub.trialEndsAt || undefined,
+              addOnModules: sub.addOnModules || [],
             });
-            // Sync to localStorage as cache
-            localStorage.setItem('user-subscription', JSON.stringify({
-              packageSlug: tierToSlug[data.tier] || data.tier,
-              status: data.status || 'active',
-            }));
           }
         } else {
           // API not available — fall back to localStorage cache
           const stored = localStorage.getItem('user-subscription');
           if (stored) {
             const parsed = JSON.parse(stored);
-            setSubscriptionState(parsed);
+            setSubscriptionState({ ...defaultSubscription, ...parsed });
           }
         }
       } catch (error) {
@@ -136,7 +137,7 @@ export function EntitlementsProvider({
         const stored = localStorage.getItem('user-subscription');
         if (stored) {
           const parsed = JSON.parse(stored);
-          setSubscriptionState(parsed);
+          setSubscriptionState({ ...defaultSubscription, ...parsed });
         }
       } finally {
         setIsLoading(false);
@@ -147,18 +148,13 @@ export function EntitlementsProvider({
   }, []);
 
   // ─────────────────────────────────────────────────────────────
-  // Persist subscription changes
+  // Persist subscription changes to localStorage cache.
+  // The server is authoritative; plan changes go through /change-plan,
+  // not a generic PUT here.
   // ─────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!isLoading) {
       localStorage.setItem('user-subscription', JSON.stringify(subscription));
-      // Sync subscription changes to API
-      fetch('/api/billing/subscription', {
-        method: 'PUT',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(subscription),
-      }).catch(() => { /* API sync is best-effort */ });
     }
   }, [subscription, isLoading]);
 
