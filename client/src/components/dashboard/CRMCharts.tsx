@@ -29,10 +29,10 @@ export function CRMCharts({ timeRange }: CRMChartsProps) {
     );
   }
 
-  const chartData = trendData?.map((point: any) => ({
+  const chartData = Array.isArray(trendData) ? trendData.map((point: any) => ({
     name: new Date(point.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
     value: point.value,
-  })) || [];
+  })) : [];
 
   const stageColors: Record<string, string> = {
     'lead': '#9ca3af',
@@ -43,11 +43,11 @@ export function CRMCharts({ timeRange }: CRMChartsProps) {
     'closed_lost': '#ef4444',
   };
 
-  const distData = distributionData?.map((item: any) => ({
+  const distData = Array.isArray(distributionData) ? distributionData.map((item: any) => ({
     name: item.name.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()),
     value: item.value,
     fill: stageColors[item.name] || '#3b82f6',
-  })) || [];
+  })) : [];
 
   return (
     <div className="space-y-4 mt-4">
