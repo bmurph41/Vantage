@@ -2976,3 +2976,79 @@ Next session priorities (in rough order):
 - #10 — Zero tests for in-scope Portfolio code (High; multiplier on every other fix's risk)
 - #14 — Financials/Performance tabs are inline Card grids (blocks #4)
 
+
+## 2026-05-01 — C19 (b-wiz) smoke-test backlog filed (7 items, FILE ONLY)
+
+These items were surfaced during the C19 (b-wiz) smoke test on 2026-04-30 and
+filed today as queue items. Memory entries created where the item warrants
+standalone tracking; remaining items live here only.
+
+**[FILE ONLY — DO NOT IMPLEMENT]** prefix used to make scope unambiguous for
+future sessions. Do not start work on these without an explicit Brett ask.
+
+### ITEM 1 — [FILE ONLY] Portfolio mode supports mixed asset classes
+- Category: Phase D (UX expansion); Severity: MEDIUM
+- Today's portfolio mode treats children as uniform asset class. Real-world
+  funds hold mixed (marinas + multifamily + office). Wizard needs per-child
+  asset-class selector; parent assetClass becomes 'mixed'/null (already
+  supported by resolveAssetClassKey); rollup logic at modeling layer must
+  aggregate children of differing classes — verify or add.
+- Effort: M (3-5h) — wizard UI + child creation + rollup verification
+- Memory: project_wizard_portfolio_mixed_classes.md
+
+### ITEM 2 — [FILE ONLY] Property size unit (SF vs Acreage) asset-class-driven
+- Category: C19 (b-wiz) follow-up; pairs with Phase D Storage UI memory
+- Severity: MEDIUM
+- Wizard Step 2 collects SF; Step 3 also renders Acreage unconditionally
+  (wrong for duplex/multifamily). Add propertySizeUnit: 'sf'|'acreage'|'both'
+  to ASSET_CLASS_CATALOGS and gate the Acreage section. Same architectural
+  pattern as tabs.physicalStorage.
+- Effort: S (1-2h)
+- Memory: project_wizard_property_size_unit.md
+
+### ITEM 3 — [FILE ONLY] Document upload supports Quarterly/Monthly/YTD
+- Category: Phase C / Document Intelligence; Severity: MEDIUM-HIGH
+- Today: annual + YTD only. Real materials include quarterly P&Ls, monthly
+  T-12, sub-annual YTD. Touches wizard upload UI, Doc Intelligence parser,
+  Pro Forma/DCF ingestion, schema for periodicity on
+  financial_data_documents.
+- Effort: L (8-12h) — multi-layer
+- Verify against existing VANTAGE_DOCUMENT_INTELLIGENCE_SPEC.md before scoping
+- Memory: project_doc_upload_periodicity.md
+
+### ITEM 4 — [FILE ONLY] Auto-detect Financial Data Source from wizard upload
+- Category: Phase C / UX polish; Severity: LOW-MEDIUM
+- Inputs & Assumptions defaults to "Direct Input" even when user uploaded a
+  P&L in the wizard. Two parts: (a) rename "Upload a P&L" → "P&L Upload" for
+  consistency with "Direct Input" labeling; (b) read project's
+  has_uploaded_pl (or equivalent) and default the toggle.
+- Effort: S (30 min)
+- Memory: project_inputs_default_source.md
+
+### ITEM 5 — [FILE ONLY] Project Created modal auto-dismiss after 5s
+- Category: Phase C / UX polish; Severity: LOW
+- Post-wizard success popup needs explicit dismissal. Add 5000ms setTimeout,
+  pause/clear on hover/focus.
+- Effort: XS (15 min)
+- Filed in journal only (no standalone memory — too small)
+
+### ITEM 6 — [FILE ONLY] Inputs & Data section redesign
+- Category: Phase D / UX redesign; Severity: MEDIUM
+- Section needs design pass: more professional, better space usage, easier to
+  navigate. Applies to all Financial Data Source modes. Design first,
+  implement second — should NOT be scoped in code-only sessions until a
+  design direction exists.
+- Effort: L design + L implementation (4-8h each)
+- Filed in journal only (blocked on design direction)
+
+### ITEM 7 — [FILE ONLY] Fuel Sales feature card hardcoded for all asset classes
+- Category: C19 (b-wiz) follow-up; Severity: MEDIUM
+- OnboardingWizard.tsx:407 has a hardcoded `features` array including
+  { id: "fuel", name: "Fuel Sales" } that renders for every class. Marina-only.
+- Same fix pattern as ITEM 2 / Phase D Storage UI: add `assetClasses?:
+  string[]` whitelist or move features into per-asset-class catalog entries.
+- defaultWizardDesignatedSpaces (line 230) is the same problem — already
+  covered by the existing Phase D Storage step UI generalization memory.
+- Effort: S (15-30 min); bundles naturally with Phase D Storage UI work
+- Consolidated into project_storage_step_generalize.md (no new memory file)
+
