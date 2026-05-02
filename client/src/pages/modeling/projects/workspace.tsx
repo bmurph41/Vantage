@@ -911,6 +911,7 @@ export default function ProjectWorkspace() {
           </div>
         </div>
 
+        <div className="px-6 lg:px-8 pt-2">
         <TabsContent value="overview" className="mt-8 space-y-6">
           <OverviewDynamic project={project} pricingData={pricingData} financials={financials} onTabChange={handleTabChange} />
           <DDTimelineSection dealId={project?.dealId ? String(project.dealId) : null} />
@@ -1137,6 +1138,7 @@ export default function ProjectWorkspace() {
         <TabsContent value="assumption-audit" className="mt-8 space-y-4">
           <AssumptionAudit projectId={projectId!} onTabChange={handleTabChange} />
         </TabsContent>
+        </div>
       </Tabs>
       </div>
     </div>
