@@ -326,6 +326,7 @@ Call the emit_rent_roll_extraction tool to return the structured extraction.`;
 
 export type DocumentClass =
   | 'pl'
+  | 'cash_flow'
   | 'rent_roll'
   | 't12'
   | 'om'
@@ -349,6 +350,7 @@ First page text: "${firstPageText.slice(0, 2000)}".
 
 Classes:
 - pl:         profit & loss / income statement (single period).
+- cash_flow:  cash flow statement — revenue minus operating expenses yielding "cash flow before debt" or net operating income. Common in laundromat, car wash, and other owner-operator businesses.
 - rent_roll:  unit-level rent roll with tenants, rents, lease dates.
 - t12:        trailing-12-month breakdown with monthly columns.
 - om:         offering memorandum / marketing deck.
@@ -357,7 +359,7 @@ Classes:
 - asa:        asset sale agreement — binding, business-acquisition flavor (stock vs. asset sale language, working-capital peg).
 - unknown:    none of the above.
 
-Reply ONLY with JSON: {"class": "pl"|"rent_roll"|"t12"|"om"|"loi"|"psa"|"asa"|"unknown", "confidence": 0.0-1.0}`
+Reply ONLY with JSON: {"class": "pl"|"cash_flow"|"rent_roll"|"t12"|"om"|"loi"|"psa"|"asa"|"unknown", "confidence": 0.0-1.0}`
       }]
     });
 

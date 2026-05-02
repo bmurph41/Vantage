@@ -1,14 +1,14 @@
 import { useCallback, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { useMutation } from '@tanstack/react-query';
-import { Upload, FileText, Table2, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Upload, FileText, Table2, TrendingDown, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
 
 interface Props {
   projectId?: string;
   onJobCreated: (jobId: string) => void;
 }
 
-type DocClass = 'pl' | 'rent_roll' | 'unknown';
+type DocClass = 'pl' | 'cash_flow' | 'rent_roll' | 'unknown';
 
 export function DocumentUploader({ projectId, onJobCreated }: Props) {
   const [documentClass, setDocumentClass] = useState<DocClass>('unknown');
@@ -55,6 +55,7 @@ export function DocumentUploader({ projectId, onJobCreated }: Props) {
 
   const docTypes: { value: DocClass; label: string; icon: typeof FileText }[] = [
     { value: 'pl', label: 'P&L / Income Statement', icon: FileText },
+    { value: 'cash_flow', label: 'Cash Flow Statement', icon: TrendingDown },
     { value: 'rent_roll', label: 'Rent Roll', icon: Table2 },
     { value: 'unknown', label: 'Auto-Detect', icon: Upload },
   ];

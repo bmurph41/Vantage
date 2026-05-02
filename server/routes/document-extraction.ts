@@ -980,6 +980,8 @@ async function processDocument(
 
   if (docClass === 'pl' || docClass === 't12') {
     templateDocClass = docClass as TemplateDocClass;
+  } else if (docClass === 'cash_flow') {
+    templateDocClass = 'pl';
   } else if (docClass === 'rent_roll') {
     templateDocClass = 'rent_roll';
   }
@@ -995,7 +997,7 @@ async function processDocument(
     }
   }
 
-  if (docClass === 'pl' || docClass === 't12') {
+  if (docClass === 'pl' || docClass === 't12' || docClass === 'cash_flow') {
     extractionResult = await extractPL(fullText, tablesFormatted, filename, templateContext);
     await saveExtractionFields(jobId, extractionResult, 'pl', thresholds);
     reconciliationReport = reconcilePL(extractionResult?.data ?? {});
