@@ -3416,4 +3416,71 @@ plan. Substep 1 reports on:
   independently
 Substep 2 (code edits) waits on Brett's review of substep 1.
 
+## 2026-05-02 — Phase A fix-4b PR-A helper landed + Portfolio rebuild discovery
+
+**Shipped:**
+
+- **`feat(billing): add atomic provisionTier helper`** — commit `5fb36472` on `main`.
+  - New `server/services/provision-service.ts` exports `provisionTier(orgId, tier, options)`. Single `db.transaction()` covering all three tables: `billing_subscriptions` (upsert), `organization_packs` (diff: upsert desired + cancel non-desired, never delete), `billing_feature_flags` (override-preserving diff: deletes only `is_override=false` rows that fall out of the new tier; conflict-update set excludes `is_override` so existing override rows are not silently demoted — fixes a pre-existing bug in `billingService.provisionFeatureFlags`).
+  - Helper landed only. Call-site migration deferred — three filed memories track the chain:
+    - `project_provision_service_circular_import.md` (~10 min, must land first; move TIER_LIMITS to shared/tier-packs.ts)
+    - `project_phase_a_fix_4b_pr_a_callsite_migration.md` (~1.5h; wire createSubscription / changePlan / handleCheckoutSessionCompleted core branch)
+    - `project_phase_a_fix_4b_pr_b_webhook_migration.md` (~1.5h; collapse server/index.ts dual-webhook split)
+  - TS baseline preserved at 26.
+
+**Discovery (no code):**
+
+- **Portfolio rebuild master plan** filed as `project_portfolio_rebuild_plan.md`. Three current portfolio surfaces (`index.tsx`, `dashboard.tsx`, `portfolio-returns.tsx`) hit `/api/portfolio/summary` with **divergent shapes**. Backend split between Drizzle (`portfolio-rollup-service.ts`, 621 lines) and raw SQL (`portfolio-summary-routes.ts`). Per-project IRR is a heuristic capped at 50% (rollup-service.ts:570), not real XIRR. Expense-category typo at line 266 (`'Expense'` vs line 164 `'Expenses'`) silently misses actuals.
+- **Critical data gaps:** `portfolio_assets` table exists (schema.ts:16380) with the right shape but **0 rows for test org**; `valuation_snapshots` empty org-wide → silent fallback to `acquisitionPrice` confirmed at crm-routes.ts:11692; `capital_stacks.interest_rate_type` and `.maturity_date` columns DO NOT EXIST (debt-maturity wall + fixed/floating exposure unbuildable without 2-col migration).
+- **Effort:** 68-96h (~2-3 weeks focused) including ~1.5wk Phase 0 prereqs (data backfill + workspace gate fixes) which are independently valuable regardless of rebuild decision.
+- **Blocked on Phase 0** + Brett's answers to 10 open questions (underperformer threshold, projection ratios, IRR replacement posture, portfolio_assets writer cadence, benchmark sources, LP gating, tab priority, deprecation strategy, rent-roll backfill, capital_stacks migration timing).
+
+**Decision deferred** pending Phase 0 prereqs + Brett's answers. **DO NOT start v1 without Phase 0** — would ship as Potemkin (purchase prices displayed as current values, no IRR data, no debt maturity).
+
+**Highest-value next-session candidates:**
+
+- (a) Phase A workspace prereqs continuation — fix-5 substep 2 (tier-vocab edits) and fix-4b PR-A substep 3 (call-site migration). Both gate the portfolio rebuild's gating story.
+- (b) Workspace audit kickoff — `pro-forma-charts.tsx:454` noi=undefined (~30 min) and shared `<RequiresInputs>` empty-state wrapper for IRR Attribution + Mark-to-Market. Both are component-level prereqs for portfolio Returns/Risk tabs.
+- (c) 1031/orchestrator-v2 tax drift bugs (`project_1031_adapter_drift.md`, `project_orchestrator_v2_tax_drift.md`) — Tier 0.5 beta-blockers, 30-60 min each, cause silent zeros in IC memos and LP statements.
+- (d) (d-1.5) deal↔property linkage — wizard 409 silent-fail (`project_wizard_property_409_silent.md`) and manual deal-form modal hardcode (`project_deal_form_modal_marina_hardcode.md`).
+
+## 2026-05-02 (cont.) — Phase A close + correctness fixes
+
+**Shipped (3 commits):**
+
+- **`47d352b3` — `fix(exit-strategy): correct silent-zero tax + 1031 boot/gain drift`**
+  Three correctness bugs in `shared/exit/` adapters caused by engine refactors that renamed/restructured result types. (1) `adapt1031ResultOldToNew` read 12 legacy flat fields off `Exchange1031EngineResult` — now reads canonical `bootAnalysis.*` / `totalRecognizedGain` / `totalDeferredGain` / `newAggregatedBasis`; signature gained `relinquishedDebt` 3rd param since the new-shape input doesn't carry it. (2) `orchestrator-v2.ts:1366-1385` read 7 legacy flat tax fields — now reads `federal.{ltcgTax, section1245Tax, niitTax, totalFederalTax}` / `dualState.netStateTax` / `totalTaxLiability`. (3) `adaptTaxProfileNewToOld` returned `adjustedGrossIncome`/`isHighIncome` (fields that don't exist) and omitted required `otherOrdinaryIncome`/`otherInvestmentIncome` — `as any` cast hid it; NIIT silently collapsed to 0. Also: `EarnoutTaxTreatment` union expanded to include `'capital_gain'` (parallel Zod schema updated to match — without it, the new union value would have been rejected at runtime). TS baseline 26→6 (77% reduction). 18 regression-shield assertions added to `patch-acceptance.test.ts`; new `orchestrator-v2-tax.test.ts` with 4 scenarios. 122/122 tests pass.
+
+- **`79fe1cad` — `feat(billing): wire provisionTier into three call sites; close circular import`**
+  PR-A substep 2.5 (TIER_LIMITS extraction to `shared/tier-packs.ts` — eliminates the runtime-safe-but-fragile `billing-service ↔ provision-service` circular dep that would have formed once call-site migration landed) + substep 3 (`changePlan`, `createSubscription`, `handleCheckoutSessionCompleted` core branch all route through `provisionTier`). Behavior change flagged: `createSubscription` is now idempotent — re-runs are safe re-provisions rather than unique-violation throws. Inline-documented.
+
+- **`ab7a0acb` — `fix(billing): migrate Stripe webhook handlers to provisionTier`**
+  PR-B all four substeps. Helper extensions (`isTierSlug` type guard in `shared/tier-packs.ts`; `status` union expanded to include `'canceled' | 'past_due' | 'paused' | 'incomplete'`; `cancelAt` and `canceledAt` options with COALESCE preservation). Three webhook handler migrations: (1) `customer.subscription.deleted` — now atomically downgrades to starter, cancels ALL active packs (not just the one matched by `stripeSubscriptionId`), and re-provisions flags to BASE_FEATURES; (2) `customer.subscription.updated` — atomically diffs packs and re-provisions flags on tier change, filtered through `isTierSlug` to prevent the prior tier-corruption bug; (3) `checkout.session.completed` packType branch — removed the corrupting `billing_subscriptions` UPSERT; single-pack purchases (e.g., `master_comps`) no longer flip the tier column.
+
+**Phase A entitlements chapter — CLOSED.** Four commits across two days:
+- `118ddac6` — tier vocabulary reconcile
+- `5fb36472` — provisionTier helper landing
+- `79fe1cad` — call-site migration + circular-import close
+- `ab7a0acb` — Stripe webhook migration
+
+Closes Brett's lockout symptom (tier change via Stripe webhook now re-provisions flags atomically), tier corruption from single-pack purchases, override-demotion bug in `provisionFeatureFlags`, ghost pack rows from `stripeSubscriptionId`-keyed updates, and the 3-middle-tier vocabulary mismatch that broke 60% of the subscription system.
+
+`provisionFeatureFlags` is now orphaned (no callers in `server/` or `client/`) — ready for retirement in a future cleanup sweep.
+
+**Memories filed (7 today):**
+- `project_earnout_engine_dead_branch_ordinary_income.md` (LOW)
+- `project_exit_scenario_kpis_methodology_version.md` (MEDIUM)
+- `project_provision_service_circular_import.md` (RESOLVED via PR-A 2.5)
+- `project_phase_a_fix_4b_pr_a_callsite_migration.md` (RESOLVED via PR-A 3)
+- `project_phase_a_fix_4b_pr_b_webhook_migration.md` (RESOLVED via PR-B)
+- `project_topackstatus_dead_code.md` (LOW Phase D cleanup)
+- `project_non_tier_pack_subscription_updates_skipped.md` (LOW; promote to MEDIUM if recurring single-pack billing ships)
+
+**Next-session candidates (Brett picks):**
+- (a) (d-1.5) deal↔property linkage — wizard 409 silent-fail + manual deal-form modal marina hardcode (~1-2h, closes C19)
+- (b) Workspace audit kickoff — `pro-forma-charts.tsx:454` noi=undefined (~30 min) + shared `<RequiresInputs>` empty-state wrapper (~1-2h)
+- (c) Phase A fix-2b — `asset_classes` gate review at `crm-routes.ts:13957` (likely shouldn't exist; ~1-2h investigation + fix)
+- (d) Portfolio rebuild Phase 0 prereqs — `portfolio_assets` writer + `valuation_snapshots` seed + `capital_stacks` 2-col migration (~8-10h, required before any portfolio v1 work)
+
+
 

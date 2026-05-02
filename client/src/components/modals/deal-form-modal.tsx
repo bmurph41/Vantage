@@ -452,6 +452,15 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
   const watchedPropertyType = form.watch("propertyType");
   const isMarinaAsset = ['marina_business', 'slip', 'mooring', 'marina'].includes(watchedPropertyType || '');
 
+  // Mirrors server crm-routes.ts:13999 pattern (post C19 d-1):
+  // crm_deals.type = `${assetClass}_acquisition`. Falls back to bare
+  // "acquisition" when no asset class is picked yet so we don't seed
+  // marina-flavored data into non-marina deals.
+  const derivedAcquisitionType = useMemo(() => {
+    const ac = (watchedPropertyType || '').toLowerCase();
+    return /^[a-z0-9_]+$/.test(ac) && ac.length > 0 ? `${ac}_acquisition` : 'acquisition';
+  }, [watchedPropertyType]);
+
   // Watch DD fields for auto-calculation
   const psaSignedDate = form.watch("psaSignedDate");
   const ddPeriodDays = form.watch("ddPeriodDays");
@@ -881,13 +890,15 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
 
   const isLoading = createDealMutation.isPending || updateDealMutation.isPending || quickStageChangeMutation.isPending;
 
-  // Quick deal templates
-  const dealTemplates = [
+  // Quick deal templates. Acquisition.type derives from the chosen asset class
+  // so clicking Quick-Start after picking e.g. multifamily seeds
+  // multifamily_acquisition rather than the prior hardcoded marina_acquisition.
+  const dealTemplates = useMemo(() => [
     {
       name: "Acquisition",
       icon: Building2,
       data: {
-        type: "marina_acquisition",
+        type: derivedAcquisitionType,
         commissionType: "percentage",
         commissionRate: "4.0",
         priority: "high",
@@ -922,7 +933,7 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
         priority: "high",
       }
     },
-  ];
+  ], [derivedAcquisitionType]);
 
   const applyTemplate = (template: typeof dealTemplates[0]) => {
     Object.entries(template.data).forEach(([key, value]) => {
@@ -1103,7 +1114,18 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
                                 </SelectTrigger>
                               </FormControl>
                               <SelectContent>
-                                <SelectItem value="marina_acquisition">Acquisition</SelectItem>
+                                <SelectItem value={derivedAcquisitionType}>
+                                  Acquisition{watchedPropertyType ? ` (${watchedPropertyType.replace(/_/g, ' ')})` : ''}
+                                </SelectItem>
+                                {field.value &&
+                                 typeof field.value === 'string' &&
+                                 field.value.endsWith('_acquisition') &&
+                                 field.value !== derivedAcquisitionType &&
+                                 field.value !== 'business_acquisition' && (
+                                  <SelectItem value={field.value}>
+                                    Acquisition ({field.value.replace(/_acquisition$/, '').replace(/_/g, ' ')})
+                                  </SelectItem>
+                                )}
                                 <SelectItem value="storage_lease">Lease</SelectItem>
                                 <SelectItem value="new_listing">New Listing</SelectItem>
                                 <SelectItem value="business_acquisition">Business Deal</SelectItem>

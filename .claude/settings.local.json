@@ -290,7 +290,11 @@
       "Bash(git ls-tree *)",
       "Bash(awk 'NR>=583 && NR<=747' /home/runner/workspace/shared/asset-class-catalog.ts)",
       "Bash(sort /tmp/update_keys.txt -o /tmp/update_keys.txt)",
-      "Skill(update-journal)"
+      "Skill(update-journal)",
+      "Bash(awk '/^export const crmDeals = pgTable/,/^}\\\\\\);/' /home/runner/workspace/shared/schema.ts)",
+      "Bash(NODE_OPTIONS=\"--max-old-space-size=6144\" npx tsc --noEmit)",
+      "Bash(tee /tmp/tsc-out.log)",
+      "Bash(ps -p 5490 -o etime,rss --no-headers)"
     ]
   }
 }
