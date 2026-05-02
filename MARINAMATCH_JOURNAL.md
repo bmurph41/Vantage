@@ -3199,3 +3199,146 @@ incomplete — actual beta gate is broader.
 - Memory: `project_create_new_document_surface_divergence.md` — three
   surfaces share modal title with three different backends + gates.
 
+## ✅ Session wrap — C19 (d-1) closed; Phase A fix-1/2a/3/4a shipped (2026-05-01)
+
+C19 (d-1) — wizard-driven asset-class-correct deal/property creation —
+shipped and DB-verified for multifamily. Along the way, a cascade of
+entitlement-layer bugs that had been masking C17 multifamily-locked, the
+Institutional FM lockout, and OM Builder 403s got peeled back through four
+Phase A fixes (two code commits + two DB-only seeds for Brett's org). The
+post-(d-1) workspace surfaced 11+ unrelated errors → captured as a
+session-level finding rather than opportunistic firefighting; that becomes
+the next chapter of pre-beta work.
+
+### What changed (code)
+- `client/src/contexts/EntitlementsContext.tsx` — Phase A fix-3 (commit
+  **32139804**). Eight-fix patch for response-shape parse: unwrap
+  `data.subscription` envelope, populate `packageName`, correct `tierToSlug`
+  to identity for the 5 real tiers, delete dead PUT useEffect, spread
+  `defaultSubscription` in cache-fallback + success branches, rename
+  `addons → addOnModules`. Upstream root cause behind C17 multifamily-locked,
+  Institutional FM lockout, and sidebar UPGRADE-everywhere.
+- Phase A fix-1 (commit **a9d44520**, prior to this session) — global
+  `ai_narratives` middleware path-prefix scope fix (already on main when
+  session started; referenced for context).
+- C19 (d-1) (commit **710482be**, prior to this session) — wizard
+  asset-class-aware persistence for `crm_deals` + `crm_properties`.
+
+### What changed (DB-only seeds, Brett's org cd3719c3)
+- Phase A fix-2a — `UPDATE organizations SET asset_classes = …` to populate
+  the column the gate at `crm-routes.ts:13948` reads. Unblocked the
+  "not in your plan" 403 on every non-null asset class.
+- Phase A fix-4a — `INSERT 0 34` rows into `billing_feature_flags` for org
+  cd3719c3 (all 34 institutional features incl. `ai_narratives`,
+  `lp_portal`, `audit_trail`, `waterfall_engine`, `document_intelligence`).
+  Mirrors `provisionFeatureFlags(orgId, 'institutional')` semantics. Unblocks
+  `POST /api/om/oms` and other `requireEntitlement`-gated routes.
+
+### Decisions made
+- **Phase A fix-2a + fix-4a are bandaids, not fixes.** Both are
+  manual-INSERT unblock for Brett's org only. The systemic fixes (fix-2b,
+  fix-4b) are filed but deferred — recommend predicate-derives-from-packs
+  (option b in both memos) so a single source of truth eliminates four
+  drift surfaces (subscriptions ↔ packs ↔ asset_classes ↔ feature_flags).
+  Pair fix-2b + fix-4b in one PR.
+- **Workspace Health Survey is one body of work, not 11 individual tickets.**
+  Six root-cause categories; one systemic fix unblocks multiple tabs. Don't
+  pick off individual bugs without first deciding the systemic-fix bucket.
+- **Three "Create New Document" surfaces should be flagged for UX review,
+  not opportunistically merged** — DocumentStudioHub vs project-oms vs
+  workspace.tsx hit three different backends with two different gate
+  behaviors.
+- **Replit auto-commit absorbed Phase A fix-3** before manual `git commit`
+  could run — verified via `git log -1 --stat` matched intended diff scope.
+  No amend needed. (Existing `feedback_replit_autocommit.md` pattern held.)
+
+### Verification
+- (d-1) DB verification — `crm_deals` newest row for org cd3719c3:
+  `type='multifamily_acquisition'`, `asset_class='multifamily'`,
+  `modeling_project_id='d4dcdaa5-…'` (populated UUID). Prior rows
+  (pre-(d-1)) still show `marina_acquisition` / `marina` — fix is
+  forward-only, no retroactive rewrites. **PASS.**
+- (d-1) `crm_properties` newest row: `type='multifamily'`, `title='Sunset
+  Ridge Apartments'`, created 1s after the deal (wizard chains property
+  creation). **PASS.**
+- Phase A fix-4a — `SELECT feature, is_enabled FROM billing_feature_flags
+  WHERE org_id='cd3719c3-…'` → 34 rows, all `is_enabled=true`. **PASS.**
+- Phase A fix-3 (EntitlementsContext) — code-level only this session;
+  browser-level multifamily-unlocks-for-institutional verification deferred
+  to next session smoke (workspace audit anyway).
+- Dev server: restarted cleanly after fix-3 commit (PID 798, /api/health
+  7s); subsequently entered a half-started state during later work
+  (process up, port refusing connections, babel parse error in
+  `/tmp/devserver.log` — unrelated to this session's edits, needs a clean
+  restart next session).
+
+### Filings this session (~17 backlog items)
+Memory files added (in order):
+- Performance / DX (3): `project_perf_vite_optimizedeps.md`,
+  `project_perf_vite_cache_persistence.md`,
+  `project_perf_lazy_load_heavy_modules.md`
+- Sunset Ridge smoke-test backlog (8):
+  `project_audit_trail_500.md`, `project_assumption_audit_html_response.md`,
+  `project_irr_attribution_400_empty_state.md`,
+  `project_mark_to_market_400_empty_state.md`,
+  `project_pro_forma_charts_noi_undefined.md`,
+  `project_replacement_cost_marina_hardcoded.md`,
+  `project_irr_attribution_value_review.md`,
+  `project_mark_to_market_explanation_tooltip.md`
+- Phase A systemic + UX (3):
+  `project_workspace_health_survey_2026_05_01.md` (master index),
+  `project_phase_a_fix_4b_subscription_seeds_flags.md`,
+  `project_create_new_document_surface_divergence.md`
+- Product / architecture (3):
+  `project_broker_extended_profile_subscription.md`,
+  `project_new_lead_modal_with_autocomplete.md`,
+  `project_pipeline_vs_workspace_deals_relationship.md`
+- All 17 indexed in `MEMORY.md`.
+
+**Pattern noted:** Replacement Cost marina-hardcoded joins three previously
+filed items (Storage step, Fuel Sales card, SF-vs-Acreage) under one Phase D
+**asset-class-aware workspace content** body of work. Same fix shape across
+all four — catalog-driven field schema, one coordinated catalog extension.
+
+### Phase A systemic items still open
+- **fix-2b** (`project_subscription_asset_classes_drift.md`) — subscription
+  flow doesn't seed `organizations.asset_classes`
+- **fix-4b** (`project_phase_a_fix_4b_subscription_seeds_flags.md`) —
+  subscription flow doesn't seed `billing_feature_flags`
+- **tier-name reconciliation** (`project_tier_name_mismatch.md`) — DB tier
+  values vs SUBSCRIPTION_PACKAGES marketing names vs server gate strings
+  all diverge; recommend canonical vocabulary + normalization helper before
+  patching individual gates
+
+These three are the same architectural class. One coordinated PR can
+address all three by switching gate predicates to derive from canonical
+subscription/pack state.
+
+### Next session
+**Do NOT open another smoke test until the workspace audit is sequenced.**
+C19 (d-1) is closed. The next chapter is one of (Brett's call):
+1. **(d-1.5) deal↔property linkage** — verify back-link traversal,
+   close `project_wizard_property_409_silent.md`
+2. **(d-2) portfolio fan-out** — extend (d-1) to portfolio mode with
+   mixed asset classes (`project_wizard_portfolio_mixed_classes.md`)
+3. **Deferred 1031 / orchestrator-v2 tax-engine drift bugs** — Tier 0.5
+   beta-blockers (`project_1031_adapter_drift.md`,
+   `project_orchestrator_v2_tax_drift.md`)
+4. **Workspace audit** — sequence the 6-category remediation per
+   `project_workspace_health_survey_2026_05_01.md`; pair with Phase A
+   fix-2b/fix-4b/tier-reconcile as one systemic PR
+
+**Not** "explore the platform and fix what surfaces" — that's how this
+session ballooned to 17 backlog items.
+
+### Known gotchas / next-session housekeeping
+- Dev server (`/tmp/devserver.log`) ended this session in a half-started
+  state. Run `/restart-dev` first thing next session before any browser
+  verification.
+- Three Phase A bandaids (fix-2a + fix-4a manual seeds) are live for org
+  cd3719c3 only. Any other test org will hit the same 403s — do not assume
+  the fix scaled.
+- `project_remaining_queue.md` (FM Beta Publish Queue) is now incomplete
+  vs actual pre-beta scope; treat `project_workspace_health_survey_…` as
+  the more accurate beta gate going forward.
+
