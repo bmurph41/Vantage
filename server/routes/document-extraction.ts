@@ -4,7 +4,7 @@ import fs from 'fs/promises';
 import { upload, ensureUploadDir, detectFileType } from '../services/document-parser/file-router.js';
 import { extractPDF } from '../services/document-parser/pdf-extractor.js';
 import { extractExcel } from '../services/document-parser/excel-extractor.js';
-import { extractPL, extractRentRoll, classifyDocument } from '../services/document-parser/claude-extractor.js';
+import { extractPL, extractRentRoll, extractSTRPayout, classifyDocument } from '../services/document-parser/claude-extractor.js';
 import { flattenExtractionResult } from '../services/document-parser/flatten-extraction.js';
 import { EXTRACTION_TO_ACTUALS_MAP, RENT_ROLL_TO_ACTUALS_MAP, type ActualsMapping } from '../services/document-parser/proforma-mapper.js';
 import { reconcilePL, reconcileRentRoll } from '../../shared/extraction-reconciliation.js';
@@ -1001,6 +1001,22 @@ async function processDocument(
     extractionResult = await extractPL(fullText, tablesFormatted, filename, templateContext);
     await saveExtractionFields(jobId, extractionResult, 'pl', thresholds);
     reconciliationReport = reconcilePL(extractionResult?.data ?? {});
+  } else if (docClass === 'str_payout') {
+    extractionResult = await extractSTRPayout(fullText, tablesFormatted, filename);
+    await pool.query(
+      `UPDATE document_extraction_jobs
+       SET status='needs_review', extraction_result=$1
+       WHERE id=$2`,
+      [JSON.stringify(extractionResult), jobId]
+    );
+  } else if (docClass === 'rental_agreement') {
+    await pool.query(
+      `UPDATE document_extraction_jobs
+       SET status='completed', extraction_notes=$1
+       WHERE id=$2`,
+      [JSON.stringify(['rental_agreement: document stored; no financial extraction performed — routes to Due Diligence']), jobId]
+    );
+    return;
   } else if (docClass === 'rent_roll') {
     extractionResult = await extractRentRoll(fullText, tablesFormatted, filename, templateContext);
     await saveExtractionFields(jobId, extractionResult, 'rent_roll', thresholds);

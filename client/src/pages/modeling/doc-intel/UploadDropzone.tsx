@@ -31,6 +31,7 @@ interface UploadDropzoneProps {
   defaultDocType?: DocTypeEnum;
   defaultRentRollSubType?: string;
   lockDocType?: boolean;
+  assetClass?: string;
 }
 
 interface CustomDocumentType {
@@ -41,7 +42,7 @@ interface CustomDocumentType {
   createdAt: string;
 }
 
-type DocTypeEnum = "pnl" | "t12" | "rent_roll" | "balance_sheet" | "rate_sheet" | "invoice" | "other";
+type DocTypeEnum = "pnl" | "t12" | "rent_roll" | "balance_sheet" | "rate_sheet" | "invoice" | "str_payout" | "rental_agreement" | "other";
 
 type DataGranularity = "monthly" | "annual";
 
@@ -73,15 +74,42 @@ const MONTH_OPTIONS = [
   { value: '10', label: 'Oct' }, { value: '11', label: 'Nov' }, { value: '12', label: 'Dec' },
 ];
 
-const BUILT_IN_DOC_TYPES: Record<DocTypeEnum, { label: string }> = {
-  pnl: { label: "P&L Statement" },
-  t12: { label: "T12" },
-  rent_roll: { label: "Rent Roll" },
-  balance_sheet: { label: "Balance Sheet" },
-  rate_sheet: { label: "Rate Sheet" },
-  invoice: { label: "Invoice" },
-  other: { label: "Other" },
+interface DocTypeConfig {
+  label: string;
+  ddOnly?: boolean;
+  description?: string;
+}
+
+const BUILT_IN_DOC_TYPES: Record<DocTypeEnum, DocTypeConfig> = {
+  pnl:              { label: "P&L Statement" },
+  t12:              { label: "T12" },
+  rent_roll:        { label: "Rent Roll" },
+  balance_sheet:    { label: "Balance Sheet" },
+  rate_sheet:       { label: "Rate Sheet" },
+  invoice:          { label: "Invoice" },
+  str_payout:       { label: "OTA Payout Report", description: "Airbnb, Evolve, VRBO earnings statements" },
+  rental_agreement: { label: "Rental Agreement", ddOnly: true, description: "Auto-routes to Due Diligence → Legal" },
+  other:            { label: "Other" },
 };
+
+const ASSET_CLASS_DOC_TYPES: Record<string, DocTypeEnum[]> = {
+  str:          ["pnl", "t12", "str_payout", "rental_agreement", "balance_sheet", "other"],
+  hotel:        ["pnl", "t12", "str_payout", "balance_sheet", "rate_sheet", "other"],
+  marina:       ["pnl", "t12", "rent_roll", "balance_sheet", "rate_sheet", "invoice", "other"],
+  multifamily:  ["pnl", "t12", "rent_roll", "balance_sheet", "invoice", "other"],
+  self_storage: ["pnl", "t12", "rent_roll", "balance_sheet", "rate_sheet", "invoice", "other"],
+  laundromat:   ["pnl", "t12", "balance_sheet", "invoice", "other"],
+  car_wash:     ["pnl", "t12", "balance_sheet", "invoice", "other"],
+  retail:       ["pnl", "t12", "rent_roll", "balance_sheet", "rate_sheet", "invoice", "other"],
+  office:       ["pnl", "t12", "rent_roll", "balance_sheet", "rate_sheet", "invoice", "other"],
+  mixed_use:    ["pnl", "t12", "rent_roll", "balance_sheet", "rate_sheet", "invoice", "other"],
+};
+
+function getDocTypesForAssetClass(assetClass?: string): DocTypeEnum[] {
+  if (!assetClass) return Object.keys(BUILT_IN_DOC_TYPES) as DocTypeEnum[];
+  const key = assetClass.toLowerCase().replace(/[\s-]/g, '_');
+  return ASSET_CLASS_DOC_TYPES[key] ?? (Object.keys(BUILT_IN_DOC_TYPES) as DocTypeEnum[]);
+}
 
 function parseDateRange(filename: string): { startMonth: string; startYear: string; endMonth: string; endYear: string } | null {
   const dateRangePattern = /(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})\s*[-–—]+\s*(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})/;
@@ -104,6 +132,12 @@ function guessDocType(filename: string): DocTypeEnum {
   const dateRange = parseDateRange(filename);
   if (dateRange) {
     return "t12";
+  }
+  if (lower.includes("airbnb") || lower.includes("evolve") || lower.includes("vrbo") || lower.includes("payout") || lower.includes("ota") || lower.includes("earnings_report") || lower.includes("host payout")) {
+    return "str_payout";
+  }
+  if (lower.includes("rental agreement") || lower.includes("rental_agreement") || lower.includes("lease agreement") || lower.includes("rental contract")) {
+    return "rental_agreement";
   }
   if (lower.includes("p&l") || lower.includes("pnl") || lower.includes("profit") || lower.includes("income")) {
     return "pnl";
@@ -163,7 +197,7 @@ const STORAGE_TYPE_LABELS: Record<string, string> = {
   rv_sites: "RV Sites",
 };
 
-export function UploadDropzone({ projectId, onUploadComplete, defaultDocType, defaultRentRollSubType, lockDocType }: UploadDropzoneProps) {
+export function UploadDropzone({ projectId, onUploadComplete, defaultDocType, defaultRentRollSubType, lockDocType, assetClass }: UploadDropzoneProps) {
   const { toast } = useToast();
   const [stagedFiles, setStagedFiles] = useState<StagedFile[]>([]);
   const [isUploading, setIsUploading] = useState(false);
@@ -230,6 +264,8 @@ export function UploadDropzone({ projectId, onUploadComplete, defaultDocType, de
   const removeStagedFile = (id: string) => {
     setStagedFiles((prev) => prev.filter((f) => f.id !== id));
   };
+
+  const allowedDocTypes = getDocTypesForAssetClass(assetClass);
 
   const getDocTypeLabel = (staged: StagedFile): string => {
     if (staged.customTypeId) {
@@ -652,11 +688,19 @@ export function UploadDropzone({ projectId, onUploadComplete, defaultDocType, de
                             <SelectValue>{staged.docType === 't12' ? 'P&L Statement' : getDocTypeLabel(staged)}</SelectValue>
                           </SelectTrigger>
                           <SelectContent>
-                            {Object.entries(BUILT_IN_DOC_TYPES).filter(([k]) => k !== "other" && k !== "t12").map(([value, { label }]) => (
-                              <SelectItem key={value} value={value}>
-                                {label}
-                              </SelectItem>
-                            ))}
+                            {allowedDocTypes.filter(k => k !== "other" && k !== "t12").map((value) => {
+                              const config = BUILT_IN_DOC_TYPES[value];
+                              return (
+                                <SelectItem key={value} value={value}>
+                                  <span className="flex items-center gap-1.5">
+                                    {config.label}
+                                    {config.ddOnly && (
+                                      <span className="text-[10px] font-semibold px-1 rounded bg-blue-100 text-blue-700 dark:bg-blue-900/60 dark:text-blue-300">→ DD</span>
+                                    )}
+                                  </span>
+                                </SelectItem>
+                              );
+                            })}
                             {customTypes.length > 0 && (
                               <>
                                 <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground border-t mt-1 pt-1">
@@ -803,6 +847,17 @@ export function UploadDropzone({ projectId, onUploadComplete, defaultDocType, de
                             ))}
                           </SelectContent>
                         </Select>
+                      </div>
+                    )}
+                    {staged.docType === 'rental_agreement' && !staged.customTypeId && (
+                      <div className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-950/30 dark:text-blue-300 dark:border-blue-800">
+                        <span className="font-medium">→ DD</span>
+                        <span>Auto-routes to Due Diligence → Legal → Contracts &amp; Agreements</span>
+                      </div>
+                    )}
+                    {staged.docType === 'str_payout' && !staged.customTypeId && (
+                      <div className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs bg-violet-50 text-violet-700 border border-violet-200 dark:bg-violet-950/30 dark:text-violet-300 dark:border-violet-800">
+                        AI will extract gross revenue, net payout, platform breakdown &amp; monthly data
                       </div>
                     )}
                     {staged.docType === 't12' && !staged.isMultiYear && (

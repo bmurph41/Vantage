@@ -327,6 +327,8 @@ Call the emit_rent_roll_extraction tool to return the structured extraction.`;
 export type DocumentClass =
   | 'pl'
   | 'cash_flow'
+  | 'str_payout'
+  | 'rental_agreement'
   | 'rent_roll'
   | 't12'
   | 'om'
@@ -349,17 +351,19 @@ export async function classifyDocument(
 First page text: "${firstPageText.slice(0, 2000)}".
 
 Classes:
-- pl:         profit & loss / income statement (single period).
-- cash_flow:  cash flow statement — revenue minus operating expenses yielding "cash flow before debt" or net operating income. Common in laundromat, car wash, and other owner-operator businesses.
-- rent_roll:  unit-level rent roll with tenants, rents, lease dates.
-- t12:        trailing-12-month breakdown with monthly columns.
-- om:         offering memorandum / marketing deck.
-- loi:        letter of intent — non-binding, short (1-5 pages), "subject to definitive agreement".
-- psa:        purchase & sale agreement — binding, long, closing/earnest money/contingency clauses for real estate.
-- asa:        asset sale agreement — binding, business-acquisition flavor (stock vs. asset sale language, working-capital peg).
-- unknown:    none of the above.
+- pl:                profit & loss / income statement (single period).
+- cash_flow:         cash flow statement — revenue minus operating expenses yielding "cash flow before debt" or net operating income. Common in laundromat, car wash, and other owner-operator businesses.
+- str_payout:        OTA platform payout or earnings report — shows bookings, nightly rates, cleaning fees, management/host fees, and net payouts. Issued by Airbnb, Evolve, VRBO, Booking.com, Hospitable, etc.
+- rental_agreement:  short-term or long-term rental/lease agreement between owner and guest/tenant. Contains check-in/out dates, nightly or monthly rates, cancellation policy. NOT a financial statement.
+- rent_roll:         unit-level rent roll with tenants, rents, lease dates.
+- t12:               trailing-12-month breakdown with monthly columns.
+- om:                offering memorandum / marketing deck.
+- loi:               letter of intent — non-binding, short (1-5 pages), "subject to definitive agreement".
+- psa:               purchase & sale agreement — binding, long, closing/earnest money/contingency clauses for real estate.
+- asa:               asset sale agreement — binding, business-acquisition flavor (stock vs. asset sale language, working-capital peg).
+- unknown:           none of the above.
 
-Reply ONLY with JSON: {"class": "pl"|"cash_flow"|"rent_roll"|"t12"|"om"|"loi"|"psa"|"asa"|"unknown", "confidence": 0.0-1.0}`
+Reply ONLY with JSON: {"class": "pl"|"cash_flow"|"str_payout"|"rental_agreement"|"rent_roll"|"t12"|"om"|"loi"|"psa"|"asa"|"unknown", "confidence": 0.0-1.0}`
       }]
     });
 
@@ -368,6 +372,120 @@ Reply ONLY with JSON: {"class": "pl"|"cash_flow"|"rent_roll"|"t12"|"om"|"loi"|"p
   } catch {
     return { class: 'unknown', confidence: 0 };
   }
+}
+
+const STR_PAYOUT_TOOL = {
+  name: 'emit_str_payout_extraction',
+  description: 'Emit the extracted STR platform payout / earnings report data. Populate every field present in the document. Set absent fields to null — never fabricate.',
+  input_schema: {
+    type: 'object',
+    required: ['data', 'confidence_scores', 'source_references', 'extraction_notes'],
+    properties: {
+      data: {
+        type: 'object',
+        properties: {
+          property_name: { type: ['string', 'null'] },
+          property_address: { type: ['string', 'null'] },
+          platform: { type: ['string', 'null'], description: 'Primary OTA: airbnb | evolve | vrbo | booking_com | direct | other' },
+          reporting_period_start: { type: ['string', 'null'], description: 'ISO date YYYY-MM-DD' },
+          reporting_period_end: { type: ['string', 'null'], description: 'ISO date YYYY-MM-DD' },
+          total_gross_revenue: { type: ['number', 'null'], description: 'Base rates + cleaning fees + other fees before any deductions' },
+          total_base_rates: { type: ['number', 'null'] },
+          total_cleaning_fees: { type: ['number', 'null'] },
+          total_management_fees: { type: ['number', 'null'], description: 'OTA or PM fees deducted from gross — store as positive' },
+          total_other_fees: { type: ['number', 'null'], description: 'Pet fees, early/late check-in, misc — store as positive' },
+          total_net_payout: { type: ['number', 'null'], description: 'Amount actually deposited / paid to host after all deductions' },
+          management_fee_pct: { type: ['number', 'null'], description: 'Management fee as decimal fraction of gross (e.g. 0.18)' },
+          total_nights_booked: { type: ['integer', 'null'] },
+          total_bookings: { type: ['integer', 'null'] },
+          avg_nightly_rate: { type: ['number', 'null'] },
+          platform_breakdown: {
+            type: 'array',
+            items: {
+              type: 'object',
+              required: ['platform'],
+              properties: {
+                platform: { type: 'string' },
+                bookings: { type: ['integer', 'null'] },
+                gross_revenue: { type: ['number', 'null'] },
+                net_payout: { type: ['number', 'null'] },
+              },
+              additionalProperties: false,
+            },
+          },
+          monthly_breakdown: {
+            type: 'array',
+            items: {
+              type: 'object',
+              required: ['period'],
+              properties: {
+                period: { type: 'string', description: 'YYYY-MM' },
+                gross_revenue: { type: ['number', 'null'] },
+                net_payout: { type: ['number', 'null'] },
+                nights_booked: { type: ['integer', 'null'] },
+                bookings: { type: ['integer', 'null'] },
+              },
+              additionalProperties: false,
+            },
+          },
+        },
+      },
+      confidence_scores: {
+        type: 'object',
+        additionalProperties: { type: 'number', minimum: 0, maximum: 1 },
+      },
+      source_references: {
+        type: 'object',
+        additionalProperties: SOURCE_REF_SCHEMA,
+      },
+      extraction_notes: {
+        type: 'array',
+        items: { type: 'string' },
+      },
+    },
+    additionalProperties: false,
+  },
+} as const;
+
+const STR_PAYOUT_SYSTEM = `You are a short-term rental (STR) financial analyst. Extract structured payout / earnings report data from the provided OTA platform document (Airbnb earnings reports, Evolve payout summaries, VRBO statements, etc.) and emit it via the emit_str_payout_extraction tool.
+
+CRITICAL RULES:
+1. Extract ONLY values explicitly present in the document. Never infer or estimate.
+2. Identify platform: airbnb, evolve, vrbo, booking_com, direct, or other.
+3. total_gross_revenue = base rates + cleaning fees + other guest-paid fees, BEFORE deductions.
+4. Management / host service fees are DEDUCTIONS — store as positive numbers in total_management_fees.
+5. total_net_payout = gross revenue minus all management/host fees (what the host actually receives).
+6. management_fee_pct = total_management_fees / total_gross_revenue (compute if not stated).
+7. If monthly data is present, populate monthly_breakdown with a row for each YYYY-MM period.
+8. If individual booking rows exist, aggregate for totals.
+9. All monetary values in USD.
+10. Add extraction_notes for any ambiguities or unusual label mappings.`;
+
+export async function extractSTRPayout(
+  fullText: string,
+  tables: string,
+  filename: string
+): Promise<any> {
+  const userPrompt = `Filename: ${filename}
+
+DOCUMENT TEXT:
+${fullText.slice(0, 50000)}${fullText.length > 50000 ? '\n[TEXT TRUNCATED — first 50K chars shown]' : ''}
+
+DETECTED TABLES:
+${tables.slice(0, 10000)}
+
+Call the emit_str_payout_extraction tool to return the structured extraction.`;
+
+  const response = await client.messages.create({
+    model: 'claude-opus-4-7',
+    max_tokens: 4096,
+    system: [{ type: 'text', text: STR_PAYOUT_SYSTEM, cache_control: { type: 'ephemeral' } } as any] as any,
+    messages: [{ role: 'user', content: userPrompt }],
+    tools: [STR_PAYOUT_TOOL as any],
+    tool_choice: { type: 'tool', name: 'emit_str_payout_extraction' } as any,
+  });
+
+  return parseToolUseResult(response, 'emit_str_payout_extraction', 'STR Payout extraction');
 }
 
 function parseToolUseResult(response: Anthropic.Messages.Message, toolName: string, context: string): any {

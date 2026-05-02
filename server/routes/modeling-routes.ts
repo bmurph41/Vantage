@@ -2090,7 +2090,8 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
       }
       
       const docType = req.body.docType;
-      const isParseable = ['pnl', 'rent_roll', 'balance_sheet', 'rate_sheet', 'invoice'].includes(docType);
+      const isParseable = ['pnl', 'rent_roll', 'balance_sheet', 'rate_sheet', 'invoice', 'str_payout'].includes(docType);
+      const isRentalAgreement = docType === 'rental_agreement';
 
       // Save to VDR for all non-P&L documents (alongside parsing)
       let savedToVdr = false;
@@ -2099,10 +2100,46 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
           const ddProjectId = project.ddProjectId;
           if (ddProjectId) {
             const { vdrFolders, vdrDocuments: vdrDocsTable } = await import('@shared/schema');
+
+            // Rental agreements route to Legal → Contracts & Agreements
+            if (isRentalAgreement) {
+              let [legalParent] = await db.select().from(vdrFolders)
+                .where(and(eq(vdrFolders.projectId, ddProjectId), eq(vdrFolders.orgId, orgId), eq(vdrFolders.name, 'Legal')))
+                .limit(1);
+              if (!legalParent) {
+                [legalParent] = await db.insert(vdrFolders).values({
+                  projectId: ddProjectId, orgId, name: 'Legal', path: '/Legal',
+                  createdBy: userId,
+                }).returning();
+              }
+              let [contractsFolder] = await db.select().from(vdrFolders)
+                .where(and(eq(vdrFolders.projectId, ddProjectId), eq(vdrFolders.orgId, orgId), eq(vdrFolders.name, 'Contracts & Agreements'), eq(vdrFolders.parentFolderId, legalParent.id)))
+                .limit(1);
+              if (!contractsFolder) {
+                [contractsFolder] = await db.insert(vdrFolders).values({
+                  projectId: ddProjectId, orgId, name: 'Contracts & Agreements', path: '/Legal/Contracts & Agreements',
+                  parentFolderId: legalParent.id, createdBy: userId,
+                }).returning();
+              }
+              const fileBuffer = req.file.buffer;
+              const hashHex = require('crypto').createHash('sha256').update(fileBuffer).digest('hex');
+              await db.insert(vdrDocsTable).values({
+                folderId: contractsFolder.id, projectId: ddProjectId, orgId,
+                filename: displayName, originalFilename: req.file.originalname,
+                mimeType: req.file.mimetype, size: req.file.size,
+                checksum: hashHex, storagePath: resolvedStoragePath,
+                uploadedBy: userId,
+                aiCategory: 'Contracts & Agreements',
+                tags: ['rental_agreement'],
+              });
+              savedToVdr = true;
+              logger.info(`[DocIntel] Rental agreement ${result.upload.id} routed to VDR Legal/Contracts & Agreements`);
+            } else {
             const docTypeLabel = docType === 'rent_roll' ? 'Rent Rolls'
               : docType === 'balance_sheet' ? 'Balance Sheets'
               : docType === 'rate_sheet' ? 'Rate Sheets'
               : docType === 'invoice' ? 'Invoices'
+              : docType === 'str_payout' ? 'OTA Payout Reports'
               : 'Other Documents';
             const folderPath = `/Financial Documents/${docTypeLabel}`;
 
@@ -2140,6 +2177,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
             });
             savedToVdr = true;
             logger.info(`[DocIntel] Document ${result.upload.id} saved to VDR folder: ${folderPath}`);
+            } // close else (non-rental-agreement financial docs)
           }
         } catch (vdrError: any) {
           console.error(`[DocIntel] Failed to save to VDR for upload ${result.upload.id}:`, vdrError.message);
@@ -2151,6 +2189,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
         ...result.upload,
         isDuplicate: result.isDuplicate,
         savedToDataRoom: savedToVdr,
+        routeToDd: isRentalAgreement && savedToVdr,
         originalUpload: result.originalUpload ? {
           id: result.originalUpload.id,
           originalName: result.originalUpload.originalName,

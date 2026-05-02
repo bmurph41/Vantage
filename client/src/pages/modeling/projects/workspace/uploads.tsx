@@ -71,6 +71,10 @@ interface WorkspaceUploadsProps {
   onTabChange?: (tab: string) => void;
 }
 
+interface ModelingProjectStub {
+  assetClass?: string;
+}
+
 interface UploadWithStats extends DocIntelUpload {
   stats?: {
     total: number;
@@ -174,6 +178,11 @@ export default function WorkspaceUploads({ projectId, onTabChange }: WorkspaceUp
     'Matching to chart of accounts...',
     'Almost there...',
   ];
+
+  const { data: project } = useQuery<ModelingProjectStub>({
+    queryKey: ['/api/modeling/projects', projectId],
+    enabled: !!projectId,
+  });
 
   const { data: uploads = [], isLoading } = useQuery<UploadWithStats[]>({
     queryKey: ['/api/modeling/projects', projectId, 'documents'],
@@ -359,8 +368,15 @@ export default function WorkspaceUploads({ projectId, onTabChange }: WorkspaceUp
     if (deleteConfirmId) deleteMutation.mutate(deleteConfirmId);
   };
 
-  const handleUploadComplete = (_upload: DocIntelUpload) => {
+  const handleUploadComplete = (upload: DocIntelUpload) => {
     queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'documents'] });
+    const resp = upload as any;
+    if (resp.routeToDd) {
+      toast({
+        title: 'Rental Agreement → Due Diligence',
+        description: 'Document has been filed under Legal → Contracts & Agreements in your Data Room.',
+      });
+    }
   };
 
   const handleReview = (uploadId: string) => {
@@ -505,7 +521,7 @@ export default function WorkspaceUploads({ projectId, onTabChange }: WorkspaceUp
         </div>
       )}
 
-      <UploadDropzone projectId={projectId} onUploadComplete={handleUploadComplete} />
+      <UploadDropzone projectId={projectId} onUploadComplete={handleUploadComplete} assetClass={project?.assetClass} />
 
       {/* VDR Documents */}
       {(vdrDocuments.length > 0 || isLoadingVdr) && (
