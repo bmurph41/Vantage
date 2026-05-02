@@ -3342,3 +3342,78 @@ session ballooned to 17 backlog items.
   vs actual pre-beta scope; treat `project_workspace_health_survey_…` as
   the more accurate beta gate going forward.
 
+## ⚠ 2026-05-01 — Phase A fix-2b/4b discovery surfaced architectural correction
+
+Read-only discovery pass for Phase A fix-2b/4b/tier-reconcile **revealed
+that prior memories were architecturally wrong**. The actual root cause
+behind Brett's OM Builder 403, the asset-class lockout, and the broader
+"my tier should give me X but doesn't" pattern is **tier-vocabulary
+mismatch** + **dual-webhook split**, not "subscription create forgot to
+seed downstream tables."
+
+### Corrections filed
+- `project_phase_a_fix_4b_subscription_seeds_flags.md` — REWRITTEN.
+  `billingService.createSubscription` DOES call `provisionFeatureFlags`
+  at `billing-service.ts:223` (also wired into `changeTier` line 489
+  and Stripe webhook line 823). Earlier memory's claim was wrong.
+- `project_subscription_asset_classes_drift.md` — APPENDED CORRECTION.
+  `organizations.asset_classes` is NOT a subscription downstream table;
+  it's written by the onboarding wizard (`onboarding-routes.ts:148`,
+  `:204`) and is independent of subscription provisioning. The gate at
+  `crm-routes.ts:13957` may be the real bug — investigate before
+  patching.
+- `project_tier_vocabulary_reconcile.md` — NEW (Phase A fix-5).
+  `billing-service.ts SUBSCRIPTION_TIERS` uses
+  `{starter, growth, institutional, enterprise}` (4) while
+  `pack-service.ts SUBSCRIPTION_TIERS` and frontend
+  `SUBSCRIPTION_PACKAGES` use canonical
+  `{starter, investor, broker, owner-operator, institutional}` (5).
+  Only `starter` + `institutional` overlap. Three middle tiers fail
+  end-to-end:
+    - `createSubscription` throws `Invalid tier` → 500
+    - `/api/billing/checkout` returns 400
+    - Stripe webhook at `billing-service.ts:782` silently skips
+  Smoking-gun comment at `billing-service.ts:776`:
+  `// ── Core platform subscription (Starter / Growth / Institutional) ──`
+
+### Revised fix sequencing
+1. **fix-5 (tier-reconcile)** — code-only ~2-3h. MUST come first.
+   Unify SUBSCRIPTION_TIERS to canonical 5-tier vocabulary; drop
+   ghost `growth`/`enterprise` if unused.
+2. **fix-4b (atomic provision)** — depends on fix-5. ~3-4h. Collapse
+   `server/index.ts` webhook + `billing-service.ts` webhook +
+   `createSubscription` + `changeTier` into one `provisionTier(orgId,
+   tier)` helper that writes subscription + packs + flags atomically.
+   Use `onConflictDoUpdate` not delete-then-insert for packs to
+   preserve trial extensions.
+3. **fix-2b (asset_classes gate review)** — independent. Investigate
+   first whether the gate at `crm-routes.ts:13957` should exist at
+   all before patching anything.
+
+### Brett's specific case explained
+`'institutional'` is the one tier that exists in BOTH vocabularies, so
+`createSubscription` would have worked for him IF it had been called.
+But his `billing_feature_flags` was empty while `organization_packs`
+was populated → **his org bypassed `billingService` entirely** (likely
+direct DB seed during dev/onboarding). The dual-webhook split means
+two different scripts populated the two tables, and the flags one
+never ran for his org.
+
+### Hybrid architectural recommendation (revised)
+Pure derive-at-predicate-time loses the `is_override` /
+`overrideExpiresAt` mechanism actually used at `feature-gate.ts:59`
+for trial expansions. **Hybrid: seed atomically + add
+`computeEntitlementsForOrg(orgId)` derive helper for new gate code,
+preserve override rows as overlay on derived defaults.**
+
+### Next step
+Proceed to Phase A fix-5 substep 1 (read-only grep audit) per Brett's
+plan. Substep 1 reports on:
+- All `'growth'` / `'enterprise'` literals in server/ shared/
+- All `SUBSCRIPTION_TIERS[...]` lookups
+- Full pack-service.ts vs billing-service.ts feature-list comparison
+- Decision input: derive features from pack-service vs define
+  independently
+Substep 2 (code edits) waits on Brett's review of substep 1.
+
+
