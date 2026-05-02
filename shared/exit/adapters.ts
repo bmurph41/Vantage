@@ -169,31 +169,44 @@ export function adapt1031InputNewToOld(
 export function adapt1031ResultOldToNew(
   result: Exchange1031EngineResult,
   input: Exchange1031Input,
+  relinquishedDebt: number,
 ): Exchange1031Result {
+  // Engine refactor moved boot/gain/basis into nested sub-objects. Read from
+  // the canonical paths — bootAnalysis.*, totalRecognizedGain, totalDeferredGain,
+  // newAggregatedBasis. Replacement debt sums the per-property newMortgage from
+  // replacementResults; relinquishedDebt is passed by the caller (orchestrator
+  // already has it in input.saleTerms.debtPayoff).
+  const replacementDebtTotal = result.replacementResults.reduce(
+    (sum, r) => sum + r.newMortgage,
+    0,
+  );
+  const totalDeferredGain = result.totalDeferredGain;
+  const replacementCount = input.replacementProperties.length;
+
   return {
-    cashBoot: result.cashBoot ?? 0,
-    mortgageBoot: result.mortgageBoot ?? 0,
+    cashBoot: result.bootAnalysis.cashBootReceived,
+    mortgageBoot: result.bootAnalysis.mortgageBoot,
     nonLikeKindBoot: input.boot.nonLikeKindPropertyRetainedValue,
-    totalBoot: result.totalBoot,
-    recognizedGain: result.recognizedGain,
-    deferredGain: result.deferredGain,
-    carryoverBasis: result.newBasis,
+    totalBoot: result.bootAnalysis.totalBoot,
+    recognizedGain: result.totalRecognizedGain,
+    deferredGain: totalDeferredGain,
+    carryoverBasis: result.newAggregatedBasis,
     replacementBasisAllocation: input.replacementProperties.map(rp => ({
       propertyId: rp.id,
       propertyName: rp.name,
       allocatedBasis: rp.purchasePrice, // simplified; full calc needed
       purchasePrice: rp.purchasePrice,
-      embeddedDeferredGain: result.deferredGain / input.replacementProperties.length,
+      embeddedDeferredGain: replacementCount > 0 ? totalDeferredGain / replacementCount : 0,
     })),
-    relinquishedDebt: result.relinquishedMortgage ?? 0,
-    replacementDebtTotal: result.replacementMortgage ?? 0,
-    netDebtRelief: (result.relinquishedMortgage ?? 0) - (result.replacementMortgage ?? 0),
-    isTradeDown: result.isTradeDown ?? false,
+    relinquishedDebt,
+    replacementDebtTotal,
+    netDebtRelief: relinquishedDebt - replacementDebtTotal,
+    isTradeDown: result.warnings.some(w => w.code === 'TRADING_DOWN'),
     tradeDownWarnings: [],
     bootExplainers: [],
     explanations: [],
-    warnings: (result.warnings ?? []).map(w => ({
-      code: w.code ?? 'EXCHANGE_WARNING',
+    warnings: result.warnings.map(w => ({
+      code: w.code,
       severity: w.severity === 'error' ? 'critical' as const : w.severity as any,
       title: w.message,
       message: w.message,
@@ -254,15 +267,26 @@ export function adaptEarnoutNewToOld(input: EarnoutInput): EarnoutEngineInput {
 // Tax Profile: New → Old
 // ============================================================
 export function adaptTaxProfileNewToOld(input: NewTaxProfile): OldTaxProfile {
+  // Map new-shape filingStatus → old-shape FilingStatus. The new shape uses
+  // 'mfj'/'mfs'/'hoh'/'qss'; the old shape uses 'married'/'single'/'head_of_household'.
+  const filingStatus =
+    input.filingStatus === 'mfj' || input.filingStatus === 'mfs' || input.filingStatus === 'qss'
+      ? 'married'
+      : input.filingStatus === 'hoh'
+        ? 'head_of_household'
+        : 'single';
+
+  // OLD TaxProfileInput requires otherOrdinaryIncome + otherInvestmentIncome
+  // (both are non-optional and feed NIIT MAGI + LTCG bracket lookup). Earlier
+  // versions of this adapter mapped them as `adjustedGrossIncome` / `isHighIncome`,
+  // which silently became `undefined` on the old shape — collapsing NIIT to 0.
   return {
-    filingStatus: input.filingStatus === 'mfj' ? 'married' :
-      input.filingStatus === 'hoh' ? 'head_of_household' : 'single',
+    filingStatus,
+    otherOrdinaryIncome: input.otherOrdinaryIncome ?? 0,
+    otherInvestmentIncome: input.otherCapitalGains ?? 0,
     stateOfResidence: input.stateCode,
-    adjustedGrossIncome: input.otherOrdinaryIncome ?? 0,
-    isHighIncome: input.niitEnabled,
-    hasPassiveLosses: input.passiveLossEnabled ?? false,
-    suspendedPassiveLosses: input.suspendedPassiveLosses ?? 0,
-  } as any; // cast to match existing engine
+    passiveActivitySuspendedLosses: input.suspendedPassiveLosses,
+  } as any;
 }
 
 // ============================================================

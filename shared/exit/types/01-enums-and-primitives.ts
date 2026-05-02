@@ -47,7 +47,7 @@ export type EarnoutMetric = (typeof EARNOUT_METRICS)[number];
 
 export type EarnoutPayoutType = 'fixed_dollars' | 'percent_of_metric' | 'percent_of_excess_over_threshold';
 export type EarnoutPaymentTiming = 'annual' | 'end_of_period' | 'quarterly';
-export type EarnoutTaxTreatment = 'purchase_price' | 'compensation' | 'mixed';
+export type EarnoutTaxTreatment = 'purchase_price' | 'compensation' | 'mixed' | 'capital_gain';
 
 // --- Earnout in Exchange Policy (1031 interaction) ---
 export type EarnoutInExchangePolicy =

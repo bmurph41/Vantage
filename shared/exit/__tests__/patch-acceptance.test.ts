@@ -12,6 +12,8 @@ import { calculateBasisLedger } from '../basis-ledger';
 import type { BasisLedgerInput } from '../basis-ledger';
 import { calculate1031ExchangeEngine } from '../exchange-1031-engine';
 import type { Exchange1031EngineInput } from '../exchange-1031-engine';
+import { adapt1031ResultOldToNew } from '../adapters';
+import type { Exchange1031Input } from '../types/04-strategy-inputs';
 import { calculateSellerFinancing } from '../seller-financing-engine';
 import type { SellerFinancingEngineInput } from '../seller-financing-engine';
 import { calculateInstallmentTaxSchedule, allocateGains, runTaxEngine } from '../tax-engine';
@@ -1184,5 +1186,192 @@ describe('GOLDEN VECTOR: 1031 Exchange Full Worked Example', () => {
 
   it('taxDeferredBreakdown.embeddedGain = $3,675,000', () => {
     expect(result.taxDeferredBreakdown!.embeddedGain).toBeCloseTo(3675000, 0);
+  });
+});
+
+// ============================================================================
+// ADAPTER REGRESSION SHIELD: adapt1031ResultOldToNew (Phase A — engine refactor drift)
+//
+// The 1031 engine refactor moved boot/gain/basis fields into nested sub-objects
+// (`bootAnalysis.*`, `totalRecognizedGain`, `totalDeferredGain`,
+// `newAggregatedBasis`). The adapter at shared/exit/adapters.ts:169 still reads
+// the legacy flat names with `?? 0` fallbacks, so it returns silent zeros for
+// downstream consumers (orchestrator-v2, IC memos, LP statements).
+//
+// These tests assert that the *adapter output* mirrors the engine result. They
+// will FAIL today (silent-zero) and PASS once substep 2 lands the field remap.
+// ============================================================================
+describe('REGRESSION SHIELD: adapt1031ResultOldToNew — full deferral', () => {
+  // Same engine inputs as GOLDEN VECTOR: 1031_full_deferral above.
+  const engineInput: Exchange1031EngineInput = {
+    relinquishedProperty: {
+      salePrice: 5000000,
+      adjustedBasis: 2580769, // 3,000,000 + 60,000 - (2,400,000 / 39 * 7) ≈ 2,576,923 → adjusted
+      accumulatedDepreciation: 430769, // 2,400,000 / 39 * 7
+      mortgageBalance: 1500000,
+      closingCosts: 300000, // 5% commission + 50K closing
+    },
+    saleDate: '2025-06-15',
+    replacementProperties: [
+      {
+        name: 'Replacement Marina A',
+        purchasePrice: 6000000,
+        newMortgage: 4000000,
+        closingCosts: 120000,
+        identificationPriority: 'primary',
+      },
+    ],
+    qualifiedIntermediaryFee: 3000,
+    additionalCashInvested: 1077000,
+  };
+
+  // Parallel new-shape input the adapter requires alongside the engine result.
+  const newInput: Exchange1031Input = {
+    enabled: true,
+    replacementProperties: [
+      {
+        id: 'rp-1',
+        name: 'Replacement Marina A',
+        purchasePrice: 6000000,
+        replacementDebtPlaced: 4000000,
+        closingCosts: 120000,
+        capitalizedCostPolicy: 'capitalize',
+      },
+    ],
+    qi: { qiFee: 3000, cashHeldByQI: true, sellerNoteAssignedToQI: false },
+    boot: { cashKeptOut: 0, additionalCashIn: 1077000, nonLikeKindPropertyRetainedValue: 0 },
+  };
+
+  const engineResult = calculate1031ExchangeEngine(engineInput);
+  const adapted = adapt1031ResultOldToNew(
+    engineResult,
+    newInput,
+    engineInput.relinquishedProperty.mortgageBalance,
+  );
+
+  it('adapter cashBoot mirrors engine bootAnalysis.cashBootReceived', () => {
+    expect(adapted.cashBoot).toBe(engineResult.bootAnalysis.cashBootReceived);
+  });
+
+  it('adapter mortgageBoot mirrors engine bootAnalysis.mortgageBoot', () => {
+    expect(adapted.mortgageBoot).toBe(engineResult.bootAnalysis.mortgageBoot);
+  });
+
+  it('adapter totalBoot mirrors engine bootAnalysis.totalBoot', () => {
+    expect(adapted.totalBoot).toBe(engineResult.bootAnalysis.totalBoot);
+  });
+
+  it('adapter recognizedGain mirrors engine totalRecognizedGain (full deferral → 0)', () => {
+    expect(adapted.recognizedGain).toBe(engineResult.totalRecognizedGain);
+    expect(adapted.recognizedGain).toBe(0);
+  });
+
+  it('adapter deferredGain mirrors engine totalDeferredGain (full deferral → > 0)', () => {
+    expect(adapted.deferredGain).toBe(engineResult.totalDeferredGain);
+    expect(adapted.deferredGain).toBeGreaterThan(0);
+  });
+
+  it('adapter carryoverBasis mirrors engine newAggregatedBasis (> 0)', () => {
+    expect(adapted.carryoverBasis).toBe(engineResult.newAggregatedBasis);
+    expect(adapted.carryoverBasis).toBeGreaterThan(0);
+  });
+
+  it('adapter relinquishedDebt > 0 (input has $1.5M mortgage)', () => {
+    expect(adapted.relinquishedDebt).toBeGreaterThan(0);
+  });
+
+  it('adapter replacementDebtTotal > 0 (input has $4M new mortgage)', () => {
+    expect(adapted.replacementDebtTotal).toBeGreaterThan(0);
+  });
+
+  it('adapter isTradeDown = false for full deferral (no TRADING_DOWN warning)', () => {
+    const hasTradingDown = engineResult.warnings.some(w => w.code === 'TRADING_DOWN');
+    expect(adapted.isTradeDown).toBe(hasTradingDown);
+    expect(adapted.isTradeDown).toBe(false);
+  });
+});
+
+describe('REGRESSION SHIELD: adapt1031ResultOldToNew — trade-down with boot', () => {
+  // Same engine inputs as GOLDEN VECTOR: 1031_with_boot above.
+  const engineInput: Exchange1031EngineInput = {
+    relinquishedProperty: {
+      salePrice: 7000000,
+      adjustedBasis: 4487179, // 5,000,000 + 100,000 - (4,000,000 / 39 * 5) ≈ 4,612,821 → adjusted
+      accumulatedDepreciation: 512820, // 4,000,000 / 39 * 5
+      mortgageBalance: 3000000,
+      closingCosts: 425000, // 5% + $75K
+    },
+    saleDate: '2025-09-01',
+    replacementProperties: [
+      {
+        name: 'Smaller Marina',
+        purchasePrice: 4000000,
+        newMortgage: 2000000,
+        closingCosts: 80000,
+        identificationPriority: 'primary',
+      },
+    ],
+    qualifiedIntermediaryFee: 3000,
+    additionalCashInvested: 0,
+  };
+
+  const newInput: Exchange1031Input = {
+    enabled: true,
+    replacementProperties: [
+      {
+        id: 'rp-1',
+        name: 'Smaller Marina',
+        purchasePrice: 4000000,
+        replacementDebtPlaced: 2000000,
+        closingCosts: 80000,
+        capitalizedCostPolicy: 'capitalize',
+      },
+    ],
+    qi: { qiFee: 3000, cashHeldByQI: true, sellerNoteAssignedToQI: false },
+    boot: { cashKeptOut: 0, additionalCashIn: 0, nonLikeKindPropertyRetainedValue: 0 },
+  };
+
+  const engineResult = calculate1031ExchangeEngine(engineInput);
+  const adapted = adapt1031ResultOldToNew(
+    engineResult,
+    newInput,
+    engineInput.relinquishedProperty.mortgageBalance,
+  );
+
+  it('adapter mortgageBoot > 0 (relinquished $3M debt vs replacement $2M)', () => {
+    expect(adapted.mortgageBoot).toBe(engineResult.bootAnalysis.mortgageBoot);
+    expect(adapted.mortgageBoot).toBeGreaterThan(0);
+  });
+
+  it('adapter totalBoot > 0 (trade-down creates boot)', () => {
+    expect(adapted.totalBoot).toBe(engineResult.bootAnalysis.totalBoot);
+    expect(adapted.totalBoot).toBeGreaterThan(0);
+  });
+
+  it('adapter recognizedGain > 0 (boot triggers partial recognition)', () => {
+    expect(adapted.recognizedGain).toBe(engineResult.totalRecognizedGain);
+    expect(adapted.recognizedGain).toBeGreaterThan(0);
+  });
+
+  it('adapter deferredGain >= 0 (some gain may still defer)', () => {
+    expect(adapted.deferredGain).toBe(engineResult.totalDeferredGain);
+    expect(adapted.deferredGain).toBeGreaterThanOrEqual(0);
+  });
+
+  it('adapter carryoverBasis = engine newAggregatedBasis', () => {
+    expect(adapted.carryoverBasis).toBe(engineResult.newAggregatedBasis);
+  });
+
+  it('adapter relinquishedDebt > 0', () => {
+    expect(adapted.relinquishedDebt).toBeGreaterThan(0);
+  });
+
+  it('adapter replacementDebtTotal > 0', () => {
+    expect(adapted.replacementDebtTotal).toBeGreaterThan(0);
+  });
+
+  it('adapter isTradeDown reflects engine TRADING_DOWN warning', () => {
+    const hasTradingDown = engineResult.warnings.some(w => w.code === 'TRADING_DOWN');
+    expect(adapted.isTradeDown).toBe(hasTradingDown);
   });
 });

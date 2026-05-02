@@ -37,7 +37,7 @@ export const EarnoutMetricSchema = z.enum([
 export const EarnoutPayoutTypeSchema = z.enum([
   'fixed_dollars', 'percent_of_metric', 'percent_of_excess_over_threshold',
 ]);
-export const EarnoutTaxTreatmentSchema = z.enum(['purchase_price', 'compensation', 'mixed']);
+export const EarnoutTaxTreatmentSchema = z.enum(['purchase_price', 'compensation', 'mixed', 'capital_gain']);
 export const EarnoutInExchangePolicySchema = z.enum([
   'treat_as_boot_when_received', 'exclude_from_1031_model', 'model_as_contingent_purchase_price',
 ]);

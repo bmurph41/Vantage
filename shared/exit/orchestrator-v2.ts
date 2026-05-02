@@ -1276,7 +1276,11 @@ export async function runExitScenarioV2(
         input.saleCloseDate,
       );
       const oldExchangeResult = calculate1031ExchangeEngine(oldExchange);
-      exchange1031Result = adapt1031ResultOldToNew(oldExchangeResult, input.exchange1031);
+      exchange1031Result = adapt1031ResultOldToNew(
+        oldExchangeResult,
+        input.exchange1031,
+        input.saleTerms.debtPayoff,
+      );
 
       // #10: Multi-property basis allocation
       const multiProp = computeMultiPropertyBasisAllocation(exchange1031Result, input, basisLedger);
@@ -1359,12 +1363,13 @@ export async function runExitScenarioV2(
     }
   }
 
-  // 10. Build tax schedule from old result
-  const taxFederal = (oldResult.taxResult?.federalCapitalGainsTax ?? 0) +
-    (oldResult.taxResult?.depreciationRecaptureTax ?? 0);
-  const taxState = oldResult.taxResult?.stateTax ?? 0;
-  const taxNIIT = oldResult.taxResult?.netInvestmentIncomeTax ?? 0;
-  const totalTax = oldResult.taxResult?.totalTax ?? 0;
+  // 10. Build tax schedule from old result.
+  // Tax-engine refactor moved fields into nested federal/dualState sub-objects
+  // and renamed totalTax → totalTaxLiability. Reads now hit the canonical paths.
+  const taxFederal = oldResult.taxResult?.federal.totalFederalTax ?? 0;
+  const taxState = oldResult.taxResult?.dualState.netStateTax ?? 0;
+  const taxNIIT = oldResult.taxResult?.federal.niitTax ?? 0;
+  const totalTax = oldResult.taxResult?.totalTaxLiability ?? 0;
 
   const taxSchedule: TaxSchedule = {
     years: [{
@@ -1375,9 +1380,9 @@ export async function runExitScenarioV2(
       ltcg: gainCharacterization.characters.find(c => c.type === 'ltcg')?.amount ?? 0,
       interestIncome: 0,
       federalOnOrdinary: 0,
-      federalOn1245: oldResult.taxResult?.depreciationRecaptureTax ?? 0,
+      federalOn1245: oldResult.taxResult?.federal.section1245Tax ?? 0,
       federalOn1250: 0,
-      federalOnLTCG: oldResult.taxResult?.federalCapitalGainsTax ?? 0,
+      federalOnLTCG: oldResult.taxResult?.federal.ltcgTax ?? 0,
       niit: taxNIIT,
       stateTax: taxState,
       passiveLossOffset: 0,
