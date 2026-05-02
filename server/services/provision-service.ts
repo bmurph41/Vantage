@@ -32,9 +32,9 @@ import {
 import {
   type SubscriptionTierSlug,
   getPacksForTier,
+  getLimitsForTier,
 } from '@shared/tier-packs';
 import { getFeaturesForTier } from '@shared/tier-features';
-import { SUBSCRIPTION_TIERS } from './billing-service';
 import { eq, and, notInArray, sql } from 'drizzle-orm';
 
 export interface ProvisionTierOptions {
@@ -66,11 +66,6 @@ export async function provisionTier(
   tier: SubscriptionTierSlug,
   options: ProvisionTierOptions,
 ): Promise<ProvisionTierResult> {
-  const tierDef = SUBSCRIPTION_TIERS[tier];
-  if (!tierDef) {
-    throw new Error(`provisionTier: unknown tier "${tier}"`);
-  }
-
   const now = new Date();
   const billingCycle = options.billingCycle ?? 'monthly';
   const currentPeriodStart = options.currentPeriodStart ?? now;
@@ -86,7 +81,9 @@ export async function provisionTier(
   const trialStart = isCreate ? now : undefined;
   const trialEnd = isCreate ? new Date(now.getTime() + 14 * MS_PER_DAY) : undefined;
 
-  const limits = tierDef.limits;
+  // TypeScript enforces tier as SubscriptionTierSlug at the signature, so
+  // every tier is in TIER_LIMITS — no unknown-tier check needed.
+  const limits = getLimitsForTier(tier);
   const seatLimit = limits.seats === -1 ? null : limits.seats;
   const dealLimit = limits.deals === -1 ? null : limits.deals;
   const storageGbLimit = limits.storageGb === -1 ? null : limits.storageGb;

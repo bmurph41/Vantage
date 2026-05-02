@@ -90,3 +90,29 @@ export const TIER_PACKS: TierPackMapping[] = [
 export function getPacksForTier(slug: SubscriptionTierSlug): PackType[] {
   return TIER_PACKS.find((t) => t.slug === slug)?.packs ?? [];
 }
+
+// ── Tier limits ───────────────────────────────────────────────────────────
+
+/** Per-tier resource limits. -1 means unlimited. */
+export interface TierLimits {
+  seats: number;
+  deals: number;
+  storageGb: number;
+  aiQueries: number;
+  lpInvestors?: number;
+}
+
+// INTERPOLATED limits for the 3 newly-canonical middle tiers — see
+// project_phase_a_fix_5_followups.md for product review TODOs.
+export const TIER_LIMITS: Record<SubscriptionTierSlug, TierLimits> = {
+  starter:          { seats: 1,  deals: 1,  storageGb: 1,    aiQueries: 10 },
+  investor:         { seats: 3,  deals: -1, storageGb: 25,   aiQueries: 200 },
+  broker:           { seats: 10, deals: -1, storageGb: 100,  aiQueries: 1000 },
+  'owner-operator': { seats: 25, deals: -1, storageGb: 500,  aiQueries: 2500, lpInvestors: 25 },
+  institutional:    { seats: -1, deals: -1, storageGb: 1000, aiQueries: -1, lpInvestors: -1 },
+};
+
+/** Helper: get limits for a tier slug. */
+export function getLimitsForTier(slug: SubscriptionTierSlug): TierLimits {
+  return TIER_LIMITS[slug];
+}

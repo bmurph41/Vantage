@@ -44,47 +44,49 @@ export interface TierDefinition {
 // Feature flags per tier are derived from PACK_TO_FEATURES in shared/tier-features.ts.
 // To add or move a feature, edit that file — do NOT add hand-maintained arrays here.
 import { getFeaturesForTier, type SubscriptionTier } from '@shared/tier-features';
+// Tier limits are canonical in shared/tier-packs.ts (TIER_LIMITS) so that
+// provision-service.ts and other consumers don't have to import server code.
+import { getLimitsForTier, type SubscriptionTierSlug } from '@shared/tier-packs';
+// Atomic three-table provisioner — see project_phase_a_fix_4b_pr_a_callsite_migration.md
+import { provisionTier } from './provision-service';
 
-// Tier prices and limits mirror frontend SUBSCRIPTION_PACKAGES (client/src/config/featureModules.ts)
-// for starter/investor/broker/owner-operator and the prior 'institutional' billing-service entry
-// for institutional. Limits for the 3 newly-canonical middle tiers (investor/broker/owner-operator)
-// were not previously defined here — the values below are interpolated between starter and
-// institutional. PRODUCT REVIEW: confirm or rebalance.
+// Tier prices mirror frontend SUBSCRIPTION_PACKAGES (client/src/config/featureModules.ts).
+// Limits are sourced from TIER_LIMITS in shared/tier-packs.ts.
 export const SUBSCRIPTION_TIERS: Record<SubscriptionTier, TierDefinition> = {
   starter: {
     name: 'Starter',
     priceMonthly: 0,
     priceAnnual: 0,
     features: getFeaturesForTier('starter'),
-    limits: { deals: 1, seats: 1, storageGb: 1, aiQueries: 10 },
+    limits: getLimitsForTier('starter'),
   },
   investor: {
     name: 'Investor',
     priceMonthly: 89,
     priceAnnual: 890,
     features: getFeaturesForTier('investor'),
-    limits: { deals: -1, seats: 3, storageGb: 25, aiQueries: 200 }, // INTERPOLATED — review
+    limits: getLimitsForTier('investor'),
   },
   broker: {
     name: 'Broker',
     priceMonthly: 179,
     priceAnnual: 1790,
     features: getFeaturesForTier('broker'),
-    limits: { deals: -1, seats: 10, storageGb: 100, aiQueries: 1000 }, // INTERPOLATED — review
+    limits: getLimitsForTier('broker'),
   },
   'owner-operator': {
     name: 'Owner / Operator',
     priceMonthly: 249,
     priceAnnual: 2490,
     features: getFeaturesForTier('owner-operator'),
-    limits: { deals: -1, seats: 25, storageGb: 500, aiQueries: 2500, lpInvestors: 25 }, // INTERPOLATED — review
+    limits: getLimitsForTier('owner-operator'),
   },
   institutional: {
     name: 'Institutional',
     priceMonthly: 1999,
     priceAnnual: 1649,
     features: getFeaturesForTier('institutional'),
-    limits: { deals: -1, seats: -1, storageGb: 1000, aiQueries: -1, lpInvestors: -1 },
+    limits: getLimitsForTier('institutional'),
   },
 };
 
@@ -169,29 +171,23 @@ export class BillingService {
         : new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
     }
 
-    const [subscription] = await db
-      .insert(billingSubscriptions)
-      .values({
-        orgId,
-        stripeCustomerId,
-        stripeSubscriptionId,
-        stripePriceId,
-        tier,
-        status: 'trialing',
+    // Atomic three-table provision (subscription + packs + flags). mode='create'
+    // sets trialStart=now, trialEnd=now+14d, defaults status='trialing'. Now an
+    // upsert (was a plain INSERT) — re-running is a safe re-provision rather
+    // than a unique-violation throw; matches the helper's idempotency contract.
+    const { subscription } = await provisionTier(
+      orgId,
+      tier as SubscriptionTierSlug,
+      {
+        mode: 'create',
         billingCycle,
-        currentPeriodStart,
-        currentPeriodEnd,
-        trialStart: now,
-        trialEnd,
-        seatLimit: tierDef.limits.seats === -1 ? null : tierDef.limits.seats,
-        dealLimit: tierDef.limits.deals === -1 ? null : tierDef.limits.deals,
-        aiQueryLimit: tierDef.limits.aiQueries === -1 ? null : tierDef.limits.aiQueries,
-        storageGbLimit: tierDef.limits.storageGb === -1 ? null : tierDef.limits.storageGb,
-      } as any)
-      .returning();
-
-    // Provision feature flags for this tier
-    await this.provisionFeatureFlags(orgId, tier);
+        currentPeriodStart: currentPeriodStart ?? undefined,
+        currentPeriodEnd: currentPeriodEnd ?? undefined,
+        stripeSubscriptionId: stripeSubscriptionId ?? undefined,
+        stripeCustomerId: stripeCustomerId ?? undefined,
+        stripePriceId: stripePriceId ?? undefined,
+      },
+    );
 
     return subscription;
   }
@@ -442,22 +438,13 @@ export class BillingService {
       paymentCheckFailed = result.paymentCheckFailed;
     }
 
-    // Update DB
-    const [updated] = await db
-      .update(billingSubscriptions)
-      .set({
-        tier: newTier,
-        seatLimit: tierDef.limits.seats === -1 ? null : tierDef.limits.seats,
-        dealLimit: tierDef.limits.deals === -1 ? null : tierDef.limits.deals,
-        aiQueryLimit: tierDef.limits.aiQueries === -1 ? null : tierDef.limits.aiQueries,
-        storageGbLimit: tierDef.limits.storageGb === -1 ? null : tierDef.limits.storageGb,
-        updatedAt: new Date(),
-      } as any)
-      .where(eq(billingSubscriptions.orgId, orgId))
-      .returning();
-
-    // Re-provision feature flags for the new tier
-    await this.provisionFeatureFlags(orgId, newTier);
+    // Atomic three-table re-provision (subscription + packs + flags). mode='change'
+    // preserves trial fields and defaults status to 'active'.
+    const { subscription: updated } = await provisionTier(
+      orgId,
+      newTier as SubscriptionTierSlug,
+      { mode: 'change' },
+    );
 
     return { ...updated, paymentProcessed, paymentCheckFailed, preChangeInvoiceId };
   }
@@ -751,47 +738,20 @@ export class BillingService {
       const billingCycle = (metadata.billingCycle || 'monthly') as 'monthly' | 'annual';
 
       if (orgId && tier && SUBSCRIPTION_TIERS[tier as keyof typeof SUBSCRIPTION_TIERS]) {
-        const tierDef = SUBSCRIPTION_TIERS[tier as keyof typeof SUBSCRIPTION_TIERS];
         const stripeCustomerId =
           typeof session.customer === 'string'
             ? session.customer
-            : (session.customer as any)?.id || null;
-        const now = new Date();
-        const periodEnd =
-          billingCycle === 'annual'
-            ? new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000)
-            : new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+            : (session.customer as any)?.id || undefined;
 
-        await db
-          .insert(billingSubscriptions)
-          .values({
-            orgId,
-            stripeCustomerId,
-            stripeSubscriptionId,
-            tier,
-            status: 'active',
-            billingCycle,
-            currentPeriodStart: now,
-            currentPeriodEnd: periodEnd,
-            seatLimit: tierDef.limits.seats === -1 ? null : tierDef.limits.seats,
-            dealLimit: tierDef.limits.deals === -1 ? null : tierDef.limits.deals,
-            aiQueryLimit: tierDef.limits.aiQueries === -1 ? null : tierDef.limits.aiQueries,
-            storageGbLimit: tierDef.limits.storageGb === -1 ? null : tierDef.limits.storageGb,
-          } as any)
-          .onConflictDoUpdate({
-            target: billingSubscriptions.orgId,
-            set: {
-              tier,
-              status: 'active',
-              stripeCustomerId,
-              stripeSubscriptionId,
-              currentPeriodStart: now,
-              currentPeriodEnd: periodEnd,
-              updatedAt: new Date(),
-            } as any,
-          });
-
-        await this.provisionFeatureFlags(orgId, tier);
+        // Atomic three-table provision. mode='webhook' defaults status='active'
+        // and preserves any existing trial fields. Period dates default inside
+        // the helper from billingCycle (30d / 365d) — no need to compute here.
+        await provisionTier(orgId, tier as SubscriptionTierSlug, {
+          mode: 'webhook',
+          billingCycle,
+          stripeSubscriptionId: stripeSubscriptionId ?? undefined,
+          stripeCustomerId,
+        });
         console.log(`[billing webhook] provisioned core platform subscription ${tier} for org=${orgId}`);
         return;
       }
