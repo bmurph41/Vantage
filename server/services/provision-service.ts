@@ -44,9 +44,13 @@ export interface ProvisionTierOptions {
   currentPeriodStart?: Date;
   currentPeriodEnd?: Date;
   billingCycle?: 'monthly' | 'annual';
-  status?: 'trialing' | 'active';
+  status?: 'trialing' | 'active' | 'canceled' | 'past_due' | 'paused' | 'incomplete';
   mode: 'create' | 'change' | 'webhook';
   userId?: string;
+  /** Future cancellation date (Stripe cancel_at_period_end). */
+  cancelAt?: Date | null;
+  /** Cancellation timestamp (Stripe canceled_at). */
+  canceledAt?: Date | null;
 }
 
 export interface ProvisionTierResult {
@@ -93,6 +97,9 @@ export async function provisionTier(
   const stripeCustomerId = options.stripeCustomerId ?? null;
   const stripePriceId = options.stripePriceId ?? null;
 
+  const cancelAt = options.cancelAt ?? null;
+  const canceledAt = options.canceledAt ?? null;
+
   return await db.transaction(async (tx) => {
     // ── Phase 1 — billing_subscriptions upsert ──────────────────────────
     const subInsertValues = {
@@ -109,6 +116,8 @@ export async function provisionTier(
       dealLimit,
       storageGbLimit,
       aiQueryLimit,
+      cancelAt,
+      canceledAt,
       ...(isCreate ? { trialStart, trialEnd } : {}),
       updatedAt: now,
     };
@@ -132,6 +141,11 @@ export async function provisionTier(
           dealLimit: sql`EXCLUDED.deal_limit`,
           storageGbLimit: sql`EXCLUDED.storage_gb_limit`,
           aiQueryLimit: sql`EXCLUDED.ai_query_limit`,
+          // cancelAt / canceledAt: COALESCE preserves existing values when caller
+          // passes null/undefined. To explicitly clear, caller would need a
+          // separate UPDATE — webhook handlers always pass the current Stripe value.
+          cancelAt: sql`COALESCE(EXCLUDED.cancel_at, billing_subscriptions.cancel_at)`,
+          canceledAt: sql`COALESCE(EXCLUDED.canceled_at, billing_subscriptions.canceled_at)`,
           updatedAt: sql`EXCLUDED.updated_at`,
         },
       })

@@ -195,42 +195,32 @@ app.post(
               },
             });
 
-            // Upsert billing_subscriptions tier/status — guarantees activation even for net-new orgs
-            await db.insert(billingSubscriptions).values({
-              orgId,
-              tier: packType,
-              status: 'active',
-              stripeSubscriptionId: data.subscription,
-              stripeCustomerId: data.customer,
-              billingCycle,
-            }).onConflictDoUpdate({
-              target: [billingSubscriptions.orgId],
-              set: {
-                status: 'active',
-                tier: packType,
-                stripeSubscriptionId: data.subscription,
-                stripeCustomerId: data.customer,
-                billingCycle,
-                updatedAt: new Date(),
-              },
-            });
+            // NOTE: This handler fires for single-pack purchases (e.g.,
+            // master_comps). Single-pack purchases should NOT write to
+            // billing_subscriptions.tier — that column is reserved for the
+            // 5 canonical tier slugs. Tier subscription checkouts (with
+            // metadata.tier set) flow through billingService.handleWebhook
+            // delegate, which calls provisionTier correctly.
 
-            // Also persist providerCustomerId to subscriptions table so billing portal can resolve customer
+            // Persist providerCustomerId to subscriptions table so billing portal can resolve customer
             const { subscriptions } = await import('@shared/schema');
             await db.update(subscriptions)
               .set({ providerCustomerId: data.customer, providerSubscriptionId: data.subscription, status: 'active', updatedAt: new Date() })
               .where(eq(subscriptions.orgId, orgId));
 
-            console.log(`[Stripe Webhook] checkout.session.completed: activated pack '${packType}' for org '${orgId}'`);
+            console.log(`[Stripe Webhook] checkout.session.completed: activated single-pack purchase '${packType}' for org '${orgId}'`);
           }
           break;
         }
         case 'customer.subscription.updated': {
-          const packStatus = toPackStatus(data.status, data.cancel_at_period_end);
           const billingStatus = toBillingStatus(data.status, data.cancel_at_period_end);
           const periodStart = data.current_period_start ? new Date(data.current_period_start * 1000) : undefined;
           const periodEnd = data.current_period_end ? new Date(data.current_period_end * 1000) : undefined;
           const cancelAt = data.cancel_at ? new Date(data.cancel_at * 1000) : null;
+          const canceledAt = data.canceled_at ? new Date(data.canceled_at * 1000) : null;
+          const stripeCustomerId = typeof data.customer === 'string'
+            ? data.customer
+            : (data.customer as any)?.id;
 
           // Resolve orgId: prefer subscription metadata; fall back to customer ID lookup
           let resolvedOrgId = orgId;
@@ -243,85 +233,108 @@ app.post(
             resolvedOrgId = sub?.orgId;
           }
 
-          if (resolvedOrgId) {
-            // Derive the new tier/packType from the subscription's price ID — handles upgrades/downgrades
-            type PackTypeEnumValue = typeof organizationPacks.packType.enumValues[number];
-            const { packCatalog } = await import('@shared/schema');
-            const { or } = await import('drizzle-orm');
-            let newPackType: PackTypeEnumValue | undefined;
-            let newBillingCycle: string | undefined;
-            let newPriceId: string | undefined;
-            const priceId = data.items?.data?.[0]?.price?.id as string | undefined;
-            if (priceId) {
-              newPriceId = priceId;
-              const [matchedPack] = await db.select().from(packCatalog)
-                .where(or(
-                  eq(packCatalog.stripePriceIdMonthly, priceId),
-                  eq(packCatalog.stripePriceIdYearly, priceId),
-                )).limit(1);
-              if (matchedPack) {
-                newPackType = matchedPack.packType as PackTypeEnumValue;
-                newBillingCycle = matchedPack.stripePriceIdYearly === priceId ? 'yearly' : 'monthly';
-              }
-            }
-
-            // Update organizationPacks (enum-safe status) — match by subscription ID
-            await db.update(organizationPacks)
-              .set({
-                status: packStatus,
-                currentPeriodEnd: periodEnd,
-                cancelAtPeriodEnd: data.cancel_at_period_end ?? false,
-                ...(newPackType ? { packType: newPackType } : {}),
-                ...(newBillingCycle ? { billingCycle: newBillingCycle } : {}),
-                updatedAt: new Date(),
-              })
-              .where(and(eq(organizationPacks.orgId, resolvedOrgId), eq(organizationPacks.stripeSubscriptionId, data.id)));
-
-            // Update billing_subscriptions (varchar status) — include tier change if detected
-            await db.update(billingSubscriptions)
-              .set({
-                status: billingStatus,
-                currentPeriodStart: periodStart,
-                currentPeriodEnd: periodEnd,
-                cancelAt,
-                ...(newPackType ? { tier: newPackType } : {}),
-                ...(newBillingCycle ? { billingCycle: newBillingCycle } : {}),
-                ...(newPriceId ? { stripePriceId: newPriceId } : {}),
-                updatedAt: new Date(),
-              })
-              .where(eq(billingSubscriptions.orgId, resolvedOrgId));
-
-            console.log(`[Stripe Webhook] customer.subscription.updated: org='${resolvedOrgId}' tier='${newPackType ?? 'unchanged'}' status='${billingStatus}'`);
-          } else {
+          if (!resolvedOrgId) {
             console.warn(`[Stripe Webhook] customer.subscription.updated: could not resolve orgId for subscription '${data.id}'`);
+            break;
           }
+
+          // Derive the new tier/packType from the subscription's price ID.
+          const { packCatalog } = await import('@shared/schema');
+          const { or } = await import('drizzle-orm');
+          const priceId = data.items?.data?.[0]?.price?.id as string | undefined;
+          let resolvedPackType: string | undefined;
+          let resolvedBillingCycleRaw: 'monthly' | 'yearly' | undefined;
+          if (priceId) {
+            const [matchedPack] = await db.select().from(packCatalog)
+              .where(or(
+                eq(packCatalog.stripePriceIdMonthly, priceId),
+                eq(packCatalog.stripePriceIdYearly, priceId),
+              )).limit(1);
+            if (matchedPack) {
+              resolvedPackType = matchedPack.packType as string;
+              resolvedBillingCycleRaw = matchedPack.stripePriceIdYearly === priceId ? 'yearly' : 'monthly';
+            }
+          }
+
+          // Guard: if priceId is missing or maps to a non-tier pack (e.g. master_comps,
+          // crm_pipeline as standalone purchases), skip the helper. Calling
+          // provisionTier with a non-tier slug would corrupt the tier column —
+          // this was the pre-migration bug. Status-only updates for non-tier
+          // single-pack subscriptions belong to a future dedicated handler.
+          const { isTierSlug } = await import('@shared/tier-packs');
+          if (!resolvedPackType || !isTierSlug(resolvedPackType)) {
+            console.warn(
+              `[Stripe Webhook] customer.subscription.updated: skipping — priceId='${priceId ?? 'missing'}' resolved to packType='${resolvedPackType ?? 'none'}' which is not a tier slug. org='${resolvedOrgId}' subscription='${data.id}'`,
+            );
+            break;
+          }
+
+          // Tier subscription update — atomic three-table re-provision.
+          // Helper diffs organization_packs (new packs activated, old packs
+          // cancelled — fixes the prior single-row-only bug) and re-provisions
+          // billing_feature_flags for the new tier (override-preserving — fixes
+          // the prior ghost-flag retention symptom that caused the lockout).
+          const billingCycle = resolvedBillingCycleRaw === 'yearly' ? 'annual' : 'monthly';
+          const { provisionTier } = await import('./services/provision-service');
+          await provisionTier(resolvedOrgId, resolvedPackType, {
+            mode: 'webhook',
+            billingCycle,
+            currentPeriodStart: periodStart,
+            currentPeriodEnd: periodEnd,
+            stripeSubscriptionId: data.id,
+            stripeCustomerId,
+            stripePriceId: priceId,
+            status: billingStatus as 'trialing' | 'active' | 'canceled' | 'past_due' | 'paused' | 'incomplete',
+            cancelAt,
+            canceledAt,
+          });
+
+          console.log(
+            `[Stripe Webhook] customer.subscription.updated: org='${resolvedOrgId}' tier='${resolvedPackType}' status='${billingStatus}'`,
+          );
           break;
         }
         case 'customer.subscription.deleted': {
           if (data.id) {
-            // Cancel organizationPacks associated with this subscription
-            await db.update(organizationPacks)
-              .set({ status: 'cancelled', updatedAt: new Date() })
-              .where(eq(organizationPacks.stripeSubscriptionId, data.id));
-            // Downgrade billing_subscriptions to free tier and mark canceled
-            // orgId is available from subscription metadata
-            if (orgId) {
+            // Resolve orgId: prefer subscription metadata; fall back to a
+            // billing_subscriptions lookup keyed on the Stripe subscription ID.
+            let resolvedOrgId = orgId;
+            if (!resolvedOrgId) {
+              const [sub] = await db.select({ orgId: billingSubscriptions.orgId })
+                .from(billingSubscriptions)
+                .where(eq(billingSubscriptions.stripeSubscriptionId, data.id))
+                .limit(1);
+              resolvedOrgId = sub?.orgId;
+            }
+
+            if (resolvedOrgId) {
+              // Atomic three-table cancellation. Helper sets billing_subscriptions
+              // tier='starter' / status='canceled', cancels ALL active packs
+              // (starter has no packs in TIER_PACKS), and re-provisions
+              // billing_feature_flags to BASE_FEATURES only — fixing the prior
+              // ghost-flag retention symptom.
+              const { provisionTier } = await import('./services/provision-service');
+              await provisionTier(resolvedOrgId, 'starter', {
+                mode: 'webhook',
+                status: 'canceled',
+                canceledAt: new Date(),
+              });
+              // Follow-on: clear stripeSubscriptionId. The helper's COALESCE
+              // conflict-update pattern preserves existing values when callers
+              // pass null/undefined, so it can't null this column itself.
               await db.update(billingSubscriptions)
-                .set({
-                  status: 'canceled',
-                  tier: 'starter', // Downgrade to free/starter tier on cancellation
-                  canceledAt: new Date(),
-                  stripeSubscriptionId: null,
-                  updatedAt: new Date(),
-                })
-                .where(eq(billingSubscriptions.orgId, orgId));
+                .set({ stripeSubscriptionId: null, updatedAt: new Date() })
+                .where(eq(billingSubscriptions.orgId, resolvedOrgId));
             } else {
-              // Fall back to matching by subscription ID if orgId not in metadata
+              // Last-resort fallback: orgId could not be resolved at all.
+              // Preserve the original minimally-destructive behavior — mark the
+              // subscription canceled by stripeSubscriptionId without tier
+              // downgrade or pack cancellation (which require knowing the org).
               await db.update(billingSubscriptions)
                 .set({ status: 'canceled', canceledAt: new Date(), updatedAt: new Date() })
                 .where(eq(billingSubscriptions.stripeSubscriptionId, data.id));
             }
-            console.log(`[Stripe Webhook] customer.subscription.deleted: subscription '${data.id}' cancelled, org='${orgId ?? 'unknown'}' downgraded to starter`);
+            console.log(`[Stripe Webhook] customer.subscription.deleted: subscription '${data.id}' cancelled, org='${resolvedOrgId ?? 'unknown'}' downgraded to starter`);
           }
           break;
         }

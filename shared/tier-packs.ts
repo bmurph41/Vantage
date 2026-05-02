@@ -116,3 +116,8 @@ export const TIER_LIMITS: Record<SubscriptionTierSlug, TierLimits> = {
 export function getLimitsForTier(slug: SubscriptionTierSlug): TierLimits {
   return TIER_LIMITS[slug];
 }
+
+/** Type guard: is this string a valid SubscriptionTierSlug? */
+export function isTierSlug(s: string): s is SubscriptionTierSlug {
+  return TIER_PACKS.some(t => t.slug === s);
+}
