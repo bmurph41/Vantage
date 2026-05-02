@@ -2,19 +2,18 @@ import { db } from "../db";
 import { organizationPacks, packCatalog } from "@shared/schema";
 import { eq, and, or, asc } from "drizzle-orm";
 import type { OrganizationPack, InsertOrganizationPack, PackCatalog } from "@shared/schema";
+import {
+  TIER_PACKS,
+  type CorePackType,
+  type AddonPackType,
+  type RolePackType,
+  type MasterPackType,
+  type PackType,
+  type SubscriptionTierSlug,
+} from "@shared/tier-packs";
 
-// Core packs that users purchase first
-export type CorePackType = "crm_pipeline" | "modeling_tools" | "analysis" | "operations";
-
-// Add-on packs that require core packs
-export type AddonPackType = "fund_management" | "lp_portal" | "prospecting" | "analytics_pro";
-
-// Role-based packs for Rent Roll access
-export type RolePackType = "owner" | "investor" | "broker";
-
-export type MasterPackType = "master_comps";
-
-export type PackType = CorePackType | AddonPackType | RolePackType | MasterPackType;
+// Re-export pack-type unions for backward compat with existing consumers.
+export type { CorePackType, AddonPackType, RolePackType, MasterPackType, PackType, SubscriptionTierSlug };
 
 // Pack dependencies - which packs are required before activation
 const PACK_DEPENDENCIES: Record<PackType, PackType[]> = {
@@ -221,15 +220,19 @@ export interface TierDefinition {
   recommended?: boolean;
 }
 
-export const SUBSCRIPTION_TIERS: TierDefinition[] = [
-  {
+// Marketing/billing data layered onto the canonical TIER_PACKS entries.
+// Keep `slug` and `packs` as the single source of truth in shared/tier-packs.ts.
+type TierMarketing = Pick<
+  TierDefinition,
+  "id" | "description" | "monthlyPriceCents" | "yearlyPriceCents" | "features" | "popular" | "recommended"
+>;
+
+const TIER_MARKETING: Record<SubscriptionTierSlug, TierMarketing> = {
+  starter: {
     id: "tier_starter",
-    name: "Starter",
-    slug: "starter",
     description: "Explore the platform with market news, sample analytics, and limited deal tracking.",
     monthlyPriceCents: 0,
     yearlyPriceCents: 0,
-    packs: [], // No packs — base features only (dashboard, docket, limited analysis preview)
     features: [
       "Dashboard overview",
       "The Docket — industry news & alerts",
@@ -239,14 +242,11 @@ export const SUBSCRIPTION_TIERS: TierDefinition[] = [
       "1 deal workspace (view only)",
     ],
   },
-  {
+  investor: {
     id: "tier_investor",
-    name: "Investor",
-    slug: "investor",
     description: "Full analysis and modeling tools for evaluating marina acquisitions.",
     monthlyPriceCents: 9900,
     yearlyPriceCents: 99000,
-    packs: ["modeling_tools", "analysis", "investor"],
     features: [
       "Everything in Starter",
       "Unlimited deal workspaces",
@@ -257,15 +257,12 @@ export const SUBSCRIPTION_TIERS: TierDefinition[] = [
       "Secure Data Room",
     ],
   },
-  {
+  broker: {
     id: "tier_broker",
-    name: "Broker",
-    slug: "broker",
     description: "Complete deal management toolkit for brokers and advisors.",
     monthlyPriceCents: 19900,
     yearlyPriceCents: 199000,
     popular: true,
-    packs: ["modeling_tools", "analysis", "crm_pipeline", "prospecting", "investor", "broker"],
     features: [
       "Everything in Investor",
       "Full CRM (contacts, companies, properties)",
@@ -276,14 +273,11 @@ export const SUBSCRIPTION_TIERS: TierDefinition[] = [
       "Debt Scenarios modeling",
     ],
   },
-  {
+  "owner-operator": {
     id: "tier_owner_operator",
-    name: "Owner / Operator",
-    slug: "owner-operator",
     description: "End-to-end marina management — deals, operations, and financials.",
     monthlyPriceCents: 24900,
     yearlyPriceCents: 249000,
-    packs: ["modeling_tools", "analysis", "crm_pipeline", "prospecting", "operations", "investor", "broker", "owner"],
     features: [
       "Everything in Broker",
       "Full Operations suite (Dockit, Fuel, Ship Store, Service)",
@@ -293,15 +287,12 @@ export const SUBSCRIPTION_TIERS: TierDefinition[] = [
       "Portfolio Analytics",
     ],
   },
-  {
+  institutional: {
     id: "tier_institutional",
-    name: "Institutional",
-    slug: "institutional",
     description: "Enterprise-grade platform for PE firms and institutional investors.",
     monthlyPriceCents: 49900,
     yearlyPriceCents: 499000,
     recommended: true,
-    packs: ["modeling_tools", "analysis", "crm_pipeline", "prospecting", "operations", "fund_management", "lp_portal", "analytics_pro", "investor", "broker", "owner"],
     features: [
       "Everything in Owner / Operator",
       "Fund Management (capital calls, distributions, NAV)",
@@ -311,7 +302,14 @@ export const SUBSCRIPTION_TIERS: TierDefinition[] = [
       "Priority support",
     ],
   },
-];
+};
+
+export const SUBSCRIPTION_TIERS: TierDefinition[] = TIER_PACKS.map((t) => ({
+  slug: t.slug,
+  name: t.name,
+  packs: t.packs,
+  ...TIER_MARKETING[t.slug],
+}));
 
 /**
  * Given a set of active packs, determine which tier the user is on

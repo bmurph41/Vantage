@@ -41,79 +41,50 @@ export interface TierDefinition {
   };
 }
 
-const STARTER_FEATURES = [
-  'deal_workspace',
-  'crm_basic',
-  'financial_model',
-  'document_vault',
-  'dd_checklist',
-  'basic_reporting',
-];
+// Feature flags per tier are derived from PACK_TO_FEATURES in shared/tier-features.ts.
+// To add or move a feature, edit that file — do NOT add hand-maintained arrays here.
+import { getFeaturesForTier, type SubscriptionTier } from '@shared/tier-features';
 
-const GROWTH_FEATURES = [
-  ...STARTER_FEATURES,
-  'lp_portal',
-  'capital_calls',
-  'distributions',
-  'workflow_automation',
-  'gantt_view',
-  'ai_narratives',
-  'lease_abstractor',
-  'email_integration',
-  'sms_alerts',
-  'vendor_management',
-  'work_orders',
-];
-
-const INSTITUTIONAL_FEATURES = [
-  ...GROWTH_FEATURES,
-  'portfolio_dashboard',
-  'benchmark_engine',
-  'stress_testing',
-  'fund_accounting',
-  'kyc_aml',
-  'capital_account_ledger',
-  'construction_module',
-  'custom_report_builder',
-  'performance_attribution',
-  'ai_underwriting',
-  'document_intelligence',
-  'sso',
-  'audit_trail',
-  'white_label',
-  'api_access',
-  'custom_deal_stages',
-  'waterfall_engine',
-];
-
-export const SUBSCRIPTION_TIERS: Record<string, TierDefinition> = {
+// Tier prices and limits mirror frontend SUBSCRIPTION_PACKAGES (client/src/config/featureModules.ts)
+// for starter/investor/broker/owner-operator and the prior 'institutional' billing-service entry
+// for institutional. Limits for the 3 newly-canonical middle tiers (investor/broker/owner-operator)
+// were not previously defined here — the values below are interpolated between starter and
+// institutional. PRODUCT REVIEW: confirm or rebalance.
+export const SUBSCRIPTION_TIERS: Record<SubscriptionTier, TierDefinition> = {
   starter: {
     name: 'Starter',
-    priceMonthly: 299,
-    priceAnnual: 249,
-    features: STARTER_FEATURES,
-    limits: { deals: 10, seats: 3, storageGb: 10, aiQueries: 100 },
+    priceMonthly: 0,
+    priceAnnual: 0,
+    features: getFeaturesForTier('starter'),
+    limits: { deals: 1, seats: 1, storageGb: 1, aiQueries: 10 },
   },
-  growth: {
-    name: 'Growth',
-    priceMonthly: 799,
-    priceAnnual: 649,
-    features: GROWTH_FEATURES,
-    limits: { deals: 50, seats: 10, storageGb: 100, aiQueries: 1000, lpInvestors: 50 },
+  investor: {
+    name: 'Investor',
+    priceMonthly: 89,
+    priceAnnual: 890,
+    features: getFeaturesForTier('investor'),
+    limits: { deals: -1, seats: 3, storageGb: 25, aiQueries: 200 }, // INTERPOLATED — review
+  },
+  broker: {
+    name: 'Broker',
+    priceMonthly: 179,
+    priceAnnual: 1790,
+    features: getFeaturesForTier('broker'),
+    limits: { deals: -1, seats: 10, storageGb: 100, aiQueries: 1000 }, // INTERPOLATED — review
+  },
+  'owner-operator': {
+    name: 'Owner / Operator',
+    priceMonthly: 249,
+    priceAnnual: 2490,
+    features: getFeaturesForTier('owner-operator'),
+    limits: { deals: -1, seats: 25, storageGb: 500, aiQueries: 2500, lpInvestors: 25 }, // INTERPOLATED — review
   },
   institutional: {
     name: 'Institutional',
     priceMonthly: 1999,
     priceAnnual: 1649,
-    features: INSTITUTIONAL_FEATURES,
+    features: getFeaturesForTier('institutional'),
     limits: { deals: -1, seats: -1, storageGb: 1000, aiQueries: -1, lpInvestors: -1 },
-  },
-  enterprise: {
-    name: 'Enterprise',
-    priceMonthly: null,
-    priceAnnual: null,
-    features: ['everything'],
-    limits: { deals: -1, seats: -1, storageGb: -1, aiQueries: -1, lpInvestors: -1 },
   },
 };
 
@@ -772,7 +743,7 @@ export class BillingService {
       return;
     }
 
-    // ── Core platform subscription (Starter / Growth / Institutional) ──
+    // ── Core platform subscription (Starter / Investor / Broker / Owner-Operator / Institutional) ──
     // Fired when /api/billing/checkout session completes for Vantage SaaS plans.
     if (!sku) {
       const orgId = metadata.orgId;
