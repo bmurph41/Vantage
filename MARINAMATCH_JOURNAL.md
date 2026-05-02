@@ -3152,3 +3152,50 @@ asset class, these latent issues become visible.
 - Fix shape: same as (d-1), derive from selected asset class. Effort: S.
 - Memory: project_deal_form_modal_marina_hardcode.md
 
+## 2026-05-01 — Workspace Health Survey (session-level finding)
+
+Workspace health survey: **11+ errors across post-wizard tabs surfaced once
+entitlements unblock (Phase A fix-3) made tabs reachable.** Filed as a
+session-level finding rather than individual bugs. Recommended approach:
+dedicated workspace audit + categorical fixes in a follow-up session, not
+opportunistic firefighting.
+
+**Severity:** HIGH (PRE-BETA BLOCKER) — affects user experience after wizard
+completion, which is the entire post-onboarding journey.
+
+**Observed (non-exhaustive):** Pricing 500 (`investmentCriteriaProfiles`),
+Capital Stack HTML-not-JSON + 403 lp_portal, DCF route-not-registered
+(`/api/capital-markets/stats`, `/api/capital-markets/rates/latest`), Hold
+Period CF "CSRF token missing", IRR Attribution + Mark-to-Market 400 Zod,
+Replacement Cost marina-hardcoded for multifamily, Audit Trail 500,
+Assumption Audit HTML-not-JSON, pro-forma-charts.tsx:454 `noi is not defined`,
+Document Studio "Operation failed" (resolved by Phase A fix-4a manual seed).
+
+**6 root-cause categories** identified (one systemic fix can unblock multiple
+tabs):
+1. Entitlement table seeding gaps → **Phase A fix-4b** (predicate from packs)
+2. Missing/unregistered routes → orphan inventory + add-or-remove
+3. Code-level runtime errors → individual fixes
+4. Asset-class-awareness gaps → bundles into Phase D asset-class-aware
+   workspace content body of work
+5. Empty-state UX vs error UX → shared `<RequiresInputs>` wrapper for
+   Analysis tabs
+6. Auth/session/CSRF infra → audit fetch helpers for CSRF threading
+
+**Effort estimate:** 1-2h discovery pass + 1-3h per systemic fix = **8-15h
+total focused work** to functional pre-beta. Larger than previously estimated
+in `project_remaining_queue.md` (FM Beta Publish Queue), which is now
+incomplete — actual beta gate is broader.
+
+**Companion work this session:**
+- Phase A fix-4a (DB-only): seeded billing_feature_flags for org cd3719c3
+  with 34 institutional features (INSERT 0 34, ai_narratives included).
+  Unblocks `POST /api/om/oms` and other gate-protected routes.
+- Memory: `project_workspace_health_survey_2026_05_01.md` — index for
+  remediation, do not pick off individual bugs without first deciding
+  systemic-fix bucket.
+- Memory: `project_phase_a_fix_4b_subscription_seeds_flags.md` — systemic
+  fix, recommend pairing with fix-2b in one PR.
+- Memory: `project_create_new_document_surface_divergence.md` — three
+  surfaces share modal title with three different backends + gates.
+
