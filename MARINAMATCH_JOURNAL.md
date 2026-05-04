@@ -3482,5 +3482,21 @@ Closes Brett's lockout symptom (tier change via Stripe webhook now re-provisions
 - (c) Phase A fix-2b — `asset_classes` gate review at `crm-routes.ts:13957` (likely shouldn't exist; ~1-2h investigation + fix)
 - (d) Portfolio rebuild Phase 0 prereqs — `portfolio_assets` writer + `valuation_snapshots` seed + `capital_stacks` 2-col migration (~8-10h, required before any portfolio v1 work)
 
+## 2026-05-04 — Spec filed: multi-partner GP/LP modeling
+
+**Filed (no code):** `project_multi_partner_gp_lp_modeling.md` — Phase D / Vantage Fund Management spec for multi-partner investment structures with per-entity ownership, basis, debt allocation, and GP-vs-LP RBAC.
+
+**Why filed now:** Vantage's current Fund Management assumes single GP / single LP / pro-rata split (`lpIrr` / `gpIrr` column pair on projects, single-partner `capital_stacks`). Real fund-management buyers expect multi-LP structures with per-entity basis (1031 carryover, step-up basis, mid-stream entry), partner-specific debt guarantees, and strict GP-vs-LP visibility separation. This is a credibility gap that blocks the institutional positioning story — files now so it can be sequenced against current Phase A / C19 work and the Portfolio rebuild master plan.
+
+**Estimated effort:** 30-42h focused work + 2-3h Phase 0 discovery (must answer six architectural questions first — schema shape, capital account lifecycle, pro-rata vs waterfall semantics, RBAC enforcement layer, LP user model, cross-org LPs).
+
+**Critical risk:** RBAC retrofit cost compounds once real LP users exist with real accounts. Schema changes become breaking changes against live data. v1 should ship before any real LP onboards — build RBAC into the schema from day one.
+
+**Hard scope:** 5-7 canonical structures (single LLC, GP+LP, GP+multi-LP, TIC, waterfall promote, preferred equity tranche, "other" manual entry). Reject unbounded "any structure" UI.
+
+**Status:** FILE ONLY. Not started. Gated behind current Phase A / C19 work completing. Sister spec to `project_portfolio_rebuild_plan.md` — both are HIGH-severity Vantage-positioning specs blocked on Phase 0 discovery.
+
+**Memory index updated:** new entry between Portfolio rebuild master plan and `activatePack` trial-wipe bug — keeps the Phase D Fund Management cluster contiguous.
+
 
 

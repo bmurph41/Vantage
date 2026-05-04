@@ -264,18 +264,10 @@ class DataBindingService {
 
     const context: BindingContext = { dealId };
 
-    // Resolve propertyId — try direct field first, then deal_property_address table
+    // Resolve propertyId from the canonical crm_deals.property_id FK.
+    // (Previously fell back to deal_property_address.property_id, but that
+    // column never existed — the SELECT always threw and was silently swallowed.)
     let propertyId: string | undefined = (deal as any).propertyId || undefined;
-    if (!propertyId) {
-      try {
-        const { pool } = await import('../../db');
-        const result = await pool.query(
-          `SELECT property_id FROM deal_property_address WHERE deal_id = $1 LIMIT 1`,
-          [dealId]
-        );
-        propertyId = result.rows[0]?.property_id || undefined;
-      } catch { /* table may not exist for all deals */ }
-    }
 
     // Also check crmProperties linked via companyId/contactId if still nothing
     if (!propertyId && (deal as any).companyId) {

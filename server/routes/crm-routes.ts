@@ -13939,6 +13939,14 @@ export function registerCRMRoutes(
       
       const data = insertModelingProjectSchema.parse(req.body);
 
+      // propertyId is destined for crm_deals (not modelingProjects), so it's
+      // pulled from raw req.body rather than the parsed schema. When the wizard
+      // (or manual deal creation) supplies one, we link the deal to that
+      // property and skip auto-creating a pendingProperty below.
+      const linkedPropertyId: string | null = typeof req.body?.propertyId === 'string' && req.body.propertyId.length > 0
+        ? req.body.propertyId
+        : null;
+
       // Mandatory entitlement check: always resolve an effective asset class and verify it.
       // Falls back to the DB column default ("marina") when the caller omits assetClass,
       // so the guard cannot be bypassed by simply not sending the field.
@@ -14003,6 +14011,7 @@ export function registerCRMRoutes(
             stage: 'modeling',
             ...(pipelineId && { pipelineId }),
             ...(stageId && { stageId }),
+            ...(linkedPropertyId && { propertyId: linkedPropertyId }),
             ownerId: userId,
             orgId,
           }).returning();
@@ -14037,32 +14046,36 @@ export function registerCRMRoutes(
       });
       
       // Check if a CRM property exists with this marina name
-      // If not found, create a pending property for review
-      try {
-        const existingProperty = await storage.findPropertyByLocation(
-          orgId, 
-          data.marinaName, 
-          data.city || undefined, 
-          data.state || undefined
-        );
-        
-        if (!existingProperty) {
-          await storage.createPendingProperty({
+      // If not found, create a pending property for review.
+      // Skip entirely when the caller already linked a real propertyId
+      // (e.g. wizard POSTed /api/properties first and supplied the id).
+      if (!linkedPropertyId) {
+        try {
+          const existingProperty = await storage.findPropertyByLocation(
             orgId,
-            sourceType: 'modeling_project',
-            marinaName: data.marinaName,
-            city: data.city || null,
-            state: data.state || null,
-            address: data.address || null,
-            createdBy: userId,
-            compMetadata: { 
-              fromModelingProjectId: result.id,
-              fromModelingProjectName: data.marinaName 
-            },
-          });
+            data.marinaName,
+            data.city || undefined,
+            data.state || undefined
+          );
+
+          if (!existingProperty) {
+            await storage.createPendingProperty({
+              orgId,
+              sourceType: 'modeling_project',
+              marinaName: data.marinaName,
+              city: data.city || null,
+              state: data.state || null,
+              address: data.address || null,
+              createdBy: userId,
+              compMetadata: {
+                fromModelingProjectId: result.id,
+                fromModelingProjectName: data.marinaName
+              },
+            });
+          }
+        } catch (pendingError) {
+          console.error('Failed to create pending property (non-blocking):', pendingError);
         }
-      } catch (pendingError) {
-        console.error('Failed to create pending property (non-blocking):', pendingError);
       }
       
       res.status(201).json(result);

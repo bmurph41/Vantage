@@ -294,7 +294,8 @@
       "Bash(awk '/^export const crmDeals = pgTable/,/^}\\\\\\);/' /home/runner/workspace/shared/schema.ts)",
       "Bash(NODE_OPTIONS=\"--max-old-space-size=6144\" npx tsc --noEmit)",
       "Bash(tee /tmp/tsc-out.log)",
-      "Bash(ps -p 5490 -o etime,rss --no-headers)"
+      "Bash(ps -p 5490 -o etime,rss --no-headers)",
+      "Bash(git log *)"
     ]
   }
 }

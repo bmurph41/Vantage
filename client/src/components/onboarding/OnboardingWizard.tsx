@@ -636,6 +636,53 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
     }
   }
 
+  async function createOrLinkProperty(payload: {
+    name: string;
+    address?: string;
+    city: string;
+    state: string;
+    zipCode?: string;
+    propertyType: string;
+  }): Promise<string | null> {
+    try {
+      const response = await apiRequest('POST', '/api/properties', { ...payload, status: 'prospect' });
+      const property = await response.json();
+      return property?.id ?? null;
+    } catch (e: any) {
+      const message: string = typeof e?.message === 'string' ? e.message : '';
+      const statusMatch = message.match(/^(\d{3}):/);
+      const status = statusMatch ? Number(statusMatch[1]) : undefined;
+      let parsedBody: any = null;
+      if (status) {
+        try { parsedBody = JSON.parse(message.slice(statusMatch![0].length).trim()); } catch { /* non-JSON body */ }
+      }
+
+      if (status === 409) {
+        const duplicate = parsedBody?.duplicates?.[0];
+        if (duplicate?.id) {
+          toast({
+            title: 'Property already exists',
+            description: `Linking to existing property: ${duplicate.title ?? payload.name}`,
+          });
+          return duplicate.id;
+        }
+        toast({
+          title: 'Duplicate property detected',
+          description: parsedBody?.message ?? 'Could not link property — continuing without CRM link.',
+          variant: 'destructive',
+        });
+        return null;
+      }
+
+      toast({
+        title: 'Property creation failed',
+        description: parsedBody?.message ?? message ?? 'An error occurred — continuing without CRM link.',
+        variant: 'destructive',
+      });
+      return null;
+    }
+  }
+
   const createDealMutation = useMutation({
     mutationFn: async (data: {
       dealStructure: DealStructure;
