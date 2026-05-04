@@ -656,6 +656,15 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
         
         const results = await Promise.all(
           validMarinas.map(async (marina) => {
+            const propertyIdToLink = await createOrLinkProperty({
+              name: marina.name,
+              address: marina.address.line1,
+              city: marina.address.city,
+              state: marina.address.state,
+              zipCode: marina.address.zip,
+              propertyType: data.assetClass || 'marina',
+            });
+
             const projectRes = await apiRequest('POST', '/api/modeling/projects', {
               marinaName: marina.name,
               address: marina.address.line1,
@@ -666,23 +675,10 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
               dealOutcome: data.dealStatus || 'active',
               customMetrics: { dealType: data.dealType, portfolioName: data.portfolioName || 'Untitled Portfolio' },
               assetClass: data.assetClass || "marina",
+              propertyId: propertyIdToLink || undefined,
             });
             const modelingProject = await projectRes.json();
-            
-            try {
-              await apiRequest('POST', '/api/properties', {
-                name: marina.name,
-                address: marina.address.line1,
-                city: marina.address.city,
-                state: marina.address.state,
-                zipCode: marina.address.zip,
-                propertyType: data.assetClass || 'marina',
-                status: 'prospect',
-              });
-            } catch (e) {
-              console.warn('CRM property creation failed (non-blocking):', e);
-            }
-            
+
             return { modelingProject };
           })
         );
@@ -692,6 +688,15 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
           throw new Error("Please provide a marina name");
         }
         
+        const propertyIdToLink = await createOrLinkProperty({
+          name: data.marinaName,
+          address: data.marinaAddress.line1,
+          city: data.marinaAddress.city,
+          state: data.marinaAddress.state,
+          zipCode: data.marinaAddress.zip,
+          propertyType: data.assetClass || 'marina',
+        });
+
         const projectRes = await apiRequest('POST', '/api/modeling/projects', {
           marinaName: data.marinaName,
           address: data.marinaAddress.line1 || undefined,
@@ -702,23 +707,10 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
           dealOutcome: data.dealStatus || 'active',
           assetClass: data.assetClass || "marina",
           customMetrics: { dealType: data.dealType },
+          propertyId: propertyIdToLink || undefined,
         });
         const modelingProject = await projectRes.json();
-        
-        try {
-          await apiRequest('POST', '/api/properties', {
-            name: data.marinaName,
-            address: data.marinaAddress.line1,
-            city: data.marinaAddress.city,
-            state: data.marinaAddress.state,
-            zipCode: data.marinaAddress.zip,
-            propertyType: data.assetClass || 'marina',
-            status: 'prospect',
-          });
-        } catch (e) {
-          console.warn('CRM property creation failed (non-blocking):', e);
-        }
-        
+
         return { modelingProject };
       }
     },

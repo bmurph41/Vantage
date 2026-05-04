@@ -4477,6 +4477,7 @@ export const crmDeals = pgTable("crm_deals", {
   // DD Project Integration
   ddProjectId: varchar("dd_project_id").references(() => projects.id), // Links to DD project if converted
   modelingProjectId: varchar("modeling_project_id"), // Links to financial modeling project (populated on model creation)
+  propertyId: varchar("property_id").references(() => crmProperties.id, { onDelete: 'set null' }), // Links to CRM property (populated by wizard or manual deal creation)
   // Broker Marketplace — attributes a closed deal to a broker_profile for verified trust signals
   brokerProfileId: varchar("broker_profile_id"),
   // Closed Deal Tracking
