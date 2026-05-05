@@ -16,8 +16,8 @@
 
 import { Router, Request, Response, NextFunction } from "express";
 import { db } from "../db";
-import { brokerRegistrations, brokerProfiles } from "@shared/schema";
-import { and, desc, eq, sql } from "drizzle-orm";
+import { brokerRegistrations, brokerProfiles, users, crmNotifications, organizationUserRoles } from "@shared/schema";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { verifyAndPersistLicense } from "../services/broker-license-verification";
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -473,6 +473,107 @@ brokerRegistrationRouter.patch("/me", async (req: Request, res: Response) => {
         .update(brokerProfiles)
         .set(profileUpdates)
         .where(eq(brokerProfiles.registrationId, current.id));
+    }
+
+    // Notify admins when an approved/suspended broker changes credential fields
+    if (current.status === "approved" || current.status === "suspended") {
+      const credentialFieldLabels: Record<string, string> = {
+        legalFirstName: "First name",
+        legalLastName: "Last name",
+        legalName: "Legal name",
+        companyName: "Company name",
+        licenseNumber: "License number",
+        licenseState: "License state",
+        licenseExpiresAt: "License expiry date",
+        licenseDocumentUrl: "License document",
+      };
+
+      // Normalize a value to a comparable string; dates are reduced to ISO date strings
+      // so that semantically equal dates (e.g. Date object vs. ISO string) don't produce
+      // false-positive change alerts.
+      function normalizeForComparison(value: unknown): string {
+        if (value == null) return "";
+        if (value instanceof Date) return value.toISOString().slice(0, 10);
+        const s = String(value);
+        // If the value looks like a full ISO timestamp, keep only the date portion
+        if (/^\d{4}-\d{2}-\d{2}T/.test(s)) return s.slice(0, 10);
+        return s;
+      }
+
+      const currentCredentialSnapshot: Record<typeof credentialFields[number], unknown> = {
+        legalFirstName: current.legalFirstName,
+        legalLastName: current.legalLastName,
+        legalName: current.legalName,
+        companyName: current.companyName,
+        licenseNumber: current.licenseNumber,
+        licenseState: current.licenseState,
+        licenseExpiresAt: current.licenseExpiresAt,
+        licenseDocumentUrl: current.licenseDocumentUrl,
+      };
+
+      const changedCredentials = credentialFields.filter(
+        (field) =>
+          field in updates &&
+          normalizeForComparison(updates[field]) !== normalizeForComparison(currentCredentialSnapshot[field]),
+      );
+
+      if (changedCredentials.length > 0) {
+        const changedLabels = changedCredentials
+          .map((f) => credentialFieldLabels[f] || f)
+          .join(", ");
+        const brokerName = updated.legalName || `${updated.legalFirstName ?? ""} ${updated.legalLastName ?? ""}`.trim() || updated.email;
+        const adminDetailPath = `/admin/broker/registrations/${current.id}`;
+
+        // Fire-and-forget: notification failures must not roll back the already-committed update
+        Promise.resolve().then(async () => {
+          try {
+            const adminRoleRows = await db
+              .select({ userId: organizationUserRoles.userId })
+              .from(organizationUserRoles)
+              .where(
+                and(
+                  eq(organizationUserRoles.orgId, ctx.orgId),
+                  eq(organizationUserRoles.isActive, true),
+                  inArray(organizationUserRoles.role, ["admin", "owner"]),
+                ),
+              );
+
+            const adminUserIds = [...new Set(adminRoleRows.map((r) => r.userId))];
+
+            const adminUsers = adminUserIds.length > 0
+              ? await db
+                  .select({ id: users.id })
+                  .from(users)
+                  .where(inArray(users.id, adminUserIds))
+              : [];
+
+            if (adminUsers.length > 0) {
+              await Promise.all(
+                adminUsers.map((admin) =>
+                  db.insert(crmNotifications).values({
+                    orgId: ctx.orgId,
+                    userId: admin.id,
+                    type: "broker_credential_update",
+                    title: `Broker credentials updated: ${brokerName}`,
+                    message: `Broker ${brokerName} (${current.status}) updated the following credential fields: ${changedLabels}. Please reverify before they continue publishing listings. Review at ${adminDetailPath}`,
+                    entityType: "broker_registration",
+                    entityId: current.id,
+                    triggeredBy: ctx.userId,
+                    metadata: {
+                      brokerName,
+                      changedFields: changedCredentials,
+                      registrationStatus: current.status,
+                      adminDetailPath,
+                    },
+                  }),
+                ),
+              );
+            }
+          } catch (notifyErr) {
+            console.error("[broker-registration] admin credential-change notification failed:", notifyErr);
+          }
+        });
+      }
     }
 
     return res.json({ registration: updated });
