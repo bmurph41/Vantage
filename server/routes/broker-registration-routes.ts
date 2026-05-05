@@ -19,7 +19,7 @@ import { db } from "../db";
 import { brokerRegistrations, brokerProfiles, users, crmNotifications, organizationUserRoles, brokerCredentialAudit, brokerRegistrationEvents } from "@shared/schema";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { verifyAndPersistLicense } from "../services/broker-license-verification";
-import { sendEmail, wrapEmailTemplate, sendBrokerRereviewEmail } from "../services/email-service";
+import { sendEmail, wrapEmailTemplate, sendBrokerRereviewEmail, sendBrokerSuspensionEmail } from "../services/email-service";
 
 // ────────────────────────────────────────────────────────────────────────────
 // Helpers
@@ -935,6 +935,24 @@ brokerAdminRouter.post("/registrations/:id/suspend", async (req: Request, res: R
 
       return { registration: updatedReg };
     });
+
+    // Fire-and-forget: email the broker about the suspension
+    const { registration: suspendedReg } = result;
+    if (suspendedReg?.email) {
+      const brokerName =
+        suspendedReg.legalName ||
+        `${suspendedReg.legalFirstName ?? ""} ${suspendedReg.legalLastName ?? ""}`.trim() ||
+        suspendedReg.email;
+      sendBrokerSuspensionEmail(suspendedReg.email, brokerName, reason)
+        .then((sent) => {
+          if (!sent) {
+            console.warn("[broker-admin] suspension email not delivered (no provider returned success):", suspendedReg.email);
+          }
+        })
+        .catch((emailErr) =>
+          console.error("[broker-admin] suspension email failed:", emailErr),
+        );
+    }
 
     return res.json(result);
   } catch (err: any) {

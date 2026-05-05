@@ -320,6 +320,48 @@ export async function sendBrokerRereviewEmail(
   });
 }
 
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+export async function sendBrokerSuspensionEmail(
+  to: string,
+  brokerName: string,
+  reason: string,
+): Promise<boolean> {
+  const loginUrl = `${APP_URL}/broker/profile`;
+  const safeReason = escapeHtml(reason);
+  return sendEmail({
+    to,
+    subject: 'Important: Your Broker Profile Has Been Suspended',
+    text: `Hi ${brokerName},\n\nYour broker profile on Vantage has been suspended by an administrator. Your profile has been unpublished and is no longer visible to others.\n\nReason for suspension:\n${reason}\n\nWhat to do next:\n1. Review the reason for suspension above.\n2. If you believe this was done in error or have questions, please contact your account administrator.\n3. Once any issues are resolved, an administrator can reinstate your profile.\n\nLog in to your account at: ${loginUrl}\n\n— The Vantage Team`,
+    html: wrapEmailTemplate(`
+      <h2 style="margin-top: 0; color: #1e293b;">Your Broker Profile Has Been Suspended</h2>
+      <p>Hi ${escapeHtml(brokerName)},</p>
+      <p>Your broker profile on Vantage has been <strong>suspended</strong> by an administrator. Your profile has been unpublished and is no longer visible to others.</p>
+      <div style="background: #fef2f2; border-left: 4px solid #ef4444; padding: 16px; border-radius: 4px; margin: 16px 0;">
+        <p style="margin: 0; font-size: 14px; font-weight: 600;">Reason for suspension:</p>
+        <p style="margin: 8px 0 0 0; font-size: 14px;">${safeReason}</p>
+      </div>
+      <p><strong>What to do next:</strong></p>
+      <ol style="font-size: 14px; padding-left: 20px; margin: 8px 0 16px 0;">
+        <li style="margin-bottom: 8px;">Review the reason for suspension above.</li>
+        <li style="margin-bottom: 8px;">If you believe this was done in error or have questions, please contact your account administrator.</li>
+        <li style="margin-bottom: 8px;">Once any issues are resolved, an administrator can reinstate your profile.</li>
+      </ol>
+      <p style="color: #64748b; font-size: 14px;">If you have questions, please reach out to your account administrator directly.</p>
+      <div style="text-align: center; margin: 32px 0;">
+        <a href="${loginUrl}" style="background: linear-gradient(135deg, #0891b2, #2563eb); color: white; padding: 14px 32px; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block;">Log In to Vantage</a>
+      </div>
+    `),
+  });
+}
+
 export async function sendInviteEmail(
   to: string,
   inviteUrl: string,
