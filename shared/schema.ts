@@ -15907,6 +15907,8 @@ export const capitalStacks = pgTable('capital_stacks', {
   totalDebt: decimal('total_debt', { precision: 18, scale: 2 }).default('0'),
   totalEquity: decimal('total_equity', { precision: 18, scale: 2 }).default('0'),
   blendedDebtRate: decimal('blended_debt_rate', { precision: 8, scale: 4 }),
+  interestRateType: varchar('interest_rate_type'),
+  maturityDate: date('maturity_date'),
   ltv: decimal('ltv', { precision: 8, scale: 4 }),
   debtYield: decimal('debt_yield', { precision: 8, scale: 4 }),
 
@@ -15914,9 +15916,6 @@ export const capitalStacks = pgTable('capital_stacks', {
   holdPeriodYears: integer('hold_period_years').default(5),
   exitCapRate: decimal('exit_cap_rate', { precision: 8, scale: 4 }),
   noiGrowthRate: decimal('noi_growth_rate', { precision: 8, scale: 4 }).default('0.02'),
-
-  interestRateType: varchar('interest_rate_type'),
-  maturityDate: date('maturity_date'),
 
   isActive: boolean('is_active').default(true).notNull(),
   createdBy: varchar('created_by').references(() => users.id),
