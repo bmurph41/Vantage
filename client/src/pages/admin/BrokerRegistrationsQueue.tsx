@@ -34,9 +34,10 @@ import {
   useRejectRegistration,
   useSuspendRegistration,
   useReverifyRegistration,
+  useRequestRereview,
   type BrokerRegistrationStatus,
 } from "@/hooks/use-broker-admin";
-import { Loader2, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, CheckCircle2, AlertCircle, Clock, ShieldQuestion } from "lucide-react";
+import { Loader2, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, CheckCircle2, AlertCircle, Clock, ShieldQuestion, RefreshCw } from "lucide-react";
 
 const TABS: { label: string; value: BrokerRegistrationStatus }[] = [
   { label: "Pending", value: "pending" },
@@ -155,6 +156,7 @@ export default function BrokerRegistrationsQueue() {
   const rejectMut = useRejectRegistration();
   const suspendMut = useSuspendRegistration();
   const reverifyMut = useReverifyRegistration();
+  const rereviewMut = useRequestRereview();
 
   const items = data?.items || [];
   const pagination = data?.pagination;
@@ -221,6 +223,20 @@ export default function BrokerRegistrationsQueue() {
       });
     } catch (e: any) {
       toast({ title: "Re-verify failed", description: e?.message || "", variant: "destructive" });
+    }
+  };
+
+  const handleRequestRereview = async () => {
+    if (!reviewId) return;
+    try {
+      await rereviewMut.mutateAsync({ id: reviewId });
+      toast({
+        title: "Re-review requested",
+        description: "Registration set to pending and profile unpublished until re-approved.",
+      });
+      closeReview();
+    } catch (e: any) {
+      toast({ title: "Re-review request failed", description: e?.message || "", variant: "destructive" });
     }
   };
 
@@ -504,6 +520,21 @@ export default function BrokerRegistrationsQueue() {
                 </section>
               )}
 
+              {reg.status === "approved" &&
+                reg.updatedAt &&
+                reg.reviewedAt &&
+                new Date(reg.updatedAt) > new Date(reg.reviewedAt) && (
+                  <div className="flex items-start gap-2 rounded-md border border-yellow-300 bg-yellow-50 dark:border-yellow-700 dark:bg-yellow-950/30 p-3 text-sm">
+                    <AlertCircle className="h-4 w-4 text-yellow-600 dark:text-yellow-400 shrink-0 mt-0.5" />
+                    <div>
+                      <span className="font-medium text-yellow-800 dark:text-yellow-300">Credentials updated since last review.</span>
+                      <span className="text-yellow-700 dark:text-yellow-400 ml-1">
+                        Use "Request Re-review" to revert to pending and pause the profile until re-approved.
+                      </span>
+                    </div>
+                  </div>
+                )}
+
               {reg.status === "pending" && (
                 <>
                   <section>
@@ -581,13 +612,30 @@ export default function BrokerRegistrationsQueue() {
               </>
             )}
             {reg?.status === "approved" && (
-              <Button
-                variant="secondary"
-                onClick={handleSuspend}
-                disabled={suspendMut.isPending || !rejectReason.trim()}
-              >
-                Suspend
-              </Button>
+              <>
+                {reg.updatedAt && reg.reviewedAt && new Date(reg.updatedAt) > new Date(reg.reviewedAt) && (
+                  <Button
+                    variant="outline"
+                    onClick={handleRequestRereview}
+                    disabled={rereviewMut.isPending}
+                    className="text-yellow-700 border-yellow-400 hover:bg-yellow-50 dark:text-yellow-400 dark:border-yellow-600 dark:hover:bg-yellow-950/30"
+                  >
+                    {rereviewMut.isPending ? (
+                      <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                    ) : (
+                      <RefreshCw className="h-3 w-3 mr-1" />
+                    )}
+                    Request Re-review
+                  </Button>
+                )}
+                <Button
+                  variant="secondary"
+                  onClick={handleSuspend}
+                  disabled={suspendMut.isPending || !rejectReason.trim()}
+                >
+                  Suspend
+                </Button>
+              </>
             )}
           </DialogFooter>
         </DialogContent>

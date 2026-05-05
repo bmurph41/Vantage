@@ -803,6 +803,61 @@ brokerAdminRouter.post("/registrations/:id/suspend", async (req: Request, res: R
   }
 });
 
+// ── Request re-review (admin flags approved broker for re-verification) ───────
+
+brokerAdminRouter.post("/registrations/:id/request-rereview", async (req: Request, res: Response) => {
+  try {
+    const result = await db.transaction(async (tx) => {
+      const [reg] = await tx
+        .select()
+        .from(brokerRegistrations)
+        .where(eq(brokerRegistrations.id, req.params.id));
+
+      if (!reg) {
+        throw Object.assign(new Error("Registration not found."), { status: 404, code: "not_found" });
+      }
+      if (reg.status !== "approved") {
+        throw Object.assign(
+          new Error("Only approved registrations can be flagged for re-review."),
+          { status: 409, code: "invalid_state" },
+        );
+      }
+
+      // Enforce that credentials were updated after the last review
+      if (
+        !reg.updatedAt ||
+        !reg.reviewedAt ||
+        new Date(reg.updatedAt) <= new Date(reg.reviewedAt)
+      ) {
+        throw Object.assign(
+          new Error("Credentials have not been updated since the last review. No re-review needed."),
+          { status: 409, code: "no_credential_change" },
+        );
+      }
+
+      const [updatedReg] = await tx
+        .update(brokerRegistrations)
+        .set({ status: "pending", updatedAt: new Date() })
+        .where(eq(brokerRegistrations.id, reg.id))
+        .returning();
+
+      await tx
+        .update(brokerProfiles)
+        .set({ isPublishable: false, updatedAt: new Date() })
+        .where(eq(brokerProfiles.registrationId, reg.id));
+
+      return { registration: updatedReg };
+    });
+
+    return res.json(result);
+  } catch (err: any) {
+    console.error("[broker-admin] request-rereview error:", err);
+    return res
+      .status(err?.status || 500)
+      .json({ error: err?.code || "server_error", message: err?.message || "Server error" });
+  }
+});
+
 // ── Manual re-verification trigger ───────────────────────────────────────────
 
 brokerAdminRouter.post("/registrations/:id/reverify", async (req: Request, res: Response) => {

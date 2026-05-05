@@ -136,6 +136,20 @@ export function useSuspendRegistration() {
   });
 }
 
+export function useRequestRereview() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (vars: { id: string }) => {
+      const res = await apiRequest("POST", `${BASE}/registrations/${vars.id}/request-rereview`, {});
+      return res.json();
+    },
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: brokerAdminKeys().all });
+      qc.invalidateQueries({ queryKey: brokerAdminKeys().detail(vars.id) });
+    },
+  });
+}
+
 export function useReverifyRegistration() {
   const qc = useQueryClient();
   return useMutation({

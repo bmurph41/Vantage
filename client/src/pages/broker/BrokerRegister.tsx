@@ -31,6 +31,8 @@ interface Registration {
   linkedinUrl: string | null;
   rejectionReason: string | null;
   submittedAt: string;
+  reviewedAt: string | null;
+  updatedAt: string | null;
 }
 
 interface FormState {
@@ -455,6 +457,7 @@ export default function BrokerRegister() {
 
   // Pending: show read-only status card (no editing mid-review)
   if (reg && reg.status === "pending") {
+    const isRereview = !!reg.reviewedAt;
     return (
       <div className="max-w-2xl mx-auto p-6 space-y-4">
         <Card>
@@ -469,9 +472,23 @@ export default function BrokerRegister() {
               <span className="text-sm text-muted-foreground">Status:</span>
               <Badge variant="secondary">pending</Badge>
             </div>
-            <p className="text-sm text-muted-foreground">
-              Your registration is under review. You will be notified when an admin reviews it.
-            </p>
+            {isRereview ? (
+              <div className="flex items-start gap-2 rounded-md border border-yellow-300 bg-yellow-50 dark:border-yellow-700 dark:bg-yellow-950/30 p-3 text-sm">
+                <svg className="h-4 w-4 text-yellow-600 dark:text-yellow-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+                </svg>
+                <div>
+                  <div className="font-medium text-yellow-800 dark:text-yellow-300">Your credentials are under re-review.</div>
+                  <div className="text-yellow-700 dark:text-yellow-400 mt-0.5">
+                    An admin has flagged your updated license information for re-verification. Your profile is temporarily unpublished until the review is complete.
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Your registration is under review. You will be notified when an admin reviews it.
+              </p>
+            )}
 
             {meData?.id && (
               <div className="mt-2">
