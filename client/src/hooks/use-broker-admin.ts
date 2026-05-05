@@ -48,6 +48,16 @@ export interface PaginatedRegistrations {
   pagination: { page: number; pageSize: number; total: number; totalPages: number };
 }
 
+export interface BrokerCredentialAuditEntry {
+  id: string;
+  registrationId: string;
+  changedBy: string;
+  changedAt: string;
+  fieldName: string;
+  oldValue: string | null;
+  newValue: string | null;
+}
+
 const BASE = "/api/admin/broker";
 
 export function brokerAdminKeys() {
@@ -56,6 +66,7 @@ export function brokerAdminKeys() {
     list: (status: BrokerRegistrationStatus, page: number, pageSize: number) =>
       ["broker-admin", "registrations", status, page, pageSize] as const,
     detail: (id: string) => ["broker-admin", "registration", id] as const,
+    audit: (id: string) => ["broker-admin", "registration", id, "audit"] as const,
   };
 }
 
@@ -146,6 +157,18 @@ export function useRequestRereview() {
     onSuccess: (_data, vars) => {
       qc.invalidateQueries({ queryKey: brokerAdminKeys().all });
       qc.invalidateQueries({ queryKey: brokerAdminKeys().detail(vars.id) });
+    },
+  });
+}
+
+export function useBrokerCredentialAudit(id: string | null) {
+  return useQuery<{ audit: BrokerCredentialAuditEntry[] }>({
+    queryKey: brokerAdminKeys().audit(id || ""),
+    enabled: !!id,
+    queryFn: async () => {
+      const res = await fetch(`${BASE}/registrations/${id}/audit`, { credentials: "include" });
+      if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`);
+      return res.json();
     },
   });
 }

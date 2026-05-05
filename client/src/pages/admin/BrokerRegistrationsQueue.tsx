@@ -30,6 +30,7 @@ import {
 import {
   useBrokerRegistrations,
   useBrokerRegistrationDetail,
+  useBrokerCredentialAudit,
   useApproveRegistration,
   useRejectRegistration,
   useSuspendRegistration,
@@ -37,7 +38,7 @@ import {
   useRequestRereview,
   type BrokerRegistrationStatus,
 } from "@/hooks/use-broker-admin";
-import { Loader2, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, CheckCircle2, AlertCircle, Clock, ShieldQuestion, RefreshCw } from "lucide-react";
+import { Loader2, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, CheckCircle2, AlertCircle, Clock, ShieldQuestion, RefreshCw, History } from "lucide-react";
 
 const TABS: { label: string; value: BrokerRegistrationStatus }[] = [
   { label: "Pending", value: "pending" },
@@ -151,6 +152,7 @@ export default function BrokerRegistrationsQueue() {
 
   const { data, isLoading } = useBrokerRegistrations({ status, page, pageSize: PAGE_SIZE });
   const { data: detail, isLoading: loadingDetail } = useBrokerRegistrationDetail(reviewId);
+  const { data: auditData } = useBrokerCredentialAudit(reviewId);
 
   const approveMut = useApproveRegistration();
   const rejectMut = useRejectRegistration();
@@ -516,6 +518,43 @@ export default function BrokerRegistrationsQueue() {
                   <h3 className="text-sm font-semibold mb-1">Rejection Reason</h3>
                   <div className="text-sm border rounded p-2 bg-destructive/10">
                     {reg.rejectionReason}
+                  </div>
+                </section>
+              )}
+
+              {auditData && auditData.audit.length > 0 && (
+                <section>
+                  <h3 className="text-sm font-semibold mb-2 flex items-center gap-1.5">
+                    <History className="h-3.5 w-3.5" />
+                    Credential Change History
+                  </h3>
+                  <div className="border rounded overflow-hidden text-xs">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="bg-muted/50 border-b">
+                          <th className="text-left px-3 py-1.5 text-muted-foreground font-medium">Field</th>
+                          <th className="text-left px-3 py-1.5 text-muted-foreground font-medium">Old Value</th>
+                          <th className="text-left px-3 py-1.5 text-muted-foreground font-medium">New Value</th>
+                          <th className="text-left px-3 py-1.5 text-muted-foreground font-medium">Changed</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {auditData.audit.map((entry) => (
+                          <tr key={entry.id} className="border-b last:border-0 hover:bg-muted/20">
+                            <td className="px-3 py-1.5 font-mono text-[11px] text-muted-foreground">{entry.fieldName}</td>
+                            <td className="px-3 py-1.5 max-w-[120px] truncate" title={entry.oldValue ?? "—"}>
+                              {entry.oldValue ?? <span className="text-muted-foreground">—</span>}
+                            </td>
+                            <td className="px-3 py-1.5 max-w-[120px] truncate font-medium" title={entry.newValue ?? "—"}>
+                              {entry.newValue ?? <span className="text-muted-foreground">—</span>}
+                            </td>
+                            <td className="px-3 py-1.5 whitespace-nowrap text-muted-foreground">
+                              {formatRelative(entry.changedAt)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
                 </section>
               )}

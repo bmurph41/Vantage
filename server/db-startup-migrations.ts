@@ -19840,6 +19840,21 @@ const MIGRATIONS: Migration[] = [
   // broker_profiles — split legal name columns (mirror of broker_registrations)
   { name: "broker_profiles: add legal_first_name", sql: `ALTER TABLE broker_profiles ADD COLUMN IF NOT EXISTS legal_first_name varchar(128)` },
   { name: "broker_profiles: add legal_last_name", sql: `ALTER TABLE broker_profiles ADD COLUMN IF NOT EXISTS legal_last_name varchar(128)` },
+  // broker_credential_audit — new table for credential change audit trail
+  {
+    name: "broker_credential_audit: create table",
+    sql: `CREATE TABLE IF NOT EXISTS broker_credential_audit (
+      id text PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      registration_id text NOT NULL REFERENCES broker_registrations(id) ON DELETE CASCADE,
+      changed_by varchar NOT NULL,
+      changed_at timestamp NOT NULL DEFAULT now(),
+      field_name varchar(64) NOT NULL,
+      old_value text,
+      new_value text
+    )`
+  },
+  { name: "broker_credential_audit: add index broker_credential_audit_reg_idx", sql: `CREATE INDEX IF NOT EXISTS broker_credential_audit_reg_idx ON broker_credential_audit (registration_id)` },
+  { name: "broker_credential_audit: add index broker_credential_audit_changed_at_idx", sql: `CREATE INDEX IF NOT EXISTS broker_credential_audit_changed_at_idx ON broker_credential_audit (registration_id, changed_at)` },
 ];
 
 /**

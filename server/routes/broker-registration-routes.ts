@@ -16,7 +16,7 @@
 
 import { Router, Request, Response, NextFunction } from "express";
 import { db } from "../db";
-import { brokerRegistrations, brokerProfiles, users, crmNotifications, organizationUserRoles } from "@shared/schema";
+import { brokerRegistrations, brokerProfiles, users, crmNotifications, organizationUserRoles, brokerCredentialAudit } from "@shared/schema";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { verifyAndPersistLicense } from "../services/broker-license-verification";
 
@@ -458,6 +458,43 @@ brokerRegistrationRouter.patch("/me", async (req: Request, res: Response) => {
       .where(eq(brokerRegistrations.id, current.id))
       .returning();
 
+    // ── Audit log: write one row per changed credential field ─────────────────
+    if (current.status === "approved" || current.status === "suspended") {
+      const auditableFields = [
+        "legalFirstName",
+        "legalLastName",
+        "legalName",
+        "companyName",
+        "licenseNumber",
+        "licenseState",
+        "licenseExpiresAt",
+        "licenseDocumentUrl",
+      ] as const;
+
+      function normalizeAuditValue(value: unknown): string | null {
+        if (value == null) return null;
+        if (value instanceof Date) return value.toISOString().slice(0, 10);
+        const s = String(value);
+        if (/^\d{4}-\d{2}-\d{2}T/.test(s)) return s.slice(0, 10);
+        return s || null;
+      }
+
+      const auditRows = auditableFields
+        .filter((field) => field in updates)
+        .map((field) => ({
+          registrationId: current.id,
+          changedBy: ctx.userId,
+          fieldName: field,
+          oldValue: normalizeAuditValue((current as Record<string, unknown>)[field]),
+          newValue: normalizeAuditValue(updates[field]),
+        }))
+        .filter((row) => row.oldValue !== row.newValue);
+
+      if (auditRows.length > 0) {
+        await db.insert(brokerCredentialAudit).values(auditRows);
+      }
+    }
+
     // Propagate credential changes to the linked broker_profiles row if it exists
     const profileUpdates: Record<string, any> = {};
     if ("legalName" in updates) profileUpdates.displayName = updated.legalName;
@@ -855,6 +892,22 @@ brokerAdminRouter.post("/registrations/:id/request-rereview", async (req: Reques
     return res
       .status(err?.status || 500)
       .json({ error: err?.code || "server_error", message: err?.message || "Server error" });
+  }
+});
+
+// ── Credential audit log ──────────────────────────────────────────────────────
+
+brokerAdminRouter.get("/registrations/:id/audit", async (req: Request, res: Response) => {
+  try {
+    const rows = await db
+      .select()
+      .from(brokerCredentialAudit)
+      .where(eq(brokerCredentialAudit.registrationId, req.params.id))
+      .orderBy(desc(brokerCredentialAudit.changedAt));
+    return res.json({ audit: rows });
+  } catch (err: any) {
+    console.error("[broker-admin] GET /registrations/:id/audit error:", err);
+    return res.status(500).json({ error: "server_error", message: err?.message || "Server error" });
   }
 });
 

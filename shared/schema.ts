@@ -20083,6 +20083,22 @@ export const brokerResponseSamples = pgTable("broker_response_samples", {
   uniqThread: uniqueIndex("broker_response_samples_thread_unique").on(table.threadType, table.threadId),
 }));
 
+export const brokerCredentialAudit = pgTable("broker_credential_audit", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()::text`),
+  registrationId: varchar("registration_id").notNull().references(() => brokerRegistrations.id, { onDelete: "cascade" }),
+  changedBy: varchar("changed_by").notNull(),
+  changedAt: timestamp("changed_at").notNull().defaultNow(),
+  fieldName: varchar("field_name", { length: 64 }).notNull(),
+  oldValue: text("old_value"),
+  newValue: text("new_value"),
+}, (table) => ({
+  regIdx: index("broker_credential_audit_reg_idx").on(table.registrationId),
+  changedAtIdx: index("broker_credential_audit_changed_at_idx").on(table.registrationId, table.changedAt),
+}));
+
+export type BrokerCredentialAudit = typeof brokerCredentialAudit.$inferSelect;
+export type InsertBrokerCredentialAudit = typeof brokerCredentialAudit.$inferInsert;
+
 export type BrokerRegistration = typeof brokerRegistrations.$inferSelect;
 export type InsertBrokerRegistration = typeof brokerRegistrations.$inferInsert;
 export type BrokerProfile = typeof brokerProfiles.$inferSelect;
