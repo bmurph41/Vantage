@@ -29,7 +29,7 @@ export interface DealContactEntry {
   phone: string;
   email: string;
   contactType: "seller" | "buyer" | "seller_counsel" | "buyer_counsel" | "title_company" | "attorney" | "broker" | "lender" | "other";
-  teamType: "seller_team" | "buyer_team" | "mutual";
+  teamType: "seller_team" | "buyer_team" | "mutual" | "broker" | "lender";
   linkedContactId?: string; // CRM contact ID if linked
 }
 
@@ -47,14 +47,16 @@ const CONTACT_TYPES = [
   { value: "buyer_counsel", label: "Buyer Counsel", icon: Scale, defaultTeam: "buyer_team" as const, color: "bg-indigo-50 text-indigo-700 border-indigo-200" },
   { value: "title_company", label: "Title Company", icon: ShieldCheck, defaultTeam: "mutual" as const, color: "bg-teal-50 text-teal-700 border-teal-200" },
   { value: "attorney", label: "Attorney", icon: Scale, defaultTeam: "mutual" as const, color: "bg-purple-50 text-purple-700 border-purple-200" },
-  { value: "broker", label: "Broker", icon: Briefcase, defaultTeam: "mutual" as const, color: "bg-amber-50 text-amber-700 border-amber-200" },
-  { value: "lender", label: "Lender", icon: Landmark, defaultTeam: "mutual" as const, color: "bg-green-50 text-green-700 border-green-200" },
+  { value: "broker", label: "Broker", icon: Briefcase, defaultTeam: "broker" as const, color: "bg-amber-50 text-amber-700 border-amber-200" },
+  { value: "lender", label: "Lender", icon: Landmark, defaultTeam: "lender" as const, color: "bg-green-50 text-green-700 border-green-200" },
   { value: "other", label: "Other", icon: MoreHorizontal, defaultTeam: "mutual" as const, color: "bg-gray-50 text-gray-700 border-gray-200" },
 ] as const;
 
 const TEAM_TYPES = [
   { value: "seller_team", label: "Seller Team" },
   { value: "buyer_team", label: "Buyer Team" },
+  { value: "broker", label: "Broker" },
+  { value: "lender", label: "Lender" },
   { value: "mutual", label: "Mutual" },
 ] as const;
 
@@ -219,6 +221,8 @@ function ContactCard({
 function KeyContactList({ contacts }: { contacts: DealContactEntry[] }) {
   const sellerTeam = contacts.filter((c) => c.teamType === "seller_team");
   const buyerTeam = contacts.filter((c) => c.teamType === "buyer_team");
+  const brokerTeam = contacts.filter((c) => c.teamType === "broker");
+  const lenderTeam = contacts.filter((c) => c.teamType === "lender");
   const mutual = contacts.filter((c) => c.teamType === "mutual");
 
   const renderTeamSection = (title: string, members: DealContactEntry[], color: string) => {
@@ -247,6 +251,8 @@ function KeyContactList({ contacts }: { contacts: DealContactEntry[] }) {
     <div className="space-y-4 print:space-y-3">
       {renderTeamSection("Seller Team", sellerTeam, "text-red-600")}
       {renderTeamSection("Buyer Team", buyerTeam, "text-blue-600")}
+      {renderTeamSection("Broker", brokerTeam, "text-amber-600")}
+      {renderTeamSection("Lender", lenderTeam, "text-green-600")}
       {renderTeamSection("Mutual", mutual, "text-gray-600")}
       {contacts.length === 0 && (
         <p className="text-xs text-muted-foreground text-center py-4">No deal contacts added</p>

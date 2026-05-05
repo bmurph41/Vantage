@@ -526,10 +526,10 @@ function RelationshipsSection({
   });
 
   // Broker contacts from deal team — de-duplicate against the primary contact and against each other
-  // Match on teamType (deal-level role) OR contactTag (contact-level tag via joined crmContacts)
+  // Match on teamType (deal-level role), contactType (deal-level type), OR contactTag (contact-level tag via joined crmContacts)
   const primaryEmail = relatedContact?.email?.toLowerCase() ?? null;
   const brokerDealContacts = (dealContactList ?? []).filter((dc: any) => {
-    const isBroker = dc.teamType === "broker" || dc.contactTag === "broker";
+    const isBroker = dc.teamType === "broker" || dc.contactType === "broker" || dc.contactTag === "broker";
     if (!isBroker || !dc.email) return false;
     if (dc.email.toLowerCase() === primaryEmail) return false;
     return true;
