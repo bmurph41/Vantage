@@ -72,13 +72,18 @@ function KV({ label, value, mono }: { label: string; value: string; mono?: boole
   );
 }
 
+interface ContactEmailResponse {
+  contact?: { email?: string | null } | null;
+  email?: string | null;
+}
+
 function BrokerSection({ brokerId }: { brokerId: string }) {
-  const { data: contactData } = useQuery<any>({
+  const { data: contactData } = useQuery<ContactEmailResponse | null>({
     queryKey: ['/api/crm/contacts', brokerId],
     queryFn: async () => {
       const res = await fetch(`/api/crm/contacts/${brokerId}`, { credentials: 'include' });
       if (!res.ok) return null;
-      return res.json();
+      return res.json() as Promise<ContactEmailResponse>;
     },
     enabled: !!brokerId,
     staleTime: 120_000,

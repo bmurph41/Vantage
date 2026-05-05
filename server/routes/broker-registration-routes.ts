@@ -119,6 +119,32 @@ brokerRegistrationRouter.get("/profile/:profileId", async (req: Request, res: Re
   }
 });
 
+brokerRegistrationRouter.get("/profile/by-email", async (req: Request, res: Response) => {
+  try {
+    const ctx = getUserContext(req);
+    if (!ctx) return res.status(401).json({ error: "unauthorized", message: "Not authenticated." });
+
+    const email = typeof req.query.email === "string" ? req.query.email.trim() : "";
+    if (!email) return res.json({ profile: null });
+
+    const rows = await db
+      .select()
+      .from(brokerProfiles)
+      .where(
+        and(
+          eq(brokerProfiles.contactEmail, email),
+          eq(brokerProfiles.orgId, ctx.orgId),
+        ),
+      )
+      .limit(1);
+
+    return res.json({ profile: rows[0] || null });
+  } catch (err: any) {
+    console.error("[broker-registration] GET /profile/by-email error:", err);
+    return res.status(500).json({ error: "server_error", message: err?.message || "Server error" });
+  }
+});
+
 // ── Registration Lookup Endpoints (fall-back when no profile exists yet) ─────
 
 brokerRegistrationRouter.get("/by-user/:userId", async (req: Request, res: Response) => {

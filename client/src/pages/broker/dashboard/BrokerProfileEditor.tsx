@@ -14,6 +14,7 @@ import {
   useUnpublishMyProfile,
 } from "@/hooks/use-broker-dashboard";
 import BrokerCriteriaEditor from "@/components/broker/BrokerCriteriaEditor";
+import { BrokerCredentialBadge } from "@/components/broker/BrokerCredentialBadge";
 import type { BrokerCriteria } from "@shared/broker/criteria";
 
 export default function BrokerProfileEditor() {
@@ -85,6 +86,10 @@ export default function BrokerProfileEditor() {
   return (
     <BrokerDashboardLayout>
       <div className="space-y-6 max-w-3xl">
+        {data?.profile?.id && (
+          <BrokerCredentialBadge brokerProfileId={data.profile.id} />
+        )}
+
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-semibold">Profile</h1>
           <div className="flex gap-2">

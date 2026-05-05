@@ -2,63 +2,125 @@ import { useQuery } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Loader2, Award, Building2, FileText, MapPin } from "lucide-react";
+import type { BrokerProfile, BrokerRegistration } from "@shared/schema";
 
 /**
- * Normalised shape the badge renders from — works for both broker_profiles
- * (post-approval) and broker_registrations (pre-approval fallback).
+ * Normalised credential shape rendered by the badge — derived from either a
+ * broker_profiles row (post-approval) or a broker_registrations row (pre-approval).
  */
 interface BrokerCredentialData {
   displayName: string;
-  companyName?: string | null;
-  licenseNumber?: string | null;
-  licenseState?: string | null;
-  /** "approved" | "pending" | "suspended" | "rejected" — or "verified" for profiles */
-  status: string;
+  companyName: string | null;
+  licenseNumber: string | null;
+  licenseState: string | null;
+  /** "verified" for approved profiles; registration status for pending/suspended/rejected */
+  status: "verified" | "pending" | "suspended" | "rejected" | "approved";
 }
 
 interface Props {
-  /** PRIMARY: id from broker_profiles table (approved broker) */
+  /** PRIMARY: id from broker_profiles table — fetched via /profile/:profileId */
   brokerProfileId?: string;
-  /** SECONDARY: platform userId — resolves profile then falls back to registration */
+  /** SECONDARY: platform userId — tries profile then falls back to registration */
   userId?: string;
-  /** FALLBACK: CRM contact email — for external contacts without platform accounts */
+  /** FALLBACK: CRM contact email — resolves profile by contactEmail field, then registration */
   contactEmail?: string;
 }
 
 const STATUS_DISPLAY: Record<string, { label: string; className: string }> = {
-  verified: { label: "Verified", className: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200" },
-  approved: { label: "Verified", className: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200" },
-  pending: { label: "Pending Verification", className: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200" },
-  suspended: { label: "Suspended", className: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200" },
-  rejected: { label: "Not Verified", className: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300" },
+  verified: {
+    label: "Verified",
+    className: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200",
+  },
+  approved: {
+    label: "Verified",
+    className: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200",
+  },
+  pending: {
+    label: "Pending Verification",
+    className: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
+  },
+  suspended: {
+    label: "Suspended",
+    className: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
+  },
+  rejected: {
+    label: "Not Verified",
+    className: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
+  },
 };
 
-function normaliseProfile(p: any): BrokerCredentialData {
-  const name =
+function fromProfile(p: BrokerProfile): BrokerCredentialData {
+  const displayName =
     p.legalFirstName && p.legalLastName
       ? `${p.legalFirstName} ${p.legalLastName}`
-      : p.displayName || p.legalName || "Broker";
+      : p.displayName;
   return {
-    displayName: name,
-    companyName: p.companyName ?? null,
+    displayName,
+    companyName: p.companyName,
     licenseNumber: p.licenseNumber ?? null,
     licenseState: p.licenseState ?? null,
     status: "verified",
   };
 }
 
-function normaliseRegistration(r: any): BrokerCredentialData {
-  const name =
+function fromRegistration(r: BrokerRegistration): BrokerCredentialData {
+  const displayName =
     r.legalFirstName && r.legalLastName
       ? `${r.legalFirstName} ${r.legalLastName}`
-      : r.legalName || "Broker";
+      : r.legalName;
   return {
-    displayName: name,
-    companyName: r.companyName ?? null,
+    displayName,
+    companyName: r.companyName,
     licenseNumber: r.licenseNumber ?? null,
     licenseState: r.licenseState ?? null,
-    status: r.status ?? "pending",
+    status: (r.status as BrokerCredentialData["status"]) ?? "pending",
   };
+}
+
+async function fetchProfile(profileId: string): Promise<BrokerCredentialData | null> {
+  const res = await fetch(
+    `/api/broker-registration/profile/${encodeURIComponent(profileId)}`,
+    { credentials: "include" },
+  );
+  if (!res.ok) return null;
+  const json = await res.json() as { profile: BrokerProfile | null };
+  return json.profile ? fromProfile(json.profile) : null;
+}
+
+async function fetchProfileByUser(userId: string): Promise<BrokerCredentialData | null> {
+  const profRes = await fetch(
+    `/api/broker-registration/profile/by-user/${encodeURIComponent(userId)}`,
+    { credentials: "include" },
+  );
+  if (profRes.ok) {
+    const json = await profRes.json() as { profile: BrokerProfile | null };
+    if (json.profile) return fromProfile(json.profile);
+  }
+  const regRes = await fetch(
+    `/api/broker-registration/by-user/${encodeURIComponent(userId)}`,
+    { credentials: "include" },
+  );
+  if (!regRes.ok) return null;
+  const regJson = await regRes.json() as { registration: BrokerRegistration | null };
+  return regJson.registration ? fromRegistration(regJson.registration) : null;
+}
+
+async function fetchByEmail(email: string): Promise<BrokerCredentialData | null> {
+  const profRes = await fetch(
+    `/api/broker-registration/profile/by-email?email=${encodeURIComponent(email)}`,
+    { credentials: "include" },
+  );
+  if (profRes.ok) {
+    const json = await profRes.json() as { profile: BrokerProfile | null };
+    if (json.profile) return fromProfile(json.profile);
+  }
+  const regRes = await fetch(
+    `/api/broker-registration/by-email?email=${encodeURIComponent(email)}`,
+    { credentials: "include" },
+  );
+  if (!regRes.ok) return null;
+  const regJson = await regRes.json() as { registration: BrokerRegistration | null };
+  return regJson.registration ? fromRegistration(regJson.registration) : null;
 }
 
 export function BrokerCredentialBadge({ brokerProfileId, userId, contactEmail }: Props) {
@@ -72,47 +134,11 @@ export function BrokerCredentialBadge({ brokerProfileId, userId, contactEmail }:
 
   const { data, isLoading } = useQuery<BrokerCredentialData | null>({
     queryKey,
-    queryFn: async () => {
-      if (brokerProfileId) {
-        const res = await fetch(
-          `/api/broker-registration/profile/${encodeURIComponent(brokerProfileId)}`,
-          { credentials: "include" },
-        );
-        if (!res.ok) return null;
-        const json = await res.json();
-        return json.profile ? normaliseProfile(json.profile) : null;
-      }
-
-      if (userId) {
-        // Try profile first (approved broker); fall back to registration status.
-        const profRes = await fetch(
-          `/api/broker-registration/profile/by-user/${encodeURIComponent(userId)}`,
-          { credentials: "include" },
-        );
-        if (profRes.ok) {
-          const json = await profRes.json();
-          if (json.profile) return normaliseProfile(json.profile);
-        }
-        const regRes = await fetch(
-          `/api/broker-registration/by-user/${encodeURIComponent(userId)}`,
-          { credentials: "include" },
-        );
-        if (!regRes.ok) return null;
-        const regJson = await regRes.json();
-        return regJson.registration ? normaliseRegistration(regJson.registration) : null;
-      }
-
-      if (contactEmail) {
-        const res = await fetch(
-          `/api/broker-registration/by-email?email=${encodeURIComponent(contactEmail)}`,
-          { credentials: "include" },
-        );
-        if (!res.ok) return null;
-        const json = await res.json();
-        return json.registration ? normaliseRegistration(json.registration) : null;
-      }
-
-      return null;
+    queryFn: () => {
+      if (brokerProfileId) return fetchProfile(brokerProfileId);
+      if (userId) return fetchProfileByUser(userId);
+      if (contactEmail) return fetchByEmail(contactEmail);
+      return Promise.resolve(null);
     },
     enabled,
     staleTime: 60_000,
@@ -129,7 +155,7 @@ export function BrokerCredentialBadge({ brokerProfileId, userId, contactEmail }:
 
   if (!data) return null;
 
-  const statusInfo = STATUS_DISPLAY[data.status] || STATUS_DISPLAY.pending;
+  const statusInfo = STATUS_DISPLAY[data.status] ?? STATUS_DISPLAY.pending;
 
   return (
     <Card className="border-emerald-200 dark:border-emerald-800 bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950 dark:to-teal-950">
@@ -156,7 +182,7 @@ export function BrokerCredentialBadge({ brokerProfileId, userId, contactEmail }:
               <span>{data.companyName}</span>
             </div>
           )}
-          {data.licenseNumber && (
+          {data.licenseNumber ? (
             <div className="flex items-center gap-1.5 text-muted-foreground">
               <FileText className="h-3 w-3 shrink-0" />
               <span>License #{data.licenseNumber}</span>
@@ -167,8 +193,7 @@ export function BrokerCredentialBadge({ brokerProfileId, userId, contactEmail }:
                 </span>
               )}
             </div>
-          )}
-          {!data.licenseNumber && (
+          ) : (
             <p className="text-muted-foreground italic">No license number on file</p>
           )}
         </div>
