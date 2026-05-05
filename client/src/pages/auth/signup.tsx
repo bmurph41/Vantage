@@ -514,6 +514,7 @@ export default function SignupPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/bootstrap"] });
 
       // Auto-submit broker registration if role is broker and credentials were entered
+      let brokerRegFailed = false;
       if (selectedRole === 'broker' && brokerCreds.legalFirstName && brokerCreds.legalLastName && brokerCreds.companyName && accountData?.email) {
         try {
           await apiRequest("POST", "/api/broker-registration", {
@@ -527,28 +528,23 @@ export default function SignupPage() {
             licenseExpiresAt: brokerCreds.licenseExpiresAt || null,
           });
         } catch {
-          // Non-fatal — registration can be completed later on /broker/register
-          toast({
-            title: "Heads up",
-            description: "Your account was created, but your broker credentials couldn't be submitted automatically. Visit Broker Registration to submit them.",
-            variant: "default",
-          });
+          brokerRegFailed = true;
         }
       }
 
-      if (selectedPacks.length > 0) {
-        toast({
-          title: "Account created!",
-          description: "Setting up your packs...",
-        });
-        setLocation("/settings/packs?setup=true");
-      } else {
-        toast({
-          title: "Welcome to Vantage!",
-          description: "Your account has been created. Start by selecting your packs.",
-        });
-        setLocation("/settings/packs");
-      }
+      const destination = selectedPacks.length > 0 ? "/settings/packs?setup=true" : "/settings/packs";
+      const brokerNote = brokerRegFailed
+        ? " Your broker credentials couldn't be submitted automatically — visit Broker Registration to complete them."
+        : selectedRole === 'broker'
+        ? " Your broker credentials have been submitted for admin review."
+        : "";
+      toast({
+        title: selectedPacks.length > 0 ? "Account created! Setting up your packs…" : "Welcome to Vantage!",
+        description: (selectedPacks.length > 0
+          ? "Your packs are being configured."
+          : "Your account has been created. Start by selecting your packs.") + brokerNote,
+      });
+      setLocation(destination);
     },
     onError: (error: any) => {
       toast({

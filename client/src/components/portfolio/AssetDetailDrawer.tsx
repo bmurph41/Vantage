@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { BrokerCredentialBadge } from '@/components/broker/BrokerCredentialBadge';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -71,6 +72,27 @@ function KV({ label, value, mono }: { label: string; value: string; mono?: boole
   );
 }
 
+function BrokerSection({ brokerId }: { brokerId: string }) {
+  const { data: contactData } = useQuery<any>({
+    queryKey: ['/api/crm/contacts', brokerId],
+    queryFn: async () => {
+      const res = await fetch(`/api/crm/contacts/${brokerId}`, { credentials: 'include' });
+      if (!res.ok) return null;
+      return res.json();
+    },
+    enabled: !!brokerId,
+    staleTime: 120_000,
+  });
+  const email = contactData?.contact?.email ?? contactData?.email ?? null;
+  if (!email) return null;
+  return (
+    <div>
+      <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-2">Introducing Broker</p>
+      <BrokerCredentialBadge contactEmail={email} />
+    </div>
+  );
+}
+
 function OverviewTab({ data }: { data: any }) {
   const { project, t12, capitalStack, returns } = data;
   const holdElapsed = project.createdAt
@@ -128,6 +150,11 @@ function OverviewTab({ data }: { data: any }) {
             </ResponsiveContainer>
           </CardContent>
         </Card>
+      )}
+
+      {/* Broker Credentials — shown when the project has an introducing broker */}
+      {project.brokerId && (
+        <BrokerSection brokerId={project.brokerId} />
       )}
 
       {/* Recent Extractions */}

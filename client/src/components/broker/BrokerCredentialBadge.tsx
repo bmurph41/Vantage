@@ -22,11 +22,11 @@ interface Props {
   contactEmail?: string;
 }
 
-const STATUS_COLORS: Record<string, string> = {
-  approved: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200",
-  pending: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
-  suspended: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
-  rejected: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
+const STATUS_DISPLAY: Record<string, { label: string; className: string }> = {
+  approved: { label: "Verified", className: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200" },
+  pending: { label: "Pending Verification", className: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200" },
+  suspended: { label: "Suspended", className: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200" },
+  rejected: { label: "Not Verified", className: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300" },
 };
 
 export function BrokerCredentialBadge({ userId, contactEmail }: Props) {
@@ -80,8 +80,8 @@ export function BrokerCredentialBadge({ userId, contactEmail }: Props) {
               Broker Credentials
             </span>
           </div>
-          <Badge className={`text-xs ${STATUS_COLORS[reg.status] || STATUS_COLORS.pending}`}>
-            {reg.status.charAt(0).toUpperCase() + reg.status.slice(1)}
+          <Badge className={`text-xs ${(STATUS_DISPLAY[reg.status] || STATUS_DISPLAY.pending).className}`}>
+            {(STATUS_DISPLAY[reg.status] || STATUS_DISPLAY.pending).label}
           </Badge>
         </div>
 

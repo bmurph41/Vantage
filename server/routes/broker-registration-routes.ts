@@ -155,6 +155,21 @@ brokerRegistrationRouter.post("/", async (req: Request, res: Response) => {
       });
     }
 
+    if (!licenseNumber || !licenseState || !licenseExpiresAt) {
+      return res.status(400).json({
+        error: "invalid_input",
+        message: "licenseNumber, licenseState, and licenseExpiresAt are required.",
+      });
+    }
+
+    const expiryDate = new Date(licenseExpiresAt);
+    if (isNaN(expiryDate.getTime()) || expiryDate <= new Date()) {
+      return res.status(400).json({
+        error: "invalid_input",
+        message: "licenseExpiresAt must be a valid future date.",
+      });
+    }
+
     // Check for an existing pending/approved row
     const existing = await db
       .select()
