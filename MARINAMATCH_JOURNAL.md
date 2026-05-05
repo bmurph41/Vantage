@@ -3498,5 +3498,155 @@ Closes Brett's lockout symptom (tier change via Stripe webhook now re-provisions
 
 **Memory index updated:** new entry between Portfolio rebuild master plan and `activatePack` trial-wipe bug — keeps the Phase D Fund Management cluster contiguous.
 
+## 2026-05-05 — Phase 0 PR-1 portfolio data backfill
+
+Closes Phase 0 PR-1 of the Portfolio rebuild master plan. The new
+6-tab dashboard's data layer now has actual snapshot rows backing
+it; future scenario saves auto-populate via a new publish hook;
+`capital_stacks` has the two columns needed for the debt-maturity
+wall + fixed/floating exposure panels.
+
+### Shipped (today's authorized work)
+
+- **`382d1f81` + `f0cdf791`** — `capital_stacks` 2-column migration.
+  `interest_rate_type` (varchar) + `maturity_date` (date) columns
+  added to live DB and `shared/schema.ts`. Both columns present and
+  correctly typed (verified via `information_schema.columns`).
+  Replit auto-commit pair; the second is a pure reorder of the
+  same fields next to other debt-related columns.
+- **`7a7fee12` "Git commit prior to merge"** — scenario-snapshot
+  hook helper landed: `server/services/scenario-snapshot-hook.ts`
+  (single export `triggerValuationSnapshot(orgId, projectId,
+  userId?, note?)`). Direct `createSnapshot` call with
+  `trigger='model_save'`, no debounce — scenario events are
+  deliberate user actions and one snapshot per event is correct.
+  Failure-isolated: caller does not need a try/catch. Plus 3
+  versioning service call sites: `createScenario` (line 93),
+  `updateScenario` createNewVersion branch (line 154),
+  `restoreVersion` (line 285).
+- **`132d5d4c` "Add a valuation snapshot when a scenario is
+  forked"** — 4th hook site: `forkScenarioVersion` in
+  `scenario-governance-service.ts` (line 315). Same helper. Auto-
+  commit message captured one of the five sites; the helper itself
+  + 3 of the 4 versioning sites landed under `7a7fee12`'s "Git
+  commit prior to merge" generic label.
+- **`adee8862` "Git commit prior to merge"** —
+  `valuation-timeline-service.ts:372` typo fix
+  (`rentRollEntries.monthlyRent` → `monthlyRate`). Pre-existing
+  bug. The Drizzle column ref pointed to a field that doesn't exist
+  on `rentRollEntries`; TypeScript silently allowed it because the
+  unrelated `marinaLeases` table at schema.ts:11002 has a
+  similarly-named `monthlyRent` field, so type inference
+  cross-resolved. At runtime, Drizzle interpolated the unknown
+  column ref as empty, producing `SUM()` with zero args →
+  PostgreSQL `function sum() does not exist`. Caught only because
+  this read path had never been exercised against real data
+  (`valuation_snapshots` had 0 rows org-wide before today).
+  Cross-codebase audit: this was the only site with the bad ref;
+  10 other sites across 8 files use `monthlyRate` correctly.
+- **`c1a651fd` "Git commit prior to merge"** —
+  `server/scripts/backfill-valuation-snapshots.ts` one-time
+  backfill. Filter: `WHERE purchase_price IS NOT NULL` to skip
+  data-empty rows that would produce Potemkin snapshots. Calls
+  `createSnapshot` directly per eligible project rather than
+  `triggerManualSync` (the latter iterates all projects regardless
+  of data quality, and `'model_save'` isn't even in its
+  `DataChangeSource` enum). `userId` omitted — confirmed optional
+  on `ValuationTimelineQuery` and `created_by` is nullable on the
+  snapshots table.
+- **Backfill run (2026-05-05).** 4/4 projects succeeded for test
+  org `cd3719c3` (Surfside 3 Marina, Oakdale Yacht Club, Sunset
+  Harbor Village Marina, 948 Florida Ave.). All snapshots
+  correctly document "no operating data yet" — `indicated_value`
+  NULL on all 4 (NOI=0 because rent_rolls/fuel/ship_store all
+  empty → `noi/capRate` formula at line 271 yields null);
+  `cap_rate` populated on 3 of 4 (sourced from `project.year1CapRate
+  / 100`); `irr` and `equity_multiple` NULL on all 4 (structural
+  gap — see follow-up below).
+
+### Three discovery-phase corrections to the original spec
+
+The original spec sketch had three signature mismatches against the
+actual service surfaces. Caught read-only before any code:
+- `notifyDataChange(orgId, projectId, source)` per spec → actual
+  signature is `notifyDataChange(event: DataChangeEvent)` AND
+  `'model_save'` isn't in `DataChangeSource` AND
+  `shouldSyncProject` has no branch for it. Decision: skip the
+  sync-service path entirely; call `createSnapshot` directly with
+  `trigger='model_save'`.
+- `triggerManualSync(orgId, userId)` doesn't filter by
+  `purchase_price`. Decision: filter at the script level, call
+  `createSnapshot` per eligible project.
+- `triggerManualSync` returns `{ projectsSynced }`, not
+  `{ snapshotsCreated }`. Decision: track per-project ✓/✗ in the
+  script directly, not via a return-shape contract.
+
+### Replit Agent autonomous activity (parallel, not directed from this session)
+
+Six unrelated commits landed during today's session window. None
+were directed from this conversation:
+
+- `9ae59921` — broker credential audit trail (task #344)
+- `f7f50eff` — BrokerCredentialBadge on deal detail (task #340)
+- `bace8845` (+ task #338 v3-v7, task #339) — broker credential
+  signup flow
+- `37736460` — task #350: admin emails on broker credential updates
+- `96c88bac` — broker re-review notifications
+- `9d9a1883` — analytics real-data + ship_store multi-tenancy
+
+Pattern observed and worth tracking: Replit Agent now operates a
+parallel task queue (#338-#350 broker credential chain) AND a
+checkpoint-replay mechanism (`9d9a1883` and `69bcf699` show
+Jan-15-2026 author dates but are recent main-branch commits) AND
+the auto-commit stub-messaging pattern (the "Git commit prior to
+merge" placeholder). Filing a session-observations memory rather
+than treating each as a one-off so the cumulative shape is visible
+next session.
+
+### Phase 0 — remaining work (deferred per discovery)
+
+- **`portfolio_assets` writer — DEFERRED entirely.** New dashboard
+  reads from `modeling_projects` + `valuation_snapshots` (verified
+  via grep in `portfolio-summary-routes.ts`). The canonical
+  roll-up `portfolio_assets` table exists for a future
+  architectural scenario but is not on the dashboard's read path
+  today. Original Phase 0 plan over-scoped this.
+- **`capital_stacks` UI capture for new columns — deferred to
+  PR-2.** The schema columns are live; the Debt Inputs UI doesn't
+  yet capture them. Not blocking dashboard rendering — defer.
+
+### Memories filed
+
+- `project_valuation_timeline_irr_moic_gap.md` (MEDIUM, ~4-6h,
+  FILE ONLY) — `valuation-timeline-service.ts:353-357` hardcodes
+  `irr/equityMultiple/cashOnCash: null`. Service has no returns
+  math. Portfolio dashboard Returns tiles will render NULL until
+  wired. Coordinate with `shared/exit/orchestrator-v2.ts` (already
+  has IRR/MOIC math for exit scenarios) and
+  `shared/finance/xirr.ts` primitive.
+
+### Memories status-updated
+
+- `project_capital_stacks_columns_migration.md` → **RESOLVED**
+- `project_portfolio_rebuild_plan.md` → annotated with Phase 0
+  PR-1 closed status
+
+### Next-session candidates (Brett picks)
+
+- **(a) Workspace audit kickoff** — `pro-forma-charts.tsx:454`
+  `noi=undefined` ReferenceError (~30 min) + shared
+  `<RequiresInputs>` empty-state wrapper for IRR Attribution +
+  Mark-to-Market (~1-2h).
+- **(b) Phase A fix-2b** — investigate whether
+  `crm-routes.ts:13957` `asset_classes` gate should exist at all
+  (~1-2h investigation + fix).
+- **(c) Multi-partner GP/LP modeling** — Phase 0 discovery (the 6
+  architectural questions, ~2-3h, no code).
+- **(d) `capital_stacks` UI capture** for `interest_rate_type` /
+  `maturity_date` in Debt Inputs (~1h, completes PR-2 of Phase 0).
+- **(e) Replit Agent operational review** — investigate
+  auto-commit pattern, audit today's parallel commits, decide on
+  memory-filing policy for autonomous parallel work.
+
 
 
