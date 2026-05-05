@@ -64,13 +64,34 @@ export function requireAdminInline(req: Request, res: Response, next: NextFuncti
 
 export const brokerRegistrationRouter = Router();
 
+brokerRegistrationRouter.get("/by-email", async (req: Request, res: Response) => {
+  try {
+    const email = String(req.query.email || "").toLowerCase().trim();
+    if (!email) return res.json({ registration: null });
+
+    const rows = await db
+      .select()
+      .from(brokerRegistrations)
+      .where(sql`lower(${brokerRegistrations.email}) = ${email}`)
+      .orderBy(desc(brokerRegistrations.submittedAt));
+
+    const current = rows.find((r) => r.status !== "rejected") || rows[0] || null;
+    return res.json({ registration: current });
+  } catch (err: any) {
+    console.error("[broker-registration] GET /by-email error:", err);
+    return res.status(500).json({ error: "server_error", message: err?.message || "Server error" });
+  }
+});
+
 brokerRegistrationRouter.post("/", async (req: Request, res: Response) => {
   try {
     const ctx = getUserContext(req);
     if (!ctx) return res.status(401).json({ error: "unauthorized", message: "Not authenticated." });
 
     const {
-      legalName,
+      legalFirstName,
+      legalLastName,
+      legalName: rawLegalName,
       companyName,
       email,
       phone,
@@ -85,10 +106,16 @@ brokerRegistrationRouter.post("/", async (req: Request, res: Response) => {
       linkedinUrl,
     } = req.body || {};
 
+    const legalName =
+      rawLegalName ||
+      (legalFirstName && legalLastName
+        ? `${legalFirstName.trim()} ${legalLastName.trim()}`
+        : legalFirstName?.trim() || legalLastName?.trim() || null);
+
     if (!legalName || !companyName || !email) {
       return res.status(400).json({
         error: "invalid_input",
-        message: "legalName, companyName, and email are required.",
+        message: "Legal name, companyName, and email are required.",
       });
     }
 
@@ -128,6 +155,8 @@ brokerRegistrationRouter.post("/", async (req: Request, res: Response) => {
       .values({
         userId: ctx.userId,
         orgId: ctx.orgId,
+        legalFirstName: legalFirstName?.trim() || null,
+        legalLastName: legalLastName?.trim() || null,
         legalName,
         companyName,
         email,

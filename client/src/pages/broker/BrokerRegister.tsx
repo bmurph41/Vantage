@@ -151,10 +151,10 @@ export default function BrokerRegister() {
 
   const reg = data?.registration;
 
-  // If an existing non-rejected registration is on file, show status card
+  // If an existing non-rejected registration is on file, show status card with credential details
   if (reg && (reg.status === "pending" || reg.status === "approved" || reg.status === "suspended")) {
     return (
-      <div className="max-w-2xl mx-auto p-6">
+      <div className="max-w-2xl mx-auto p-6 space-y-4">
         <Card>
           <CardHeader>
             <CardTitle>Broker Registration Status</CardTitle>
@@ -162,7 +162,7 @@ export default function BrokerRegister() {
               Submitted {new Date(reg.submittedAt).toLocaleDateString()}
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="space-y-4">
             <div className="flex items-center gap-2">
               <span className="text-sm text-muted-foreground">Status:</span>
               <Badge
@@ -184,8 +184,7 @@ export default function BrokerRegister() {
             )}
             {reg.status === "approved" && (
               <p className="text-sm text-muted-foreground">
-                Your registration is approved. Subscribe to a broker plan to start publishing
-                listings.
+                Your registration is approved. Subscribe to a broker plan to start publishing listings.
               </p>
             )}
             {reg.status === "suspended" && reg.rejectionReason && (
@@ -196,6 +195,39 @@ export default function BrokerRegister() {
                 </div>
               </div>
             )}
+
+            <div className="border-t pt-4 grid grid-cols-2 gap-3 text-sm">
+              <div>
+                <div className="text-xs text-muted-foreground mb-0.5">Legal Name</div>
+                <div className="font-medium">{reg.legalName || "—"}</div>
+              </div>
+              <div>
+                <div className="text-xs text-muted-foreground mb-0.5">Company</div>
+                <div className="font-medium">{reg.companyName || "—"}</div>
+              </div>
+              <div>
+                <div className="text-xs text-muted-foreground mb-0.5">Email</div>
+                <div className="font-medium">{reg.email || "—"}</div>
+              </div>
+              {reg.phone && (
+                <div>
+                  <div className="text-xs text-muted-foreground mb-0.5">Phone</div>
+                  <div className="font-medium">{reg.phone}</div>
+                </div>
+              )}
+              {reg.licenseNumber && (
+                <div>
+                  <div className="text-xs text-muted-foreground mb-0.5">License Number</div>
+                  <div className="font-medium">{reg.licenseNumber}</div>
+                </div>
+              )}
+              {reg.licenseState && (
+                <div>
+                  <div className="text-xs text-muted-foreground mb-0.5">License State</div>
+                  <div className="font-medium">{reg.licenseState}</div>
+                </div>
+              )}
+            </div>
           </CardContent>
         </Card>
       </div>

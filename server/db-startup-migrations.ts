@@ -19833,6 +19833,10 @@ const MIGRATIONS: Migration[] = [
       END; $$
     `,
   },
+
+  // broker_registrations — split name columns
+  { name: "broker_registrations: add legal_first_name", sql: `ALTER TABLE broker_registrations ADD COLUMN IF NOT EXISTS legal_first_name varchar(128)` },
+  { name: "broker_registrations: add legal_last_name", sql: `ALTER TABLE broker_registrations ADD COLUMN IF NOT EXISTS legal_last_name varchar(128)` },
 ];
 
 /**

@@ -31,6 +31,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { format, formatDistanceToNow, differenceInDays } from "date-fns";
 import { AddressInput, type AddressComponents } from "@/components/address-input";
 import { ContactEngagementCard } from "@/components/crm/ContactEngagementCard";
+import { BrokerCredentialBadge } from "@/components/broker/BrokerCredentialBadge";
 import type { Contact, Company, Deal, Property, Activity as ActivityType, Note, CrmTask, CrmFile } from "@shared/schema";
 import { getPositionLabel, CONTACT_POSITION_OPTIONS } from "@shared/crm-constants";
 
@@ -915,6 +916,11 @@ export default function ContactDetailModal({ isOpen, onClose, contact, onCompany
 
                 {/* Right Column - Sidebar */}
                 <div className="space-y-6">
+                  {/* Broker Credential Badge — only for broker-tagged contacts */}
+                  {contact.contactTag === 'broker' && contact.email && (
+                    <BrokerCredentialBadge contactEmail={contact.email} />
+                  )}
+
                   {/* Brokered Transactions */}
                   {brokeredComps.length > 0 && (
                     <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950 dark:to-indigo-900 border-blue-200 dark:border-blue-800">

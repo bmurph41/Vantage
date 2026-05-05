@@ -209,14 +209,35 @@ const ASSET_CATEGORIES: AssetCategory[] = [
 const ALL_ASSET_CLASSES: AssetClassOption[] = ASSET_CATEGORIES.flatMap(c => c.assets);
 
 // --- Step type ---
-type StepId = 'account' | 'role' | 'assets' | 'packs';
+type StepId = 'account' | 'role' | 'broker_credentials' | 'assets' | 'packs';
 
-const STEPS: { id: StepId; label: string; number: number }[] = [
-  { id: 'account', label: 'Account', number: 1 },
-  { id: 'role', label: 'Your Role', number: 2 },
-  { id: 'assets', label: 'Asset Focus', number: 3 },
-  { id: 'packs', label: 'Choose Packs', number: 4 },
+const BASE_STEPS: { id: StepId; label: string }[] = [
+  { id: 'account', label: 'Account' },
+  { id: 'role', label: 'Your Role' },
+  { id: 'assets', label: 'Asset Focus' },
+  { id: 'packs', label: 'Choose Packs' },
 ];
+
+const BROKER_STEPS: { id: StepId; label: string }[] = [
+  { id: 'account', label: 'Account' },
+  { id: 'role', label: 'Your Role' },
+  { id: 'broker_credentials', label: 'Credentials' },
+  { id: 'assets', label: 'Asset Focus' },
+  { id: 'packs', label: 'Choose Packs' },
+];
+
+function getSteps(role: RoleType | null) {
+  const raw = role === 'broker' ? BROKER_STEPS : BASE_STEPS;
+  return raw.map((s, i) => ({ ...s, number: i + 1 }));
+}
+
+interface BrokerCredentials {
+  legalFirstName: string;
+  legalLastName: string;
+  companyName: string;
+  licenseNumber: string;
+  licenseState: string;
+}
 
 // --- Password strength ---
 function getPasswordStrength(password: string): { score: number; label: string; color: string } {
@@ -339,12 +360,12 @@ function RightPanelContent({ step }: { step: StepId }) {
 }
 
 // --- Step indicator ---
-function StepIndicator({ currentStep }: { currentStep: StepId }) {
-  const currentIndex = STEPS.findIndex(s => s.id === currentStep);
+function StepIndicator({ currentStep, steps }: { currentStep: StepId; steps: ReturnType<typeof getSteps> }) {
+  const currentIndex = steps.findIndex(s => s.id === currentStep);
 
   return (
     <div className="flex items-center justify-center gap-1 sm:gap-2 w-full max-w-2xl mx-auto">
-      {STEPS.map((s, i) => {
+      {steps.map((s, i) => {
         const isCompleted = i < currentIndex;
         const isCurrent = s.id === currentStep;
         return (
@@ -388,6 +409,15 @@ export default function SignupPage() {
   const allTiers = getAllTiers();
   const [referralSource, setReferralSource] = useState<string>('');
   const [referralSourceOther, setReferralSourceOther] = useState<string>('');
+  const [brokerCreds, setBrokerCreds] = useState<BrokerCredentials>({
+    legalFirstName: '',
+    legalLastName: '',
+    companyName: '',
+    licenseNumber: '',
+    licenseState: '',
+  });
+
+  const STEPS = getSteps(selectedRole);
 
   const form = useForm<SignupFormValues>({
     resolver: zodResolver(signupSchema),
@@ -430,6 +460,22 @@ export default function SignupPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
       queryClient.invalidateQueries({ queryKey: ["/api/bootstrap"] });
 
+      // Auto-submit broker registration if role is broker and credentials were entered
+      if (selectedRole === 'broker' && (brokerCreds.legalFirstName || brokerCreds.legalLastName) && brokerCreds.companyName && accountData?.email) {
+        try {
+          await apiRequest("POST", "/api/broker-registration", {
+            legalFirstName: brokerCreds.legalFirstName.trim() || undefined,
+            legalLastName: brokerCreds.legalLastName.trim() || undefined,
+            companyName: brokerCreds.companyName.trim(),
+            email: accountData.email,
+            licenseNumber: brokerCreds.licenseNumber.trim() || null,
+            licenseState: brokerCreds.licenseState.trim().toUpperCase() || null,
+          });
+        } catch {
+          // Non-fatal — registration can be completed later on /broker/register
+        }
+      }
+
       if (selectedPacks.length > 0) {
         toast({
           title: "Account created!",
@@ -459,7 +505,11 @@ export default function SignupPage() {
   };
 
   const onRoleSubmit = () => {
-    setStep('assets');
+    if (selectedRole === 'broker') {
+      setStep('broker_credentials');
+    } else {
+      setStep('assets');
+    }
   };
 
   const onAssetsSubmit = () => {
@@ -543,13 +593,13 @@ export default function SignupPage() {
             {/* Step indicator (small, subtle for step 1) */}
             <div className="mb-6">
               <div className="flex items-center gap-2">
-                {STEPS.map((s, i) => (
+                {BASE_STEPS.map((s, i) => (
                   <div key={s.id} className="flex items-center gap-2">
-                    {i > 0 && <div className={`w-6 h-0.5 rounded-full ${i === 0 ? 'bg-cyan-400' : 'bg-white/20'}`} />}
+                    {i > 0 && <div className={`w-6 h-0.5 rounded-full bg-white/20`} />}
                     <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-semibold ${
                       s.id === 'account' ? 'bg-cyan-500 text-white' : 'bg-white/10 text-white/40'
                     }`}>
-                      {s.number}
+                      {i + 1}
                     </div>
                   </div>
                 ))}
@@ -901,6 +951,109 @@ export default function SignupPage() {
       );
     }
 
+    // --- BROKER CREDENTIALS STEP ---
+    if (step === 'broker_credentials') {
+      const hasMandatoryFields = brokerCreds.legalFirstName.trim() && brokerCreds.legalLastName.trim() && brokerCreds.companyName.trim();
+      return (
+        <div className="space-y-6">
+          <div>
+            <h2 className="text-2xl font-bold text-slate-800 mb-1">Broker Credentials</h2>
+            <p className="text-slate-500">Enter your credentials. They will be submitted for admin review when your account is created.</p>
+          </div>
+
+          <div className="space-y-4">
+            <div>
+              <p className="text-sm font-semibold text-slate-700 mb-3">Legal Name *</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-slate-500 block mb-1">First Name</label>
+                  <input
+                    type="text"
+                    value={brokerCreds.legalFirstName}
+                    onChange={(e) => setBrokerCreds(p => ({ ...p, legalFirstName: e.target.value }))}
+                    placeholder="Jane"
+                    className="w-full h-11 px-3 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 bg-slate-50/50"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-slate-500 block mb-1">Last Name</label>
+                  <input
+                    type="text"
+                    value={brokerCreds.legalLastName}
+                    onChange={(e) => setBrokerCreds(p => ({ ...p, legalLastName: e.target.value }))}
+                    placeholder="Smith"
+                    className="w-full h-11 px-3 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 bg-slate-50/50"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <label className="text-sm font-semibold text-slate-700 block mb-1">Company / Brokerage Name *</label>
+              <input
+                type="text"
+                value={brokerCreds.companyName}
+                onChange={(e) => setBrokerCreds(p => ({ ...p, companyName: e.target.value }))}
+                placeholder="Smith Realty Group"
+                className="w-full h-11 px-3 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 bg-slate-50/50"
+              />
+            </div>
+
+            <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
+              <p className="text-sm font-semibold text-slate-700 mb-3">License Information <span className="text-slate-400 font-normal">(optional but recommended)</span></p>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-slate-500 block mb-1">License Number</label>
+                  <input
+                    type="text"
+                    value={brokerCreds.licenseNumber}
+                    onChange={(e) => setBrokerCreds(p => ({ ...p, licenseNumber: e.target.value }))}
+                    placeholder="BRE-0123456"
+                    className="w-full h-10 px-3 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 bg-white"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-slate-500 block mb-1">License State</label>
+                  <input
+                    type="text"
+                    maxLength={2}
+                    value={brokerCreds.licenseState}
+                    onChange={(e) => setBrokerCreds(p => ({ ...p, licenseState: e.target.value.toUpperCase() }))}
+                    placeholder="CA"
+                    className="w-full h-10 px-3 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 bg-white uppercase"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-400 leading-relaxed">
+              Your credentials will be reviewed by our team. You can update them later on your Broker Registration page.
+            </p>
+          </div>
+
+          <div className="flex items-center justify-between pt-4">
+            <Button
+              variant="outline"
+              onClick={() => setStep('role')}
+              className="gap-2"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back
+            </Button>
+            <Button
+              onClick={() => setStep('assets')}
+              disabled={!hasMandatoryFields}
+              className="gap-2 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white shadow-lg shadow-cyan-500/25"
+              data-testid="button-continue-broker-creds"
+            >
+              Continue
+              <ArrowRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      );
+    }
+
     // --- STEP 3: Asset class selection (categorized) ---
     if (step === 'assets') {
       return (
@@ -993,7 +1146,7 @@ export default function SignupPage() {
           <div className="flex items-center justify-between pt-4">
             <Button
               variant="outline"
-              onClick={() => setStep('role')}
+              onClick={() => setStep(selectedRole === 'broker' ? 'broker_credentials' : 'role')}
               className="gap-2"
               data-testid="button-back"
             >
@@ -1392,7 +1545,7 @@ export default function SignupPage() {
               <span className="text-lg font-bold text-slate-800 hidden sm:inline">Vantage</span>
             </div>
           </Link>
-          <StepIndicator currentStep={step} />
+          <StepIndicator currentStep={step} steps={STEPS} />
           <div className="w-20" /> {/* Spacer for centering */}
         </div>
       </div>

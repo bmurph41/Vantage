@@ -19832,6 +19832,8 @@ export const brokerRegistrations = pgTable("broker_registrations", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()::text`),
   userId: varchar("user_id").notNull(),
   orgId: varchar("org_id").notNull(),
+  legalFirstName: varchar("legal_first_name", { length: 128 }),
+  legalLastName: varchar("legal_last_name", { length: 128 }),
   legalName: varchar("legal_name", { length: 255 }).notNull(),
   companyName: varchar("company_name", { length: 255 }).notNull(),
   email: varchar("email", { length: 255 }).notNull(),
