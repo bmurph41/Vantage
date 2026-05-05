@@ -20,6 +20,7 @@ import {
 } from '@shared/schema';
 import { eq, and, desc, asc } from 'drizzle-orm';
 import * as crypto from 'crypto';
+import { triggerValuationSnapshot } from './scenario-snapshot-hook';
 
 // ============================================
 // TYPES
@@ -310,7 +311,14 @@ export class ScenarioGovernanceService {
         newVersion,
       },
     });
-    
+
+    await triggerValuationSnapshot(
+      orgId,
+      source.modelingProjectId,
+      userId,
+      'Scenario forked',
+    );
+
     return {
       success: true,
       newScenario: this.mapToScenarioVersion(forked),
