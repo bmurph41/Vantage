@@ -296,7 +296,8 @@
       "Bash(tee /tmp/tsc-out.log)",
       "Bash(ps -p 5490 -o etime,rss --no-headers)",
       "Bash(git log *)",
-      "Bash(tsx *)"
+      "Bash(tsx *)",
+      "Bash(tee /tmp/tc.out)"
     ]
   }
 }
