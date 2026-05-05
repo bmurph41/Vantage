@@ -19,6 +19,7 @@ import { db } from "../db";
 import { brokerRegistrations, brokerProfiles, users, crmNotifications, organizationUserRoles, brokerCredentialAudit } from "@shared/schema";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { verifyAndPersistLicense } from "../services/broker-license-verification";
+import { sendEmail, wrapEmailTemplate } from "../services/email-service";
 
 // ────────────────────────────────────────────────────────────────────────────
 // Helpers
@@ -579,12 +580,15 @@ brokerRegistrationRouter.patch("/me", async (req: Request, res: Response) => {
 
             const adminUsers = adminUserIds.length > 0
               ? await db
-                  .select({ id: users.id })
+                  .select({ id: users.id, email: users.email, name: users.name })
                   .from(users)
                   .where(inArray(users.id, adminUserIds))
               : [];
 
             if (adminUsers.length > 0) {
+              const APP_URL = process.env.APP_URL || "https://vantage.com";
+              const reviewUrl = `${APP_URL}${adminDetailPath}`;
+
               await Promise.all(
                 adminUsers.map((admin) =>
                   db.insert(crmNotifications).values({
@@ -602,6 +606,61 @@ brokerRegistrationRouter.patch("/me", async (req: Request, res: Response) => {
                       registrationStatus: current.status,
                       adminDetailPath,
                     },
+                  }),
+                ),
+              );
+
+              // Also send an email to each admin (fire-and-forget within fire-and-forget)
+              const emailSubject = `Action required: Broker credentials updated — ${brokerName}`;
+              const emailText = [
+                `Hello${' '}Admin,`,
+                ``,
+                `Broker ${brokerName} (status: ${current.status}) has updated their credentials.`,
+                ``,
+                `Changed fields: ${changedLabels}`,
+                ``,
+                `Please reverify this broker before they continue publishing listings.`,
+                ``,
+                `Review the registration: ${reviewUrl}`,
+                ``,
+                `— The Vantage Team`,
+              ].join("\n");
+              const emailHtml = wrapEmailTemplate(`
+                <h2 style="margin-top: 0; color: #1e293b;">Broker Credentials Updated</h2>
+                <p>Hello Admin,</p>
+                <p>
+                  Broker <strong>${brokerName}</strong>
+                  (status: <strong>${current.status}</strong>)
+                  has updated their credentials and may require reverification before continuing to publish listings.
+                </p>
+                <table style="width:100%; border-collapse:collapse; margin: 16px 0;">
+                  <tr>
+                    <td style="padding: 8px; background:#f1f5f9; font-weight:600; border-radius:4px 0 0 4px; width:40%;">Changed fields</td>
+                    <td style="padding: 8px; background:#f8fafc; border-radius:0 4px 4px 0;">${changedLabels}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px; background:#f1f5f9; font-weight:600; border-radius:4px 0 0 4px;">Registration status</td>
+                    <td style="padding: 8px; background:#f8fafc; border-radius:0 4px 4px 0;">${current.status}</td>
+                  </tr>
+                </table>
+                <div style="text-align:center; margin: 32px 0;">
+                  <a href="${reviewUrl}" style="background: linear-gradient(135deg, #0891b2, #2563eb); color: white; padding: 14px 32px; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block;">Review Registration</a>
+                </div>
+                <p style="color:#64748b; font-size:14px;">Please reverify the broker's credentials before they continue publishing listings.</p>
+              `);
+
+              await Promise.all(
+                adminUsers.map((admin) =>
+                  sendEmail({
+                    to: admin.email,
+                    subject: emailSubject,
+                    text: emailText,
+                    html: emailHtml,
+                  }).catch((emailErr) => {
+                    console.error(
+                      `[broker-registration] email to admin ${admin.email} failed:`,
+                      emailErr,
+                    );
                   }),
                 ),
               );
