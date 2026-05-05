@@ -626,6 +626,26 @@ export default function BrokerRegistrationsQueue() {
                   </>
                 )}
 
+              {reg.status === "pending" && reg.reviewedAt && (() => {
+                const rereviewEvent = eventsData?.events
+                  .filter((e) => e.eventType === "rereview_requested")
+                  .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
+                if (!rereviewEvent) return null;
+                return (
+                  <div className="flex items-start gap-2 rounded-md border border-yellow-300 bg-yellow-50 dark:border-yellow-700 dark:bg-yellow-950/30 p-3 text-sm">
+                    <AlertCircle className="h-4 w-4 text-yellow-600 dark:text-yellow-400 shrink-0 mt-0.5" />
+                    <div>
+                      <span className="font-medium text-yellow-800 dark:text-yellow-300">Re-review requested.</span>
+                      {rereviewEvent.reason ? (
+                        <p className="text-yellow-700 dark:text-yellow-400 mt-0.5">{rereviewEvent.reason}</p>
+                      ) : (
+                        <span className="text-yellow-700 dark:text-yellow-400 ml-1">No reason was provided.</span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
+
               {reg.status === "pending" && (
                 <>
                   <section>
