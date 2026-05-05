@@ -5,6 +5,7 @@ import {
   modelingProjects
 } from '@shared/schema';
 import { eq, and, desc, sql, ne } from 'drizzle-orm';
+import { triggerValuationSnapshot } from './scenario-snapshot-hook';
 
 export type ScenarioType = 'base' | 'aggressive' | 'conservative' | 'custom';
 export type ScenarioStatus = 'draft' | 'pending_approval' | 'approved' | 'rejected';
@@ -89,6 +90,13 @@ export class ScenarioVersioningService {
       userId: input.userId
     });
 
+    await triggerValuationSnapshot(
+      input.orgId,
+      input.projectId,
+      input.userId,
+      'Scenario created',
+    );
+
     return scenario;
   }
 
@@ -142,6 +150,13 @@ export class ScenarioVersioningService {
         newValue: newVersion,
         userId: input.userId
       });
+
+      await triggerValuationSnapshot(
+        currentScenario.orgId,
+        currentScenario.modelingProjectId,
+        input.userId,
+        'Scenario updated',
+      );
 
       return newVersion;
     } else {
@@ -266,6 +281,13 @@ export class ScenarioVersioningService {
       newValue: restored,
       userId
     });
+
+    await triggerValuationSnapshot(
+      targetVersion.orgId,
+      targetVersion.modelingProjectId,
+      userId,
+      'Scenario version restored',
+    );
 
     return restored;
   }
