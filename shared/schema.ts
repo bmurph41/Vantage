@@ -20099,6 +20099,24 @@ export const brokerCredentialAudit = pgTable("broker_credential_audit", {
 export type BrokerCredentialAudit = typeof brokerCredentialAudit.$inferSelect;
 export type InsertBrokerCredentialAudit = typeof brokerCredentialAudit.$inferInsert;
 
+export const brokerRegistrationEvents = pgTable("broker_registration_events", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()::text`),
+  registrationId: varchar("registration_id").notNull().references(() => brokerRegistrations.id, { onDelete: "cascade" }),
+  eventType: varchar("event_type", { length: 64 }).notNull(),
+  fromStatus: varchar("from_status", { length: 32 }),
+  toStatus: varchar("to_status", { length: 32 }).notNull(),
+  actorId: varchar("actor_id"),
+  reason: text("reason"),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  regIdx: index("broker_reg_events_reg_idx").on(table.registrationId),
+  createdAtIdx: index("broker_reg_events_created_at_idx").on(table.registrationId, table.createdAt),
+}));
+
+export type BrokerRegistrationEvent = typeof brokerRegistrationEvents.$inferSelect;
+export type InsertBrokerRegistrationEvent = typeof brokerRegistrationEvents.$inferInsert;
+
 export type BrokerRegistration = typeof brokerRegistrations.$inferSelect;
 export type InsertBrokerRegistration = typeof brokerRegistrations.$inferInsert;
 export type BrokerProfile = typeof brokerProfiles.$inferSelect;

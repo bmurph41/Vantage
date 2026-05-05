@@ -31,6 +31,7 @@ import {
   useBrokerRegistrations,
   useBrokerRegistrationDetail,
   useBrokerCredentialAudit,
+  useBrokerRegistrationEvents,
   useApproveRegistration,
   useRejectRegistration,
   useSuspendRegistration,
@@ -149,10 +150,12 @@ export default function BrokerRegistrationsQueue() {
   const [reviewId, setReviewId] = useState<string | null>(null);
   const [tier, setTier] = useState<string>("starter");
   const [rejectReason, setRejectReason] = useState("");
+  const [rereviewReason, setRereviewReason] = useState("");
 
   const { data, isLoading } = useBrokerRegistrations({ status, page, pageSize: PAGE_SIZE });
   const { data: detail, isLoading: loadingDetail } = useBrokerRegistrationDetail(reviewId);
   const { data: auditData } = useBrokerCredentialAudit(reviewId);
+  const { data: eventsData } = useBrokerRegistrationEvents(reviewId);
 
   const approveMut = useApproveRegistration();
   const rejectMut = useRejectRegistration();
@@ -167,6 +170,7 @@ export default function BrokerRegistrationsQueue() {
   const closeReview = () => {
     setReviewId(null);
     setRejectReason("");
+    setRereviewReason("");
     setTier("starter");
   };
 
@@ -231,7 +235,7 @@ export default function BrokerRegistrationsQueue() {
   const handleRequestRereview = async () => {
     if (!reviewId) return;
     try {
-      await rereviewMut.mutateAsync({ id: reviewId });
+      await rereviewMut.mutateAsync({ id: reviewId, reason: rereviewReason.trim() || undefined });
       toast({
         title: "Re-review requested",
         description: "Registration set to pending and profile unpublished until re-approved.",
@@ -559,19 +563,67 @@ export default function BrokerRegistrationsQueue() {
                 </section>
               )}
 
+              {eventsData && eventsData.events.length > 0 && (
+                <section>
+                  <h3 className="text-sm font-semibold mb-2 flex items-center gap-1.5">
+                    <History className="h-3.5 w-3.5" />
+                    Status Change History
+                  </h3>
+                  <ol className="relative border-l border-border ml-2 space-y-0">
+                    {eventsData.events.map((evt) => {
+                      const eventLabels: Record<string, { label: string; color: string }> = {
+                        approved: { label: "Approved", color: "bg-emerald-500" },
+                        rejected: { label: "Rejected", color: "bg-destructive" },
+                        suspended: { label: "Suspended", color: "bg-orange-500" },
+                        rereview_requested: { label: "Re-review Requested", color: "bg-yellow-500" },
+                      };
+                      const cfg = eventLabels[evt.eventType] ?? { label: evt.eventType, color: "bg-muted-foreground" };
+                      return (
+                        <li key={evt.id} className="ml-4 pb-4 last:pb-0">
+                          <span className={`absolute -left-[5px] mt-1.5 h-2.5 w-2.5 rounded-full border-2 border-background ${cfg.color}`} />
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-xs font-semibold">{cfg.label}</span>
+                            {evt.fromStatus && (
+                              <span className="text-[10px] text-muted-foreground">
+                                {evt.fromStatus} → {evt.toStatus}
+                              </span>
+                            )}
+                            <span className="text-[10px] text-muted-foreground ml-auto">{formatRelative(evt.createdAt)}</span>
+                          </div>
+                          {evt.reason && (
+                            <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug">{evt.reason}</p>
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ol>
+                </section>
+              )}
+
               {reg.status === "approved" &&
                 reg.updatedAt &&
                 reg.reviewedAt &&
                 new Date(reg.updatedAt) > new Date(reg.reviewedAt) && (
-                  <div className="flex items-start gap-2 rounded-md border border-yellow-300 bg-yellow-50 dark:border-yellow-700 dark:bg-yellow-950/30 p-3 text-sm">
-                    <AlertCircle className="h-4 w-4 text-yellow-600 dark:text-yellow-400 shrink-0 mt-0.5" />
-                    <div>
-                      <span className="font-medium text-yellow-800 dark:text-yellow-300">Credentials updated since last review.</span>
-                      <span className="text-yellow-700 dark:text-yellow-400 ml-1">
-                        Use "Request Re-review" to revert to pending and pause the profile until re-approved.
-                      </span>
+                  <>
+                    <div className="flex items-start gap-2 rounded-md border border-yellow-300 bg-yellow-50 dark:border-yellow-700 dark:bg-yellow-950/30 p-3 text-sm">
+                      <AlertCircle className="h-4 w-4 text-yellow-600 dark:text-yellow-400 shrink-0 mt-0.5" />
+                      <div>
+                        <span className="font-medium text-yellow-800 dark:text-yellow-300">Credentials updated since last review.</span>
+                        <span className="text-yellow-700 dark:text-yellow-400 ml-1">
+                          Use "Request Re-review" to revert to pending and pause the profile until re-approved.
+                        </span>
+                      </div>
                     </div>
-                  </div>
+                    <section>
+                      <h3 className="text-sm font-semibold mb-1">Re-review Reason <span className="text-muted-foreground font-normal">(optional)</span></h3>
+                      <Textarea
+                        value={rereviewReason}
+                        onChange={(e) => setRereviewReason(e.target.value)}
+                        placeholder="Describe why this broker is being sent for re-review..."
+                        rows={2}
+                      />
+                    </section>
+                  </>
                 )}
 
               {reg.status === "pending" && (

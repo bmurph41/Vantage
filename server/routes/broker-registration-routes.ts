@@ -16,7 +16,7 @@
 
 import { Router, Request, Response, NextFunction } from "express";
 import { db } from "../db";
-import { brokerRegistrations, brokerProfiles, users, crmNotifications, organizationUserRoles, brokerCredentialAudit } from "@shared/schema";
+import { brokerRegistrations, brokerProfiles, users, crmNotifications, organizationUserRoles, brokerCredentialAudit, brokerRegistrationEvents } from "@shared/schema";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { verifyAndPersistLicense } from "../services/broker-license-verification";
 import { sendEmail, wrapEmailTemplate, sendBrokerRereviewEmail } from "../services/email-service";
@@ -808,6 +808,16 @@ brokerAdminRouter.post("/registrations/:id/approve", async (req: Request, res: R
         .where(eq(brokerRegistrations.id, reg.id))
         .returning();
 
+      await tx.insert(brokerRegistrationEvents).values({
+        registrationId: reg.id,
+        eventType: "approved",
+        fromStatus: reg.status,
+        toStatus: "approved",
+        actorId: adminUser?.id || null,
+        reason: null,
+        metadata: { brokerTier: brokerTier || "starter" },
+      });
+
       return { registration: updatedReg, profile };
     });
 
@@ -839,6 +849,13 @@ brokerAdminRouter.post("/registrations/:id/reject", async (req: Request, res: Re
     if (!reason || typeof reason !== "string" || !reason.trim()) {
       return res.status(400).json({ error: "invalid_input", message: "reason is required." });
     }
+    const existing = await db
+      .select({ status: brokerRegistrations.status })
+      .from(brokerRegistrations)
+      .where(eq(brokerRegistrations.id, req.params.id))
+      .limit(1);
+    const fromStatus = existing[0]?.status ?? null;
+
     const [updated] = await db
       .update(brokerRegistrations)
       .set({
@@ -851,6 +868,17 @@ brokerAdminRouter.post("/registrations/:id/reject", async (req: Request, res: Re
       .where(eq(brokerRegistrations.id, req.params.id))
       .returning();
     if (!updated) return res.status(404).json({ error: "not_found", message: "Registration not found." });
+
+    await db.insert(brokerRegistrationEvents).values({
+      registrationId: updated.id,
+      eventType: "rejected",
+      fromStatus,
+      toStatus: "rejected",
+      actorId: adminUser?.id || null,
+      reason,
+      metadata: null,
+    });
+
     return res.json({ registration: updated });
   } catch (err: any) {
     console.error("[broker-admin] reject error:", err);
@@ -867,6 +895,13 @@ brokerAdminRouter.post("/registrations/:id/suspend", async (req: Request, res: R
     }
 
     const result = await db.transaction(async (tx) => {
+      const [currentReg] = await tx
+        .select({ status: brokerRegistrations.status })
+        .from(brokerRegistrations)
+        .where(eq(brokerRegistrations.id, req.params.id))
+        .limit(1);
+      const fromStatus = currentReg?.status ?? null;
+
       const [updatedReg] = await tx
         .update(brokerRegistrations)
         .set({
@@ -886,6 +921,16 @@ brokerAdminRouter.post("/registrations/:id/suspend", async (req: Request, res: R
         .update(brokerProfiles)
         .set({ isPublishable: false, updatedAt: new Date() })
         .where(eq(brokerProfiles.registrationId, updatedReg.id));
+
+      await tx.insert(brokerRegistrationEvents).values({
+        registrationId: updatedReg.id,
+        eventType: "suspended",
+        fromStatus,
+        toStatus: "suspended",
+        actorId: adminUser?.id || null,
+        reason,
+        metadata: null,
+      });
 
       return { registration: updatedReg };
     });
@@ -931,6 +976,8 @@ brokerAdminRouter.post("/registrations/:id/request-rereview", async (req: Reques
         );
       }
 
+      const adminUser = (req as any).user || (req as any).session?.user;
+
       const [updatedReg] = await tx
         .update(brokerRegistrations)
         .set({ status: "pending", updatedAt: new Date() })
@@ -941,6 +988,16 @@ brokerAdminRouter.post("/registrations/:id/request-rereview", async (req: Reques
         .update(brokerProfiles)
         .set({ isPublishable: false, updatedAt: new Date() })
         .where(eq(brokerProfiles.registrationId, reg.id));
+
+      await tx.insert(brokerRegistrationEvents).values({
+        registrationId: reg.id,
+        eventType: "rereview_requested",
+        fromStatus: reg.status,
+        toStatus: "pending",
+        actorId: adminUser?.id || null,
+        reason: (req.body || {}).reason || null,
+        metadata: null,
+      });
 
       return { registration: updatedReg };
     });
@@ -971,6 +1028,22 @@ brokerAdminRouter.post("/registrations/:id/request-rereview", async (req: Reques
     return res
       .status(err?.status || 500)
       .json({ error: err?.code || "server_error", message: err?.message || "Server error" });
+  }
+});
+
+// ── Registration event history ────────────────────────────────────────────────
+
+brokerAdminRouter.get("/registrations/:id/events", async (req: Request, res: Response) => {
+  try {
+    const rows = await db
+      .select()
+      .from(brokerRegistrationEvents)
+      .where(eq(brokerRegistrationEvents.registrationId, req.params.id))
+      .orderBy(desc(brokerRegistrationEvents.createdAt));
+    return res.json({ events: rows });
+  } catch (err: any) {
+    console.error("[broker-admin] GET /registrations/:id/events error:", err);
+    return res.status(500).json({ error: "server_error", message: err?.message || "Server error" });
   }
 });
 

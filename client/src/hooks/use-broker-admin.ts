@@ -58,6 +58,18 @@ export interface BrokerCredentialAuditEntry {
   newValue: string | null;
 }
 
+export interface BrokerRegistrationEvent {
+  id: string;
+  registrationId: string;
+  eventType: string;
+  fromStatus: string | null;
+  toStatus: string;
+  actorId: string | null;
+  reason: string | null;
+  metadata: Record<string, unknown> | null;
+  createdAt: string;
+}
+
 const BASE = "/api/admin/broker";
 
 export function brokerAdminKeys() {
@@ -67,6 +79,7 @@ export function brokerAdminKeys() {
       ["broker-admin", "registrations", status, page, pageSize] as const,
     detail: (id: string) => ["broker-admin", "registration", id] as const,
     audit: (id: string) => ["broker-admin", "registration", id, "audit"] as const,
+    events: (id: string) => ["broker-admin", "registration", id, "events"] as const,
   };
 }
 
@@ -150,13 +163,16 @@ export function useSuspendRegistration() {
 export function useRequestRereview() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (vars: { id: string }) => {
-      const res = await apiRequest("POST", `${BASE}/registrations/${vars.id}/request-rereview`, {});
+    mutationFn: async (vars: { id: string; reason?: string }) => {
+      const res = await apiRequest("POST", `${BASE}/registrations/${vars.id}/request-rereview`, {
+        reason: vars.reason || undefined,
+      });
       return res.json();
     },
     onSuccess: (_data, vars) => {
       qc.invalidateQueries({ queryKey: brokerAdminKeys().all });
       qc.invalidateQueries({ queryKey: brokerAdminKeys().detail(vars.id) });
+      qc.invalidateQueries({ queryKey: brokerAdminKeys().events(vars.id) });
     },
   });
 }
@@ -183,6 +199,18 @@ export function useReverifyRegistration() {
     onSuccess: (_data, vars) => {
       qc.invalidateQueries({ queryKey: brokerAdminKeys().all });
       qc.invalidateQueries({ queryKey: brokerAdminKeys().detail(vars.id) });
+    },
+  });
+}
+
+export function useBrokerRegistrationEvents(id: string | null) {
+  return useQuery<{ events: BrokerRegistrationEvent[] }>({
+    queryKey: brokerAdminKeys().events(id || ""),
+    enabled: !!id,
+    queryFn: async () => {
+      const res = await fetch(`${BASE}/registrations/${id}/events`, { credentials: "include" });
+      if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`);
+      return res.json();
     },
   });
 }

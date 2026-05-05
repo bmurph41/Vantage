@@ -19855,6 +19855,35 @@ const MIGRATIONS: Migration[] = [
   },
   { name: "broker_credential_audit: add index broker_credential_audit_reg_idx", sql: `CREATE INDEX IF NOT EXISTS broker_credential_audit_reg_idx ON broker_credential_audit (registration_id)` },
   { name: "broker_credential_audit: add index broker_credential_audit_changed_at_idx", sql: `CREATE INDEX IF NOT EXISTS broker_credential_audit_changed_at_idx ON broker_credential_audit (registration_id, changed_at)` },
+
+  // broker_registration_events — new table
+  {
+    name: "broker_registration_events: create table",
+    sql: `
+      CREATE TABLE IF NOT EXISTS broker_registration_events (
+        id text PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        registration_id text NOT NULL REFERENCES broker_registrations(id) ON DELETE CASCADE,
+        event_type varchar(64) NOT NULL,
+        from_status varchar(32),
+        to_status varchar(32) NOT NULL,
+        actor_id varchar,
+        reason text,
+        metadata jsonb,
+        created_at timestamp NOT NULL DEFAULT NOW()
+      )
+    `,
+  },
+
+  // capital_stacks — uncovered columns
+  { name: "capital_stacks: add interest_rate_type", sql: `ALTER TABLE capital_stacks ADD COLUMN IF NOT EXISTS interest_rate_type text` },
+  { name: "capital_stacks: add maturity_date", sql: `ALTER TABLE capital_stacks ADD COLUMN IF NOT EXISTS maturity_date text` },
+
+  // crm_deals — uncovered columns
+  { name: "crm_deals: add property_id", sql: `ALTER TABLE crm_deals ADD COLUMN IF NOT EXISTS property_id text` },
+
+  // broker_registration_events — uncovered indexes
+  { name: "broker_registration_events: add index broker_reg_events_reg_idx", sql: `CREATE INDEX IF NOT EXISTS broker_reg_events_reg_idx ON broker_registration_events (registration_id)` },
+  { name: "broker_registration_events: add index broker_reg_events_created_at_idx", sql: `CREATE INDEX IF NOT EXISTS broker_reg_events_created_at_idx ON broker_registration_events (registration_id, created_at)` },
 ];
 
 /**
