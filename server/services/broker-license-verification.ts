@@ -35,18 +35,161 @@ export interface LicenseVerificationProvider {
   verify(input: LicenseVerificationInput): Promise<LicenseVerificationResult>;
 }
 
-class ManualReviewProvider implements LicenseVerificationProvider {
+// ── Manual review fallback ────────────────────────────────────────────────────
+// Used when no third-party API credentials are configured.  All licenses are
+// flagged for human review rather than auto-accepted.
+
+export class ManualReviewProvider implements LicenseVerificationProvider {
   readonly name = "manual";
   async verify(_input: LicenseVerificationInput): Promise<LicenseVerificationResult> {
     return {
       status: "manual_review_required",
       provider: this.name,
-      notes: "No third-party license lookup provider is configured. Admin must review manually.",
+      notes:
+        "No third-party license lookup provider is configured (NIPR_API_KEY not set). " +
+        "Admin must review manually.",
     };
   }
 }
 
-let activeProvider: LicenseVerificationProvider = new ManualReviewProvider();
+// ── NIPR Gateway API provider ─────────────────────────────────────────────────
+// Calls the National Insurance Producer Registry (NIPR) PLAS Gateway API to
+// verify a license number against the issuing state's records.
+//
+// Configuration:
+//   NIPR_API_KEY  – subscription API key issued by NIPR (nipr.com)
+//   NIPR_API_BASE – (optional) override base URL; defaults to the NIPR gateway
+//
+// Response status mapping:
+//   ACTIVE / LICENSED → verified
+//   EXPIRED           → expired
+//   REVOKED / SUSPENDED / TERMINATED → revoked
+//   (not found / 404) → not_found
+//   unexpected         → manual_review_required
+//
+// If NIPR_API_KEY is absent the active provider falls back to ManualReviewProvider.
+
+const NIPR_DEFAULT_BASE = "https://niprgateway.com/Gateway/v1";
+
+export class NIPRApiProvider implements LicenseVerificationProvider {
+  readonly name = "nipr";
+  private readonly apiKey: string;
+  private readonly baseUrl: string;
+
+  constructor(apiKey: string, baseUrl: string = NIPR_DEFAULT_BASE) {
+    this.apiKey = apiKey;
+    this.baseUrl = baseUrl.replace(/\/$/, "");
+  }
+
+  async verify(input: LicenseVerificationInput): Promise<LicenseVerificationResult> {
+    const { licenseNumber, licenseState } = input;
+
+    const url =
+      `${this.baseUrl}/producers/license` +
+      `?licenseNumber=${encodeURIComponent(licenseNumber)}` +
+      `&stateCode=${encodeURIComponent(licenseState.toUpperCase())}`;
+
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${this.apiKey}`,
+          Accept: "application/json",
+          "X-NIPR-Client": "marinalytics/1.0",
+        },
+        signal: AbortSignal.timeout(12_000),
+      });
+    } catch (networkErr) {
+      throw new Error(
+        `NIPR API network error: ${networkErr instanceof Error ? networkErr.message : String(networkErr)}`,
+      );
+    }
+
+    if (response.status === 404) {
+      return {
+        status: "not_found",
+        provider: this.name,
+        notes: `License ${licenseNumber} was not found in the NIPR database for state ${licenseState}.`,
+        rawPayload: { httpStatus: 404 },
+      };
+    }
+
+    if (response.status === 401 || response.status === 403) {
+      throw new Error(`NIPR API authentication failed (HTTP ${response.status}). Check NIPR_API_KEY.`);
+    }
+
+    if (!response.ok) {
+      throw new Error(`NIPR API returned HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    let data: Record<string, unknown>;
+    try {
+      data = (await response.json()) as Record<string, unknown>;
+    } catch {
+      throw new Error("NIPR API returned a non-JSON response body.");
+    }
+
+    const rawStatus = String(data?.licenseStatus ?? data?.status ?? "UNKNOWN").toUpperCase();
+
+    let status: LicenseVerificationStatus;
+    switch (rawStatus) {
+      case "ACTIVE":
+      case "LICENSED":
+      case "CURRENT":
+        status = "verified";
+        break;
+      case "EXPIRED":
+        status = "expired";
+        break;
+      case "REVOKED":
+      case "SUSPENDED":
+      case "TERMINATED":
+      case "CANCELLED":
+        status = "revoked";
+        break;
+      case "NOT FOUND":
+      case "NOTFOUND":
+      case "NOT_FOUND":
+        status = "not_found";
+        break;
+      default:
+        status = "manual_review_required";
+    }
+
+    return {
+      status,
+      provider: this.name,
+      notes:
+        typeof data?.statusDescription === "string"
+          ? data.statusDescription
+          : `NIPR license status: ${rawStatus}`,
+      expiresAt: typeof data?.expirationDate === "string" ? data.expirationDate : null,
+      rawPayload: data,
+    };
+  }
+}
+
+// ── Active provider registry ──────────────────────────────────────────────────
+// Bootstrapped from environment at startup.  Call registerLicenseVerificationProvider()
+// to swap in a different provider at runtime (e.g. in tests or when credentials
+// become available after startup).
+
+function buildDefaultProvider(): LicenseVerificationProvider {
+  const apiKey = process.env.NIPR_API_KEY;
+  const baseUrl = process.env.NIPR_API_BASE || NIPR_DEFAULT_BASE;
+  if (apiKey) {
+    console.info("[broker-license] NIPR_API_KEY detected — using NIPRApiProvider for live lookups.");
+    return new NIPRApiProvider(apiKey, baseUrl);
+  }
+  console.info(
+    "[broker-license] NIPR_API_KEY not set — using ManualReviewProvider. " +
+      "Set NIPR_API_KEY to enable live license lookups.",
+  );
+  return new ManualReviewProvider();
+}
+
+let activeProvider: LicenseVerificationProvider = buildDefaultProvider();
 
 export function registerLicenseVerificationProvider(provider: LicenseVerificationProvider): void {
   activeProvider = provider;
@@ -55,6 +198,8 @@ export function registerLicenseVerificationProvider(provider: LicenseVerificatio
 export function getLicenseVerificationProvider(): LicenseVerificationProvider {
   return activeProvider;
 }
+
+// ── Core verification + persistence ──────────────────────────────────────────
 
 export async function verifyAndPersistLicense(
   registrationId: string,
@@ -84,6 +229,8 @@ export async function verifyAndPersistLicense(
 
   return result;
 }
+
+// ── License-expiry scanner (background / cron) ────────────────────────────────
 
 const DAY_MS = 86_400_000;
 

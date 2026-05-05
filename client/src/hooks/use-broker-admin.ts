@@ -15,6 +15,10 @@ export interface BrokerRegistration {
   licenseState: string | null;
   licenseExpiresAt: string | null;
   licenseDocumentUrl: string | null;
+  licenseVerificationStatus: string | null;
+  licenseVerificationProvider: string | null;
+  licenseVerificationNotes: string | null;
+  licenseLastVerifiedAt: string | null;
   yearsExperience: number | null;
   specialties: string[] | null;
   bio: string | null;
@@ -128,6 +132,20 @@ export function useSuspendRegistration() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: brokerAdminKeys().all });
+    },
+  });
+}
+
+export function useReverifyRegistration() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (vars: { id: string }) => {
+      const res = await apiRequest("POST", `${BASE}/registrations/${vars.id}/reverify`, {});
+      return res.json();
+    },
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: brokerAdminKeys().all });
+      qc.invalidateQueries({ queryKey: brokerAdminKeys().detail(vars.id) });
     },
   });
 }

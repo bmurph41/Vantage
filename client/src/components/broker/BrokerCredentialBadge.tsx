@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { Loader2, Award, Building2, FileText, MapPin } from "lucide-react";
+import { Loader2, Award, Building2, FileText, MapPin, CheckCircle2, AlertCircle } from "lucide-react";
 import type { BrokerProfile, BrokerRegistration } from "@shared/schema";
 
 /**
@@ -13,8 +13,10 @@ interface BrokerCredentialData {
   companyName: string | null;
   licenseNumber: string | null;
   licenseState: string | null;
-  /** "verified" for approved profiles; registration status for pending/suspended/rejected */
+  /** Registration/profile approval status */
   status: "verified" | "pending" | "suspended" | "rejected" | "approved";
+  /** NIPR / third-party license verification status */
+  licenseVerificationStatus: string | null;
 }
 
 interface Props {
@@ -28,15 +30,15 @@ interface Props {
 
 const STATUS_DISPLAY: Record<string, { label: string; className: string }> = {
   verified: {
-    label: "Verified",
+    label: "License Verified",
     className: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200",
   },
   approved: {
-    label: "Verified",
-    className: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200",
+    label: "Approved",
+    className: "bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-200",
   },
   pending: {
-    label: "Pending Verification",
+    label: "Pending Review",
     className: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
   },
   suspended: {
@@ -44,22 +46,65 @@ const STATUS_DISPLAY: Record<string, { label: string; className: string }> = {
     className: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
   },
   rejected: {
-    label: "Not Verified",
+    label: "Not Approved",
     className: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
   },
 };
 
-function fromProfile(p: BrokerProfile): BrokerCredentialData {
+const LICENSE_CHECK_DISPLAY: Record<string, { label: string; icon: typeof CheckCircle2; className: string } | undefined> = {
+  verified: {
+    label: "License verified",
+    icon: CheckCircle2,
+    className: "text-emerald-600 dark:text-emerald-400",
+  },
+  not_found: {
+    label: "License not found",
+    icon: AlertCircle,
+    className: "text-red-500 dark:text-red-400",
+  },
+  revoked: {
+    label: "License revoked",
+    icon: AlertCircle,
+    className: "text-red-500 dark:text-red-400",
+  },
+  expired: {
+    label: "License expired",
+    icon: AlertCircle,
+    className: "text-orange-500 dark:text-orange-400",
+  },
+  error: {
+    label: "Check failed",
+    icon: AlertCircle,
+    className: "text-gray-500 dark:text-gray-400",
+  },
+};
+
+type ProfileWithVerification = BrokerProfile & { licenseVerificationStatus?: string };
+
+function fromProfile(p: ProfileWithVerification): BrokerCredentialData {
   const displayName =
     p.legalFirstName && p.legalLastName
       ? `${p.legalFirstName} ${p.legalLastName}`
       : p.displayName;
+
+  const lvs = p.licenseVerificationStatus;
+  let status: BrokerCredentialData["status"];
+  if (lvs === "verified") {
+    status = "verified";
+  } else if (lvs === "revoked" || lvs === "expired") {
+    status = "suspended";
+  } else {
+    // admin approved, but license not yet NIPR-confirmed (manual_review, unverified, not_found, error)
+    status = "approved";
+  }
+
   return {
     displayName,
     companyName: p.companyName,
     licenseNumber: p.licenseNumber ?? null,
     licenseState: p.licenseState ?? null,
-    status: "verified",
+    status,
+    licenseVerificationStatus: lvs ?? null,
   };
 }
 
@@ -74,6 +119,7 @@ function fromRegistration(r: BrokerRegistration): BrokerCredentialData {
     licenseNumber: r.licenseNumber ?? null,
     licenseState: r.licenseState ?? null,
     status: (r.status as BrokerCredentialData["status"]) ?? "pending",
+    licenseVerificationStatus: r.licenseVerificationStatus ?? null,
   };
 }
 
@@ -83,7 +129,7 @@ async function fetchProfile(profileId: string): Promise<BrokerCredentialData | n
     { credentials: "include" },
   );
   if (!res.ok) return null;
-  const json = await res.json() as { profile: BrokerProfile | null };
+  const json = await res.json() as { profile: ProfileWithVerification | null };
   return json.profile ? fromProfile(json.profile) : null;
 }
 
@@ -93,7 +139,7 @@ async function fetchProfileByUser(userId: string): Promise<BrokerCredentialData 
     { credentials: "include" },
   );
   if (profRes.ok) {
-    const json = await profRes.json() as { profile: BrokerProfile | null };
+    const json = await profRes.json() as { profile: ProfileWithVerification | null };
     if (json.profile) return fromProfile(json.profile);
   }
   const regRes = await fetch(
@@ -111,7 +157,7 @@ async function fetchByEmail(email: string): Promise<BrokerCredentialData | null>
     { credentials: "include" },
   );
   if (profRes.ok) {
-    const json = await profRes.json() as { profile: BrokerProfile | null };
+    const json = await profRes.json() as { profile: ProfileWithVerification | null };
     if (json.profile) return fromProfile(json.profile);
   }
   const regRes = await fetch(
@@ -156,6 +202,9 @@ export function BrokerCredentialBadge({ brokerProfileId, userId, contactEmail }:
   if (!data) return null;
 
   const statusInfo = STATUS_DISPLAY[data.status] ?? STATUS_DISPLAY.pending;
+  const licenseCheck = data.licenseVerificationStatus
+    ? LICENSE_CHECK_DISPLAY[data.licenseVerificationStatus]
+    : undefined;
 
   return (
     <Card className="border-emerald-200 dark:border-emerald-800 bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950 dark:to-teal-950">
@@ -190,6 +239,12 @@ export function BrokerCredentialBadge({ brokerProfileId, userId, contactEmail }:
                 <span className="flex items-center gap-0.5">
                   <MapPin className="h-2.5 w-2.5" />
                   {data.licenseState}
+                </span>
+              )}
+              {licenseCheck && (
+                <span className={`flex items-center gap-0.5 ml-1 ${licenseCheck.className}`}>
+                  <licenseCheck.icon className="h-3 w-3" />
+                  <span className="text-[10px]">{licenseCheck.label}</span>
                 </span>
               )}
             </div>

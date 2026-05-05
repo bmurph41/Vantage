@@ -33,9 +33,10 @@ import {
   useApproveRegistration,
   useRejectRegistration,
   useSuspendRegistration,
+  useReverifyRegistration,
   type BrokerRegistrationStatus,
 } from "@/hooks/use-broker-admin";
-import { Loader2, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
+import { Loader2, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, CheckCircle2, AlertCircle, Clock, ShieldQuestion } from "lucide-react";
 
 const TABS: { label: string; value: BrokerRegistrationStatus }[] = [
   { label: "Pending", value: "pending" },
@@ -73,6 +74,72 @@ function formatRelative(ts: string | null | undefined): string {
   return d.toLocaleDateString();
 }
 
+interface LicenseCheckBadgeProps {
+  status: string | null | undefined;
+  compact?: boolean;
+}
+
+function LicenseCheckBadge({ status, compact = false }: LicenseCheckBadgeProps) {
+  if (!status || status === "unverified") {
+    return compact ? (
+      <span className="text-gray-400 text-xs">—</span>
+    ) : (
+      <span className="inline-flex items-center gap-1 text-xs text-gray-500">
+        <ShieldQuestion className="h-3 w-3" />
+        Unverified
+      </span>
+    );
+  }
+
+  const configs: Record<string, { label: string; icon: typeof CheckCircle2; className: string }> = {
+    verified: {
+      label: "Verified",
+      icon: CheckCircle2,
+      className: "text-emerald-600 dark:text-emerald-400",
+    },
+    manual_review_required: {
+      label: "Manual Review",
+      icon: Clock,
+      className: "text-yellow-600 dark:text-yellow-400",
+    },
+    not_found: {
+      label: "Not Found",
+      icon: AlertCircle,
+      className: "text-red-500 dark:text-red-400",
+    },
+    expired: {
+      label: "Expired",
+      icon: AlertCircle,
+      className: "text-orange-500 dark:text-orange-400",
+    },
+    revoked: {
+      label: "Revoked",
+      icon: AlertCircle,
+      className: "text-red-600 dark:text-red-500",
+    },
+    error: {
+      label: "Check Failed",
+      icon: AlertCircle,
+      className: "text-gray-500",
+    },
+  };
+
+  const cfg = configs[status] ?? {
+    label: status,
+    icon: ShieldQuestion,
+    className: "text-gray-500",
+  };
+
+  const Icon = cfg.icon;
+
+  return (
+    <span className={`inline-flex items-center gap-1 text-xs font-medium ${cfg.className}`}>
+      <Icon className="h-3 w-3 shrink-0" />
+      {cfg.label}
+    </span>
+  );
+}
+
 export default function BrokerRegistrationsQueue() {
   const { toast } = useToast();
   const [status, setStatus] = useState<BrokerRegistrationStatus>("pending");
@@ -87,6 +154,7 @@ export default function BrokerRegistrationsQueue() {
   const approveMut = useApproveRegistration();
   const rejectMut = useRejectRegistration();
   const suspendMut = useSuspendRegistration();
+  const reverifyMut = useReverifyRegistration();
 
   const items = data?.items || [];
   const pagination = data?.pagination;
@@ -142,6 +210,20 @@ export default function BrokerRegistrationsQueue() {
     }
   };
 
+  const handleReverify = async () => {
+    if (!reviewId) return;
+    try {
+      const result = await reverifyMut.mutateAsync({ id: reviewId });
+      const vs = result?.registration?.licenseVerificationStatus ?? result?.verificationResult?.status ?? "unknown";
+      toast({
+        title: "License re-checked",
+        description: `Result: ${vs}`,
+      });
+    } catch (e: any) {
+      toast({ title: "Re-verify failed", description: e?.message || "", variant: "destructive" });
+    }
+  };
+
   const reg = detail?.registration;
   const specialties: string[] = Array.isArray(reg?.specialties) ? (reg!.specialties as any) : [];
 
@@ -192,6 +274,7 @@ export default function BrokerRegistrationsQueue() {
                   <TableHead>Company</TableHead>
                   <TableHead>Legal Name</TableHead>
                   <TableHead>License State</TableHead>
+                  <TableHead>License Check</TableHead>
                   <TableHead>Experience</TableHead>
                   <TableHead>Submitted</TableHead>
                   <TableHead>Status</TableHead>
@@ -204,6 +287,9 @@ export default function BrokerRegistrationsQueue() {
                     <TableCell className="font-medium">{r.companyName}</TableCell>
                     <TableCell>{r.legalName}</TableCell>
                     <TableCell>{r.licenseState || "—"}</TableCell>
+                    <TableCell>
+                      <LicenseCheckBadge status={r.licenseVerificationStatus} compact />
+                    </TableCell>
                     <TableCell>{r.yearsExperience != null ? `${r.yearsExperience}y` : "—"}</TableCell>
                     <TableCell>{formatRelative(r.submittedAt)}</TableCell>
                     <TableCell>
@@ -343,6 +429,28 @@ export default function BrokerRegistrationsQueue() {
                     </div>
                   </div>
                 </div>
+
+                <div className="mt-3 p-3 rounded-md border bg-muted/30">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="text-xs text-muted-foreground mb-1">Automated License Check</div>
+                      <LicenseCheckBadge status={reg.licenseVerificationStatus} />
+                      {reg.licenseVerificationProvider && (
+                        <div className="text-[10px] text-muted-foreground mt-0.5">
+                          via {reg.licenseVerificationProvider}
+                          {reg.licenseLastVerifiedAt
+                            ? ` · ${formatRelative(reg.licenseLastVerifiedAt)}`
+                            : ""}
+                        </div>
+                      )}
+                      {reg.licenseVerificationNotes && (
+                        <div className="text-[11px] text-muted-foreground mt-1 max-w-xs">
+                          {reg.licenseVerificationNotes}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
               </section>
 
               <section>
@@ -429,7 +537,21 @@ export default function BrokerRegistrationsQueue() {
             </div>
           )}
 
-          <DialogFooter className="gap-2">
+          <DialogFooter className="gap-2 flex-wrap">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleReverify}
+              disabled={reverifyMut.isPending || !reg?.licenseNumber}
+              className="mr-auto"
+            >
+              {reverifyMut.isPending ? (
+                <Loader2 className="h-3 w-3 animate-spin mr-1" />
+              ) : (
+                <ShieldQuestion className="h-3 w-3 mr-1" />
+              )}
+              Re-verify License
+            </Button>
             <Button variant="outline" onClick={closeReview}>
               Cancel
             </Button>

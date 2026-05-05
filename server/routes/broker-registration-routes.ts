@@ -18,6 +18,7 @@ import { Router, Request, Response, NextFunction } from "express";
 import { db } from "../db";
 import { brokerRegistrations, brokerProfiles } from "@shared/schema";
 import { and, desc, eq, sql } from "drizzle-orm";
+import { verifyAndPersistLicense } from "../services/broker-license-verification";
 
 // ────────────────────────────────────────────────────────────────────────────
 // Helpers
@@ -86,7 +87,21 @@ brokerRegistrationRouter.get("/profile/by-user/:userId", async (req: Request, re
       )
       .limit(1);
 
-    return res.json({ profile: rows[0] || null });
+    if (!rows[0]) return res.json({ profile: null });
+
+    const profile = rows[0];
+    const regRows = await db
+      .select({ licenseVerificationStatus: brokerRegistrations.licenseVerificationStatus })
+      .from(brokerRegistrations)
+      .where(eq(brokerRegistrations.id, profile.registrationId))
+      .limit(1);
+
+    return res.json({
+      profile: {
+        ...profile,
+        licenseVerificationStatus: regRows[0]?.licenseVerificationStatus ?? "unverified",
+      },
+    });
   } catch (err: any) {
     console.error("[broker-registration] GET /profile/by-user error:", err);
     return res.status(500).json({ error: "server_error", message: err?.message || "Server error" });
@@ -112,7 +127,21 @@ brokerRegistrationRouter.get("/profile/:profileId", async (req: Request, res: Re
       )
       .limit(1);
 
-    return res.json({ profile: rows[0] || null });
+    if (!rows[0]) return res.json({ profile: null });
+
+    const profile = rows[0];
+    const regRows = await db
+      .select({ licenseVerificationStatus: brokerRegistrations.licenseVerificationStatus })
+      .from(brokerRegistrations)
+      .where(eq(brokerRegistrations.id, profile.registrationId))
+      .limit(1);
+
+    return res.json({
+      profile: {
+        ...profile,
+        licenseVerificationStatus: regRows[0]?.licenseVerificationStatus ?? "unverified",
+      },
+    });
   } catch (err: any) {
     console.error("[broker-registration] GET /profile/:profileId error:", err);
     return res.status(500).json({ error: "server_error", message: err?.message || "Server error" });
@@ -138,7 +167,21 @@ brokerRegistrationRouter.get("/profile/by-email", async (req: Request, res: Resp
       )
       .limit(1);
 
-    return res.json({ profile: rows[0] || null });
+    if (!rows[0]) return res.json({ profile: null });
+
+    const profile = rows[0];
+    const regRows = await db
+      .select({ licenseVerificationStatus: brokerRegistrations.licenseVerificationStatus })
+      .from(brokerRegistrations)
+      .where(eq(brokerRegistrations.id, profile.registrationId))
+      .limit(1);
+
+    return res.json({
+      profile: {
+        ...profile,
+        licenseVerificationStatus: regRows[0]?.licenseVerificationStatus ?? "unverified",
+      },
+    });
   } catch (err: any) {
     console.error("[broker-registration] GET /profile/by-email error:", err);
     return res.status(500).json({ error: "server_error", message: err?.message || "Server error" });
@@ -307,6 +350,17 @@ brokerRegistrationRouter.post("/", async (req: Request, res: Response) => {
         status: "pending",
       })
       .returning();
+
+    // Fire-and-forget license verification — does not block the response
+    if (row?.id && licenseNumber && licenseState) {
+      verifyAndPersistLicense(row.id, {
+        licenseNumber,
+        licenseState,
+        legalName,
+      }).catch((err) =>
+        console.error("[broker-registration] background verify error:", err),
+      );
+    }
 
     return res.status(201).json({ registration: row });
   } catch (err: any) {
@@ -560,6 +614,18 @@ brokerAdminRouter.post("/registrations/:id/approve", async (req: Request, res: R
       return { registration: updatedReg, profile };
     });
 
+    // Fire-and-forget license re-verification on admin approval
+    const approvedReg = result.registration;
+    if (approvedReg?.id && approvedReg.licenseNumber && approvedReg.licenseState) {
+      verifyAndPersistLicense(approvedReg.id, {
+        licenseNumber: approvedReg.licenseNumber,
+        licenseState: approvedReg.licenseState,
+        legalName: approvedReg.legalName,
+      }).catch((err) =>
+        console.error("[broker-admin] background verify on approve error:", err),
+      );
+    }
+
     return res.json(result);
   } catch (err: any) {
     console.error("[broker-admin] approve error:", err);
@@ -633,6 +699,42 @@ brokerAdminRouter.post("/registrations/:id/suspend", async (req: Request, res: R
     return res
       .status(err?.status || 500)
       .json({ error: err?.code || "server_error", message: err?.message || "Server error" });
+  }
+});
+
+// ── Manual re-verification trigger ───────────────────────────────────────────
+
+brokerAdminRouter.post("/registrations/:id/reverify", async (req: Request, res: Response) => {
+  try {
+    const [reg] = await db
+      .select()
+      .from(brokerRegistrations)
+      .where(eq(brokerRegistrations.id, req.params.id));
+    if (!reg) {
+      return res.status(404).json({ error: "not_found", message: "Registration not found." });
+    }
+    if (!reg.licenseNumber || !reg.licenseState) {
+      return res.status(400).json({
+        error: "invalid_input",
+        message: "Registration has no licenseNumber or licenseState to verify.",
+      });
+    }
+
+    const result = await verifyAndPersistLicense(reg.id, {
+      licenseNumber: reg.licenseNumber,
+      licenseState: reg.licenseState,
+      legalName: reg.legalName,
+    });
+
+    const [updated] = await db
+      .select()
+      .from(brokerRegistrations)
+      .where(eq(brokerRegistrations.id, reg.id));
+
+    return res.json({ registration: updated, verificationResult: result });
+  } catch (err: any) {
+    console.error("[broker-admin] reverify error:", err);
+    return res.status(500).json({ error: "server_error", message: err?.message || "Server error" });
   }
 });
 
