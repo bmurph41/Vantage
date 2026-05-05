@@ -485,6 +485,7 @@ brokerRegistrationRouter.patch("/me", async (req: Request, res: Response) => {
         .map((field) => ({
           registrationId: current.id,
           changedBy: ctx.userId,
+          changedByRole: "broker" as const,
           fieldName: field,
           oldValue: normalizeAuditValue((current as Record<string, unknown>)[field]),
           newValue: normalizeAuditValue(updates[field]),
@@ -1044,6 +1045,125 @@ brokerAdminRouter.get("/registrations/:id/events", async (req: Request, res: Res
   } catch (err: any) {
     console.error("[broker-admin] GET /registrations/:id/events error:", err);
     return res.status(500).json({ error: "server_error", message: err?.message || "Server error" });
+  }
+});
+
+// ── Admin credential edit (audited) ──────────────────────────────────────────
+// NOTE: The status-only admin flows (approve, suspend, reject, request-rereview)
+// do NOT write credential audit rows because they do not change credential fields
+// (licenseNumber, licenseState, legalName, etc.). Only this endpoint and the broker
+// self-edit route (PATCH /api/broker-registration/me) touch those fields and therefore
+// produce broker_credential_audit rows.
+
+brokerAdminRouter.patch("/registrations/:id/credentials", async (req: Request, res: Response) => {
+  try {
+    const adminUser = (req as any).user || (req as any).session?.user;
+    if (!adminUser?.id) {
+      return res.status(401).json({ error: "unauthorized", message: "Not authenticated." });
+    }
+
+    const credentialFields = [
+      "legalFirstName",
+      "legalLastName",
+      "legalName",
+      "companyName",
+      "licenseNumber",
+      "licenseState",
+      "licenseExpiresAt",
+      "licenseDocumentUrl",
+    ] as const;
+
+    const updates: Record<string, any> = {};
+    for (const key of credentialFields) {
+      if (key in (req.body || {})) updates[key] = req.body[key];
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ error: "invalid_input", message: "No credential fields provided." });
+    }
+
+    // Recompute legalName if first/last names are being updated
+    if ("legalFirstName" in updates || "legalLastName" in updates) {
+      const reg = await db
+        .select({ legalFirstName: brokerRegistrations.legalFirstName, legalLastName: brokerRegistrations.legalLastName })
+        .from(brokerRegistrations)
+        .where(eq(brokerRegistrations.id, req.params.id))
+        .limit(1);
+      if (reg[0]) {
+        const firstName = updates.legalFirstName ?? reg[0].legalFirstName ?? "";
+        const lastName = updates.legalLastName ?? reg[0].legalLastName ?? "";
+        if (firstName || lastName) {
+          updates.legalName = `${firstName} ${lastName}`.trim();
+        }
+      }
+    }
+
+    updates.updatedAt = new Date();
+
+    const result = await db.transaction(async (tx) => {
+      const [current] = await tx
+        .select()
+        .from(brokerRegistrations)
+        .where(eq(brokerRegistrations.id, req.params.id));
+      if (!current) {
+        throw Object.assign(new Error("Registration not found."), { status: 404, code: "not_found" });
+      }
+
+      const [updated] = await tx
+        .update(brokerRegistrations)
+        .set(updates)
+        .where(eq(brokerRegistrations.id, current.id))
+        .returning();
+
+      function normalizeAuditValue(value: unknown): string | null {
+        if (value == null) return null;
+        if (value instanceof Date) return value.toISOString().slice(0, 10);
+        const s = String(value);
+        if (/^\d{4}-\d{2}-\d{2}T/.test(s)) return s.slice(0, 10);
+        return s || null;
+      }
+
+      const auditRows = credentialFields
+        .filter((field) => field in updates)
+        .map((field) => ({
+          registrationId: current.id,
+          changedBy: adminUser.id,
+          changedByRole: "admin" as const,
+          fieldName: field,
+          oldValue: normalizeAuditValue((current as Record<string, unknown>)[field]),
+          newValue: normalizeAuditValue(updates[field]),
+        }))
+        .filter((row) => row.oldValue !== row.newValue);
+
+      if (auditRows.length > 0) {
+        await tx.insert(brokerCredentialAudit).values(auditRows);
+      }
+
+      // Propagate credential changes to broker_profiles if it exists
+      const profileUpdates: Record<string, any> = {};
+      if ("legalName" in updates) profileUpdates.displayName = updated.legalName;
+      if ("legalFirstName" in updates) profileUpdates.legalFirstName = updated.legalFirstName;
+      if ("legalLastName" in updates) profileUpdates.legalLastName = updated.legalLastName;
+      if ("companyName" in updates) profileUpdates.companyName = updated.companyName;
+      if ("licenseNumber" in updates) profileUpdates.licenseNumber = updated.licenseNumber;
+      if ("licenseState" in updates) profileUpdates.licenseState = updated.licenseState;
+      if (Object.keys(profileUpdates).length > 0) {
+        profileUpdates.updatedAt = new Date();
+        await tx
+          .update(brokerProfiles)
+          .set(profileUpdates)
+          .where(eq(brokerProfiles.registrationId, current.id));
+      }
+
+      return { registration: updated, auditedFields: auditRows.map((r) => r.fieldName) };
+    });
+
+    return res.json(result);
+  } catch (err: any) {
+    console.error("[broker-admin] PATCH /registrations/:id/credentials error:", err);
+    return res
+      .status(err?.status || 500)
+      .json({ error: err?.code || "server_error", message: err?.message || "Server error" });
   }
 });
 

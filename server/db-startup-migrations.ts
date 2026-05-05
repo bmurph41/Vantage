@@ -19855,6 +19855,7 @@ const MIGRATIONS: Migration[] = [
   },
   { name: "broker_credential_audit: add index broker_credential_audit_reg_idx", sql: `CREATE INDEX IF NOT EXISTS broker_credential_audit_reg_idx ON broker_credential_audit (registration_id)` },
   { name: "broker_credential_audit: add index broker_credential_audit_changed_at_idx", sql: `CREATE INDEX IF NOT EXISTS broker_credential_audit_changed_at_idx ON broker_credential_audit (registration_id, changed_at)` },
+  { name: "broker_credential_audit: add changed_by_role", sql: `ALTER TABLE broker_credential_audit ADD COLUMN IF NOT EXISTS changed_by_role varchar(32) NOT NULL DEFAULT 'broker'` },
 
   // broker_registration_events — new table
   {

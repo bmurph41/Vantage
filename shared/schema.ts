@@ -20087,6 +20087,7 @@ export const brokerCredentialAudit = pgTable("broker_credential_audit", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()::text`),
   registrationId: varchar("registration_id").notNull().references(() => brokerRegistrations.id, { onDelete: "cascade" }),
   changedBy: varchar("changed_by").notNull(),
+  changedByRole: varchar("changed_by_role", { length: 32 }).notNull().default("broker"),
   changedAt: timestamp("changed_at").notNull().defaultNow(),
   fieldName: varchar("field_name", { length: 64 }).notNull(),
   oldValue: text("old_value"),
