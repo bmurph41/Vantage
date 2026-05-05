@@ -295,7 +295,8 @@
       "Bash(NODE_OPTIONS=\"--max-old-space-size=6144\" npx tsc --noEmit)",
       "Bash(tee /tmp/tsc-out.log)",
       "Bash(ps -p 5490 -o etime,rss --no-headers)",
-      "Bash(git log *)"
+      "Bash(git log *)",
+      "Bash(tsx *)"
     ]
   }
 }
