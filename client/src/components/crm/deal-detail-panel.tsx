@@ -499,6 +499,22 @@ function FieldInput({
   }
 }
 
+// ─── Team type options (matches DealContactsBlock) ────────────────
+
+const TEAM_TYPE_OPTIONS = [
+  { value: "seller_team", label: "Seller Team" },
+  { value: "buyer_team", label: "Buyer Team" },
+  { value: "broker",     label: "Broker" },
+  { value: "lender",     label: "Lender" },
+  { value: "mutual",     label: "Mutual" },
+] as const;
+
+type TeamTypeValue = typeof TEAM_TYPE_OPTIONS[number]["value"];
+
+function teamTypeLabel(v: string): string {
+  return TEAM_TYPE_OPTIONS.find(o => o.value === v)?.label ?? v;
+}
+
 // ─── Relationships Section ────────────────────────────────────────
 
 function RelationshipsSection({
@@ -508,13 +524,16 @@ function RelationshipsSection({
   relatedContact?: Contact | null;
   relatedCompany?: Company | null;
 }) {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
   // Fetch associated entities
   const { data: associations } = useQuery<any[]>({
     queryKey: [`/api/crm/associations?entityType=deal&entityId=${deal.id}`],
     enabled: !!deal.id,
   });
 
-  // Fetch deal contacts to find additional broker team members
+  // Fetch deal contacts
   const { data: dealContactList } = useQuery<any[]>({
     queryKey: ["/api/crm/deals", deal.id, "deal-contacts"],
     queryFn: async () => {
@@ -525,18 +544,36 @@ function RelationshipsSection({
     enabled: !!deal.id,
   });
 
-  // Broker contacts from deal team — de-duplicate against the primary contact and against each other
-  // Match on teamType (deal-level role), contactType (deal-level type), OR contactTag (contact-level tag via joined crmContacts)
+  // Mutation: PATCH a single deal contact's teamType
+  const updateTeamType = useMutation<unknown, Error, { contactId: string; teamType: string }>({
+    mutationFn: async ({ contactId, teamType }) => {
+      const res = await fetch(`/api/crm/deals/${deal.id}/deal-contacts/${contactId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ teamType }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Failed to update team type");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/deals", deal.id, "deal-contacts"] });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Update failed", description: err.message, variant: "destructive" });
+    },
+  });
+
+  // De-duplicate deal contacts by email for broker badge display
   const primaryEmail = relatedContact?.email?.toLowerCase() ?? null;
-  const brokerDealContacts = (dealContactList ?? []).filter((dc: any) => {
+  const seenEmails = new Set<string>();
+  const uniqueBrokerContacts = (dealContactList ?? []).filter((dc: any) => {
     const isBroker = dc.teamType === "broker" || dc.contactType === "broker" || dc.contactTag === "broker";
     if (!isBroker || !dc.email) return false;
     if (dc.email.toLowerCase() === primaryEmail) return false;
-    return true;
-  });
-  // De-duplicate by email
-  const seenEmails = new Set<string>();
-  const uniqueBrokerContacts = brokerDealContacts.filter((dc: any) => {
     const key = dc.email.toLowerCase();
     if (seenEmails.has(key)) return false;
     seenEmails.add(key);
@@ -614,7 +651,56 @@ function RelationshipsSection({
         )}
       </div>
 
-      {/* Broker credential badges for additional broker team contacts */}
+      {/* Deal Team Contacts — each row has an inline team-type dropdown */}
+      {dealContactList && dealContactList.length > 0 && (
+        <div className="space-y-1 pt-1">
+          <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Deal Team</p>
+          {dealContactList.map((dc: any) => {
+            const displayName = [dc.firstName, dc.lastName].filter(Boolean).join(" ") || dc.email || "Contact";
+            const isPending = updateTeamType.isPending && updateTeamType.variables?.contactId === dc.id;
+            return (
+              <div
+                key={dc.id}
+                className="flex items-center gap-2 px-2 py-1.5 rounded-md border bg-muted/30 hover:bg-muted/50 transition-colors"
+              >
+                <div className="w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center flex-shrink-0">
+                  <User className="h-3 w-3 text-blue-600" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium text-foreground truncate">{displayName}</p>
+                  {dc.titleRole && (
+                    <p className="text-[10px] text-muted-foreground truncate">{dc.titleRole}</p>
+                  )}
+                </div>
+                <Select
+                  value={dc.teamType || "mutual"}
+                  onValueChange={(val: TeamTypeValue) =>
+                    updateTeamType.mutate({ contactId: dc.id, teamType: val })
+                  }
+                  disabled={isPending}
+                >
+                  <SelectTrigger className="h-6 text-[10px] px-1.5 w-auto min-w-[80px] border-dashed">
+                    {isPending ? (
+                      <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                    ) : (
+                      <SelectValue>{teamTypeLabel(dc.teamType || "mutual")}</SelectValue>
+                    )}
+                  </SelectTrigger>
+                  <SelectContent>
+                    {TEAM_TYPE_OPTIONS.map(opt => (
+                      <SelectItem key={opt.value} value={opt.value} className="text-xs">
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Broker credential badges for broker-tagged deal team contacts */}
       {uniqueBrokerContacts.length > 0 && (
         <div className="space-y-2 pt-1">
           {uniqueBrokerContacts.map((dc: any) => (

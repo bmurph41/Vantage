@@ -6,7 +6,7 @@
 import { Router, Request, Response, NextFunction } from "express";
 import { db } from "../db";
 import { dealContacts, dealExtensions, dealDeposits, dealPropertyAddress, crmContacts } from "@shared/schema";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 
 const router = Router();
 
@@ -40,6 +40,32 @@ router.get("/crm/deals/:dealId/deal-contacts", async (req: Request, res: Respons
       .leftJoin(crmContacts, eq(dealContacts.contactId, crmContacts.id))
       .where(eq(dealContacts.dealId, req.params.dealId));
     res.json(rows);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.patch("/crm/deals/:dealId/deal-contacts/:contactId", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { dealId, contactId } = req.params;
+    const { teamType } = req.body;
+
+    const validTeamTypes = ["seller_team", "buyer_team", "mutual", "broker", "lender"];
+    if (!teamType || !validTeamTypes.includes(teamType)) {
+      return res.status(400).json({ error: "Invalid teamType value" });
+    }
+
+    const result = await db
+      .update(dealContacts)
+      .set({ teamType, updatedAt: new Date() })
+      .where(and(eq(dealContacts.id, contactId), eq(dealContacts.dealId, dealId)))
+      .returning();
+
+    if (result.length === 0) {
+      return res.status(404).json({ error: "Deal contact not found" });
+    }
+
+    res.json(result[0]);
   } catch (error) {
     next(error);
   }
