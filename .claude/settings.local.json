@@ -299,7 +299,8 @@
       "Bash(tsx *)",
       "Bash(tee /tmp/tc.out)",
       "Bash(shuf -n 12 --random-source=/dev/urandom)",
-      "Bash(awk 'NR==1||NR==15||NR==30||NR==45||NR==60||NR==80||NR==95||NR==110||NR==130||NR==150||NR==165||NR==168')"
+      "Bash(awk 'NR==1||NR==15||NR==30||NR==45||NR==60||NR==80||NR==95||NR==110||NR==130||NR==150||NR==165||NR==168')",
+      "Bash(awk '{ if \\($1 > 0\\) print }')"
     ]
   }
 }
