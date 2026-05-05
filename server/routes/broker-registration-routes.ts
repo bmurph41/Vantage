@@ -348,32 +348,54 @@ brokerRegistrationRouter.patch("/me", async (req: Request, res: Response) => {
     if (!current) {
       return res.status(404).json({ error: "not_found", message: "No registration on file." });
     }
-    if (current.status !== "pending") {
+
+    const editableStatuses = ["pending", "approved", "suspended"];
+    if (!editableStatuses.includes(current.status)) {
       return res.status(409).json({
         error: "not_editable",
         message: `Cannot edit a registration in state '${current.status}'.`,
       });
     }
 
-    const allowed = [
+    // Pending registrations allow all fields; approved/suspended only allow credential fields
+    const credentialFields = [
+      "legalFirstName",
+      "legalLastName",
       "legalName",
       "companyName",
-      "email",
-      "phone",
       "licenseNumber",
       "licenseState",
       "licenseExpiresAt",
       "licenseDocumentUrl",
+    ] as const;
+
+    const allFields = [
+      ...credentialFields,
+      "email",
+      "phone",
       "yearsExperience",
       "specialties",
       "bio",
       "website",
       "linkedinUrl",
     ] as const;
+
+    const allowed = current.status === "pending" ? allFields : credentialFields;
+
     const updates: Record<string, any> = {};
     for (const key of allowed) {
       if (key in (req.body || {})) updates[key] = req.body[key];
     }
+
+    // Recompute legalName if first/last names are being updated
+    if ("legalFirstName" in updates || "legalLastName" in updates) {
+      const firstName = updates.legalFirstName ?? current.legalFirstName ?? "";
+      const lastName = updates.legalLastName ?? current.legalLastName ?? "";
+      if (firstName || lastName) {
+        updates.legalName = `${firstName} ${lastName}`.trim();
+      }
+    }
+
     updates.updatedAt = new Date();
 
     const [updated] = await db
@@ -381,6 +403,23 @@ brokerRegistrationRouter.patch("/me", async (req: Request, res: Response) => {
       .set(updates)
       .where(eq(brokerRegistrations.id, current.id))
       .returning();
+
+    // Propagate credential changes to the linked broker_profiles row if it exists
+    const profileUpdates: Record<string, any> = {};
+    if ("legalName" in updates) profileUpdates.displayName = updated.legalName;
+    if ("legalFirstName" in updates) profileUpdates.legalFirstName = updated.legalFirstName;
+    if ("legalLastName" in updates) profileUpdates.legalLastName = updated.legalLastName;
+    if ("companyName" in updates) profileUpdates.companyName = updated.companyName;
+    if ("licenseNumber" in updates) profileUpdates.licenseNumber = updated.licenseNumber;
+    if ("licenseState" in updates) profileUpdates.licenseState = updated.licenseState;
+
+    if (Object.keys(profileUpdates).length > 0) {
+      profileUpdates.updatedAt = new Date();
+      await db
+        .update(brokerProfiles)
+        .set(profileUpdates)
+        .where(eq(brokerProfiles.registrationId, current.id));
+    }
 
     return res.json({ registration: updated });
   } catch (err: any) {
