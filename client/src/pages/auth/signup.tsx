@@ -515,7 +515,16 @@ export default function SignupPage() {
 
       // Auto-submit broker registration if role is broker and credentials were entered
       let brokerRegFailed = false;
-      if (selectedRole === 'broker' && brokerCreds.legalFirstName && brokerCreds.legalLastName && brokerCreds.companyName && accountData?.email) {
+      if (
+        selectedRole === 'broker' &&
+        brokerCreds.legalFirstName &&
+        brokerCreds.legalLastName &&
+        brokerCreds.companyName &&
+        brokerCreds.licenseNumber &&
+        brokerCreds.licenseState &&
+        brokerCreds.licenseExpiresAt &&
+        accountData?.email
+      ) {
         try {
           await apiRequest("POST", "/api/broker-registration", {
             legalFirstName: brokerCreds.legalFirstName.trim(),

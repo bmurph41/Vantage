@@ -83,7 +83,7 @@ export default function BrokerRegister() {
 
   useEffect(() => {
     const r = data?.registration;
-    if (r && r.status === "pending") {
+    if (r && (r.status === "pending" || r.status === "rejected")) {
       setForm({
         legalName: r.legalName || "",
         companyName: r.companyName || "",
