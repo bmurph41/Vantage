@@ -15915,6 +15915,9 @@ export const capitalStacks = pgTable('capital_stacks', {
   exitCapRate: decimal('exit_cap_rate', { precision: 8, scale: 4 }),
   noiGrowthRate: decimal('noi_growth_rate', { precision: 8, scale: 4 }).default('0.02'),
 
+  interestRateType: varchar('interest_rate_type'),
+  maturityDate: date('maturity_date'),
+
   isActive: boolean('is_active').default(true).notNull(),
   createdBy: varchar('created_by').references(() => users.id),
   createdAt: timestamp('created_at').defaultNow().notNull(),
