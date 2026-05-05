@@ -64,6 +64,63 @@ export function requireAdminInline(req: Request, res: Response, next: NextFuncti
 
 export const brokerRegistrationRouter = Router();
 
+// ── Broker Profile Lookup Endpoints ─────────────────────────────────────────
+// These resolve from broker_profiles (post-approval) rather than registrations.
+
+brokerRegistrationRouter.get("/profile/by-user/:userId", async (req: Request, res: Response) => {
+  try {
+    const ctx = getUserContext(req);
+    if (!ctx) return res.status(401).json({ error: "unauthorized", message: "Not authenticated." });
+
+    const targetUserId = req.params.userId;
+    if (!targetUserId) return res.json({ profile: null });
+
+    const rows = await db
+      .select()
+      .from(brokerProfiles)
+      .where(
+        and(
+          eq(brokerProfiles.userId, targetUserId),
+          eq(brokerProfiles.orgId, ctx.orgId),
+        ),
+      )
+      .limit(1);
+
+    return res.json({ profile: rows[0] || null });
+  } catch (err: any) {
+    console.error("[broker-registration] GET /profile/by-user error:", err);
+    return res.status(500).json({ error: "server_error", message: err?.message || "Server error" });
+  }
+});
+
+brokerRegistrationRouter.get("/profile/:profileId", async (req: Request, res: Response) => {
+  try {
+    const ctx = getUserContext(req);
+    if (!ctx) return res.status(401).json({ error: "unauthorized", message: "Not authenticated." });
+
+    const profileId = req.params.profileId;
+    if (!profileId) return res.json({ profile: null });
+
+    const rows = await db
+      .select()
+      .from(brokerProfiles)
+      .where(
+        and(
+          eq(brokerProfiles.id, profileId),
+          eq(brokerProfiles.orgId, ctx.orgId),
+        ),
+      )
+      .limit(1);
+
+    return res.json({ profile: rows[0] || null });
+  } catch (err: any) {
+    console.error("[broker-registration] GET /profile/:profileId error:", err);
+    return res.status(500).json({ error: "server_error", message: err?.message || "Server error" });
+  }
+});
+
+// ── Registration Lookup Endpoints (fall-back when no profile exists yet) ─────
+
 brokerRegistrationRouter.get("/by-user/:userId", async (req: Request, res: Response) => {
   try {
     const ctx = getUserContext(req);
