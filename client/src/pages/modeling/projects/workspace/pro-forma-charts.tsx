@@ -451,7 +451,7 @@ export default function WorkspaceProFormaCharts({ projectId, onTabChange }: Work
                       <div key={idx} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
                         <div>
                           <p className="font-medium">Year {idx + 1} ({year})</p>
-                          <p className="text-sm text-muted-foreground">NOI: {formatCurrency(noi)}</p>
+                          <p className="text-sm text-muted-foreground">NOI: {formatCurrency(y.noi)}</p>
                         </div>
                         <div className="text-right">
                           <p className="font-bold text-lg">{margin.toFixed(1)}%</p>
