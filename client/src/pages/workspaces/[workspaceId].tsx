@@ -816,6 +816,9 @@ export default function WorkspaceDetailPage() {
                 </Select>
               </div>
             </div>
+            {inviteRole === 'broker' && inviteEmail.trim() && (
+              <BrokerCredentialBadge contactEmail={inviteEmail.trim()} />
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowInviteDialog(false)}>Cancel</Button>
