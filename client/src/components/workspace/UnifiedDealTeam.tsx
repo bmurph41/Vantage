@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Users, RefreshCw, Mail, Phone, Building2, Shield } from "lucide-react";
+import { BrokerCredentialBadge } from "@/components/broker/BrokerCredentialBadge";
 
 interface Props { dealId: string; }
 
@@ -84,30 +85,35 @@ export default function UnifiedDealTeam({ dealId }: Props) {
             </CardHeader>
             <CardContent className="space-y-2 pb-3">
               {members.map((member: any, i: number) => (
-                <div key={i} className="flex items-center justify-between py-1.5">
-                  <div className="flex-1">
-                    <p className="font-medium text-sm">{member.name || member.email || "Unknown"}</p>
-                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                      {member.email && <span className="flex items-center gap-1"><Mail className="h-3 w-3" />{member.email}</span>}
-                      {member.phone && <span className="flex items-center gap-1"><Phone className="h-3 w-3" />{member.phone}</span>}
-                      {member.company && <span className="flex items-center gap-1"><Building2 className="h-3 w-3" />{member.company}</span>}
+                <div key={i} className="space-y-2">
+                  <div className="flex items-center justify-between py-1.5">
+                    <div className="flex-1">
+                      <p className="font-medium text-sm">{member.name || member.email || "Unknown"}</p>
+                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                        {member.email && <span className="flex items-center gap-1"><Mail className="h-3 w-3" />{member.email}</span>}
+                        {member.phone && <span className="flex items-center gap-1"><Phone className="h-3 w-3" />{member.phone}</span>}
+                        {member.company && <span className="flex items-center gap-1"><Building2 className="h-3 w-3" />{member.company}</span>}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      {member.inWorkspace && (
+                        <Badge variant="secondary" className="text-[10px]">
+                          <Shield className="h-2.5 w-2.5 mr-0.5" />
+                          {member.vdrPermission || "—"}
+                        </Badge>
+                      )}
+                      {member.isPrimary && <Badge className="text-[10px]">Primary</Badge>}
+                      {!member.inWorkspace && member.inDealContacts && (
+                        <Badge variant="outline" className="text-[10px]">CRM only</Badge>
+                      )}
+                      {member.inviteStatus === "pending" && (
+                        <Badge variant="outline" className="text-[10px] text-amber-600">Pending</Badge>
+                      )}
                     </div>
                   </div>
-                  <div className="flex items-center gap-1">
-                    {member.inWorkspace && (
-                      <Badge variant="secondary" className="text-[10px]">
-                        <Shield className="h-2.5 w-2.5 mr-0.5" />
-                        {member.vdrPermission || "—"}
-                      </Badge>
-                    )}
-                    {member.isPrimary && <Badge className="text-[10px]">Primary</Badge>}
-                    {!member.inWorkspace && member.inDealContacts && (
-                      <Badge variant="outline" className="text-[10px]">CRM only</Badge>
-                    )}
-                    {member.inviteStatus === "pending" && (
-                      <Badge variant="outline" className="text-[10px] text-amber-600">Pending</Badge>
-                    )}
-                  </div>
+                  {type === "broker" && member.email && (
+                    <BrokerCredentialBadge contactEmail={member.email} />
+                  )}
                 </div>
               ))}
             </CardContent>

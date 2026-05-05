@@ -514,6 +514,35 @@ function RelationshipsSection({
     enabled: !!deal.id,
   });
 
+  // Fetch deal contacts to find additional broker team members
+  const { data: dealContactList } = useQuery<any[]>({
+    queryKey: ["/api/crm/deals", deal.id, "deal-contacts"],
+    queryFn: async () => {
+      const res = await fetch(`/api/crm/deals/${deal.id}/deal-contacts`, { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!deal.id,
+  });
+
+  // Broker contacts from deal team — de-duplicate against the primary contact and against each other
+  // Match on teamType (deal-level role) OR contactTag (contact-level tag via joined crmContacts)
+  const primaryEmail = relatedContact?.email?.toLowerCase() ?? null;
+  const brokerDealContacts = (dealContactList ?? []).filter((dc: any) => {
+    const isBroker = dc.teamType === "broker" || dc.contactTag === "broker";
+    if (!isBroker || !dc.email) return false;
+    if (dc.email.toLowerCase() === primaryEmail) return false;
+    return true;
+  });
+  // De-duplicate by email
+  const seenEmails = new Set<string>();
+  const uniqueBrokerContacts = brokerDealContacts.filter((dc: any) => {
+    const key = dc.email.toLowerCase();
+    if (seenEmails.has(key)) return false;
+    seenEmails.add(key);
+    return true;
+  });
+
   return (
     <div className="space-y-3">
       <h4 className="text-sm font-semibold text-foreground flex items-center gap-1.5">
@@ -584,6 +613,15 @@ function RelationshipsSection({
           </div>
         )}
       </div>
+
+      {/* Broker credential badges for additional broker team contacts */}
+      {uniqueBrokerContacts.length > 0 && (
+        <div className="space-y-2 pt-1">
+          {uniqueBrokerContacts.map((dc: any) => (
+            <BrokerCredentialBadge key={dc.email} contactEmail={dc.email} />
+          ))}
+        </div>
+      )}
 
       {/* Add Relationship */}
       <Button variant="outline" size="sm" className="w-full h-7 text-xs gap-1 border-dashed">

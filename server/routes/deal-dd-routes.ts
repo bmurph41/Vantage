@@ -5,7 +5,7 @@
 
 import { Router, Request, Response, NextFunction } from "express";
 import { db } from "../db";
-import { dealContacts, dealExtensions, dealDeposits, dealPropertyAddress } from "@shared/schema";
+import { dealContacts, dealExtensions, dealDeposits, dealPropertyAddress, crmContacts } from "@shared/schema";
 import { eq } from "drizzle-orm";
 
 const router = Router();
@@ -16,8 +16,30 @@ const router = Router();
 
 router.get("/crm/deals/:dealId/deal-contacts", async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const contacts = await db.select().from(dealContacts).where(eq(dealContacts.dealId, req.params.dealId));
-    res.json(contacts);
+    const rows = await db
+      .select({
+        id: dealContacts.id,
+        dealId: dealContacts.dealId,
+        contactId: dealContacts.contactId,
+        firstName: dealContacts.firstName,
+        lastName: dealContacts.lastName,
+        company: dealContacts.company,
+        titleRole: dealContacts.titleRole,
+        phone: dealContacts.phone,
+        email: dealContacts.email,
+        contactType: dealContacts.contactType,
+        teamType: dealContacts.teamType,
+        isPrimary: dealContacts.isPrimary,
+        notes: dealContacts.notes,
+        displayOrder: dealContacts.displayOrder,
+        createdAt: dealContacts.createdAt,
+        updatedAt: dealContacts.updatedAt,
+        contactTag: crmContacts.contactTag,
+      })
+      .from(dealContacts)
+      .leftJoin(crmContacts, eq(dealContacts.contactId, crmContacts.id))
+      .where(eq(dealContacts.dealId, req.params.dealId));
+    res.json(rows);
   } catch (error) {
     next(error);
   }
