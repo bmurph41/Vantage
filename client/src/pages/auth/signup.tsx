@@ -86,6 +86,24 @@ const signupSchema = z.object({
 
 type SignupFormValues = z.infer<typeof signupSchema>;
 
+const TODAY = new Date();
+TODAY.setHours(0, 0, 0, 0);
+
+const brokerCredsSchema = z.object({
+  legalFirstName: z.string().min(1, "Legal first name is required"),
+  legalLastName: z.string().min(1, "Legal last name is required"),
+  companyName: z.string().min(1, "Company name is required"),
+  phone: z.string().optional(),
+  licenseNumber: z.string().min(1, "License number is required"),
+  licenseState: z.string().min(2, "License state is required").max(2, "Use 2-letter state code"),
+  licenseExpiresAt: z.string().min(1, "License expiry date is required").refine(
+    (val) => new Date(val) > TODAY,
+    { message: "License expiry must be a future date" },
+  ),
+});
+
+type BrokerCredsValues = z.infer<typeof brokerCredsSchema>;
+
 function formatPrice(cents: number): string {
   return `$${(cents / 100).toFixed(0)}`;
 }
@@ -996,17 +1014,11 @@ export default function SignupPage() {
     // --- BROKER CREDENTIALS STEP ---
     if (step === 'broker_credentials') {
       const todayStr = new Date().toISOString().split('T')[0];
+      const credsParseResult = brokerCredsSchema.safeParse(brokerCreds);
+      const hasMandatoryFields = credsParseResult.success;
       const expDateValid = brokerCreds.licenseExpiresAt
         ? new Date(brokerCreds.licenseExpiresAt) > new Date()
         : false;
-      const hasMandatoryFields =
-        brokerCreds.legalFirstName.trim() &&
-        brokerCreds.legalLastName.trim() &&
-        brokerCreds.companyName.trim() &&
-        brokerCreds.licenseNumber.trim() &&
-        brokerCreds.licenseState.trim() &&
-        brokerCreds.licenseExpiresAt.trim() &&
-        expDateValid;
 
       const fieldCls = "w-full h-10 px-3 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 bg-slate-50/50";
       return (

@@ -68,6 +68,10 @@ export default function BrokerRegister() {
   const qc = useQueryClient();
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
 
+  const { data: meData } = useQuery<{ id: string } & Record<string, any>>({
+    queryKey: ["/api/auth/me"],
+  });
+
   const { data, isLoading } = useQuery<{ registration: Registration | null }>({
     queryKey: ["/api/broker-registration/me"],
     queryFn: async () => {
@@ -197,9 +201,9 @@ export default function BrokerRegister() {
               </div>
             )}
 
-            {reg.email && (
+            {meData?.id && (
               <div className="mt-2">
-                <BrokerCredentialBadge contactEmail={reg.email} />
+                <BrokerCredentialBadge userId={meData.id} />
               </div>
             )}
 

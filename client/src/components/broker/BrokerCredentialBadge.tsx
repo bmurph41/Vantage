@@ -16,7 +16,10 @@ interface BrokerRegistration {
 }
 
 interface Props {
-  contactEmail: string;
+  /** Primary: platform user ID — resolves via /by-user/:userId (org-scoped) */
+  userId?: string;
+  /** Fallback: CRM contact email — used when userId is unavailable for external contacts */
+  contactEmail?: string;
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -26,18 +29,27 @@ const STATUS_COLORS: Record<string, string> = {
   rejected: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
 };
 
-export function BrokerCredentialBadge({ contactEmail }: Props) {
-  const encodedEmail = encodeURIComponent(contactEmail);
+export function BrokerCredentialBadge({ userId, contactEmail }: Props) {
+  const queryKey = userId
+    ? ["/api/broker-registration/by-user", userId]
+    : ["/api/broker-registration/by-email", contactEmail];
+
   const { data, isLoading, isError } = useQuery<{ registration: BrokerRegistration | null }>({
-    queryKey: ["/api/broker-registration/by-email", contactEmail],
+    queryKey,
     queryFn: async () => {
-      const res = await fetch(`/api/broker-registration/by-email?email=${encodedEmail}`, {
-        credentials: "include",
-      });
+      let url: string;
+      if (userId) {
+        url = `/api/broker-registration/by-user/${encodeURIComponent(userId)}`;
+      } else if (contactEmail) {
+        url = `/api/broker-registration/by-email?email=${encodeURIComponent(contactEmail)}`;
+      } else {
+        return { registration: null };
+      }
+      const res = await fetch(url, { credentials: "include" });
       if (!res.ok) return { registration: null };
       return res.json();
     },
-    enabled: !!contactEmail,
+    enabled: !!(userId || contactEmail),
     staleTime: 60_000,
   });
 

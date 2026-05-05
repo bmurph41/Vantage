@@ -532,7 +532,7 @@ function RelationshipsSection({
               role="Primary Contact"
               href={`/crm/contacts/${relatedContact.id}`}
             />
-            {(relatedContact as any).contactTag === "broker" && relatedContact.email && (
+            {relatedContact.contactTag === "broker" && relatedContact.email && (
               <div className="mt-2">
                 <BrokerCredentialBadge contactEmail={relatedContact.email} />
               </div>

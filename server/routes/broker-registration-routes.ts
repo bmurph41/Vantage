@@ -64,6 +64,34 @@ export function requireAdminInline(req: Request, res: Response, next: NextFuncti
 
 export const brokerRegistrationRouter = Router();
 
+brokerRegistrationRouter.get("/by-user/:userId", async (req: Request, res: Response) => {
+  try {
+    const ctx = getUserContext(req);
+    if (!ctx) return res.status(401).json({ error: "unauthorized", message: "Not authenticated." });
+
+    const targetUserId = req.params.userId;
+    if (!targetUserId) return res.json({ registration: null });
+
+    const rows = await db
+      .select()
+      .from(brokerRegistrations)
+      .where(
+        and(
+          eq(brokerRegistrations.userId, targetUserId),
+          eq(brokerRegistrations.orgId, ctx.orgId),
+        ),
+      )
+      .orderBy(desc(brokerRegistrations.submittedAt))
+      .limit(1);
+
+    const current = rows[0] || null;
+    return res.json({ registration: current });
+  } catch (err: any) {
+    console.error("[broker-registration] GET /by-user error:", err);
+    return res.status(500).json({ error: "server_error", message: err?.message || "Server error" });
+  }
+});
+
 brokerRegistrationRouter.get("/by-email", async (req: Request, res: Response) => {
   try {
     const ctx = getUserContext(req);
@@ -363,8 +391,8 @@ brokerAdminRouter.post("/registrations/:id/approve", async (req: Request, res: R
             slug,
             displayName: reg.legalName,
             companyName: reg.companyName,
-            legalFirstName: (reg as any).legalFirstName ?? null,
-            legalLastName: (reg as any).legalLastName ?? null,
+            legalFirstName: reg.legalFirstName ?? null,
+            legalLastName: reg.legalLastName ?? null,
             bio: reg.bio,
             specialties: reg.specialties,
             yearsExperience: reg.yearsExperience,
