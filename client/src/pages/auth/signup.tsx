@@ -231,12 +231,21 @@ function getSteps(role: RoleType | null) {
   return raw.map((s, i) => ({ ...s, number: i + 1 }));
 }
 
+const US_STATES = [
+  "AL","AK","AZ","AR","CA","CO","CT","DE","DC","FL","GA","HI","ID","IL","IN",
+  "IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH",
+  "NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT",
+  "VT","VA","WA","WV","WI","WY",
+];
+
 interface BrokerCredentials {
   legalFirstName: string;
   legalLastName: string;
   companyName: string;
+  phone: string;
   licenseNumber: string;
   licenseState: string;
+  licenseExpiresAt: string;
 }
 
 // --- Password strength ---
@@ -299,6 +308,30 @@ function RightPanelContent({ step }: { step: StepId }) {
         </p>
         <div className="space-y-3">
           {['Custom dashboard layout', 'Role-specific quick actions', 'Recommended pack bundles', 'Tailored onboarding flow'].map((item, i) => (
+            <div key={i} className="flex items-center gap-3">
+              <div className="w-6 h-6 rounded-full bg-cyan-50 flex items-center justify-center">
+                <Check className="h-3.5 w-3.5 text-cyan-600" />
+              </div>
+              <span className="text-slate-600 text-sm">{item}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (step === 'broker_credentials') {
+    return (
+      <div className="flex flex-col justify-center h-full px-10 py-16">
+        <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center mb-6 shadow-lg shadow-cyan-500/30">
+          <Briefcase className="h-7 w-7 text-white" />
+        </div>
+        <h2 className="text-2xl font-bold text-slate-800 mb-3">Verified broker profile</h2>
+        <p className="text-slate-500 mb-8 leading-relaxed">
+          Your credentials are reviewed by our team and used to build a verified broker profile visible to deal principals and investors on the platform.
+        </p>
+        <div className="space-y-3">
+          {['Admin-verified credential badge', 'Appear in broker discovery', 'Trusted by deal counterparties', 'License validation support'].map((item, i) => (
             <div key={i} className="flex items-center gap-3">
               <div className="w-6 h-6 rounded-full bg-cyan-50 flex items-center justify-center">
                 <Check className="h-3.5 w-3.5 text-cyan-600" />
@@ -413,8 +446,10 @@ export default function SignupPage() {
     legalFirstName: '',
     legalLastName: '',
     companyName: '',
+    phone: '',
     licenseNumber: '',
     licenseState: '',
+    licenseExpiresAt: '',
   });
 
   const STEPS = getSteps(selectedRole);
@@ -461,18 +496,25 @@ export default function SignupPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/bootstrap"] });
 
       // Auto-submit broker registration if role is broker and credentials were entered
-      if (selectedRole === 'broker' && (brokerCreds.legalFirstName || brokerCreds.legalLastName) && brokerCreds.companyName && accountData?.email) {
+      if (selectedRole === 'broker' && brokerCreds.legalFirstName && brokerCreds.legalLastName && brokerCreds.companyName && accountData?.email) {
         try {
           await apiRequest("POST", "/api/broker-registration", {
-            legalFirstName: brokerCreds.legalFirstName.trim() || undefined,
-            legalLastName: brokerCreds.legalLastName.trim() || undefined,
+            legalFirstName: brokerCreds.legalFirstName.trim(),
+            legalLastName: brokerCreds.legalLastName.trim(),
             companyName: brokerCreds.companyName.trim(),
             email: accountData.email,
+            phone: brokerCreds.phone.trim() || null,
             licenseNumber: brokerCreds.licenseNumber.trim() || null,
             licenseState: brokerCreds.licenseState.trim().toUpperCase() || null,
+            licenseExpiresAt: brokerCreds.licenseExpiresAt || null,
           });
         } catch {
           // Non-fatal — registration can be completed later on /broker/register
+          toast({
+            title: "Heads up",
+            description: "Your account was created, but your broker credentials couldn't be submitted automatically. Visit Broker Registration to submit them.",
+            variant: "default",
+          });
         }
       }
 
@@ -953,17 +995,31 @@ export default function SignupPage() {
 
     // --- BROKER CREDENTIALS STEP ---
     if (step === 'broker_credentials') {
-      const hasMandatoryFields = brokerCreds.legalFirstName.trim() && brokerCreds.legalLastName.trim() && brokerCreds.companyName.trim();
+      const todayStr = new Date().toISOString().split('T')[0];
+      const expDateValid = brokerCreds.licenseExpiresAt
+        ? new Date(brokerCreds.licenseExpiresAt) > new Date()
+        : false;
+      const hasMandatoryFields =
+        brokerCreds.legalFirstName.trim() &&
+        brokerCreds.legalLastName.trim() &&
+        brokerCreds.companyName.trim() &&
+        brokerCreds.licenseNumber.trim() &&
+        brokerCreds.licenseState.trim() &&
+        brokerCreds.licenseExpiresAt.trim() &&
+        expDateValid;
+
+      const fieldCls = "w-full h-10 px-3 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 bg-slate-50/50";
       return (
         <div className="space-y-6">
           <div>
             <h2 className="text-2xl font-bold text-slate-800 mb-1">Broker Credentials</h2>
-            <p className="text-slate-500">Enter your credentials. They will be submitted for admin review when your account is created.</p>
+            <p className="text-slate-500">Your credentials are submitted for admin review when your account is created.</p>
           </div>
 
           <div className="space-y-4">
+            {/* Legal Name */}
             <div>
-              <p className="text-sm font-semibold text-slate-700 mb-3">Legal Name *</p>
+              <p className="text-sm font-semibold text-slate-700 mb-2">Legal Name <span className="text-red-500">*</span></p>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs text-slate-500 block mb-1">First Name</label>
@@ -972,7 +1028,7 @@ export default function SignupPage() {
                     value={brokerCreds.legalFirstName}
                     onChange={(e) => setBrokerCreds(p => ({ ...p, legalFirstName: e.target.value }))}
                     placeholder="Jane"
-                    className="w-full h-11 px-3 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 bg-slate-50/50"
+                    className={fieldCls}
                   />
                 </div>
                 <div>
@@ -982,26 +1038,40 @@ export default function SignupPage() {
                     value={brokerCreds.legalLastName}
                     onChange={(e) => setBrokerCreds(p => ({ ...p, legalLastName: e.target.value }))}
                     placeholder="Smith"
-                    className="w-full h-11 px-3 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 bg-slate-50/50"
+                    className={fieldCls}
                   />
                 </div>
               </div>
             </div>
 
-            <div>
-              <label className="text-sm font-semibold text-slate-700 block mb-1">Company / Brokerage Name *</label>
-              <input
-                type="text"
-                value={brokerCreds.companyName}
-                onChange={(e) => setBrokerCreds(p => ({ ...p, companyName: e.target.value }))}
-                placeholder="Smith Realty Group"
-                className="w-full h-11 px-3 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 bg-slate-50/50"
-              />
+            {/* Company + Phone */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-sm font-semibold text-slate-700 block mb-1">Brokerage Name <span className="text-red-500">*</span></label>
+                <input
+                  type="text"
+                  value={brokerCreds.companyName}
+                  onChange={(e) => setBrokerCreds(p => ({ ...p, companyName: e.target.value }))}
+                  placeholder="Smith Realty Group"
+                  className={fieldCls}
+                />
+              </div>
+              <div>
+                <label className="text-sm font-semibold text-slate-700 block mb-1">Phone <span className="text-slate-400 font-normal">(optional)</span></label>
+                <input
+                  type="tel"
+                  value={brokerCreds.phone}
+                  onChange={(e) => setBrokerCreds(p => ({ ...p, phone: e.target.value }))}
+                  placeholder="+1 (555) 000-0000"
+                  className={fieldCls}
+                />
+              </div>
             </div>
 
-            <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
-              <p className="text-sm font-semibold text-slate-700 mb-3">License Information <span className="text-slate-400 font-normal">(optional but recommended)</span></p>
-              <div className="grid grid-cols-2 gap-3">
+            {/* License Info */}
+            <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
+              <p className="text-sm font-semibold text-slate-700">License Information <span className="text-red-500">*</span></p>
+              <div className="grid grid-cols-3 gap-3">
                 <div>
                   <label className="text-xs text-slate-500 block mb-1">License Number</label>
                   <input
@@ -1009,29 +1079,44 @@ export default function SignupPage() {
                     value={brokerCreds.licenseNumber}
                     onChange={(e) => setBrokerCreds(p => ({ ...p, licenseNumber: e.target.value }))}
                     placeholder="BRE-0123456"
-                    className="w-full h-10 px-3 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 bg-white"
+                    className={fieldCls}
                   />
                 </div>
                 <div>
-                  <label className="text-xs text-slate-500 block mb-1">License State</label>
-                  <input
-                    type="text"
-                    maxLength={2}
+                  <label className="text-xs text-slate-500 block mb-1">State</label>
+                  <select
                     value={brokerCreds.licenseState}
-                    onChange={(e) => setBrokerCreds(p => ({ ...p, licenseState: e.target.value.toUpperCase() }))}
-                    placeholder="CA"
-                    className="w-full h-10 px-3 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 bg-white uppercase"
+                    onChange={(e) => setBrokerCreds(p => ({ ...p, licenseState: e.target.value }))}
+                    className={fieldCls}
+                  >
+                    <option value="">Select…</option>
+                    {US_STATES.map(s => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs text-slate-500 block mb-1">Expiration Date</label>
+                  <input
+                    type="date"
+                    min={todayStr}
+                    value={brokerCreds.licenseExpiresAt}
+                    onChange={(e) => setBrokerCreds(p => ({ ...p, licenseExpiresAt: e.target.value }))}
+                    className={fieldCls}
                   />
+                  {brokerCreds.licenseExpiresAt && !expDateValid && (
+                    <p className="text-xs text-red-500 mt-1">Must be a future date</p>
+                  )}
                 </div>
               </div>
             </div>
 
             <p className="text-xs text-slate-400 leading-relaxed">
-              Your credentials will be reviewed by our team. You can update them later on your Broker Registration page.
+              Your license details are required for admin verification. You can update them later on your Broker Registration page.
             </p>
           </div>
 
-          <div className="flex items-center justify-between pt-4">
+          <div className="flex items-center justify-between pt-2">
             <Button
               variant="outline"
               onClick={() => setStep('role')}
@@ -1043,7 +1128,7 @@ export default function SignupPage() {
             <Button
               onClick={() => setStep('assets')}
               disabled={!hasMandatoryFields}
-              className="gap-2 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white shadow-lg shadow-cyan-500/25"
+              className="gap-2 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white shadow-lg shadow-cyan-500/25 disabled:opacity-50"
               data-testid="button-continue-broker-creds"
             >
               Continue

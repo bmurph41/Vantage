@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Loader2 } from "lucide-react";
+import { BrokerCredentialBadge } from "@/components/broker/BrokerCredentialBadge";
 
 interface Registration {
   id: string;
@@ -196,6 +197,12 @@ export default function BrokerRegister() {
               </div>
             )}
 
+            {reg.email && (
+              <div className="mt-2">
+                <BrokerCredentialBadge contactEmail={reg.email} />
+              </div>
+            )}
+
             <div className="border-t pt-4 grid grid-cols-2 gap-3 text-sm">
               <div>
                 <div className="text-xs text-muted-foreground mb-0.5">Legal Name</div>
@@ -225,6 +232,12 @@ export default function BrokerRegister() {
                 <div>
                   <div className="text-xs text-muted-foreground mb-0.5">License State</div>
                   <div className="font-medium">{reg.licenseState}</div>
+                </div>
+              )}
+              {reg.licenseExpiresAt && (
+                <div>
+                  <div className="text-xs text-muted-foreground mb-0.5">License Expires</div>
+                  <div className="font-medium">{new Date(reg.licenseExpiresAt).toLocaleDateString()}</div>
                 </div>
               )}
             </div>

@@ -66,13 +66,21 @@ export const brokerRegistrationRouter = Router();
 
 brokerRegistrationRouter.get("/by-email", async (req: Request, res: Response) => {
   try {
+    const ctx = getUserContext(req);
+    if (!ctx) return res.status(401).json({ error: "unauthorized", message: "Not authenticated." });
+
     const email = String(req.query.email || "").toLowerCase().trim();
     if (!email) return res.json({ registration: null });
 
     const rows = await db
       .select()
       .from(brokerRegistrations)
-      .where(sql`lower(${brokerRegistrations.email}) = ${email}`)
+      .where(
+        and(
+          sql`lower(${brokerRegistrations.email}) = ${email}`,
+          eq(brokerRegistrations.orgId, ctx.orgId),
+        ),
+      )
       .orderBy(desc(brokerRegistrations.submittedAt));
 
     const current = rows.find((r) => r.status !== "rejected") || rows[0] || null;
@@ -355,6 +363,8 @@ brokerAdminRouter.post("/registrations/:id/approve", async (req: Request, res: R
             slug,
             displayName: reg.legalName,
             companyName: reg.companyName,
+            legalFirstName: (reg as any).legalFirstName ?? null,
+            legalLastName: (reg as any).legalLastName ?? null,
             bio: reg.bio,
             specialties: reg.specialties,
             yearsExperience: reg.yearsExperience,

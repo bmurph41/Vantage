@@ -1618,14 +1618,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
   }
 
   // Auth endpoints
-  app.get("/api/auth/me", authenticateUser, (req: any, res) => {
-    res.json({
-      id: req.user.id,
-      orgId: req.user.orgId,
-      role: req.user.role,
-      email: req.user.email,
-      name: req.user.name,
-    });
+  app.get("/api/auth/me", authenticateUser, async (req: any, res) => {
+    try {
+      const baseUser = {
+        id: req.user.id,
+        orgId: req.user.orgId,
+        role: req.user.role,
+        email: req.user.email,
+        name: req.user.name,
+      };
+
+      // Attach broker registration if the user's role is broker
+      if (req.user.role === "broker") {
+        try {
+          const { brokerRegistrations: brt } = await import("@shared/schema");
+          const { desc: descOp, eq: eqOp } = await import("drizzle-orm");
+          const rows = await db
+            .select()
+            .from(brt)
+            .where(eqOp(brt.userId, req.user.id))
+            .orderBy(descOp(brt.submittedAt))
+            .limit(1);
+          const reg = rows[0] || null;
+          return res.json({ ...baseUser, brokerRegistration: reg });
+        } catch {
+          // Non-fatal — return user without broker data
+        }
+      }
+
+      res.json(baseUser);
+    } catch (err: any) {
+      console.error("[/api/auth/me] error:", err);
+      res.status(500).json({ error: "server_error" });
+    }
   });
 
   // Users list — org-scoped, used by CRM assignment dropdowns

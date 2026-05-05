@@ -19882,6 +19882,8 @@ export const brokerProfiles = pgTable("broker_profiles", {
   criteriaUpdatedAt: timestamp("criteria_updated_at"),
   autoLearnEnabled: boolean("auto_learn_enabled").notNull().default(false),
   yearsExperience: integer("years_experience"),
+  legalFirstName: varchar("legal_first_name", { length: 128 }),
+  legalLastName: varchar("legal_last_name", { length: 128 }),
   licenseNumber: varchar("license_number", { length: 100 }),
   licenseState: varchar("license_state", { length: 2 }),
   contactEmail: varchar("contact_email", { length: 255 }),

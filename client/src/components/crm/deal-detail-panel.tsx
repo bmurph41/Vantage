@@ -54,6 +54,7 @@ import { DealStageTracker } from "./deal-stage-tracker";
 import { DealFinancialKPIs } from "./deal-financial-kpis";
 import { DealActivityTimeline } from "./deal-activity-timeline";
 import { DealDocumentsPanel } from "./deal-documents-panel";
+import { BrokerCredentialBadge } from "@/components/broker/BrokerCredentialBadge";
 import {
   getAssetClassConfig,
   type AssetClass, type FieldDefinition, type AssetClassConfig
@@ -523,13 +524,20 @@ function RelationshipsSection({
       <div className="space-y-1.5">
         {/* Primary Contact */}
         {relatedContact && (
-          <RelationshipCard
-            type="contact"
-            name={`${relatedContact.firstName || ""} ${relatedContact.lastName || ""}`.trim() || relatedContact.name || "Contact"}
-            subtitle={relatedContact.email || relatedContact.title || ""}
-            role="Primary Contact"
-            href={`/crm/contacts/${relatedContact.id}`}
-          />
+          <>
+            <RelationshipCard
+              type="contact"
+              name={`${relatedContact.firstName || ""} ${relatedContact.lastName || ""}`.trim() || relatedContact.name || "Contact"}
+              subtitle={relatedContact.email || relatedContact.title || ""}
+              role="Primary Contact"
+              href={`/crm/contacts/${relatedContact.id}`}
+            />
+            {(relatedContact as any).contactTag === "broker" && relatedContact.email && (
+              <div className="mt-2">
+                <BrokerCredentialBadge contactEmail={relatedContact.email} />
+              </div>
+            )}
+          </>
         )}
 
         {/* Primary Company */}

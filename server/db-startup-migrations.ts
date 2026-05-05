@@ -19837,6 +19837,9 @@ const MIGRATIONS: Migration[] = [
   // broker_registrations — split name columns
   { name: "broker_registrations: add legal_first_name", sql: `ALTER TABLE broker_registrations ADD COLUMN IF NOT EXISTS legal_first_name varchar(128)` },
   { name: "broker_registrations: add legal_last_name", sql: `ALTER TABLE broker_registrations ADD COLUMN IF NOT EXISTS legal_last_name varchar(128)` },
+  // broker_profiles — split legal name columns (mirror of broker_registrations)
+  { name: "broker_profiles: add legal_first_name", sql: `ALTER TABLE broker_profiles ADD COLUMN IF NOT EXISTS legal_first_name varchar(128)` },
+  { name: "broker_profiles: add legal_last_name", sql: `ALTER TABLE broker_profiles ADD COLUMN IF NOT EXISTS legal_last_name varchar(128)` },
 ];
 
 /**
