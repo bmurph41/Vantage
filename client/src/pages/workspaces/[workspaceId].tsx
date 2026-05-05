@@ -42,6 +42,7 @@ import { Swords, Award, ClipboardCheck, GitBranch } from 'lucide-react';
 import { useDisplayMode } from '@/stores/display-mode-store';
 import GuidedDealFlow from '@/components/deal-workspace/GuidedDealFlow';
 import SimplifiedDDChecklist from '@/components/dd/SimplifiedDDChecklist';
+import { BrokerCredentialBadge } from '@/components/broker/BrokerCredentialBadge';
 
 // Matches existing workspace_status enum: active, pending, under_contract, due_diligence, closing, closed, dead, on_hold
 const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
@@ -681,29 +682,39 @@ export default function WorkspaceDetailPage() {
               {members.length > 0 ? (
                 <div className="space-y-2">
                   {members.map((member: any) => (
-                    <div key={member.id} className="flex items-center justify-between p-3 rounded-lg bg-muted">
-                      <div className="flex items-center gap-3">
-                        <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
-                          <Users className="h-4 w-4 text-blue-600" />
+                    <div key={member.id} className="p-3 rounded-lg bg-muted space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
+                            <Users className="h-4 w-4 text-blue-600" />
+                          </div>
+                          <div>
+                            <div className="font-medium text-sm">{member.displayName || member.email || `User ${member.userId?.slice(0, 8)}`}</div>
+                            <div className="text-xs text-muted-foreground">{member.email || 'Internal user'}</div>
+                          </div>
                         </div>
-                        <div>
-                          <div className="font-medium text-sm">{member.displayName || member.email || `User ${member.userId?.slice(0, 8)}`}</div>
-                          <div className="text-xs text-muted-foreground">{member.email || 'Internal user'}</div>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className="text-xs">{ROLE_LABELS[member.role] || member.role}</Badge>
+                          <Badge variant="secondary" className="text-xs">VDR: {member.vdrPermission?.replace(/_/g, ' ')}</Badge>
+                          <Badge variant="secondary" className="text-xs">DD: {member.ddPermission}</Badge>
+                          {member.role !== 'owner_admin' && (
+                            <Button
+                              variant="ghost" size="sm" className="text-red-600 h-7 px-2"
+                              onClick={() => workspaceId && revokeMember.mutate({ workspaceId, memberId: member.id })}
+                            >
+                              Revoke
+                            </Button>
+                          )}
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline" className="text-xs">{ROLE_LABELS[member.role] || member.role}</Badge>
-                        <Badge variant="secondary" className="text-xs">VDR: {member.vdrPermission?.replace(/_/g, ' ')}</Badge>
-                        <Badge variant="secondary" className="text-xs">DD: {member.ddPermission}</Badge>
-                        {member.role !== 'owner_admin' && (
-                          <Button
-                            variant="ghost" size="sm" className="text-red-600 h-7 px-2"
-                            onClick={() => workspaceId && revokeMember.mutate({ workspaceId, memberId: member.id })}
-                          >
-                            Revoke
-                          </Button>
-                        )}
-                      </div>
+                      {member.role === 'broker' && (
+                        <div className="ml-11">
+                          <BrokerCredentialBadge
+                            userId={member.userId || undefined}
+                            contactEmail={!member.userId && member.email ? member.email : undefined}
+                          />
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
