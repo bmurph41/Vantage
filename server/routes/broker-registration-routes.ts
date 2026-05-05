@@ -19,7 +19,7 @@ import { db } from "../db";
 import { brokerRegistrations, brokerProfiles, users, crmNotifications, organizationUserRoles, brokerCredentialAudit } from "@shared/schema";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { verifyAndPersistLicense } from "../services/broker-license-verification";
-import { sendEmail, wrapEmailTemplate } from "../services/email-service";
+import { sendEmail, wrapEmailTemplate, sendBrokerRereviewEmail } from "../services/email-service";
 
 // ────────────────────────────────────────────────────────────────────────────
 // Helpers
@@ -944,6 +944,26 @@ brokerAdminRouter.post("/registrations/:id/request-rereview", async (req: Reques
 
       return { registration: updatedReg };
     });
+
+    // Fire-and-forget: notify the broker by email that their profile was flagged for re-review
+    const updatedReg = result.registration;
+    const brokerEmail = updatedReg.email;
+    const brokerName =
+      updatedReg.legalName ||
+      `${updatedReg.legalFirstName ?? ""} ${updatedReg.legalLastName ?? ""}`.trim() ||
+      brokerEmail;
+
+    if (brokerEmail) {
+      sendBrokerRereviewEmail(brokerEmail, brokerName)
+        .then((sent) => {
+          if (!sent) {
+            console.warn("[broker-admin] request-rereview: email not delivered to", brokerEmail);
+          }
+        })
+        .catch((err) =>
+          console.error("[broker-admin] request-rereview email error:", err),
+        );
+    }
 
     return res.json(result);
   } catch (err: any) {

@@ -289,6 +289,37 @@ export async function sendTrialLastDayEmail(to: string, userName?: string): Prom
   });
 }
 
+export async function sendBrokerRereviewEmail(
+  to: string,
+  brokerName: string,
+): Promise<boolean> {
+  const loginUrl = `${APP_URL}/broker/profile`;
+  return sendEmail({
+    to,
+    subject: 'Action Required: Your Broker Profile Has Been Flagged for Re-Review',
+    text: `Hi ${brokerName},\n\nYour broker profile on Vantage has been flagged by an administrator for credential re-verification.\n\nAs a result, your profile has been temporarily unpublished and is no longer visible to others until the review is complete.\n\nWhat to do next:\n1. Log in to your Vantage account.\n2. Review your credential information and update any details that may have changed.\n3. Our team will re-verify your credentials and restore your profile once approved.\n\nIf you believe this was done in error or have any questions, please contact your account administrator.\n\nLog in at: ${loginUrl}\n\n— The Vantage Team`,
+    html: wrapEmailTemplate(`
+      <h2 style="margin-top: 0; color: #1e293b;">Action Required: Profile Flagged for Re-Review</h2>
+      <p>Hi ${brokerName},</p>
+      <p>Your broker profile on Vantage has been flagged by an administrator for <strong>credential re-verification</strong>.</p>
+      <div style="background: #fef3c7; border-left: 4px solid #f59e0b; padding: 16px; border-radius: 4px; margin: 16px 0;">
+        <p style="margin: 0; font-size: 14px;"><strong>Your profile is temporarily unpublished.</strong></p>
+        <p style="margin: 8px 0 0 0; font-size: 14px;">It will not be visible to others until your credentials have been re-verified and approved.</p>
+      </div>
+      <p><strong>What to do next:</strong></p>
+      <ol style="font-size: 14px; padding-left: 20px; margin: 8px 0 16px 0;">
+        <li style="margin-bottom: 8px;">Log in to your Vantage account.</li>
+        <li style="margin-bottom: 8px;">Review your credential information and update any details that may have changed.</li>
+        <li style="margin-bottom: 8px;">Our team will re-verify your credentials and restore your profile once approved.</li>
+      </ol>
+      <p style="color: #64748b; font-size: 14px;">If you believe this was done in error or have any questions, please contact your account administrator.</p>
+      <div style="text-align: center; margin: 32px 0;">
+        <a href="${loginUrl}" style="background: linear-gradient(135deg, #0891b2, #2563eb); color: white; padding: 14px 32px; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block;">Log In to Vantage</a>
+      </div>
+    `),
+  });
+}
+
 export async function sendInviteEmail(
   to: string,
   inviteUrl: string,
