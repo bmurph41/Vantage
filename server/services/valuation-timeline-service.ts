@@ -369,7 +369,7 @@ export class ValuationTimelineService {
     const asOfDateStr = asOfDate.toISOString().split('T')[0];
     
     const rentRollData = await db.select({
-      totalRevenue: sql<string>`COALESCE(SUM(${rentRollEntries.monthlyRent}), 0)`,
+      totalRevenue: sql<string>`COALESCE(SUM(${rentRollEntries.monthlyRate}), 0)`,
       entryCount: sql<string>`COUNT(*)`,
       latestDate: sql<string>`MAX(${rentRollEntries.startDate})`
     })
