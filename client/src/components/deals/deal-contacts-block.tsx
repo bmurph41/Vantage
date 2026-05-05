@@ -123,6 +123,11 @@ function ContactCard({
               <Link2 className="w-2.5 h-2.5" /> CRM Linked
             </Badge>
           )}
+          {contact.teamType === "broker" && (
+            <Badge className="text-[9px] h-4 bg-amber-100 text-amber-800 border border-amber-300 hover:bg-amber-100">
+              Broker
+            </Badge>
+          )}
         </div>
         <div className="flex items-center gap-1">
           <Button type="button" variant="ghost" size="icon" className="h-6 w-6"
