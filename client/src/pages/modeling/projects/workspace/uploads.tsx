@@ -38,6 +38,12 @@ import {
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import {
   Upload,
   FileSpreadsheet,
   CheckCircle2,
@@ -81,7 +87,10 @@ interface UploadWithStats extends DocIntelUpload {
     pending: number;
     confirmed: number;
     rejected: number;
+    excluded: number;
     needsReview: number;
+    reviewed: number;
+    notReviewed: number;
     highConfidence: number;
     lowConfidence: number;
     imported: number;
@@ -618,9 +627,21 @@ export default function WorkspaceUploads({ projectId, onTabChange }: WorkspaceUp
               {pendingUploads.map((upload) => {
                 const isPnlType = PNL_DOC_TYPES.has(upload.docType ?? '');
                 const isSyncing = syncingUploadId === upload.id;
+                const totalCount = upload.stats?.total ?? 0;
                 const confirmedCount = upload.stats?.confirmed ?? 0;
+                const notReviewedCount = upload.stats?.notReviewed ?? 0;
                 const alreadySynced = (upload.stats?.imported ?? 0) >= confirmedCount && confirmedCount > 0;
-                const canSync = isPnlType && confirmedCount > 0 && (upload.status === 'parsed' || upload.status === 'reviewing' || upload.status === 'completed');
+                const allReviewed = totalCount > 0 && notReviewedCount === 0;
+                const isValidSyncStatus = upload.status === 'parsed' || upload.status === 'reviewing' || upload.status === 'completed';
+                const showSyncButton = isPnlType && isValidSyncStatus;
+                const canSync = showSyncButton && allReviewed && confirmedCount > 0;
+                const syncDisabledReason = !showSyncButton
+                  ? null
+                  : !allReviewed
+                    ? `${notReviewedCount} of ${totalCount} line items still need review`
+                    : confirmedCount === 0
+                      ? 'All line items rejected — nothing to sync'
+                      : null;
                 const isRentRollType = isRentRollSyncable(upload);
                 const isSyncingRentRoll = syncingRentRollId === upload.id;
                 const canSyncRentRoll = isRentRollType && (upload.status === 'parsed' || upload.status === 'reviewing' || upload.status === 'completed');
@@ -735,20 +756,31 @@ export default function WorkspaceUploads({ projectId, onTabChange }: WorkspaceUp
                         </Button>
                       )}
                       {/* ── NEW: Sync to Financial Model button ── */}
-                      {canSync && !isSyncing && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className={`gap-1.5 ${alreadySynced
-                            ? 'border-gray-300 text-gray-500 hover:bg-gray-50'
-                            : 'border-green-300 text-green-700 hover:bg-green-50 dark:border-green-800 dark:text-green-400'}`}
-                          onClick={() => handleSyncToModel(upload.id)}
-                          disabled={pnlImportMutation.isPending}
-                          data-testid={`button-sync-model-${upload.id}`}
-                        >
-                          <Zap className="h-3.5 w-3.5" />
-                          {alreadySynced ? 'Re-sync to Model' : 'Sync to Model'}
-                        </Button>
+                      {showSyncButton && !isSyncing && (
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span tabIndex={canSync ? -1 : 0}>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className={`gap-1.5 ${alreadySynced
+                                    ? 'border-gray-300 text-gray-500 hover:bg-gray-50'
+                                    : 'border-green-300 text-green-700 hover:bg-green-50 dark:border-green-800 dark:text-green-400'}`}
+                                  onClick={() => handleSyncToModel(upload.id)}
+                                  disabled={!canSync || pnlImportMutation.isPending}
+                                  data-testid={`button-sync-model-${upload.id}`}
+                                >
+                                  <Zap className="h-3.5 w-3.5" />
+                                  {alreadySynced ? 'Re-sync to Model' : 'Sync to Model'}
+                                </Button>
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent side="top">
+                              {syncDisabledReason ?? 'Push line items to financial model'}
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
                       )}
                       {/* ── NEW: Sync Rent Roll button ── */}
                       {canSyncRentRoll && (
@@ -801,6 +833,18 @@ export default function WorkspaceUploads({ projectId, onTabChange }: WorkspaceUp
               {completedUploads.map((upload) => {
                 const isPnlType = PNL_DOC_TYPES.has(upload.docType ?? '');
                 const isSyncing = syncingUploadId === upload.id;
+                const totalCount = upload.stats?.total ?? 0;
+                const confirmedCount = upload.stats?.confirmed ?? 0;
+                const notReviewedCount = upload.stats?.notReviewed ?? 0;
+                const allReviewed = totalCount > 0 && notReviewedCount === 0;
+                const canResync = isPnlType && allReviewed && confirmedCount > 0;
+                const resyncDisabledReason = !isPnlType
+                  ? null
+                  : !allReviewed
+                    ? `${notReviewedCount} of ${totalCount} line items still need review`
+                    : confirmedCount === 0
+                      ? 'All line items rejected — nothing to sync'
+                      : null;
                 const isRentRollType = isRentRollSyncable(upload);
                 const isSyncingRentRoll = syncingRentRollId === upload.id;
 
@@ -828,19 +872,30 @@ export default function WorkspaceUploads({ projectId, onTabChange }: WorkspaceUp
                     <div className="flex items-center gap-2">
                       {/* ── NEW: Re-sync to Financial Model ── */}
                       {isPnlType && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="gap-1.5 border-green-300 text-green-700 hover:bg-green-50 dark:border-green-800 dark:text-green-400"
-                          onClick={() => handleSyncToModel(upload.id)}
-                          disabled={isSyncing || pnlImportMutation.isPending}
-                        >
-                          {isSyncing ? (
-                            <><Loader2 className="h-3.5 w-3.5 animate-spin" />Syncing...</>
-                          ) : (
-                            <><Zap className="h-3.5 w-3.5" />Re-sync to Model</>
-                          )}
-                        </Button>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span tabIndex={canResync ? -1 : 0}>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="gap-1.5 border-green-300 text-green-700 hover:bg-green-50 dark:border-green-800 dark:text-green-400"
+                                  onClick={() => handleSyncToModel(upload.id)}
+                                  disabled={!canResync || isSyncing || pnlImportMutation.isPending}
+                                >
+                                  {isSyncing ? (
+                                    <><Loader2 className="h-3.5 w-3.5 animate-spin" />Syncing...</>
+                                  ) : (
+                                    <><Zap className="h-3.5 w-3.5" />Re-sync to Model</>
+                                  )}
+                                </Button>
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent side="top">
+                              {resyncDisabledReason ?? 'Re-push line items to financial model'}
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
                       )}
                       {/* ── NEW: Re-sync Rent Roll ── */}
                       {isRentRollType && (

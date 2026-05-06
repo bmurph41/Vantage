@@ -1915,7 +1915,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
       }
       
       const uploadIds = uploads.map((u: any) => u.id);
-      let statsMap: Record<string, { total: number; pending: number; confirmed: number; rejected: number; needsReview: number; highConfidence: number; lowConfidence: number; imported: number }> = {};
+      let statsMap: Record<string, { total: number; pending: number; confirmed: number; rejected: number; excluded: number; needsReview: number; reviewed: number; notReviewed: number; highConfidence: number; lowConfidence: number; imported: number }> = {};
       if (uploadIds.length > 0) {
         const { docIntelExtractedItems } = await import('@shared/schema');
         const { sql, inArray, and: andOp, eq: eqOp } = await import('drizzle-orm');
@@ -1925,6 +1925,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
           pending: sql<number>`count(*) filter (where ${docIntelExtractedItems.status} = 'pending')::int`,
           confirmed: sql<number>`count(*) filter (where ${docIntelExtractedItems.status} = 'confirmed')::int`,
           rejected: sql<number>`count(*) filter (where ${docIntelExtractedItems.status} = 'rejected')::int`,
+          excluded: sql<number>`count(*) filter (where ${docIntelExtractedItems.status} = 'excluded')::int`,
           highConfidence: sql<number>`count(*) filter (where ${docIntelExtractedItems.confidenceScore}::numeric >= 0.8)::int`,
           lowConfidence: sql<number>`count(*) filter (where ${docIntelExtractedItems.confidenceScore}::numeric < 0.8)::int`,
           imported: sql<number>`count(*) filter (where ${docIntelExtractedItems.targetRecordId} is not null)::int`,
@@ -1936,12 +1937,16 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
           ))
           .groupBy(docIntelExtractedItems.uploadId);
         for (const row of statsRows) {
+          const reviewed = row.confirmed + row.rejected + row.excluded;
           statsMap[row.uploadId] = {
             total: row.total,
             pending: row.pending,
             confirmed: row.confirmed,
             rejected: row.rejected,
+            excluded: row.excluded,
             needsReview: row.pending,
+            reviewed,
+            notReviewed: row.total - reviewed,
             highConfidence: row.highConfidence,
             lowConfidence: row.lowConfidence,
             imported: row.imported || 0,

@@ -2851,18 +2851,28 @@ Respond with JSON only:
     pending: number;
     confirmed: number;
     rejected: number;
+    excluded: number;
     needsReview: number;
+    reviewed: number;
+    notReviewed: number;
     highConfidence: number;
     lowConfidence: number;
   }> {
     const items = await this.getExtractedItems(orgId, uploadId);
-    
+    const confirmed = items.filter(i => i.status === 'confirmed').length;
+    const rejected = items.filter(i => i.status === 'rejected').length;
+    const excluded = items.filter(i => i.status === 'excluded').length;
+    const reviewed = confirmed + rejected + excluded;
+
     return {
       total: items.length,
       pending: items.filter(i => i.status === 'pending').length,
-      confirmed: items.filter(i => i.status === 'confirmed').length,
-      rejected: items.filter(i => i.status === 'rejected').length,
+      confirmed,
+      rejected,
+      excluded,
       needsReview: items.filter(i => i.status === 'needs_review').length,
+      reviewed,
+      notReviewed: items.length - reviewed,
       highConfidence: items.filter(i => i.confidenceScore && parseFloat(i.confidenceScore) >= 0.9).length,
       lowConfidence: items.filter(i => !i.confidenceScore || parseFloat(i.confidenceScore) < 0.7).length,
     };
