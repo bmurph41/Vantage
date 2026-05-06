@@ -17476,7 +17476,8 @@ export const modelingActuals = pgTable('modeling_actuals', {
 
   // Period information
   year: integer('year').notNull(),
-  month: integer('month').notNull(), // 1-12
+  month: integer('month').notNull(), // 1-12 (annual rollups land at month=1; period_type discriminates)
+  periodType: text('period_type').$type<'month' | 'year' | 'quarter'>().notNull().default('month'),
 
   // Category classification (matches P&L structure)
   category: text('category').notNull(), // 'Revenue', 'COGS', 'Expenses'
@@ -17506,8 +17507,8 @@ export const modelingActuals = pgTable('modeling_actuals', {
   periodIdx: index('modeling_actuals_period_idx').on(table.year, table.month),
   categoryIdx: index('modeling_actuals_category_idx').on(table.category, table.subcategory),
   dataSourceIdx: index('modeling_actuals_data_source_idx').on(table.dataSource),
-  uniqueLineItem: unique('modeling_actuals_unique_line').on(
-    table.modelingProjectId, table.year, table.month, table.category, table.subcategory, table.lineItemDescription
+  uniqueLineItem: unique('modeling_actuals_unique_period').on(
+    table.modelingProjectId, table.year, table.month, table.periodType, table.category, table.subcategory, table.lineItemDescription
   ),
 }));
 

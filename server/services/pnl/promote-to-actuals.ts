@@ -147,7 +147,9 @@ export async function promotePnlFactsToActuals(
         const department = normalizeDepartment(rawDepartment);
 
         const year = fact.fiscalYear;
-        const month = fact.fiscalPeriod || 1;
+        const periodType = (fact.periodType as 'month' | 'year' | 'quarter') || 'month';
+        const isAnnual = periodType === 'year';
+        const month = isAnnual ? 1 : (fact.fiscalPeriod || 1);
         const amount = fact.value;
 
         yearsSet.add(year);
@@ -160,6 +162,7 @@ export async function promotePnlFactsToActuals(
             modelingProjectId,
             year,
             month,
+            periodType,
             category,
             subcategory,
             department,
@@ -174,6 +177,7 @@ export async function promotePnlFactsToActuals(
               modelingActuals.modelingProjectId,
               modelingActuals.year,
               modelingActuals.month,
+              modelingActuals.periodType,
               modelingActuals.category,
               modelingActuals.subcategory,
               modelingActuals.lineItemDescription,
