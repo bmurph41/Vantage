@@ -89,6 +89,7 @@ import { useDisplayOverrides } from '@/hooks/useDisplayOverrides';
 import { DepartmentOrderSettings } from '@/components/modeling/DepartmentOrderSettings';
 import { InlineEditableName } from '@/components/modeling/InlineEditableName';
 import type { ProjectConfig, HistoricalPLData, ActualsData } from '@/types/modeling';
+import type { DocIntelUpload } from '@shared/schema';
 import { ExportPdfButton } from '@/components/ui/export-pdf-button';
 
 interface WorkspaceHistoricalPLProps {
@@ -280,6 +281,31 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
   const { data: config } = useQuery<ProjectConfig>({
     queryKey: ['/api/modeling/projects', projectId, 'config'],
   });
+
+  // G3: derive default granularity (monthly/annual) from uploaded P&L docs.
+  // Most-common dataGranularity wins; ties + no uploads default to monthly.
+  const { data: projectUploads } = useQuery<DocIntelUpload[]>({
+    queryKey: ['/api/modeling/projects', projectId, 'documents'],
+  });
+
+  const defaultGranularity = useMemo<'monthly' | 'annual'>(() => {
+    if (!projectUploads || projectUploads.length === 0) return 'monthly';
+    const granularities = projectUploads
+      .filter(u => u.docType === 'pnl' && u.status !== 'error')
+      .map(u => (u.dataGranularity ?? 'monthly') as 'monthly' | 'annual');
+    if (granularities.length === 0) return 'monthly';
+    const monthlyCount = granularities.filter(g => g === 'monthly').length;
+    const annualCount = granularities.filter(g => g === 'annual').length;
+    return annualCount > monthlyCount ? 'annual' : 'monthly';
+  }, [projectUploads]);
+
+  // G3: sync displayMode default to majority granularity of uploaded P&Ls.
+  // Matches the viewMode→annual effect pattern above — clobbers any manual
+  // toggle that occurred during uploads loading window (rare race;
+  // one-click recoverable).
+  useEffect(() => {
+    setDisplayMode(defaultGranularity);
+  }, [defaultGranularity]);
 
   // Revenue source config for department badges
   const { data: revenueSourceConfig } = useQuery<{ departments: Array<{ dept: string; label: string; hasProfitCenterData: boolean; source: string }>; revenueSourceByDept: Record<string, string> }>({
