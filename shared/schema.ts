@@ -12873,8 +12873,13 @@ export const compSets = pgTable('comp_sets', {
 
   // Configuration
   filters: jsonb('filters').$type<CompSetFilters>().default({}),
-  scoringConfig: jsonb('scoring_config').$type<ScoringConfig>().default({}),
-  adjustmentConfig: jsonb('adjustment_config').$type<AdjustmentConfig>().default({}),
+  scoringConfig: jsonb('scoring_config').$type<ScoringConfig>().default({
+    exponentP: 2,
+    useTravelTime: false,
+  }),
+  adjustmentConfig: jsonb('adjustment_config').$type<AdjustmentConfig>().default({
+    outlierTrim: 'none',
+  }),
 
   // Last compute result
   lastComputeResult: jsonb('last_compute_result').$type<RateSetComputeResult | SalesSetComputeResult>(),

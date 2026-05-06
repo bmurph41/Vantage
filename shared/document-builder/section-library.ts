@@ -1563,7 +1563,7 @@ For each risk, provide likelihood (Low/Medium/High), impact, and specific mitiga
           gridGap: '24px',
           placeholders: [
             { id: 'narrative', blockType: 'text', x: 72, y: 72, width: 330, height: 400, bindingKey: 'operationsOverview' },
-            { id: 'metrics', blockType: 'metrics', x: 420, y: 72, width: 324, height: 400, bindingKey: 'totalSlips' }
+            { id: 'metrics', blockType: 'metric_tile', x: 420, y: 72, width: 324, height: 400, bindingKey: 'totalSlips' }
           ]
         }
       }
@@ -1572,10 +1572,14 @@ For each risk, provide likelihood (Low/Medium/High), impact, and specific mitiga
       {
         key: 'operations_narrative',
         name: 'Operations Narrative',
-        promptTemplate: 'Write a professional 3-paragraph operations overview for {{propertyName}}, a marina with {{totalSlips}} total slips ({{wetSlips}} wet, {{drySlips}} dry) located in {{location}}. Describe the operational strengths, revenue streams, and management approach. Annual revenue is approximately {{annualRevenue}}. Occupancy rate is {{occupancyRate}}. Write in institutional investment memo style.',
-        outputFormat: 'text',
+        // PLACEHOLDER DEFAULTS: systemPrompt/maxTokens/temperature filled in
+        // 2026-05-06 to satisfy AIPromptTemplate type. Tune before relying on output.
+        systemPrompt: 'You are an expert real estate investment analyst writing professional marina underwriting content. Produce clear, factual narrative based on the provided context.',
+        userPromptTemplate: 'Write a professional 3-paragraph operations overview for {{propertyName}}, a marina with {{totalSlips}} total slips ({{wetSlips}} wet, {{drySlips}} dry) located in {{location}}. Describe the operational strengths, revenue streams, and management approach. Annual revenue is approximately {{annualRevenue}}. Occupancy rate is {{occupancyRate}}. Write in institutional investment memo style.',
         requiredContext: ['propertyName', 'totalSlips'],
-        optionalContext: ['wetSlips', 'drySlips', 'location', 'annualRevenue', 'occupancyRate'],
+        outputFormat: 'text',
+        maxTokens: 600,
+        temperature: 0.7,
       }
     ],
     completionRules: [

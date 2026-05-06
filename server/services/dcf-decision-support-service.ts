@@ -247,6 +247,7 @@ export async function runDecisionSupport(
     attribution,
     purchasePrice,
     equityInvested,
+    year1Noi: year1.netOperatingIncome,
     holdPeriodYears: holdPeriod,
     totalDebt,
     hurdleIRR,

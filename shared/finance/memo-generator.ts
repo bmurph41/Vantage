@@ -84,6 +84,7 @@ export interface MemoInput {
   attribution?: AttributionResult;
   purchasePrice: number;
   equityInvested: number;
+  year1Noi?: number;
   holdPeriodYears: number;
   totalDebt: number;
   hurdleIRR: number;
@@ -182,12 +183,19 @@ function generateICMemo(input: MemoInput): MemoResult {
   const sections: MemoSection[] = [];
 
   // Investment Thesis
+  const goingInCap = (input.year1Noi && input.purchasePrice > 0)
+    ? (input.year1Noi / input.purchasePrice) * 100
+    : null;
+  const exitNote = base.overridesApplied.exitCapRateDelta === 0
+    ? 'unchanged exit cap'
+    : 'adjusted exit cap';
+
   sections.push({
     title: 'Investment Thesis',
     bullets: [
       `${input.holdPeriodYears}-year value-add/stabilized hold targeting ${fmt(base.irr)}%+ IRR`,
-      `Going-in cap rate of ${fmt(base.irr > 0 ? (base.overridesApplied ? 'N/A' : 'see appendix') : 'N/A')}`,
-      `Exit at ${fmt(base.overridesApplied.exitCapRateDelta === 0 ? 'base' : 'adjusted')} cap rate with ${fmtCurrency(base.netSaleProceeds)} net proceeds`,
+      `Going-in cap rate of ${goingInCap !== null ? fmt(goingInCap) + '%' : 'N/A'}`,
+      `Projected exit: ${exitNote}, ${fmtCurrency(base.netSaleProceeds)} net proceeds`,
     ],
   });
 
