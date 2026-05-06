@@ -3432,7 +3432,22 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
               }
               const rawNoi = revenue - cogs - expenses;
 
-              // Apply active addbacks to get normalized NOI
+              // Apply active addbacks to get normalized NOI.
+              //
+              // Addback semantics: REPLACEMENT (per AddbackEditor.tsx UX —
+              // "this value replaces the original amount"). Each addback's
+              // stored amount is what the line item SHOULD be; the delta to
+              // NOI is the difference between the original (live-lookup from
+              // modeling_actuals) and the replacement, signed by the line's
+              // accounting category.
+              //
+              // Known data-model gap: modeling_addbacks does not store the
+              // original amount at creation time, forcing a live lookup that
+              // drifts when source actuals change. See
+              // project_addback_original_anchoring.md for the Tier 2 fix
+              // (add original_amount_at_creation column + populate). When
+              // that ships, prefer the stored value if non-null and fall
+              // back to live lookup if null.
               let addbackTotal = 0;
               try {
                 const { modelingAddbacks, modelingAddbackValues } = await import('@shared/schema');
@@ -3444,12 +3459,65 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
                     eq(modelingAddbacks.isActive, true)
                   ));
                 for (const ab of activeAddbackRows) {
+                  // 1. Sum the replacement value(s) for this addback.
                   const vals = await db.select()
                     .from(modelingAddbackValues)
                     .where(eq(modelingAddbackValues.addbackId, ab.id));
-                  for (const v of vals) {
-                    addbackTotal += parseFloat(v.amount?.toString() || '0');
+                  const replacementSum = vals.reduce(
+                    (s, v) => s + parseFloat(v.amount?.toString() || '0'), 0
+                  );
+
+                  // 2. Live-lookup the original from modeling_actuals based
+                  //    on the addback's scope.
+                  const lookupConditions = [
+                    eq(modelingActuals.modelingProjectId, projectId),
+                    eq(modelingActuals.orgId, orgId),
+                  ];
+                  if (ab.scope === 'category') {
+                    // category-scope: line_item_key holds the category name.
+                    lookupConditions.push(eq(modelingActuals.category, ab.lineItemKey));
+                  } else {
+                    // line_item / month_cell: line_item_key matches subcategory.
+                    lookupConditions.push(eq(modelingActuals.subcategory, ab.lineItemKey));
                   }
+                  if (ab.addbackYear != null) {
+                    lookupConditions.push(eq(modelingActuals.year, ab.addbackYear));
+                  }
+                  if (ab.scope === 'month_cell' && ab.addbackMonth != null) {
+                    lookupConditions.push(eq(modelingActuals.month, ab.addbackMonth));
+                  }
+                  const matchedRows = await db.select()
+                    .from(modelingActuals)
+                    .where(and(...lookupConditions));
+
+                  // Graceful degradation: addback references a line that
+                  // doesn't exist in actuals (e.g., legacy seed mismatch,
+                  // pre-creation reference). Skip with a warning rather than
+                  // applying an incorrect adjustment.
+                  if (matchedRows.length === 0) {
+                    console.warn(
+                      `[Exit Metrics] Addback ${ab.id} (lineItemKey=${ab.lineItemKey}, scope=${ab.scope}, year=${ab.addbackYear}) found no matching modeling_actuals — skipping`
+                    );
+                    continue;
+                  }
+
+                  const originalSum = matchedRows.reduce(
+                    (s, r) => s + parseFloat(r.amount?.toString() || '0'), 0
+                  );
+
+                  // 3. Determine accounting sign from the matched line's
+                  //    category (prefer addback's stored category as a tie-break).
+                  const matchCategory = (ab.category || matchedRows[0].category || '').toLowerCase();
+                  const isRevenue = matchCategory === 'revenue';
+
+                  // 4. Compute signed delta. modeling_actuals.amount is stored
+                  //    positive; sign convention comes from category:
+                  //    Revenue: NOI += (replacement - original)
+                  //    Expense/COGS: NOI += (original - replacement)
+                  const delta = isRevenue
+                    ? (replacementSum - originalSum)
+                    : (originalSum - replacementSum);
+                  addbackTotal += delta;
                 }
               } catch (abErr) {
                 console.warn('[Exit Metrics] Addback fetch failed (non-fatal):', abErr);
