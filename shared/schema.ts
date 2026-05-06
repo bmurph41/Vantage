@@ -11492,6 +11492,11 @@ export const modelingProjects = pgTable('modeling_projects', {
   // Case configuration - custom labels for scenarios (base, aggressive, conservative, custom)
   caseLabels: jsonb('case_labels').default(sql`'{"base": "Base Case", "aggressive": "Aggressive Case", "conservative": "Conservative Case", "custom": "Custom Case"}'`),
 
+  // G4: project-level master toggle for the per-line-item adjustments UI.
+  // 'all_on' / 'all_off' apply universally; 'custom' means per-line state lives
+  // on modeling_addbacks.is_active.
+  adjustmentsMasterState: text('adjustments_master_state').$type<'all_on' | 'all_off' | 'custom'>().notNull().default('all_on'),
+
   // Metadata
   notes: text('notes'),
   createdBy: varchar('created_by').notNull().references(() => users.id),
@@ -17493,6 +17498,11 @@ export const modelingActuals = pgTable('modeling_actuals', {
   sourceRecordId: varchar('source_record_id'), // ID from source system
   sourceRecordType: text('source_record_type'), // e.g., 'rent_roll_entry', 'fuel_sale', 'ship_store_transaction'
 
+  // G4: provenance — distinguishes original uploaded/imported rows from
+  // user inline-edits applied during reconciliation. 'manual_override' rows
+  // survive destructive re-syncs from doc_intel_pipeline.
+  source: text('source').$type<'uploaded' | 'manual_override'>().notNull().default('uploaded'),
+
   // Sync metadata
   syncedAt: timestamp('synced_at').defaultNow().notNull(),
   syncJobId: varchar('sync_job_id'),
@@ -21403,6 +21413,57 @@ export const modelingPnlOverrides = pgTable("modeling_pnl_overrides", {
   orgIdx: index("modeling_pnl_overrides_org_idx").on(table.orgId),
   lineItemIdx: index("modeling_pnl_overrides_line_item_idx").on(table.projectId, table.lineItemKey),
   uniqueOverride: unique("modeling_pnl_overrides_unique").on(table.projectId, table.lineItemKey, table.overrideType),
+}));
+
+// ============================================================================
+// G4 — CONSOLIDATED MULTI-PERIOD P&L (adjustment state + audit trail)
+//
+// Tenant isolation note: these tables follow the canonical project pattern of
+// app-layer org filtering via `WHERE org_id = $orgId` in service queries +
+// `setTenantContext()` defense-in-depth (server/middleware/tenant-context.ts).
+// No Postgres RLS policies exist anywhere in the codebase; do not add an
+// `enableRLS()` directive or `CREATE POLICY` here unless the project-wide
+// tenant-isolation pattern changes.
+// ============================================================================
+
+// Per-year projection-handling decisions captured by the user when
+// modeling_actuals coverage is partial within an effective range.
+export const modelingProjectionDecisions = pgTable("modeling_projection_decisions", {
+  projectId: varchar("project_id").notNull(),
+  orgId: varchar("org_id").notNull(),
+  year: integer("year").notNull(),
+  handling: text("handling").$type<'auto' | 'manual' | 'gap'>().notNull().default('auto'),
+  needsReview: boolean("needs_review").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  // composite PK on (project_id, year) per Phase 1.1 DDL
+  pk: primaryKey({ columns: [table.projectId, table.year] }),
+}));
+
+// Polymorphic audit log for adjustment-related events. action_type discriminates.
+export const modelingAdjustmentHistory = pgTable("modeling_adjustment_history", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull(),
+  projectId: varchar("project_id").notNull(),
+  userId: varchar("user_id").notNull(),
+  actionType: text("action_type").$type<
+    | 'addback_toggle'
+    | 'master_state_change'
+    | 'reconciliation_decision'
+    | 'projection_method_change'
+    | 'apply_to_pro_forma'
+    | 'manual_override'
+    | 'addback_created_post_upload'
+    | 'addback_deleted_via_resync'
+  >().notNull(),
+  targetId: varchar("target_id"),
+  oldValue: jsonb("old_value"),
+  newValue: jsonb("new_value"),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  projectTimeIdx: index("idx_adj_history_project_time").on(table.projectId, table.createdAt),
 }));
 
 // ============================================================================

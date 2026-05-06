@@ -10917,6 +10917,24 @@ const MIGRATIONS: Migration[] = [
   { name: "modeling_actuals: add created_at", sql: `ALTER TABLE modeling_actuals ADD COLUMN IF NOT EXISTS created_at timestamp` },
   { name: "modeling_actuals: add updated_at", sql: `ALTER TABLE modeling_actuals ADD COLUMN IF NOT EXISTS updated_at timestamp` },
 
+  // ── G4 Phase 1.0 (commit c3ab6c99) — bootstrap stubs that were missing from
+  //    that commit. Stubs run BEFORE any Phase 1.1+ stub that depends on
+  //    period_type. None of the Phase 1.1 blocks reference period_type today,
+  //    but the ordering invariant is explicit for future readers.
+  { name: "modeling_actuals: add period_type", sql: `ALTER TABLE modeling_actuals ADD COLUMN IF NOT EXISTS period_type text NOT NULL DEFAULT 'month' CHECK (period_type IN ('month', 'year', 'quarter'))` },
+  { name: "modeling_actuals: drop legacy unique_line constraint", sql: `ALTER TABLE modeling_actuals DROP CONSTRAINT IF EXISTS modeling_actuals_unique_line` },
+  { name: "modeling_actuals: add unique_period constraint", sql: `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'modeling_actuals_unique_period') THEN ALTER TABLE modeling_actuals ADD CONSTRAINT modeling_actuals_unique_period UNIQUE (modeling_project_id, year, month, period_type, category, subcategory, line_item_description); END IF; END $$;` },
+
+  // ── G4 Phase 1.1 — adjustment state + audit log columns/tables.
+  //    is_active on modeling_addbacks already existed pre-Phase-1.0; idempotent stub
+  //    handles fresh bootstraps where the column needs to be added.
+  { name: "modeling_addbacks: add is_active", sql: `ALTER TABLE modeling_addbacks ADD COLUMN IF NOT EXISTS is_active boolean NOT NULL DEFAULT true` },
+  { name: "modeling_projects: add adjustments_master_state", sql: `ALTER TABLE modeling_projects ADD COLUMN IF NOT EXISTS adjustments_master_state text NOT NULL DEFAULT 'all_on' CHECK (adjustments_master_state IN ('all_on', 'all_off', 'custom'))` },
+  { name: "modeling_actuals: add source", sql: `ALTER TABLE modeling_actuals ADD COLUMN IF NOT EXISTS source text NOT NULL DEFAULT 'uploaded' CHECK (source IN ('uploaded', 'manual_override'))` },
+  { name: "modeling_projection_decisions: create table", sql: `CREATE TABLE IF NOT EXISTS modeling_projection_decisions (project_id uuid NOT NULL, org_id uuid NOT NULL, year integer NOT NULL, handling text NOT NULL DEFAULT 'auto' CHECK (handling IN ('auto', 'manual', 'gap')), needs_review boolean NOT NULL DEFAULT true, created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(), PRIMARY KEY (project_id, year))` },
+  { name: "modeling_adjustment_history: create table", sql: `CREATE TABLE IF NOT EXISTS modeling_adjustment_history (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), org_id uuid NOT NULL, project_id uuid NOT NULL, user_id uuid NOT NULL, action_type text NOT NULL CHECK (action_type IN ('addback_toggle','master_state_change','reconciliation_decision','projection_method_change','apply_to_pro_forma','manual_override','addback_created_post_upload','addback_deleted_via_resync')), target_id uuid, old_value jsonb, new_value jsonb, metadata jsonb, created_at timestamptz NOT NULL DEFAULT now())` },
+  { name: "modeling_adjustment_history: add idx_adj_history_project_time", sql: `CREATE INDEX IF NOT EXISTS idx_adj_history_project_time ON modeling_adjustment_history (project_id, created_at DESC)` },
+
   // modeling_addback_values — uncovered columns
   { name: "modeling_addback_values: add id", sql: `ALTER TABLE modeling_addback_values ADD COLUMN IF NOT EXISTS id varchar` },
   { name: "modeling_addback_values: add addback_id", sql: `ALTER TABLE modeling_addback_values ADD COLUMN IF NOT EXISTS addback_id varchar` },
