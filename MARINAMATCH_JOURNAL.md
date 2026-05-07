@@ -1,5 +1,57 @@
 # MarinaMatch Platform Journal
 
+## ✅ G4 Phase 1 wrap — single source of truth for addback-adjusted actuals (2026-05-07)
+
+Phase 1 of the G4 financial-model gap landed across 12 commits ending in `a2e86cdd`. Starting point was the Phase 1.2.5 reference implementation: an inline N+1 addback loop at the Exit Metrics handler computing T12 EBITDA from raw NOI plus per-addback signed deltas. End point is a shared service (`getAdjustedActuals`) that Exit Metrics, the Consolidated P&L view, and the pro-forma engine all call. Same code path → same number across all three surfaces.
+
+### Commits in this window (oldest → newest)
+
+- `91b8c6d0` Phase 1.2.5 — addback semantics locked at Exit Metrics handler (replacement, not additive; sign by category)
+- `40d4556c` Phase 1.3 — shared types (`shared/types/consolidated-pnl.ts`)
+- `6ea00a50` Phase 1.4 — `getAdjustedActuals` service (12-CTE single-roundtrip query)
+- `0f047a78` Phase 1.5 — `getConsolidatedPnL` service (range resolution + missing-period detection + auto-projection)
+- `b7621ce5` Phase 1.5 cleanup — unify ConsolidatedPnLOptions, align isPartial with coverage semantic
+- `138ff63f` Phase 1.6a — `applyAdjustments` mutation service (transactional + audit log)
+- `9f9a5c11` canonical-actuals-loader Phase 1.0/1.4 dedupe (drop year rollups when monthly coverage exists)
+- `02e4663f` (tangential) TypeScript compilation settings + project specs
+- `c9d04dd2` (tangential) Remove Simple Mode toggle
+- `1ff1ce8c` Phase 1.6b — addback substitution via canonical-actuals-loader (with workaround sign-flip)
+- `9d906551` Phase 1.6b-fix — adjustedAmount line-direction semantic corrected at SQL source; loader workaround removed; consolidated-pnl-service double-flip removed
+- `a2e86cdd` Phase 1.6c — Exit Metrics retires inline N+1 addback math; single source of truth via `getAdjustedActuals` (26 added / 92 removed)
+
+### What changed (cumulative)
+
+- `shared/types/consolidated-pnl.ts` — `AdjustedActualRow`, `AnnualAdjustmentGroup`, `AppliedAddback`, `ConsolidatedPnLResponse`, `YearColumn`, options + range modes. Phase 1.6b-fix refined `adjustedAmount`/`adjustmentDelta` docstrings: line-direction vs NOI-direction.
+- `server/services/adjusted-actuals-service.ts` — 12-CTE query (year-coverage dedupe → ranged actuals → addback replacement/original/inrange sums → per-row delta distribution → JSON aggregation). Phase 1.6b-fix split `row_share` into `row_line_share` (line direction, sign-flipped for non-revenue) + `row_noi_share` (NOI direction). `adjusted_amount` uses line direction; `row_delta` uses NOI direction.
+- `server/services/consolidated-pnl-service.ts` — orchestrates range resolution, missing-period detection, auto-projection chain (`prior_year_yoy → trailing_3mo → gap`), variance detection (stub). Phase 1.6b-fix removed spurious `sign *` on `row.adjustmentDelta` at `buildAnnualAdjustments:459` — was double-flipping an already-NOI-signed delta for expense rows.
+- `server/services/applyAdjustments.ts` — Phase 1.6a mutation service (toggle + master state, transactional, audit-log rows).
+- `server/services/canonical-actuals-loader.ts` — Phase 1.6b added `applyAddbacks=true` substitution path (calls `getAdjustedActuals` and remaps by `(year, month, subcategory, lineItemDescription)`). Phase 1.6b-fix removed the workaround sign-flip; passes through `r.adjustedAmount` directly. Also Phase 1.0/1.4 dedupe applied to drop year rollups when monthly coverage exists.
+- `server/routes/modeling-routes.ts:3434-3525` — Phase 1.6c retired the inline N+1. Single `getAdjustedActuals` call against the T12 window; `addbackTotal = sum of adjustmentDelta`. 66-line net reduction.
+
+### Decisions made
+
+- **`adjustedAmount` is line-direction; `adjustmentDelta` is NOI-direction.** The per-row identity `adjustedAmount = baseAmount + adjustmentDelta` no longer holds for cost categories — it holds only at NOI rollup (`AnnualAdjustmentGroup`). Documented at the type level. The general lesson is now standing rule #7 in `.claude/CLAUDE.md`.
+- **Full year-level addback delta distributes proportionally across in-range matched rows.** A 2023 Payroll addback active in the Sep2023–Aug2024 T12 window contributes its full +$89,641 NOI delta even though only Sep–Dec 2023 rows fall in range. Sum of `adjustmentDelta` over the response = full year delta.
+- **Replacement semantics** (locked Phase 1.2.5): addback values REPLACE the original line-item, not add to it. Sign convention: revenue → `delta = replacement - original`; expense/COGS → `delta = original - replacement`.
+- **N+1 collapsed to single CTE-based query.** Performance: ~10–30ms isolated cost vs 2–5× for the prior N+1.
+
+### Verification
+
+- Phase 1.6b-fix six test cases (project `6b3a9021`) pass exactly: 2024 monthly+annual `base/adj/delta = 262,777 / 200,000 / +62,777`; 2023 annual `= 339,641 / 250,000 / +89,641` (was `429,282` pre-fix); loader-level NOI delta `= +$62,777`; consolidated AnnualAdjustment invariants hold across Y2022/2023/2024.
+- Phase 1.6c cross-surface: live endpoint pre + post = `$1,654,064` (identical to floating-point, capRate `305.7419593345656` matches to 13 decimals); direct `getAdjustedActuals.adjustmentDelta` sum = `$89,641`. Three independent calculations converge: `rawNoi $1,564,423 + addback $89,641 = $1,654,064`.
+- `shared/` tsc clean across all phases (0 errors via `tsc -p shared`, 4GB heap).
+
+### Next session
+
+- **Phase 2 — UI surface** for the Consolidated P&L view (frontend consumers of `getConsolidatedPnL` response).
+- Spec v4 update covers Phase 1 closing state.
+- Memory `project_adjusted_amount_sign_drift.md` marked RESOLVED (commit `9d906551`).
+- Open follow-ups not blocking Phase 2:
+  - Tier 2 data-model fix: add `original_amount_at_creation` column to `modeling_addbacks` (live-lookup drifts when source actuals change). Tracked in `project_addback_original_anchoring.md`.
+  - Variance detection (Phase 1.5 stub) for the monthly-partial vs annual-rollup case (Q2 case 3, filed as Phase 3 follow-up in service header).
+
+---
+
 ## 2026-04-22 — Per-asset-class Ops landings + entitlement intersection
 
 Goal: ensure every asset class and business type has its own Ops section, with

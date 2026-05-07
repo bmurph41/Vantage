@@ -176,3 +176,50 @@ Before ending any session:
 - [ ] List the exact next steps for the next session
 - [ ] Confirm dev server is running cleanly
 - [ ] Confirm no TypeScript errors (`npx tsc --noEmit`)
+
+---
+
+## Standing rules — Phase 1 G4 learnings (durable, all projects)
+
+### Verification discipline (added 2026-05-08, durable beyond G4)
+
+These rules emerged from FM Gap G4 Phase 1 and apply to all Vantage and Bookd work going forward.
+
+1. **Verify any DB constraint, index, enum value, or column name against the live DB before referencing it in code or DDL.** Never trust a spec's guess at a name. Pattern:
+   - Before any `DROP CONSTRAINT` / `ALTER ... DROP` → `\d <table>` and confirm exact name
+   - Before any string match against a constraint name in error handling → `grep -r '<old_name>'` workspace-wide
+   - Before any enum value reference → `SELECT enumlabel FROM pg_enum WHERE enumtypid = '<enum>'::regtype`
+   - Before any policy reference → query `pg_policies`
+
+2. **When verifying a math invariant, run it through at least one OTHER consumer with a known-good reference. Self-match is not verification. Cross-surface match is.** If you compute the same number two ways using your own logic, you've verified consistency, not correctness. Run the same calculation through a separate code path (a different service, a hand SQL query, a working endpoint) and confirm the numbers agree.
+
+3. **Working-tree audit before every commit.** Always run `git status` before `git add`. Surface anything outside the immediate phase scope explicitly — list it in the articulation block. Decide explicitly what's in and what's out. Don't let unrelated modifications hitchhike on a commit.
+
+4. **Replit auto-commit watch.** Replit auto-commit absorbs file saves into intermediate "Git commit prior to merge" stub commits. Inside long phases, file activity may be captured under the wrong commit message before the intentional commit lands. Mitigation:
+   - Smaller sub-phase commits — don't accumulate too many file changes between articulation blocks
+   - `git status` checks after major file save bursts
+   - Surface auto-commit absorption when it happens; don't treat it as background noise
+   - If an auto-commit captures intermediate code, file an intentional follow-up commit immediately to restore correct state
+
+5. **"Found code I don't remember writing" gets surfaced explicitly.** When code is found in the workspace that wasn't part of the active directive, surface its origin (this session, prior session, unknown) before continuing. Don't quietly continue against it. The reflex is `git log --follow --all <path>` — that tells you when the file was created and by whom.
+
+6. **Phase verification gates are non-negotiable.** Every phase's spec test cases get executed against the live DB before commit, even when the code is mechanical or "obviously" correct. Skipping verification because the code looks right is how latent bugs ship. The verify step has caught multiple bugs that tsc-clean code shipped past.
+
+7. **Replacement semantics — line vs NOI direction (G4-specific but cross-applies to financial work).** When working with addbacks anywhere:
+   - Line value moves to the replacement
+   - NOI moves by the difference
+   - For expense lines, the two have OPPOSITE signs
+   - `adjustedAmount` is line direction; `adjustmentDelta` is NOI direction
+   - Don't conflate them — use the right field for the right consumer
+
+   This pattern (two related values that move in opposite directions for cost categories) shows up anywhere accounting math meets line-item display. The general lesson: name and document direction conventions explicitly at the type level.
+
+### Articulation block format (preserved from existing CLAUDE.md)
+
+Before every commit, write a brief block in chat that includes:
+- What's about to commit (files + summary)
+- What's NOT in the commit (working-tree items deliberately excluded)
+- Verification performed (tsc results, test cases run, numbers matched)
+- Any flags or known caveats
+
+This is the surfacing step that the rules above support.
