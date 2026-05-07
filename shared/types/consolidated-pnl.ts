@@ -421,3 +421,34 @@ export interface GetAdjustedActualsResult {
   rows: AdjustedActualRow[];
   unmatchedAddbacks: UnmatchedAddback[];
 }
+
+// ---------------------------------------------------------------------------
+// applyAdjustments — service contract for the user-initiated "Apply" action
+// (Phase 1.6a). Persists addback toggle + master-state changes inside one
+// transaction and writes audit-log rows. Does NOT recompute pro forma — the
+// next pro-forma read picks up the new state automatically (no cache).
+// ---------------------------------------------------------------------------
+
+export interface AddbackToggle {
+  addbackId: string;
+  isActive: boolean;
+}
+
+export interface ApplyAdjustmentsRequest {
+  addbackToggles: AddbackToggle[];
+  masterStateChange?: AdjustmentMasterState;
+}
+
+export interface ApplyAdjustmentsResult {
+  /** Number of addback toggles whose persisted is_active changed (no-ops excluded). */
+  appliedToggles: number;
+  /** True iff masterStateChange was provided AND differed from the persisted value. */
+  masterStateChanged: boolean;
+  /**
+   * Total rows written to modeling_adjustment_history. Equals
+   * appliedToggles + (masterStateChanged ? 1 : 0) + 1 — the trailing +1 is
+   * the always-recorded apply_to_pro_forma row, which captures the user's
+   * "Apply" intent even on no-op submissions.
+   */
+  historyEntries: number;
+}
