@@ -158,7 +158,8 @@ addback_matched_inrange AS (
   SELECT
     ab.id          AS addback_id,
     a.id           AS actual_id,
-    a.amount::numeric AS actual_amount
+    a.amount::numeric AS actual_amount,
+    a.category     AS actual_category
   FROM active_addbacks ab
   JOIN ranged_actuals a ON
     a.year = ab.addback_year
@@ -197,6 +198,16 @@ addback_delta AS (
   WHERE ao.original_sum IS NOT NULL
 ),
 applied_per_row AS (
+  -- row_noi_share is the addback's NOI-direction contribution distributed
+  -- across in-range matched rows. Positive when the addback raises NOI.
+  -- row_line_share is the same contribution mapped onto the LINE direction:
+  --   Revenue lines:  line_share = +noi_share  (replacement > original ⇒ line up ⇒ NOI up)
+  --   Expense / COGS: line_share = -noi_share  (replacement < original ⇒ line down ⇒ NOI up)
+  -- Adding row_line_share to the line's base amount produces the post-addback
+  -- line value (e.g., Payroll $339,641 base + (-$89,641) line_share = $250,000).
+  -- Adding row_noi_share to the NOI rollup yields the addback's NOI delta.
+  -- See project_adjusted_amount_sign_drift.md for the historical drift
+  -- between adjusted_amount (line direction) and adjustmentDelta (NOI direction).
   SELECT
     am.actual_id,
     ad.addback_id,
@@ -209,16 +220,24 @@ applied_per_row AS (
     ad.original_sum,
     ad.delta,
     CASE WHEN ad.inrange_sum > 0
+      THEN (am.actual_amount / ad.inrange_sum) *
+           CASE WHEN LOWER(am.actual_category) = 'revenue' THEN ad.delta
+                ELSE -ad.delta
+           END
+      ELSE 0
+    END AS row_line_share,
+    CASE WHEN ad.inrange_sum > 0
       THEN (am.actual_amount / ad.inrange_sum) * ad.delta
       ELSE 0
-    END AS row_share
+    END AS row_noi_share
   FROM addback_matched_inrange am
   JOIN addback_delta ad ON ad.addback_id = am.addback_id
 ),
 row_adjustments AS (
   SELECT
     actual_id,
-    SUM(row_share) AS total_share,
+    SUM(row_line_share) AS total_line_share,
+    SUM(row_noi_share)  AS total_noi_share,
     json_agg(json_build_object(
       'addbackId',              addback_id,
       'lineItemKey',            line_item_key,
@@ -228,7 +247,7 @@ row_adjustments AS (
       'month',                  addback_month,
       'replacementAmount',      replacement_sum,
       'originalAmountAtLookup', original_sum,
-      'delta',                  row_share
+      'delta',                  row_noi_share
     ) ORDER BY addback_id) AS applied_addbacks
   FROM applied_per_row
   GROUP BY actual_id
@@ -243,9 +262,9 @@ SELECT
   ra.department,
   ra.line_item_description,
   ra.amount::numeric AS base_amount,
-  COALESCE(rj.total_share, 0)::numeric                  AS row_delta,
-  (ra.amount::numeric + COALESCE(rj.total_share, 0))::numeric AS adjusted_amount,
-  COALESCE(rj.applied_addbacks, '[]'::json)             AS applied_addbacks
+  COALESCE(rj.total_noi_share, 0)::numeric                       AS row_delta,
+  (ra.amount::numeric + COALESCE(rj.total_line_share, 0))::numeric AS adjusted_amount,
+  COALESCE(rj.applied_addbacks, '[]'::json)                      AS applied_addbacks
 FROM ranged_actuals ra
 LEFT JOIN row_adjustments rj ON rj.actual_id = ra.id
 ORDER BY ra.year, ra.month, ra.category, ra.subcategory, ra.line_item_description NULLS FIRST

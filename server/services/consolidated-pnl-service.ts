@@ -453,10 +453,15 @@ function buildAnnualAdjustments(
     if (row.periodType !== 'year') continue;
     const acc = accByYear.get(row.year);
     if (!acc) continue;
+    // base + adjusted: per-row values are line-direction; flip for cost
+    // categories so the year-level rollup is in NOI direction.
+    // delta: per-row adjustmentDelta is already NOI-direction (Phase 1.2.5),
+    // so it sums directly without sign conversion. Preserves the
+    // AnnualAdjustmentGroup invariant: adjustedAmount = baseAmount + adjustmentDelta.
     const sign = noiSign(row.category);
     acc.base += sign * row.baseAmount;
     acc.adjusted += sign * row.adjustedAmount;
-    acc.delta += sign * row.adjustmentDelta;
+    acc.delta += row.adjustmentDelta;
     for (const ab of row.appliedAddbacks) {
       acc.applied.push({ ...ab });
     }

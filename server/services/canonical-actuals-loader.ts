@@ -230,23 +230,11 @@ export async function loadCanonicalActuals(
   // → line-level adjusted amount via getAdjustedActuals; the loop below uses
   // that amount in place of the raw value when applyAddbacks=true.
   //
-  // Sign convention. getAdjustedActuals returns `adjustmentDelta` already
-  // NOI-signed per the Phase 1.2.5 spec:
-  //   - Revenue:        delta = replacement - original  (positive raises NOI)
-  //   - Expense / COGS: delta = original - replacement  (positive raises NOI)
-  // The SQL's row-level `adjusted_amount = base + delta` therefore moves the
-  // line in the correct direction ONLY for Revenue (replacement > original
-  // means line UP, NOI UP). For Expense / COGS, naively adding the NOI-signed
-  // delta to base lifts the expense line — the wrong direction for the line
-  // total, even though the implied NOI change is still correct in spirit.
-  // Empirically verified during 1.6b wiring: a $89,641 NOI-raising Payroll
-  // addback raised the Payroll-Ops line from $339,641 to $429,282 under the
-  // naive substitution, dropping NOI by $89,641.
-  //
-  // The fix here: flip sign for cost categories before adding to base, so
-  // the substituted line value moves in the natural line direction.
-  // (A deeper fix to the SQL's adjusted_amount semantic is out of scope —
-  // see project_adjusted_amount_sign_drift.md.)
+  // Per project_adjusted_amount_sign_drift.md (resolved at SQL source),
+  // AdjustedActualRow.adjustedAmount is now line-direction-correct: for an
+  // expense addback that REPLACES $339,641 with $250,000, adjustedAmount is
+  // $250,000 (line went DOWN even though the addback raised NOI). No sign
+  // manipulation needed here — pass through directly.
   //
   // Match by modeling_actuals.id-equivalent key (year, month, subcategory,
   // lineItemDescription) — id isn't exposed on AdjustedActualRow but that
@@ -262,15 +250,10 @@ export async function loadCanonicalActuals(
         : undefined,
       includeUnmatched: false,
     });
-    const lineDeltaSign = (cat: string): 1 | -1 => {
-      const c = cat.toLowerCase();
-      return c === 'cogs' || c === 'expenses' || c === 'expense' ? -1 : 1;
-    };
     const adjustedByKey = new Map<string, number>();
     for (const r of adjusted.rows) {
       const k = `${r.year}|${r.month}|${r.subcategory}|${r.lineItemDescription ?? ''}`;
-      const lineLevelAdjusted = r.baseAmount + lineDeltaSign(r.category) * r.adjustmentDelta;
-      adjustedByKey.set(k, lineLevelAdjusted);
+      adjustedByKey.set(k, r.adjustedAmount);
     }
     for (const a of relevantActuals) {
       const k = `${a.year}|${a.month}|${a.subcategory}|${a.lineItemDescription ?? ''}`;

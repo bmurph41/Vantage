@@ -389,14 +389,27 @@ export interface AdjustedActualRow {
 
   /** Raw modeling_actuals.amount before any adjustment. */
   baseAmount: number;
-  /** Raw amount after replacement-semantic addback application. */
+  /**
+   * Line-direction value after replacement-semantic addback application.
+   * Moves in the natural direction of the line: a Payroll addback that
+   * REPLACES $339,641 of base with $250,000 yields adjustedAmount=$250,000
+   * (the line goes DOWN even though the addback raises NOI).
+   *
+   * NOTE: For Expense/COGS lines, adjustedAmount - baseAmount is the
+   * NEGATIVE of adjustmentDelta (line direction is opposite to NOI
+   * direction). For Revenue lines, the two are equal.
+   */
   adjustedAmount: number;
   /**
-   * adjustedAmount - baseAmount. Sum across all rows in a response equals
-   * the sum of full year-level deltas of all addbacks that have at least
-   * one matched row in the response range (proportional distribution
-   * across in-range matched rows; see addback overlay note in the service
-   * header).
+   * Signed contribution to NOI from addbacks applied to this row. Positive
+   * when the addback raises NOI, negative when it lowers it. Sign convention:
+   *   - Expense / COGS:  delta = originalSum - replacementSum  (per-row pro-rata share)
+   *   - Revenue:         delta = replacementSum - originalSum  (per-row pro-rata share)
+   *
+   * Sum across all rows in a response equals the sum of full year-level NOI
+   * deltas of all addbacks that have at least one matched row in the
+   * response range (proportional distribution across in-range matched
+   * rows; see addback overlay note in the service header).
    */
   adjustmentDelta: number;
 
