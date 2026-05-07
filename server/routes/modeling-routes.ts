@@ -3432,106 +3432,40 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
               }
               const rawNoi = revenue - cogs - expenses;
 
-              // Apply active addbacks to get normalized NOI.
-              //
-              // Addback semantics: REPLACEMENT (per AddbackEditor.tsx UX —
-              // "this value replaces the original amount"). Each addback's
-              // stored amount is what the line item SHOULD be; the delta to
-              // NOI is the difference between the original (live-lookup from
-              // modeling_actuals) and the replacement, signed by the line's
-              // accounting category.
-              //
-              // Known data-model gap: modeling_addbacks does not store the
-              // original amount at creation time, forcing a live lookup that
-              // drifts when source actuals change. See
-              // project_addback_original_anchoring.md for the Tier 2 fix
-              // (add original_amount_at_creation column + populate). When
-              // that ships, prefer the stored value if non-null and fall
-              // back to live lookup if null.
+              const firstPeriod = sortedPeriods[0].split('-');
+              const lastPeriod = sortedPeriods[sortedPeriods.length - 1].split('-');
+              const startYear = parseInt(firstPeriod[0]);
+              const startMonth = parseInt(firstPeriod[1]);
+              const endYear = parseInt(lastPeriod[0]);
+              const endMonth = parseInt(lastPeriod[1]);
+
+              // Apply active addbacks via getAdjustedActuals — single source
+              // of truth shared with the Consolidated View and the pro-forma
+              // engine (G4 phase 1.6c). Phase 1.4 distributes each addback's
+              // full year-level NOI delta proportionally across in-range
+              // matched rows; summing adjustmentDelta over the response gives
+              // the addback total contribution to NOI for the T12 window.
+              // Per-row adjustmentDelta is NOI-direction (Phase 1.6b-fix
+              // commit 9d906551). Unmatched addbacks are skipped at the
+              // service level.
               let addbackTotal = 0;
               try {
-                const { modelingAddbacks, modelingAddbackValues } = await import('@shared/schema');
-                const activeAddbackRows = await db.select()
-                  .from(modelingAddbacks)
-                  .where(and(
-                    eq(modelingAddbacks.projectId, projectId),
-                    eq(modelingAddbacks.orgId, orgId),
-                    eq(modelingAddbacks.isActive, true)
-                  ));
-                for (const ab of activeAddbackRows) {
-                  // 1. Sum the replacement value(s) for this addback.
-                  const vals = await db.select()
-                    .from(modelingAddbackValues)
-                    .where(eq(modelingAddbackValues.addbackId, ab.id));
-                  const replacementSum = vals.reduce(
-                    (s, v) => s + parseFloat(v.amount?.toString() || '0'), 0
-                  );
-
-                  // 2. Live-lookup the original from modeling_actuals based
-                  //    on the addback's scope.
-                  const lookupConditions = [
-                    eq(modelingActuals.modelingProjectId, projectId),
-                    eq(modelingActuals.orgId, orgId),
-                  ];
-                  if (ab.scope === 'category') {
-                    // category-scope: line_item_key holds the category name.
-                    lookupConditions.push(eq(modelingActuals.category, ab.lineItemKey));
-                  } else {
-                    // line_item / month_cell: line_item_key matches subcategory.
-                    lookupConditions.push(eq(modelingActuals.subcategory, ab.lineItemKey));
-                  }
-                  if (ab.addbackYear != null) {
-                    lookupConditions.push(eq(modelingActuals.year, ab.addbackYear));
-                  }
-                  if (ab.scope === 'month_cell' && ab.addbackMonth != null) {
-                    lookupConditions.push(eq(modelingActuals.month, ab.addbackMonth));
-                  }
-                  const matchedRows = await db.select()
-                    .from(modelingActuals)
-                    .where(and(...lookupConditions));
-
-                  // Graceful degradation: addback references a line that
-                  // doesn't exist in actuals (e.g., legacy seed mismatch,
-                  // pre-creation reference). Skip with a warning rather than
-                  // applying an incorrect adjustment.
-                  if (matchedRows.length === 0) {
-                    console.warn(
-                      `[Exit Metrics] Addback ${ab.id} (lineItemKey=${ab.lineItemKey}, scope=${ab.scope}, year=${ab.addbackYear}) found no matching modeling_actuals — skipping`
-                    );
-                    continue;
-                  }
-
-                  const originalSum = matchedRows.reduce(
-                    (s, r) => s + parseFloat(r.amount?.toString() || '0'), 0
-                  );
-
-                  // 3. Determine accounting sign from the matched line's
-                  //    category (prefer addback's stored category as a tie-break).
-                  const matchCategory = (ab.category || matchedRows[0].category || '').toLowerCase();
-                  const isRevenue = matchCategory === 'revenue';
-
-                  // 4. Compute signed delta. modeling_actuals.amount is stored
-                  //    positive; sign convention comes from category:
-                  //    Revenue: NOI += (replacement - original)
-                  //    Expense/COGS: NOI += (original - replacement)
-                  const delta = isRevenue
-                    ? (replacementSum - originalSum)
-                    : (originalSum - replacementSum);
-                  addbackTotal += delta;
-                }
+                const { getAdjustedActuals } = await import('../services/adjusted-actuals-service');
+                const adjusted = await getAdjustedActuals(orgId, projectId, {
+                  granularity: 'monthly',
+                  range: {
+                    start: { year: startYear, month: startMonth },
+                    end:   { year: endYear,   month: endMonth   },
+                  },
+                  includeUnmatched: false,
+                });
+                addbackTotal = adjusted.rows.reduce((s, r) => s + r.adjustmentDelta, 0);
               } catch (abErr) {
                 console.warn('[Exit Metrics] Addback fetch failed (non-fatal):', abErr);
               }
               t12Ebitda = rawNoi + addbackTotal;
 
-              const firstPeriod = sortedPeriods[0].split('-');
-              const lastPeriod = sortedPeriods[sortedPeriods.length - 1].split('-');
-              const startMonth = parseInt(firstPeriod[1]);
-              const startYear = parseInt(firstPeriod[0]);
-              const endMonth = parseInt(lastPeriod[1]);
-              const endYear = parseInt(lastPeriod[0]);
               const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-
               if (sortedPeriods.length === 12 && startMonth === 1 && endMonth === 12 && startYear === endYear) {
                 t12Label = `FY ${startYear}`;
               } else {
