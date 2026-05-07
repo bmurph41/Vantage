@@ -38,6 +38,13 @@ export type PeriodType = 'month' | 'year' | 'quarter';
 
 export type PnLViewMode = 'raw' | 'adjusted';
 
+/** Inclusive bound for a calendar (year, month) range filter. */
+export interface PeriodPoint {
+  year: number;
+  /** 1–12. */
+  month: number;
+}
+
 // ---------------------------------------------------------------------------
 // AppliedAddback
 //
@@ -214,6 +221,7 @@ export interface ConsolidatedPnLResponse {
 
 export interface AdjustedActualRow {
   year: number;
+  /** 1–12 for monthly granularity; 1 (canonical anchor) for annual rollups. */
   month: number;
   periodType: PeriodType;
   category: PnLCategory | string;
@@ -225,9 +233,30 @@ export interface AdjustedActualRow {
   baseAmount: number;
   /** Raw amount after replacement-semantic addback application. */
   adjustedAmount: number;
+  /**
+   * adjustedAmount - baseAmount. Sum across all rows in a response equals
+   * the sum of full year-level deltas of all addbacks that have at least
+   * one matched row in the response range (proportional distribution
+   * across in-range matched rows; see addback overlay note in the service
+   * header).
+   */
+  adjustmentDelta: number;
 
-  /** Addbacks applied to this row, if any. Empty array when none matched. */
+  /**
+   * Addbacks applied to this row, if any. Empty array when none matched.
+   * `delta` field on each entry is the addback's row-level share for
+   * monthly granularity, or the addback's full year-level delta for
+   * annual granularity.
+   */
   appliedAddbacks: AppliedAddback[];
+}
+
+export interface AdjustedActualsOptions {
+  granularity?: 'monthly' | 'annual';
+  /** Inclusive (year, month) range. Omit to return all available periods. */
+  range?: { start: PeriodPoint; end: PeriodPoint };
+  /** Default true. When false, the unmatchedAddbacks array is empty. */
+  includeUnmatched?: boolean;
 }
 
 export interface GetAdjustedActualsResult {
