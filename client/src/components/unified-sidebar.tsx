@@ -15,8 +15,6 @@ import { DetailDrawer } from "@/components/crm/detail-drawer";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useAuth } from "@/contexts/AuthContext";
 import { UserMenu } from "@/components/layout/UserMenu";
-import { SimplifiedModeToggle } from "@/components/SimplifiedModeToggle";
-import { useDisplayMode } from "@/stores/display-mode-store";
 import { PaywallModal } from "@/components/PaywallModal";
 import { SupportContactModal } from "@/components/support/SupportContactModal";
 import { HeadphonesIcon } from "lucide-react";
@@ -178,7 +176,6 @@ export default function UnifiedSidebar() {
   const [expandedSubcats, setExpandedSubcats] = useState<Set<string>>(new Set()); // all start collapsed
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedEntity, setSelectedEntity] = useState<{type: 'contact' | 'company' | 'deal', id: string} | null>(null);
-  const { simplifiedMode } = useDisplayMode();
   const { selectedAssetId: selectedOpsAssetId, setSelectedAsset: setSelectedOpsAsset } = useOpsAssetStore();
   
   // Sidebar collapse state with localStorage persistence
@@ -993,16 +990,6 @@ export default function UnifiedSidebar() {
               <div className="border-l-2 border-blue-500/40 ml-2 mr-1 bg-white/[0.04] rounded-br-sm pb-1 mb-2">
                 {hasPack('modeling_tools') ? (
                   analysisNav
-                    .filter((item) => {
-                      if (!simplifiedMode) return true;
-                      const hiddenInSimplifiedMode = [
-                        "/modeling/scenarios",
-                        "/modeling/returns-valuation",
-                        "/modeling/portfolio/returns",
-                        "/modeling/exit-strategies",
-                      ];
-                      return !hiddenInSimplifiedMode.includes(item.href);
-                    })
                     .map((item) => (
                       <NavLink key={item.name} item={item} />
                     ))
@@ -1272,11 +1259,6 @@ export default function UnifiedSidebar() {
         </div>
       </nav>
       
-      {/* Simplified Mode Toggle */}
-      <div className="border-t border-sidebar-border bg-sidebar flex-shrink-0">
-        <SimplifiedModeToggle collapsed={sidebarCollapsed} />
-      </div>
-
       {/* Collapse Toggle Button */}
       <div className={cn(
         "border-t border-sidebar-border bg-sidebar flex-shrink-0 hidden md:flex",

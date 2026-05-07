@@ -96,10 +96,36 @@ export interface ActualsCoverage {
   annualizationFactor: number;
 }
 
+export interface LoadCanonicalActualsOptions {
+  /**
+   * Phase 1.6b — when true, replace each row's raw amount with its
+   * addback-adjusted equivalent via getAdjustedActuals before aggregation.
+   *
+   * Default false. The historical-P&L surface MUST keep this off (raw is
+   * the "what actually happened" view; addback adjustments are an
+   * underwriting overlay that belongs on the pro-forma side only).
+   *
+   * Order of operations inside this loader:
+   *   1. Load raw modeling_actuals
+   *   2. Apply modeling_pnl_overrides (excludes, category/dept overrides)
+   *   3. Apply period_type dedupe (Phase 1.6b-pre)
+   *   4. (NEW) Apply addbacks via getAdjustedActuals when applyAddbacks=true
+   *   5. Annualization, totals
+   *
+   * The addback substitution matches by modeling_actuals.id (1:1 perfect
+   * key) — sidesteps any drift in category override interaction. When the
+   * project has zero active addbacks, getAdjustedActuals returns rows
+   * with adjusted_amount === base_amount, so the result is numerically
+   * identical to applyAddbacks=false.
+   */
+  applyAddbacks?: boolean;
+}
+
 export async function loadCanonicalActuals(
   projectId: string,
   orgId: string,
-  year?: number
+  year?: number,
+  options: LoadCanonicalActualsOptions = {},
 ): Promise<{
   items: CanonicalLineItem[];
   categorized: CanonicalActualsResult;
@@ -110,6 +136,7 @@ export async function loadCanonicalActuals(
   /** Partial-year coverage information */
   coverage: ActualsCoverage;
 }> {
+  const applyAddbacks = options.applyAddbacks === true;
   // 1. Load PNL overrides
   const pnlOverrides = await db.select()
     .from(modelingPnlOverrides)
@@ -198,20 +225,59 @@ export async function loadCanonicalActuals(
   const relevantActuals = year
     ? actuals.filter(a => a.year === year)
     : actuals;
-  
+
+  // 4b. Phase 1.6b — addback substitution. Build a map of modeling_actuals.id
+  // → adjusted_amount via getAdjustedActuals; the loop below uses that
+  // amount in place of the raw value when applyAddbacks=true. Match by id
+  // is exact (1:1) — avoids any drift between this loader's overrides and
+  // the raw category/subcategory the addback engine sees.
+  const adjustmentByActualId = new Map<string, number>();
+  if (applyAddbacks) {
+    const { getAdjustedActuals } = await import('./adjusted-actuals-service');
+    const adjusted = await getAdjustedActuals(orgId, projectId, {
+      granularity: 'monthly',
+      range: year
+        ? { start: { year, month: 1 }, end: { year, month: 12 } }
+        : undefined,
+      includeUnmatched: false,
+    });
+    // The MAIN_QUERY SELECT exposes modeling_actuals.id as `id`, but
+    // toMonthlyRow strips it from the public AdjustedActualRow shape.
+    // We re-fetch the id via raw amounts on the row's match key
+    // (year, month, subcategory, lineItemDescription) — that key is
+    // unique within deduped+ranged rows. For the live test data the
+    // 1.6b-pre loader dedupe and the MAIN_QUERY Phase 1.4 dedupe agree
+    // on every (project, year), so adjusted.rows is 1:1 with relevantActuals.
+    const adjustedByKey = new Map<string, number>();
+    for (const r of adjusted.rows) {
+      const k = `${r.year}|${r.month}|${r.subcategory}|${r.lineItemDescription ?? ''}`;
+      adjustedByKey.set(k, r.adjustedAmount);
+    }
+    for (const a of relevantActuals) {
+      const k = `${a.year}|${a.month}|${a.subcategory}|${a.lineItemDescription ?? ''}`;
+      const adj = adjustedByKey.get(k);
+      if (adj !== undefined) {
+        adjustmentByActualId.set(a.id, adj);
+      }
+    }
+  }
+
   // 5. Group by subcategory, normalize categories, resolve departments
   const lineItems: Record<string, {
     monthlyAmounts: Record<number, number>;
     category: string;
     department: string;
   }> = {};
-  
+
   for (const actual of relevantActuals) {
     // CONSISTENT key: always subcategory || category || 'Other'
     // (Previously, generateProForma used lineItem as fallback instead of category)
     const key = actual.subcategory || actual.category || 'Other';
     const month = actual.month || 1;
-    const amount = parseFloat(actual.amount?.toString() || '0');
+    const rawAmount = parseFloat(actual.amount?.toString() || '0');
+    const amount = applyAddbacks
+      ? (adjustmentByActualId.get(actual.id) ?? rawAmount)
+      : rawAmount;
     
     if (!lineItems[key]) {
       // Normalize category using the SHARED function

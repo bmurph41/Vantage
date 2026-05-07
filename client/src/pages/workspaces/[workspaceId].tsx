@@ -39,9 +39,6 @@ import DealScoringCard from '@/components/pipeline/DealScoringCard';
 import DDStatusReport from '@/components/dd/DDStatusReport';
 import DocumentVersions from '@/components/vdr/DocumentVersions';
 import { Swords, Award, ClipboardCheck, GitBranch } from 'lucide-react';
-import { useDisplayMode } from '@/stores/display-mode-store';
-import GuidedDealFlow from '@/components/deal-workspace/GuidedDealFlow';
-import SimplifiedDDChecklist from '@/components/dd/SimplifiedDDChecklist';
 import { BrokerCredentialBadge } from '@/components/broker/BrokerCredentialBadge';
 
 // Matches existing workspace_status enum: active, pending, under_contract, due_diligence, closing, closed, dead, on_hold
@@ -82,8 +79,6 @@ export default function WorkspaceDetailPage() {
   const { workspaceId } = useParams<{ workspaceId: string }>();
   const [location, navigate] = useLocation();
   const { toast } = useToast();
-  const { simplifiedMode } = useDisplayMode();
-
   const urlParams = new URLSearchParams(location.split('?')[1] || '');
   const tabFromUrl = urlParams.get('tab') || 'overview';
   const [activeTab, setActiveTab] = useState(tabFromUrl);
@@ -398,13 +393,6 @@ export default function WorkspaceDetailPage() {
         </div>
       </div>
 
-      {/* Guided Deal Flow - shown in simplified mode */}
-      {simplifiedMode && workspaceId && (
-        <div className="px-6 pt-4">
-          <GuidedDealFlow workspaceId={workspaceId} />
-        </div>
-      )}
-
       {/* ─── Tab Rail + Content ───────────────────────────────────── */}
       <Tabs value={activeTab} onValueChange={handleTabChange} className="flex-1 flex flex-col overflow-hidden">
         <div className="bg-white border-b border-gray-200 px-6">
@@ -562,10 +550,7 @@ export default function WorkspaceDetailPage() {
 
         {/* ═══ DILIGENCE TAB ═══ */}
         <TabsContent value="diligence" className="space-y-4 mt-0">
-          {simplifiedMode ? (
-            <SimplifiedDDChecklist workspaceId={workspaceId} />
-          ) : (
-            <>
+          <>
               {!hasDDProject && (
                 <Card className="mb-4">
                   <CardContent className="py-4">
@@ -583,7 +568,6 @@ export default function WorkspaceDetailPage() {
               )}
               <DdChecklistPanel workspaceId={workspaceId} />
             </>
-          )}
         </TabsContent>
 
         {/* ═══ DD STATUS TAB ═══ */}

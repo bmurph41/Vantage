@@ -69,9 +69,6 @@ import { useDisplayPreferences } from '@/hooks/use-display-preferences';
 import { apiRequest } from '@/lib/queryClient';
 import { toast } from '@/hooks/use-toast';
 import ProjectTypeBadge from '@/components/modeling/ProjectTypeBadge';
-import { useDisplayMode } from '@/stores/display-mode-store';
-import SimplifiedWorkspace from '@/components/analysis/SimplifiedWorkspace';
-
 import WorkspaceOverview from './workspace/overview';
 import { OverviewDynamic } from './workspace/overview-dynamic';
 import InputsAssumptions from './workspace/inputs';
@@ -471,7 +468,6 @@ function DDTimelineSection({ dealId }: { dealId: string | null }) {
 export default function ProjectWorkspace() {
   const { projectId } = useParams<{ projectId: string }>();
   const [, navigate] = useLocation();
-  const { simplifiedMode } = useDisplayMode();
   const searchString = useSearch();
   const [activeTab, setActiveTab] = useState(() => {
     const params = new URLSearchParams(searchString);
@@ -662,10 +658,6 @@ export default function ProjectWorkspace() {
     return formatCurrency(numValue);
   };
 
-  // Simplified mode: render single-page summary instead of 67-tab workspace
-  if (simplifiedMode) {
-    return <SimplifiedWorkspace projectId={projectId!} />;
-  }
 
   return (
     <div className="flex flex-col min-h-screen bg-background">

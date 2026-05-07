@@ -48,8 +48,6 @@ import DealFormModal from "@/components/modals/deal-form-modal";
 import PipelineSettingsModal from "@/components/modals/pipeline-settings-modal";
 import type { Deal, Contact, Company, PipelineStage, Pipeline } from "@shared/schema";
 import { formatCurrency } from "@/lib/utils";
-import { useDisplayMode } from "@/stores/display-mode-store";
-import SimpleDealTracker from "@/components/pipeline/SimpleDealTracker";
 import MarinaMapEmbed from "@/components/marina-map/MarinaMapEmbed";
 import AutomationRulesPanel from "@/components/pipeline/AutomationRulesPanel";
 import { CsvExportButton } from "@/components/crm/csv-export-button";
@@ -831,7 +829,6 @@ function PipelineAnalyticsView({
 // ─── Main Pipeline Component ─────────────────────────────────────────
 
 export default function Pipeline() {
-  const { simplifiedMode } = useDisplayMode();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedPipelineId, setSelectedPipelineId] = useState<string>("");
   const [sortBy, setSortBy] = useState("value");
@@ -1125,20 +1122,6 @@ export default function Pipeline() {
       <div className="flex-1 flex items-center justify-center h-screen">
         <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full" />
       </div>
-    );
-  }
-
-  // Simplified mode: render SimpleDealTracker instead of Kanban
-  if (simplifiedMode) {
-    return (
-      <>
-        <SimpleDealTracker
-          onSwitchToKanban={() => useDisplayMode.getState().toggleSimplifiedMode()}
-          onAddDeal={handleAddNewDeal}
-          onDealClick={handleDealClick}
-        />
-        <DealFormModal isOpen={isDealFormOpen} onClose={handleCloseDealForm} deal={selectedDeal} />
-      </>
     );
   }
 

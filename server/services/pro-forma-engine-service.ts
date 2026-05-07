@@ -446,7 +446,16 @@ export class ProFormaEngineService {
 
     // FIX: Use shared canonical actuals loader for baseline aggregation.
     // Guarantees identical category/department as getHistoricalPL().
-    const { items: baselineItems, coverage } = await loadCanonicalActuals(projectId, orgId, latestHistoricalYear);
+    //
+    // Phase 1.6b — applyAddbacks=true so the pro-forma baseline reflects
+    // the user's addback adjustments. getHistoricalPL stays at default
+    // (false) so the historical view continues to show raw actuals.
+    const { items: baselineItems, coverage } = await loadCanonicalActuals(
+      projectId,
+      orgId,
+      latestHistoricalYear,
+      { applyAddbacks: true },
+    );
 
     // ── Partial-year annualization ────────────────────────────────
     // If the user uploaded only N months of data (e.g. 2) and has enabled
