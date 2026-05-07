@@ -3648,5 +3648,314 @@ next session.
   auto-commit pattern, audit today's parallel commits, decide on
   memory-filing policy for autonomous parallel work.
 
+---
+
+## 2026-05-06 — Foundation cleanup + FM gap-closure spec filings + shared/ TS-clean milestone
+
+Goal: directed Bite 1 work on the `shared/` TypeScript baseline, plus
+filing revised Financial Model spec memories now that Brett's audit
+confirmed the FM section is ~70-80% built (not from-scratch).
+
+### Code changes (real product fixes)
+
+- **`shared/finance/memo-generator.ts` + `server/services/dcf-decision-support-service.ts`** — IC memo "NaN%" cap rate bug fixed.
+  Three-file change: added `year1Noi?: number` to `MemoInput`,
+  caller now passes `year1Noi: year1.netOperatingIncome`, broken
+  Investment Thesis bullets replaced with real cap rate computation
+  `(year1Noi / purchasePrice) * 100` when present, `"N/A"` fallback
+  otherwise. Exit bullet rewritten as narrative
+  (`"Projected exit: unchanged exit cap, $X net proceeds"`). Dead
+  `'see appendix'` branch (always shadowed by an always-truthy
+  object check on `base.overridesApplied`) eliminated. Cap rate
+  formula matches canonical pattern at 4+ other locations
+  (`lease-cashflow-engine.ts:914`, `sensitivity-matrix-service.ts:323`,
+  etc.). Closes `project_memo_generator_nan.md`.
+
+- **`shared/document-builder/section-library.ts`** — two errors fixed
+  in the `marina_operations` template. `blockType: 'metrics'` →
+  `'metric_tile'` (matches `BlockType` union and sibling usages at
+  lines 200, 662). The `operations_narrative` AI template was
+  restructured from broken (`promptTemplate` field, missing required
+  fields) to AIPromptTemplate-compliant — original prompt copy
+  preserved, `systemPrompt`/`maxTokens`/`temperature` filled in as
+  PLACEHOLDERS with an inline comment flagging them for product
+  review before being relied on. Closes
+  `project_section_library_block_type.md`.
+
+- **`shared/schema.ts`** — `comp_sets` table jsonb defaults at lines
+  12876-12877 upgraded from `{}` to populated objects mirroring their
+  Zod schemas' declared defaults: `scoringConfig.default({ exponentP: 2, useTravelTime: false })`
+  and `adjustmentConfig.default({ outlierTrim: 'none' })`. No
+  runtime impact (project doesn't run `db:push`; existing DB
+  unaffected). Closes `project_schema_jsonb_default.md`.
+
+### Spec filings (memory only — NON-EXECUTABLE, "DO NOT IMPLEMENT" markers)
+
+- **`project_financial_model_completion_2026_05_06.md`** — gap-closure
+  framing for the FM section. Documents what's already shipped
+  (~70-80% of the 12-component vision) and lists 7 specific gaps:
+  G1 auto-routing non-financial docs to DD Vault/Data Room,
+  G2 line-item approve/reject gate, G3 annual/monthly column toggle,
+  G4 consolidated multi-period P&L view (the biggest, ~6-10h),
+  G5 goal-seek mode, G6 portfolio impact simulation, G7 department
+  drill-down charts. Total ~24-38h focused. Q1-Q4 architectural
+  decisions must be answered before implementation. Replaces the
+  earlier (incorrect) "from-scratch FM spec" framing.
+
+- **`project_document_upload_station_sub_spec.md`** — sub-spec under
+  the FM gap-closure parent. Upload station already exists; this
+  documents only the refinements (R1 auto-routing, R2 external
+  storage, R3 re-upload/version handling, R4 parse-failure recovery).
+
+- **`project_external_storage_integration_spec_2026_05_06.md`** —
+  bidirectional Dropbox/Drive/Box/OneDrive integration so Vantage
+  fits INTO institutional data rooms instead of replacing them. V1
+  scope: Tier 1 providers + OAuth + pull/push + conflict resolution.
+  ~17-29h V1, ~28-50h V1 complete. Q1-Q8 architectural decisions
+  must be answered first.
+
+- **`project_scenario_result_type_drift.md`** — surfaced during
+  sub-bite 1B server-side verification. Inlined `ScenarioResult`
+  type copy at `shared/finance/memo-generator.ts:23-37` has drifted
+  from canonical `server/services/dcf-scenario-layer.ts` (cashFlows
+  shape differs). Latent — invisible to `tsc -p shared` and
+  project-level tsc; only single-file `--skipLibCheck` surfaces it.
+  Recommended fix: extract type to `shared/` as single source of
+  truth. ~30-60 min, LOW.
+
+### Memory updates
+
+- `project_section_library_block_type.md` → **RESOLVED** (with
+  caveat about placeholder defaults needing product review).
+- `project_memo_generator_nan.md` → **RESOLVED** (with caveat that
+  exit cap rate stays narrative pending NOI/saleValue plumbing).
+- `project_schema_jsonb_default.md` → **RESOLVED** (with "pattern
+  for future jsonb columns" guidance).
+- `project_ci_red_known.md` → **REWRITTEN** with per-area
+  baselines, history of the wrong "26" and "6" baselines, honest
+  measurement notes.
+- `MEMORY.md` index entries updated to match for all five.
+
+### Key findings
+
+- **`shared/` is now TypeScript-clean (0 errors).** Verified via
+  `NODE_OPTIONS=--max-old-space-size=4096 npx tsc --noEmit -p shared`.
+  First time in codebase history per the rewritten ci-red memory.
+  Baseline trajectory through Bite 1: **6 → 4 → 2 → 0**.
+- **Full-project tsc cannot complete in current Replit environment.**
+  Consistently times out at 10 minutes even with 8GB heap. Per-area
+  verification (`tsc -p <area>`) is the practical path forward.
+- **Multiple prior agent reports about TS baselines were inaccurate.**
+  The "26 baseline" was probably a partial run with accidentally-
+  included dirs. The "6 baseline" came from `npm run typecheck` —
+  which is NOT a real script in this codebase. Both invalidated;
+  ci-red memory rewritten with per-area table and history of the
+  wrong numbers.
+- **Dev server (PID 278) was hot-spinning at 99% CPU for 1+ hour at
+  start of session.** CPU breakdown was almost entirely system/kernel
+  time (`stime=3791s` vs `utime=43s`) — signature of fs/syscall
+  thrashing (chokidar watcher loop, esbuild rebuilds), not a JS
+  infinite loop. Resolved by restart-dev skill (new PID 4138; took
+  ~30s to boot due to "Running 14990 idempotent migrations" — the
+  skill's 15s health probe is too tight for this codebase). Filing
+  this as a process note; not a recurring fix candidate.
+- **Financial Model section is 70-80% built per Brett's audit.** The
+  original "from-scratch FM spec" framing was inappropriate.
+  Reframed as gap-closure with 7 specific items.
+- **Replit auto-commit absorbed several mid-session edits into "Git
+  commit prior to merge" stub commits.** Pattern continues per
+  earlier `project_replit_agent_session_observations_2026_05_05.md`.
+
+### Validation
+
+- `tsc -p shared` after each sub-bite: **6 → 4 → 2 → 0**.
+- Server-side spot check on the `dcf-decision-support-service.ts`
+  caller: no new errors introduced by the `year1Noi` plumbing
+  (pre-existing `ScenarioResult` drift surfaced — filed as separate
+  memory).
+
+### No commits pushed this session
+
+All code changes are in the working tree; Replit auto-commit pipeline
+will absorb them. No `git commit` / `git push` invoked from
+this session.
+
+### Next-session candidates (Brett picks)
+
+**Foundation track (continues today's pattern):**
+- (a) Per-area tsconfig setup — ensure `tsc -p server` and `tsc -p client`
+  work cleanly; ~20-30 min infrastructure investment
+- (b) Bite 2: `server/services/` TypeScript baseline cleanup — same
+  one-error-at-a-time process as Bite 1, expected mix of legacy
+  marina-launch (skip) and real Vantage code (fix)
+- (c) Bite 3+: `server/routes/`, then `client/src/pages/modeling/`,
+  `/portfolio/`, `/crm/` — each its own focused session
+
+**Product track (Financial Model gap closure — see filed spec):**
+- (d) FM Gap G2 — line-item approve/reject gate (~2-3h)
+- (e) FM Gap G3 — annual/monthly column toggle (~2-3h)
+- (f) FM Gap G4 — consolidated multi-period P&L view (~6-10h)
+- (g) FM Gap G5 — goal-seek mode (~4-6h)
+- (h) FM Gap G6 — portfolio impact simulation (~4-6h)
+- (i) FM Gap G7 — department drill-down charts (~3-5h)
+
+**Strategic track:**
+- (j) Multi-partner GP/LP discovery (Q1-Q6 architectural decisions,
+  ~2-3h, no code)
+
+## 2026-05-07 — Audits + FM Gap G2 + G3 closures
+
+Goal: close the next two FM gap-closure items (G2 approval gate + G3
+period-toggle default) and stand up institutional-grade audit memories
+for Deal Workspace and Document Studio so future sessions have a
+shared map of remaining latent problems.
+
+### What shipped (code commits — local, not pushed)
+
+- `55888af6` — `feat(fm): G2 — gate Sync to Financial Model on
+  per-line-item review (FM gap closure)`
+- `8a897010` — `feat(fm): G3 — default historical P&L granularity
+  from uploaded P&Ls (FM gap closure)`
+
+**G2** — Sync to Financial Model is now gated on per-line-item review
+of uploaded P&L docs. Pending items can no longer slip into the model
+unreviewed. Stats payload split between the routes literal and the
+service method surfaced mid-implementation; documented and
+carried-through.
+
+**G3** — Historical P&L tab now picks its default annual/monthly
+display mode based on the majority granularity of the project's
+uploaded P&Ls. Filter: `docType='pnl' AND status!='error'`. Ties +
+zero uploads default to monthly. User can flip freely after the
+default applies. `viewMode='all'/'compare'` still forces annual
+(existing behavior preserved). Implementation matches the existing
+`viewMode→annual` useEffect pattern in the same file (line 238-242)
+— declaration order forced useEffect over useState init.
+
+### Audit memories filed
+
+- `project_deal_workspace_audit_2026_05_07.md` — 155-line audit,
+  reverse-engineered from code + institutional CRE patterns. 4 entry
+  points / 3 record-page shells (deal-detail.tsx 13-tab vs
+  [workspaceId].tsx 8-tab). CLAUDE.md priorities 2/3/5/6 already
+  shipped — journal stale on those. IC backend (10 endpoints)
+  unexposed on deal record (~2-3h to add tab). Marina copy still
+  leaks.
+- `project_document_studio_audit_2026_05_07.md` — 194-line audit,
+  same shape. 3 parallel doc-gen pipelines
+  (`document-builder/*` / legacy `om/*` / `memo-generator.ts`).
+  Capital calls + distributions + quarterly + annual letters are
+  plain-text email templates only (LP statement + K-1 PDFs are
+  wired — pattern needs lifting). Token resolver gaps: no waterfall
+  tier table / no MC P10/P50/P90 / no DSCR/LTV timelines / IRR_NET
+  conflated. 11 of 23 sections marina-flavored.
+
+### Follow-up memories filed
+
+- `project_doc_intel_v2_nav_dead_entry.md` — `/document-intelligence`
+  in MobileBottomNav points at ExtractionReview /
+  `document_extraction_jobs` (0 rows ever). V1 (`uploads.tsx` +
+  `doc_intel_*`) is active. Brett to choose: retire V2, plan
+  migration, or document differentiation.
+- `project_upload_stats_needs_review_bug.md` — `modeling-routes.ts`
+  `needsReview: row.pending` instead of querying
+  `status='needs_review'`. Bypassed in G2 by deriving
+  `notReviewed = total - reviewed`.
+- `project_upload_with_stats_type_drift.md` — `UploadWithStats` /
+  `upload.stats` type drift across 3 client surfaces + 1 server
+  literal. Move to single shared type.
+- `project_g3_parser_granularity_detection.md` — parser
+  auto-detection of granularity deferred until real annual upload
+  test data exists. `excel-extractor.ts` classifies internally but
+  doesn't persist to `doc_intel_uploads.dataGranularity`.
+- `project_actuals_data_typing_drift.md` — 4 pre-existing TS errors
+  in `historical-pl.tsx` around `actualsData.grouped`. Surfaces
+  only under single-file `--skipLibCheck`. Latent risk if
+  `.grouped` is ever null at runtime.
+
+### Key findings
+
+- **Financial Model is now functionally complete for the user-facing
+  workflow** described in Brett's morning destination, EXCEPT for the
+  Document Studio export piece. G2 (approval gate) and G3 (period
+  default) close the holding-station UX. Pro forma → returns →
+  metrics path was already mature pre-today.
+
+- **The remaining gap to Brett's stated destination is in Document
+  Studio, not Financial Model:**
+  * Token resolver missing: waterfall tier table, Monte Carlo
+    P10/P50/P90, tornado/attribution, DSCR/LTV timelines, scenario
+    comparison
+  * Three parallel doc-gen pipelines, with `ic-memo-service.ts`
+    effectively orphan
+  * Asset-class drift live: 11/23 sections marina-specific, 6/9 AI
+    prompts marina-flavored
+  * Capital calls / distributions / letters are plain-text email
+    bodies only (LP statement + K-1 fully wired with `pdf-lib` —
+    pattern needs lifting)
+
+- **Deal Workspace is functionally OK but architecturally
+  fragmented:** 4 entry points, 2 competing 1,000+ LOC shells. IC
+  Memo backend (10 endpoints) exists but not exposed on deal record.
+  Pre-beta workspace remediation is 8-15h of latent problems
+  (`project_workspace_health_survey_2026_05_01.md` still open).
+
+- **The discovery-then-implement pattern caught real architectural
+  decisions on both G2 and G3** that the spec text didn't predict:
+  G2 — stats payload split between routes literal and service
+  method; G3 — declaration-order constraint forced useEffect pattern
+  over useState init.
+
+- **Multiple agent reports caught and corrected mid-session**
+  (typecheck false-positive interpretation, declaration-order bug).
+  The discipline pattern continues to function as intended.
+
+### Validation
+
+- `tsc -p shared`: **0 errors** (clean) before and after both commits.
+- G3 single-file tsc with project paths: 4 pre-existing errors at
+  unrelated lines (412→438, 415→441, 423→449, 443→469 post-G3),
+  zero new errors introduced. Filed as
+  `project_actuals_data_typing_drift.md`.
+- G2 verified independently in its own commit (see commit message
+  for details).
+
+### No new push
+
+Both commits made locally (`55888af6`, `8a897010`); awaiting Brett's
+push. Working tree at session-end shows journal modified +
+`.claude/settings.local.json` ambient drift +
+`attached_assets/Pasted-...txt` paste untracked.
+
+### Next-session candidates (Brett picks)
+
+**Document Studio track (closes the export gap from morning's goal):**
+- (a) Asset-class drift cleanup — replace marina-specific copy in
+  section library + token resolver + AI prompts (~4-6h)
+- (b) Token resolver gap closure — waterfall tier table, Monte Carlo
+  bands, DSCR/LTV (~3-5h)
+- (c) Lift LP statement / K-1 PDF pattern → capital calls +
+  distributions + quarterly letters (~3-5h)
+- (d) IC tab exposure on deal record — backend already built, just
+  surface it (~2-3h)
+
+**Financial Model gap closure track (continued):**
+- (e) FM Gap G4 — consolidated multi-period P&L view (~6-10h, biggest
+  piece)
+- (f) FM Gap G5 — goal-seek / reverse-engineer mode (~4-6h)
+- (g) FM Gap G6 — portfolio impact simulation (~4-6h)
+- (h) FM Gap G7 — department drill-down charts (~3-5h)
+
+**Foundation track:**
+- (i) Resolve V2 nav decision
+  (`project_doc_intel_v2_nav_dead_entry.md`)
+- (j) Per-area tsconfig setup for `server/` + `client/` verification
+- (k) `UploadWithStats` type unification
+  (`project_upload_with_stats_type_drift.md`)
+- (l) Bite 2: `server/services/` TypeScript baseline cleanup
+
+**Strategic track:**
+- (m) Multi-partner GP/LP discovery (Q1-Q6 architectural)
+
 
 

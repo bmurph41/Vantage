@@ -302,7 +302,25 @@
       "Bash(awk 'NR==1||NR==15||NR==30||NR==45||NR==60||NR==80||NR==95||NR==110||NR==130||NR==150||NR==165||NR==168')",
       "Bash(awk '{ if \\($1 > 0\\) print }')",
       "Bash(tee /tmp/ts-errors.txt)",
-      "Bash(NODE_OPTIONS=\"--max-old-space-size=8192\" npx tsc)"
+      "Bash(NODE_OPTIONS=\"--max-old-space-size=8192\" npx tsc)",
+      "Bash(NODE_OPTIONS=--max-old-space-size=4096 npx tsc --noEmit -p shared)",
+      "Bash(NODE_OPTIONS=--max-old-space-size=6144 npx tsc --noEmit --project tsconfig.json)",
+      "Bash(NODE_OPTIONS=--max-old-space-size=4096 node_modules/.bin/tsc -p shared --noEmit)",
+      "Bash(echo \"shared tsc exit: $?\")",
+      "Bash(python3 -c 'import sys, json; pkg = json.load\\(sys.stdin\\); print\\(pkg.get\\(\"scripts\", {}\\).get\\(\"check\", \"\\(no check script\\)\"\\)\\)')",
+      "Bash(NODE_OPTIONS=--max-old-space-size=4096 node_modules/.bin/tsc --noEmit --skipLibCheck --target esnext --module esnext --moduleResolution bundler --strict --esModuleInterop --baseUrl . --paths '{\"@shared/*\":[\"./shared/*\"]}' --types node --lib esnext,dom server/services/adjusted-actuals-service.ts)",
+      "Bash(git *)",
+      "Bash(NODE_OPTIONS=\"--max-old-space-size=4096\" npx tsc -p shared --noEmit)",
+      "Bash(NODE_OPTIONS=\"--max-old-space-size=4096\" npx tsc --noEmit --skipLibCheck --module esnext --moduleResolution bundler --target es2022 --strict --esModuleInterop --allowImportingTsExtensions --baseUrl . --paths '{\"@shared/*\":[\"./shared/*\"],\"@/*\":[\"./client/src/*\"]}' --types node server/services/adjusted-actuals-service.ts)",
+      "Bash(NODE_OPTIONS=\"--max-old-space-size=8192\" timeout 540 npx tsc -p tsconfig.check.json)",
+      "Bash(cp /tmp/probe.mjs /home/runner/workspace/probe.mjs)",
+      "Bash(rm probe.mjs)",
+      "Bash(NODE_OPTIONS=\"--max-old-space-size=4096\" npx tsc -p shared)",
+      "Bash(NODE_OPTIONS=\"--max-old-space-size=4096\" npx tsc --noEmit --skipLibCheck --module esnext --moduleResolution bundler --target es2022 --strict --esModuleInterop --resolveJsonModule --jsx preserve --baseUrl . --paths '{\"@shared/*\":[\"shared/*\"]}' server/services/consolidated-pnl-service.ts server/services/adjusted-actuals-service.ts)",
+      "Bash(echo \"shared tsc exit=$?\")",
+      "Bash(NODE_OPTIONS=\"--max-old-space-size=4096\" npx tsc --noEmit --skipLibCheck --target ES2022 --module ESNext --moduleResolution bundler --strict --esModuleInterop --resolveJsonModule --jsx preserve --baseUrl . --paths '{\"@shared/*\":[\"shared/*\"]}' server/services/adjustment-apply-service.ts)",
+      "Bash(NODE_OPTIONS=\"--max-old-space-size=4096\" npx tsc -p /tmp/tsconfig-svc.json)",
+      "Bash(NODE_OPTIONS=\"--max-old-space-size=4096\" npx tsc --noEmit --skipLibCheck --target ES2022 --module ESNext --moduleResolution bundler --strict --esModuleInterop --resolveJsonModule --jsx preserve --baseUrl . --paths '{\"@shared/*\":[\"shared/*\"]}' server/services/canonical-actuals-loader.ts)"
     ]
   }
 }
