@@ -132,9 +132,9 @@ export async function loadCanonicalActuals(
   const allActuals = await db.select()
     .from(modelingActuals)
     .where(eq(modelingActuals.modelingProjectId, projectId));
-  
+
   // 3. Apply excludes and category overrides
-  const actuals = allActuals
+  const actualsAfterOverrides = allActuals
     .filter(a => !excludeSet.has(a.subcategory || ''))
     .map(a => {
       const catOverride = categoryOverrideMap[a.subcategory || ''];
@@ -143,11 +143,57 @@ export async function loadCanonicalActuals(
       }
       return a;
     });
-  
+
+  // 3b. Per-(project, year) period_type dedupe — Phase 1.0/1.4 semantics.
+  // modeling_actuals rows carry period_type ∈ {'month', 'year', 'quarter'}.
+  // Annual rollup rows land at month=1; monthly rows distribute across 1..12.
+  // Without dedupe the loader sums monthly + annual additively (the rollup row
+  // gets bucketed into month=1, double-counting any year that has both shapes).
+  //
+  // Decision per year:
+  //   1. 12 distinct monthly months → keep monthly only (drop year+quarter)
+  //   2. <12 monthly + ≥1 year row  → keep year only (annual is canonical)
+  //   3. <12 monthly + 0 year rows  → keep monthly only (partial-year mode)
+  //   4. 0 monthly + ≥1 year row    → keep year only (annual-only project)
+  // Quarter rows are dropped in all branches — the loader's monthly-bucket
+  // representation can't disambiguate them and no current consumer uses them.
+  const monthlyMonthsByYear = new Map<number, Set<number>>();
+  const hasYearRowByYear = new Set<number>();
+  for (const a of actualsAfterOverrides) {
+    if (a.periodType === 'month') {
+      let set = monthlyMonthsByYear.get(a.year);
+      if (!set) {
+        set = new Set();
+        monthlyMonthsByYear.set(a.year, set);
+      }
+      set.add(a.month);
+    } else if (a.periodType === 'year') {
+      hasYearRowByYear.add(a.year);
+    }
+  }
+  // Years where the canonical value is the annual rollup (case 2 or case 4).
+  // Tracked so coverage can suppress partial-year annualization on these years.
+  const annualSourcedYears = new Set<number>();
+  for (const yr of hasYearRowByYear) {
+    if ((monthlyMonthsByYear.get(yr)?.size ?? 0) < 12) {
+      annualSourcedYears.add(yr);
+    }
+  }
+  const actuals = actualsAfterOverrides.filter((a) => {
+    const monthlyCount = monthlyMonthsByYear.get(a.year)?.size ?? 0;
+    if (monthlyCount === 12) {
+      return a.periodType === 'month'; // case 1
+    }
+    if (hasYearRowByYear.has(a.year)) {
+      return a.periodType === 'year';  // cases 2, 4
+    }
+    return a.periodType === 'month';   // case 3
+  });
+
   // Determine available years
   const availableYears = Array.from(new Set(actuals.map(a => a.year).filter((y): y is number => y !== null))).sort((a, b) => a - b);
   const latestYear = availableYears.length > 0 ? availableYears[availableYears.length - 1] : null;
-  
+
   // 4. Filter to requested year
   const relevantActuals = year
     ? actuals.filter(a => a.year === year)
@@ -225,15 +271,28 @@ export async function loadCanonicalActuals(
   const grossProfit = totalRevenue - totalCOGS;
   const noi = grossProfit - totalExpenses;
 
-  // Build partial-year coverage: which months have at least one non-zero entry
-  const coveredMonthSet = new Set<number>();
-  for (const item of items) {
-    for (const [monthStr, amount] of Object.entries(item.monthlyAmounts)) {
-      if (amount !== 0) coveredMonthSet.add(Number(monthStr));
+  // Build partial-year coverage: which months have at least one non-zero entry.
+  // For annual-sourced years (rollup row is the canonical year value), the
+  // amount lands at month=1 only; treating that as 1-month coverage would
+  // trip 12x annualization downstream. Suppress by reporting full coverage.
+  const coverageYear = year ?? latestYear;
+  const isAnnualSourced =
+    coverageYear !== null && coverageYear !== undefined && annualSourcedYears.has(coverageYear);
+  let coveredMonths: number[];
+  let monthsWithData: number;
+  if (isAnnualSourced) {
+    coveredMonths = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+    monthsWithData = 12;
+  } else {
+    const coveredMonthSet = new Set<number>();
+    for (const item of items) {
+      for (const [monthStr, amount] of Object.entries(item.monthlyAmounts)) {
+        if (amount !== 0) coveredMonthSet.add(Number(monthStr));
+      }
     }
+    coveredMonths = Array.from(coveredMonthSet).sort((a, b) => a - b);
+    monthsWithData = coveredMonths.length;
   }
-  const coveredMonths = Array.from(coveredMonthSet).sort((a, b) => a - b);
-  const monthsWithData = coveredMonths.length;
   const annualizationFactor = monthsWithData > 0 && monthsWithData < 12
     ? 12 / monthsWithData
     : 1;
