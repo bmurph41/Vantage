@@ -177,6 +177,123 @@ export interface UnmatchedAddback {
 }
 
 // ---------------------------------------------------------------------------
+// Range modes — Phase 1.5
+//
+// Translated by getConsolidatedPnL into concrete (year, month) bounds against
+// available modeling_actuals coverage. The resolved bounds are returned to
+// callers as effectiveStart / effectiveEnd on the response.
+// ---------------------------------------------------------------------------
+
+export type YearRangeMode = 'calendar' | 'fiscal' | 't12' | 'custom';
+
+export interface ConsolidatedPnLOptions {
+  yearRange: YearRangeMode;
+  /** Required when yearRange='custom'. */
+  customStart?: PeriodPoint;
+  /** Required when yearRange='custom'. */
+  customEnd?: PeriodPoint;
+  /**
+   * 1–12. Used only when yearRange='fiscal'. Defaults to 1 (calendar-equivalent).
+   * Persisted fiscal-year-start lives outside this contract today; callers
+   * pass the value through here.
+   */
+  fiscalYearStartMonth?: number;
+  viewMode?: PnLViewMode;
+}
+
+// ---------------------------------------------------------------------------
+// ReconciliationVariance — Phase 1.5
+//
+// Phase 1.4's Q2 dedupe drops the year-type rollup row when 12 monthly rows
+// exist for the same (project, year), so this surface is reserved for the
+// "monthly partial coverage + annual rollup also present" case spec v3 calls
+// out (Q2 case 3). Phase 1.5 ships variance detection as a stub that returns
+// []; the raw-actuals query that populates it lands in a follow-up.
+// ---------------------------------------------------------------------------
+
+export interface ReconciliationVariance {
+  year: number;
+  category: PnLCategory | string;
+  subcategory: string;
+  lineItemDescription: string | null;
+
+  /** Sum of monthly modeling_actuals.amount in this (year, line). */
+  monthlySum: number;
+  /** modeling_actuals.amount on the year-type rollup row for this (year, line). */
+  annualReported: number;
+
+  /** annualReported - monthlySum. */
+  variance: number;
+
+  /**
+   * 'rounding' when |variance| ≤ 0.1% of |annualReported| (or when
+   * annualReported is 0 and |variance| ≤ 1.0); 'material' otherwise.
+   */
+  severity: 'rounding' | 'material';
+
+  /**
+   * Always 'unresolved' from the detection pass. Future variants
+   * ('accepted_monthly' | 'accepted_annual') land alongside the user-action
+   * UI in a later phase.
+   */
+  status: 'unresolved';
+}
+
+// ---------------------------------------------------------------------------
+// MissingPeriodReport — Phase 1.5
+//
+// One entry per year inside [effectiveStart.year, effectiveEnd.year] that has
+// at least one monthly row. Years with zero presence are out of scope and
+// are not reported. monthsCovered is bounded by the request range.
+// ---------------------------------------------------------------------------
+
+export interface MissingPeriodReport {
+  year: number;
+  /** Months 1–12 with at least one monthly row inside the request range. */
+  monthsCovered: number[];
+  /** Months 1–12 inside the request range with no monthly row. */
+  missingMonths: number[];
+  /** From modeling_projection_decisions; defaults to 'auto'. */
+  handling: ProjectionHandling;
+  /** From modeling_projection_decisions; defaults to true. */
+  needsReview: boolean;
+}
+
+// ---------------------------------------------------------------------------
+// ConsolidatedCell — Phase 1.5
+//
+// One projected (or explicitly-gapped) value for a (year, month, line). The
+// projection chain for handling='auto' is:
+//   prior_year_yoy → trailing_3mo → gap
+//
+// prior_year_yoy formula:
+//   priorYearSameMonth × (currentYTD ÷ priorYTD)
+// where currentYTD and priorYTD are summed over the same (line) across all
+// covered months in their respective years.
+//
+// trailing_3mo formula:
+//   mean of the last up-to-3 monthly values for (line) in the current year.
+// ---------------------------------------------------------------------------
+
+export type ProjectionSource =
+  | 'auto:prior_year_yoy'
+  | 'auto:trailing_3mo'
+  | 'gap';
+
+export interface ConsolidatedCell {
+  year: number;
+  /** 1–12. */
+  month: number;
+  category: PnLCategory | string;
+  subcategory: string;
+  lineItemDescription: string | null;
+
+  /** null when source='gap' (no basis to project from). */
+  baseAmount: number | null;
+  source: ProjectionSource;
+}
+
+// ---------------------------------------------------------------------------
 // ConsolidatedPnLResponse — the consolidated-view endpoint payload
 // ---------------------------------------------------------------------------
 
@@ -195,6 +312,15 @@ export interface ConsolidatedPnLResponse {
 
   masterState: AdjustmentMasterState;
 
+  /**
+   * Resolved (year, month) bounds for the requested yearRange mode.
+   * Inclusive on both ends. Used by the UI to render the date-range header
+   * and by downstream consumers (pro-forma projection engine) to fetch the
+   * matching adjusted-actuals stream.
+   */
+  effectiveStart: PeriodPoint;
+  effectiveEnd: PeriodPoint;
+
   /** Year columns in display order. */
   years: YearColumn[];
 
@@ -211,6 +337,28 @@ export interface ConsolidatedPnLResponse {
    * line-item key.
    */
   unmatchedAddbacks: UnmatchedAddback[];
+
+  /**
+   * Monthly-vs-annual reconciliation variances. Phase 1.5 ships this as
+   * always-empty; the raw-actuals query that populates it is a Phase 3
+   * follow-up (spec v3 doesn't gate the consolidated view on it).
+   */
+  variances: ReconciliationVariance[];
+
+  /**
+   * One entry per in-scope year with monthly coverage, listing months
+   * covered + missing inside the resolved range, and the user's
+   * projection-handling decision.
+   */
+  missingPeriods: MissingPeriodReport[];
+
+  /**
+   * Projected (or gapped) cells produced for missing months whose handling
+   * is 'auto' or 'gap'. Empty for 'manual' years (the UI captures values
+   * separately). One entry per (missing month × line item present in
+   * current year).
+   */
+  projectedCells: ConsolidatedCell[];
 }
 
 // ---------------------------------------------------------------------------
