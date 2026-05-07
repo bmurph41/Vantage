@@ -139,8 +139,20 @@ export interface AnnualAdjustmentGroup {
 export interface YearColumn {
   year: number;
   periodType: PeriodType;
-  /** True when modeling_actuals coverage for the year is < 12 months. */
+  /**
+   * True when the year has fewer than 12 distinct monthly rows in
+   * modeling_actuals. This reflects the underlying coverage of the year as
+   * a whole, NOT the slice the current request range exposes — a fully
+   * covered year remains isPartial=false even when displayed in a t12
+   * window that clips it to a few months.
+   */
   isPartial: boolean;
+  /**
+   * Distinct months (1–12) with at least one monthly row in
+   * modeling_actuals for this year. Same whole-year semantic as
+   * isPartial — independent of the current request range. For the
+   * range-bounded view, see MissingPeriodReport.monthsCovered.
+   */
   monthsCovered: number;
   /** Per-year projection-handling decision (modeling_projection_decisions). */
   handling: ProjectionHandling;
@@ -295,13 +307,11 @@ export interface ConsolidatedCell {
 
 // ---------------------------------------------------------------------------
 // ConsolidatedPnLResponse — the consolidated-view endpoint payload
+//
+// The endpoint request body is `ConsolidatedPnLOptions` — projectId comes
+// from the route parameter, options from the body. There is no separate
+// ConsolidatedPnLRequest type.
 // ---------------------------------------------------------------------------
-
-export interface ConsolidatedPnLRequest {
-  projectId: string;
-  yearRange?: { start: number; end: number };
-  viewMode?: PnLViewMode;
-}
 
 export interface ConsolidatedPnLResponse {
   projectId: string;

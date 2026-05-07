@@ -94,6 +94,31 @@ async function fetchCoverageBounds(
   };
 }
 
+/**
+ * Whole-year monthly coverage, independent of the current request range.
+ * Drives YearColumn.isPartial / monthsCovered. Distinct from the
+ * range-filtered monthly stream that feeds detectMissingPeriods, which
+ * reports range-bounded coverage gaps.
+ */
+async function fetchMonthlyCoverageByYear(
+  orgId: string,
+  projectId: string,
+): Promise<Map<number, number>> {
+  const r = await pool.query<{ year: number; months: string }>(
+    `SELECT year, COUNT(DISTINCT month) AS months
+     FROM modeling_actuals
+     WHERE modeling_project_id = $1 AND org_id = $2 AND period_type = 'month'
+       AND year BETWEEN 1900 AND 2200
+     GROUP BY year`,
+    [projectId, orgId],
+  );
+  const map = new Map<number, number>();
+  for (const row of r.rows) {
+    map.set(Number(row.year), Number(row.months));
+  }
+  return map;
+}
+
 function shiftMonth(point: PeriodPoint, deltaMonths: number): PeriodPoint {
   const total = point.year * 12 + (point.month - 1) + deltaMonths;
   return {
@@ -238,28 +263,17 @@ function rangeMonthsForYear(year: number, range: ResolvedRange): number[] {
 
 function buildYearColumns(
   range: ResolvedRange,
-  monthlyRows: AdjustedActualRow[],
+  fullYearCoverage: Map<number, number>,
   decisions: Map<number, ProjectionDecisionRow>,
 ): YearColumn[] {
-  // Months covered per year (from monthly rows actually in range).
-  const coveredByYear = new Map<number, Set<number>>();
-  for (const row of monthlyRows) {
-    if (row.periodType !== 'month') continue;
-    let set = coveredByYear.get(row.year);
-    if (!set) {
-      set = new Set<number>();
-      coveredByYear.set(row.year, set);
-    }
-    set.add(row.month);
-  }
-
   const cols: YearColumn[] = [];
   for (let y = range.start.year; y <= range.end.year; y++) {
     const expected = rangeMonthsForYear(y, range);
     if (expected.length === 0) continue;
-    const covered = coveredByYear.get(y) ?? new Set<number>();
-    const monthsCovered = expected.filter((m) => covered.has(m)).length;
-    const isPartial = monthsCovered < expected.length;
+    // Whole-year coverage — not range-bounded. A fully covered year stays
+    // isPartial=false even when the visible window clips it (t12 mode).
+    const monthsCovered = fullYearCoverage.get(y) ?? 0;
+    const isPartial = monthsCovered < 12;
     const dec = decisionFor(y, decisions);
     cols.push({
       year: y,
@@ -622,22 +636,24 @@ export async function getConsolidatedPnL(
 ): Promise<ConsolidatedPnLResponse> {
   const range = await resolveYearRange(orgId, projectId, options);
 
-  const [masterState, decisions, annualResult, monthlyResult] = await Promise.all([
-    fetchMasterState(orgId, projectId),
-    fetchProjectionDecisions(orgId, projectId),
-    getAdjustedActuals(orgId, projectId, {
-      granularity: 'annual',
-      range,
-      includeUnmatched: true,
-    }),
-    getAdjustedActuals(orgId, projectId, {
-      granularity: 'monthly',
-      range,
-      includeUnmatched: false,
-    }),
-  ]);
+  const [masterState, decisions, fullYearCoverage, annualResult, monthlyResult] =
+    await Promise.all([
+      fetchMasterState(orgId, projectId),
+      fetchProjectionDecisions(orgId, projectId),
+      fetchMonthlyCoverageByYear(orgId, projectId),
+      getAdjustedActuals(orgId, projectId, {
+        granularity: 'annual',
+        range,
+        includeUnmatched: true,
+      }),
+      getAdjustedActuals(orgId, projectId, {
+        granularity: 'monthly',
+        range,
+        includeUnmatched: false,
+      }),
+    ]);
 
-  const years = buildYearColumns(range, monthlyResult.rows, decisions);
+  const years = buildYearColumns(range, fullYearCoverage, decisions);
   const lineItems = buildLineItems(annualResult.rows, years);
   const annualAdjustments = buildAnnualAdjustments(annualResult.rows, years);
   const missingPeriods = detectMissingPeriods(monthlyResult.rows, range, decisions);
