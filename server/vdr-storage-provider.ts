@@ -8,8 +8,10 @@ import {
   deleteObjectStorageFile,
   docIntelFileExists,
 } from './utils/doc-intel-storage';
+import { BUCKET_NAME } from './storage/s3-client';
 
-const USE_S3 = !!(process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY && process.env.S3_BUCKET_NAME);
+// s3-client asserts AWS creds + bucket at module load — no runtime fallback path remains.
+const USE_S3 = true;
 
 export interface StorageProvider {
   upload(filePath: string, storagePath: string): Promise<string>;
@@ -220,8 +222,8 @@ export function createStorageProvider(type: 'local' | 's3' | 'replit' = 'local',
     return new S3StorageProvider(config.bucket, config.region);
   }
   // Auto-detect: S3 takes priority to match upload priority in vdr-file-service.ts
-  if (USE_S3 && process.env.S3_BUCKET_NAME) {
-    return new S3StorageProvider(process.env.S3_BUCKET_NAME, process.env.AWS_REGION);
+  if (USE_S3 && BUCKET_NAME) {
+    return new S3StorageProvider(BUCKET_NAME, process.env.AWS_REGION);
   }
   if (type === 'replit' || isObjectStorageAvailable()) {
     return new ReplitObjectStorageProvider(config?.baseDir);

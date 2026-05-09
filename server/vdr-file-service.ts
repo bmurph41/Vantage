@@ -12,8 +12,8 @@ import {
   deleteObjectStorageFile,
 } from './utils/doc-intel-storage';
 
-// Check if S3 is configured
-const USE_S3 = !!(process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY && process.env.S3_BUCKET_NAME);
+// s3-client asserts AWS creds + bucket at module load — no runtime fallback path remains.
+const USE_S3 = true;
 
 export interface FileValidationConfig {
   maxSizeBytes: number;
