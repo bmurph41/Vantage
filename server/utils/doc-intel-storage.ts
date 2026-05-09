@@ -1,50 +1,19 @@
-import { Storage } from "@google-cloud/storage";
-import { ExternalAccountClient } from "google-auth-library";
+import {
+  PutObjectCommand,
+  GetObjectCommand,
+  DeleteObjectCommand,
+  HeadObjectCommand,
+} from "@aws-sdk/client-s3";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
 import * as crypto from "crypto";
-
-const REPLIT_SIDECAR_ENDPOINT = "http://127.0.0.1:1106";
-
-function getStorageClient(): Storage {
-  const authClient = ExternalAccountClient.fromJSON({
-    type: "external_account",
-    audience: "replit",
-    subject_token_type: "access_token",
-    token_url: `${REPLIT_SIDECAR_ENDPOINT}/token`,
-    credential_source: {
-      url: `${REPLIT_SIDECAR_ENDPOINT}/credential`,
-      format: {
-        type: "json",
-        subject_token_field_name: "access_token",
-      },
-    },
-    universe_domain: "googleapis.com",
-  });
-  if (!authClient) {
-    throw new Error("Failed to initialize object storage auth client");
-  }
-  return new Storage({ authClient, projectId: "" });
-}
-
-function parseBucketAndPrefix(): { bucketName: string; prefix: string } {
-  const privateDir = process.env.PRIVATE_OBJECT_DIR;
-  if (!privateDir) {
-    throw new Error("PRIVATE_OBJECT_DIR is not set. Object storage is not configured.");
-  }
-  const trimmed = privateDir.startsWith("/") ? privateDir.slice(1) : privateDir;
-  const slashIdx = trimmed.indexOf("/");
-  if (slashIdx === -1) {
-    return { bucketName: trimmed, prefix: "" };
-  }
-  const bucketName = trimmed.slice(0, slashIdx);
-  const prefix = trimmed.slice(slashIdx + 1);
-  return { bucketName, prefix };
-}
+import type { Readable } from "stream";
+import { s3Client, BUCKET_NAME } from "../storage/s3-client";
 
 export function isObjectStorageAvailable(): boolean {
-  return !!process.env.PRIVATE_OBJECT_DIR;
+  // s3-client.ts asserts AWS creds + bucket at module-load; reaching this is proof S3 is configured.
+  return true;
 }
 
 export function isObjectStorageKey(storagePath: string): boolean {
@@ -58,44 +27,14 @@ export async function uploadVdrFile(
   buffer: Buffer,
   contentType: string
 ): Promise<string> {
-  const { bucketName, prefix } = parseBucketAndPrefix();
-  const client = getStorageClient();
-
   const key = `vdr/${orgId}/${projectId}/${filename}`;
-  const objectName = prefix ? `${prefix}/${key}` : key;
-
-  const bucket = client.bucket(bucketName);
-  const file = bucket.file(objectName);
-
-  await file.save(buffer, {
-    metadata: { contentType },
-    resumable: false,
-  });
-
+  await s3Client.send(new PutObjectCommand({
+    Bucket: BUCKET_NAME,
+    Key: key,
+    Body: buffer,
+    ContentType: contentType,
+  }));
   return key;
-}
-
-export async function downloadObjectStorageToStream(bucketKey: string): Promise<import("stream").Readable> {
-  const { bucketName, prefix } = parseBucketAndPrefix();
-  const client = getStorageClient();
-
-  const objectName = prefix ? `${prefix}/${bucketKey}` : bucketKey;
-  const bucket = client.bucket(bucketName);
-  const file = bucket.file(objectName);
-
-  return file.createReadStream();
-}
-
-export async function deleteObjectStorageFile(bucketKey: string): Promise<void> {
-  try {
-    const { bucketName, prefix } = parseBucketAndPrefix();
-    const client = getStorageClient();
-    const objectName = prefix ? `${prefix}/${bucketKey}` : bucketKey;
-    const bucket = client.bucket(bucketName);
-    const file = bucket.file(objectName);
-    await file.delete({ ignoreNotFound: true });
-  } catch {
-  }
 }
 
 export async function uploadDocIntelFile(
@@ -104,34 +43,35 @@ export async function uploadDocIntelFile(
   buffer: Buffer,
   contentType: string
 ): Promise<string> {
-  const { bucketName, prefix } = parseBucketAndPrefix();
-  const client = getStorageClient();
+  const key = `doc-intel/${orgId}/${filename}`;
+  await s3Client.send(new PutObjectCommand({
+    Bucket: BUCKET_NAME,
+    Key: key,
+    Body: buffer,
+    ContentType: contentType,
+  }));
+  return key;
+}
 
-  const objectName = prefix
-    ? `${prefix}/doc-intel/${orgId}/${filename}`
-    : `doc-intel/${orgId}/${filename}`;
-
-  const bucket = client.bucket(bucketName);
-  const file = bucket.file(objectName);
-
-  await file.save(buffer, {
-    metadata: { contentType },
-    resumable: false,
-  });
-
-  return `doc-intel/${orgId}/${filename}`;
+export async function downloadObjectStorageToStream(bucketKey: string): Promise<Readable> {
+  const response = await s3Client.send(new GetObjectCommand({
+    Bucket: BUCKET_NAME,
+    Key: bucketKey,
+  }));
+  return response.Body as Readable;
 }
 
 export async function downloadDocIntelToBuffer(bucketKey: string): Promise<Buffer> {
-  const { bucketName, prefix } = parseBucketAndPrefix();
-  const client = getStorageClient();
-
-  const objectName = prefix ? `${prefix}/${bucketKey}` : bucketKey;
-  const bucket = client.bucket(bucketName);
-  const file = bucket.file(objectName);
-
-  const [contents] = await file.download();
-  return contents;
+  const response = await s3Client.send(new GetObjectCommand({
+    Bucket: BUCKET_NAME,
+    Key: bucketKey,
+  }));
+  const stream = response.Body as Readable;
+  const chunks: Buffer[] = [];
+  for await (const chunk of stream) {
+    chunks.push(Buffer.from(chunk));
+  }
+  return Buffer.concat(chunks);
 }
 
 export async function downloadDocIntelToTempFile(
@@ -147,16 +87,28 @@ export async function downloadDocIntelToTempFile(
   return tmpPath;
 }
 
+export async function deleteObjectStorageFile(bucketKey: string): Promise<void> {
+  try {
+    await s3Client.send(new DeleteObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: bucketKey,
+    }));
+  } catch {
+    // Match legacy GCS ignoreNotFound semantics — swallow any failure (S3 DeleteObject is also idempotent for missing keys).
+  }
+}
+
 export async function docIntelFileExists(bucketKey: string): Promise<boolean> {
   try {
-    const { bucketName, prefix } = parseBucketAndPrefix();
-    const client = getStorageClient();
-    const objectName = prefix ? `${prefix}/${bucketKey}` : bucketKey;
-    const bucket = client.bucket(bucketName);
-    const file = bucket.file(objectName);
-    const [exists] = await file.exists();
-    return exists;
-  } catch {
+    await s3Client.send(new HeadObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: bucketKey,
+    }));
+    return true;
+  } catch (err: any) {
+    if (err?.name === "NotFound" || err?.$metadata?.httpStatusCode === 404) {
+      return false;
+    }
     return false;
   }
 }
