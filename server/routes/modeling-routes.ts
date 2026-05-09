@@ -6,6 +6,7 @@ import { requirePermission } from "../middleware/rbac";
 import { parsePagination, paginatedResponse } from "../utils/pagination";
 import { debtScenarioService } from "../debt-scenario-service";
 import { docIntelService } from "../services/doc-intel-service";
+import { logger } from "../lib/logger";
 import { vdrFileService } from "../vdr-file-service";
 import { dashboardService } from "../services/dashboard-service";
 import { personaService } from "../services/persona-service";
