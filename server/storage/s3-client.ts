@@ -23,14 +23,24 @@ const s3Client = new S3Client({
   }
 });
 
-const BUCKET_NAME = process.env.S3_BUCKET_NAME!;
+const RESOLVED_BUCKET = process.env.AWS_S3_BUCKET || process.env.S3_BUCKET_NAME;
+const BUCKET_SOURCE: 'AWS_S3_BUCKET' | 'S3_BUCKET_NAME' | null =
+  process.env.AWS_S3_BUCKET ? 'AWS_S3_BUCKET' :
+  process.env.S3_BUCKET_NAME ? 'S3_BUCKET_NAME' : null;
 
-// Validate required environment variables
-if (!process.env.AWS_ACCESS_KEY_ID || !process.env.AWS_SECRET_ACCESS_KEY || !process.env.S3_BUCKET_NAME) {
+if (!process.env.AWS_ACCESS_KEY_ID || !process.env.AWS_SECRET_ACCESS_KEY || !RESOLVED_BUCKET) {
   console.error('❌ Missing required S3 environment variables');
-  console.error('   Required: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, S3_BUCKET_NAME');
+  console.error('   Required: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_S3_BUCKET (or legacy S3_BUCKET_NAME)');
   process.exit(1);
 }
+
+if (BUCKET_SOURCE === 'S3_BUCKET_NAME') {
+  console.warn(`⚠ S3 bucket resolved from deprecated S3_BUCKET_NAME=${RESOLVED_BUCKET}. Rename the secret to AWS_S3_BUCKET.`);
+} else {
+  console.log(`✓ S3 bucket resolved from AWS_S3_BUCKET=${RESOLVED_BUCKET}`);
+}
+
+const BUCKET_NAME: string = RESOLVED_BUCKET;
 
 /**
  * Upload file to S3
