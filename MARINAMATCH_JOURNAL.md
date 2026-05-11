@@ -1,5 +1,66 @@
 # MarinaMatch Platform Journal
 
+## ✅ S3 storage migration — Replit GCS sidecar replaced with own AWS S3 (2026-05-08)
+
+Pre-revenue self-fix for the broken Replit object-storage sidecar (`project_pipeline_inoperative_2026_05_09.md`). All file uploads were failing at the sidecar's placeholder JWT — every doc-intel upload in error state, no production beta possible until resolved. Replaced with own AWS S3 bucket using existing AWS account from MarinaMatch era. Migration completed in 5 commits across one session, with end-to-end pipeline verification closing Phase 4 Gate 1a of G4.
+
+### Commits in this window (oldest → newest)
+
+- `6771f9e5` Step 1 — softened boot foot-gun in `server/storage/s3-client.ts` to accept `AWS_S3_BUCKET` with `S3_BUCKET_NAME` legacy fallback + deprecation warning
+- `435dfc05` Step 2 — rewrote `server/utils/doc-intel-storage.ts` from GCS sidecar to AWS S3 (signature-preserving; all 8 functions). Net −48 lines
+- `d2d27ac2` Step 3a — VDR provider single-source bucket resolution via `s3-client.ts`. Retired `USE_S3` predicate (constant true post-migration)
+- `50541d7d` Pre-existing bug fix — imported missing logger in `modeling-routes.ts`. Surfaced when Step 2 unblocked the `setImmediate` block that referenced 13+ undeclared `logger.*` call sites. Outer catch was silently flipping uploads to `status='completed'` before the parser ever ran. NOT migration-caused; migration unblocked observability
+- `ff4763d7` Step 5 cleanup — removed dead GCS infrastructure: 2 orphan migration scripts, admin Doc-Intel Migration UI (page + route + sidebar entry), dead else-branches of `isObjectStorageAvailable()` predicate in `modeling-routes.ts`. Net −561 lines
+
+### AWS-side setup (Brett, manual)
+
+- Bucket: `vantage-uploads-bm`, region `us-east-1`, versioning enabled, all four public-access blocks set, SSE-S3 encryption
+- IAM user: `vantage-app` with scoped policy `vantage-app-s3-access` (PutObject/GetObject/DeleteObject/ListBucket on the bucket only)
+- Replit Secrets: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_S3_BUCKET=vantage-uploads-bm`, `AWS_REGION=us-east-1`
+
+### What changed (cumulative)
+
+- `server/storage/s3-client.ts` — Step 1 softened boot check, allows `AWS_S3_BUCKET || S3_BUCKET_NAME` resolution with deprecation warning on legacy
+- `server/utils/doc-intel-storage.ts` — Step 2 full rewrite. All 8 functions (upload/download/delete/exists for both `doc-intel/` and `vdr/` prefixes) now use `s3Client.send()` with `PutObject` / `GetObject` / `DeleteObject` / `HeadObject` commands. Signatures preserved — consumers untouched. Path conventions preserved (`doc-intel/<orgId>/<filename>`, `vdr/<orgId>/<projectId>/<filename>`)
+- `server/vdr-file-service.ts` + `server/vdr-storage-provider.ts` — Step 3a both import `BUCKET_NAME` from `s3-client.ts` directly. `USE_S3` predicate retired (constant true). Single source of truth for bucket resolution codified as architectural principle
+- `server/routes/modeling-routes.ts` — Step 4 imported missing `logger` from `../lib/logger`. Step 5 pruned 2 dead else-branches at lines 810 and 1992 (the `if (isObjectStorageAvailable())` wrapper since predicate is constant-true). `isObjectStorageAvailable` import removed
+- 5 deletions (Step 5): `server/scripts/migrateDocIntelToObjectStorage.ts`, `server/migrate-to-s3.ts`, `server/routes/admin/doc-intel-migration-routes.ts`, `client/src/pages/admin/DocIntelMigrationAdmin.tsx`, mount + route + sidebar entry for the admin UI
+
+### Decisions made
+
+- **Single source of truth for S3 bucket resolution.** `s3-client.ts` is canonical. Other modules import `BUCKET_NAME` from there, never re-implement the env-var lookup. Codified after Step 3 Phase 0 discovery surfaced VDR provider reading `process.env.S3_BUCKET_NAME` directly, causing post-Step-1 asymmetry (uploads to new bucket, downloads from inaccessible legacy bucket)
+- **No runtime fallback to local disk.** Pre-migration code had `if (isObjectStorageAvailable()) { upload } else { local fallback }` patterns. Post-migration the predicate is constant-true, the else-branches are unreachable, and the architectural intent is honest: S3 is required, server fails at boot if not configured
+- **Admin migration UI deleted (Option 1).** DB count confirmed dormant: 6 rows already marked unrecoverable, 1 stuck row transitioned to error state before deletion. Tool was functional but had no operational work remaining. Cleaner codebase wins
+- **`isObjectStorageAvailable()` function preserved as constant-true predicate.** Still imported by VDR services as documentation-of-intent. Full retirement deferred — would require touching VDR file service patterns left intact
+- **Phase 4 Gate 1 split into Gate 1a / Gate 1b.** Step 4 verification revealed two parallel pipelines (doc-intel review-based vs PNL auto-extract) plus a bridge. Migration verifies Gate 1a (doc-intel upload → S3 → parser → `docIntelExtractedItems`). Gate 1b (PNL pipeline through bridge → `pnl_facts` → `modeling_actuals`) deferred per `project_pnl_bridge_storage_assumptions.md`
+
+### Verification
+
+- **Step 2 harness:** 19/19 assertions, zero S3 residue across both prefixes
+- **Step 3b consumer exercise:** 27/27 assertions, SHA256 byte-exact across all read/write paths, `defaultStorageProvider.bucket = vantage-uploads-bm` confirmed (was `marinamatch1` pre-3a)
+- **Step 4 Gate 1a:** 14/14 assertions. Upload → 'uploaded' → 'processing' → 'parsed' → 'reviewing' in 45.3s (parser baseline for 1-year monthly P&L, 8 line items). 96 extracted items (8 × 12 = correct). Sample amounts matched input
+- **Step 5 smoke test:** POST → HTTP 201 → S3 key landed
+- `tsc -p shared` clean across all 5 commits
+
+### Pre-existing bugs surfaced (filed, not all fixed)
+
+- **`logger` unimported in modeling-routes.ts** — 13+ references with no import. Single-file tsc reports 410 errors on the file. Project-level tsc OOMs at 4GB before catching them. Logger fix shipped in `50541d7d`; broader 400+ remaining errors filed for future scope. Spec drift learning: "tsc clean" has been shared/-only-clean throughout the build; full-project tsc has never run to completion
+- **Drizzle/DB schema drift** — second confirmed case (after `modeling_adjustment_history` during G4 Phase 1.6a). `doc_intel_uploads` Drizzle declares 5 FK columns with `onDelete: 'cascade'`; live DB has zero FK constraints. CASCADE doesn't fire on deletes. Pattern of drift suggests systemic. Audit memory filed
+- **PNL pipeline bridge** — `server/services/pnl/project-bridge.ts:104-110, 129` and `parseOrchestrator.ts:315/330/341/400` have hardcoded local-disk assumptions about `storage_path`. Migration unblocked discovery but didn't fix. Two architectural directions documented in the bridge memory
+
+### Next session
+
+- **Phase 2 — UI surface** for the Consolidated P&L view (frontend consumers of `getConsolidatedPnL` response). Backend is stable, single source of truth verified end-to-end across 3 consumers (Exit Metrics, Consolidated View, pro forma). Estimated 4-6h for backbone components
+- Spec v4 covers Phase 1 closing state + Phase 2 sketch
+- Open follow-ups not blocking Phase 2:
+  - **Gate 1b** — PNL pipeline bridge S3-aware patch. Tracked in `project_pnl_bridge_storage_assumptions.md`. ~4-6h estimated. Blocking real production beta but not Phase 2 UI work
+  - **Modeling-routes tsc cleanup** — 400+ pre-existing errors in `modeling-routes.ts` from unimported identifiers. Tracked in `project_modeling_routes_logger_unimported.md` (notes the broader pattern beyond the logger fix shipped)
+  - **Drizzle/DB FK drift audit** — pre-beta priority. Tracked in `project_drizzle_db_fk_drift_audit.md`
+  - **VDR predicate cleanup** — `USE_S3` and `isObjectStorageAvailable()` patterns in `vdr-file-service.ts:69,81,197` are tautologies post-migration. Harmless but bookkeeping. ~30min when bandwidth allows
+  - **97 unshipped commits on `main`** — push backlog accumulated since prior session. Glance at `git log origin/main..main --oneline` before pushing
+
+---
+
 ## ✅ G4 Phase 1 wrap — single source of truth for addback-adjusted actuals (2026-05-07)
 
 Phase 1 of the G4 financial-model gap landed across 12 commits ending in `a2e86cdd`. Starting point was the Phase 1.2.5 reference implementation: an inline N+1 addback loop at the Exit Metrics handler computing T12 EBITDA from raw NOI plus per-addback signed deltas. End point is a shared service (`getAdjustedActuals`) that Exit Metrics, the Consolidated P&L view, and the pro-forma engine all call. Same code path → same number across all three surfaces.
