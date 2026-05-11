@@ -1214,7 +1214,6 @@ export default function UnifiedSidebar() {
                     <NavLink item={{ name: "Activity Log", href: "/admin/audit-trail" }} />
                     <NavLink item={{ name: "Data Sources", href: "/admin/data-sources" }} />
                     <NavLink item={{ name: "Asset Classes", href: "/admin/asset-classes" }} />
-                    <NavLink item={{ name: "Doc-Intel Migration", href: "/admin/doc-intel-migration" }} />
                   </div>
                 )}
               </>

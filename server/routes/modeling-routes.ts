@@ -28,10 +28,7 @@ import { validateFileUpload } from "../middleware/file-upload-security";
 import path from "path";
 import fs from "fs-extra";
 import crypto from "crypto";
-import {
-  isObjectStorageAvailable,
-  uploadDocIntelFile,
-} from "../utils/doc-intel-storage";
+import { uploadDocIntelFile } from "../utils/doc-intel-storage";
 import {
   modelingProjects,
   modelingProjectCollaborators,
@@ -806,23 +803,13 @@ export function registerModelingRoutes(
         return res.status(404).json({ error: 'VDR document file not found in storage' });
       }
 
-      // Persist to object storage (or local fallback) so the new doc-intel record is durable
-      let vdrDocIntelStoragePath: string;
-      if (isObjectStorageAvailable()) {
-        vdrDocIntelStoragePath = await uploadDocIntelFile(
-          orgId,
-          newFilename,
-          vdrFileBuffer,
-          vdrDoc.mimeType
-        );
-      } else {
-        const fsModule = await import('fs');
-        const docIntelDir = pathModule.default.join(process.cwd(), 'server', 'uploads', 'doc-intel');
-        fsModule.mkdirSync(docIntelDir, { recursive: true });
-        const destPath = pathModule.default.join(docIntelDir, newFilename);
-        fsModule.writeFileSync(destPath, vdrFileBuffer);
-        vdrDocIntelStoragePath = destPath;
-      }
+      // Persist to object storage so the new doc-intel record is durable
+      const vdrDocIntelStoragePath = await uploadDocIntelFile(
+        orgId,
+        newFilename,
+        vdrFileBuffer,
+        vdrDoc.mimeType
+      );
 
       const result = await docIntelService.createUploadWithDuplicateCheck(
         orgId,
@@ -1988,23 +1975,13 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
       const uploadExt = path.extname(req.file.originalname);
       const uploadFilename = `${uploadTimestamp}-${crypto.randomBytes(8).toString('hex')}${uploadExt}`;
 
-      // Determine storage path: object storage bucket key or local fallback
-      let resolvedStoragePath: string;
-      if (isObjectStorageAvailable()) {
-        resolvedStoragePath = await uploadDocIntelFile(
-          orgId,
-          uploadFilename,
-          req.file.buffer,
-          req.file.mimetype
-        );
-      } else {
-        // Fallback to local disk (ephemeral, not recommended for production)
-        const uploadDir = path.join(process.cwd(), 'server', 'uploads', 'doc-intel');
-        fs.ensureDirSync(uploadDir);
-        const localPath = path.join(uploadDir, uploadFilename);
-        fs.writeFileSync(localPath, req.file.buffer);
-        resolvedStoragePath = localPath;
-      }
+      // Persist to object storage
+      const resolvedStoragePath = await uploadDocIntelFile(
+        orgId,
+        uploadFilename,
+        req.file.buffer,
+        req.file.mimetype
+      );
 
       let holdingTags: string[] = [];
       if (req.body.tags) {
