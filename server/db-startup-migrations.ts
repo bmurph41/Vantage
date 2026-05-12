@@ -12422,7 +12422,7 @@ const MIGRATIONS: Migration[] = [
   { name: "platform_asset_classes: add default_data_sources", sql: `ALTER TABLE platform_asset_classes ADD COLUMN IF NOT EXISTS default_data_sources jsonb` },
   { name: "platform_asset_classes: add coa_taxonomy_pack_key", sql: `ALTER TABLE platform_asset_classes ADD COLUMN IF NOT EXISTS coa_taxonomy_pack_key varchar(50)` },
   { name: "platform_asset_classes: add dd_template_key", sql: `ALTER TABLE platform_asset_classes ADD COLUMN IF NOT EXISTS dd_template_key varchar(100)` },
-  { name: "platform_asset_classes: add group", sql: `ALTER TABLE platform_asset_classes ADD COLUMN IF NOT EXISTS group text` },
+  { name: "platform_asset_classes: add group", sql: `ALTER TABLE platform_asset_classes ADD COLUMN IF NOT EXISTS "group" text` },
   { name: "platform_asset_classes: add created_at", sql: `ALTER TABLE platform_asset_classes ADD COLUMN IF NOT EXISTS created_at timestamp` },
   { name: "platform_asset_classes: add updated_at", sql: `ALTER TABLE platform_asset_classes ADD COLUMN IF NOT EXISTS updated_at timestamp` },
 
