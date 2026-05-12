@@ -9,7 +9,14 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./vitest.setup.ts'],
     include: ['**/*.{test,spec}.{js,ts,jsx,tsx}'],
-    exclude: ['node_modules', 'dist', 'ship-store', 'shared/exit-backup/**'],
+    exclude: [
+      'node_modules',
+      'dist',
+      'ship-store',
+      'shared/exit-backup/**',
+      // Integration test requiring supertest + live DB — excluded from unit suite
+      'server/tests/workspace-routes.test.ts',
+    ],
     environmentMatchGlobs: [
       ['server/**', 'node'],
     ],

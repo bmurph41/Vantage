@@ -388,13 +388,13 @@ export async function runSchemaDriftCheck(): Promise<number> {
         // Intentionally managed outside Drizzle — skip without warning.
         continue;
       }
-      // Log one EXTRA TABLE warning per phantom table and count it as a single
-      // drift issue (the number of columns is informational only).
+      // Log one EXTRA TABLE warning per phantom table and count each orphan
+      // column as a drift issue (consistent with how missing tables are counted).
       console.warn(
         `${PREFIX} EXTRA TABLE: "${dbTable}" exists in the database but has no Drizzle schema definition` +
           ` (${dbCols.size} column(s): ${[...dbCols].join(", ")})`
       );
-      driftCount++;
+      driftCount += dbCols.size;
     }
 
     // Build a flat set of all index names declared in the schema (across all tables).

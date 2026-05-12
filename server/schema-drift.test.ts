@@ -50,10 +50,11 @@ function dbRows(pairs: Array<[string, string]>) {
 }
 
 /**
- * Wire mockQuery for the three queries issued by fetchLiveColumnMaps():
+ * Wire mockQuery for the four queries issued by fetchLiveColumnMaps():
  *   1. SET LOCAL statement_timeout  → no rows
  *   2. Schema-filtered columns      → schemaRows
  *   3. All public columns           → allRows
+ *   4. pg_indexes (fetchLiveIndexNames) → no rows (index drift not tested here)
  */
 function setupQueryMock(
   schemaRows: Array<[string, string]>,
@@ -62,7 +63,8 @@ function setupQueryMock(
   mockQuery
     .mockResolvedValueOnce({ rows: [] })                    // SET LOCAL timeout
     .mockResolvedValueOnce({ rows: dbRows(schemaRows) })    // schema-table query
-    .mockResolvedValueOnce({ rows: dbRows(allRows) });      // all-public query
+    .mockResolvedValueOnce({ rows: dbRows(allRows) })       // all-public query
+    .mockResolvedValueOnce({ rows: [] });                   // pg_indexes (index names)
 }
 
 // ── Test suite ───────────────────────────────────────────────────────────────
@@ -210,7 +212,7 @@ describe("runSchemaDriftCheck", () => {
     const warnCalls = (console.warn as ReturnType<typeof vi.spyOn>).mock.calls
       .map((args) => args[0] as string);
     expect(
-      warnCalls.some((m) => m.includes("EXTRA COLUMN") && m.includes('"orphan_table"'))
+      warnCalls.some((m) => m.includes("EXTRA TABLE") && m.includes('"orphan_table"'))
     ).toBe(true);
   });
 

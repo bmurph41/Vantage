@@ -17,7 +17,27 @@ jobs:
           node-version: 20
           cache: 'npm'
       - run: npm ci
-      - run: npm run typecheck
+
+      # Cache the shared-module declaration outputs and the root tsbuildinfo so
+      # incremental compilation is fast on repeat runs (e.g. across PRs).
+      - name: Cache TypeScript build artifacts
+        uses: actions/cache@v4
+        with:
+          path: |
+            dist-types
+            .tsbuildinfo
+          key: tsc-${{ runner.os }}-${{ hashFiles('shared/**/*.ts', 'tsconfig.json', 'shared/tsconfig.json') }}
+          restore-keys: |
+            tsc-${{ runner.os }}-
+
+      # Run tsc directly at 4 GB to stay safely within the 7 GB runner limit.
+      # (package.json uses 6 GB which can OOM once the OS + npm ci overhead is
+      # accounted for on the standard ubuntu-latest runner.)
+      - name: Build shared type declarations
+        run: NODE_OPTIONS=--max-old-space-size=4096 npx tsc -b shared
+
+      - name: Type-check full project
+        run: NODE_OPTIONS=--max-old-space-size=4096 npx tsc --noEmit
 
   test:
     name: Unit Tests
