@@ -90,6 +90,7 @@ export default function PnlUploadReview() {
   const [selectedProjectId, setSelectedProjectId] = useState<string>("");
   const { data: projects = [] } = useQuery<Array<{id: string; name: string}>>({
     queryKey: ['/api/modeling/projects'],
+    select: (res: any) => Array.isArray(res) ? res : (res?.data ?? []),
   });
 
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);

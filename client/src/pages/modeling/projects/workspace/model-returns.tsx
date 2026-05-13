@@ -212,6 +212,7 @@ function ComparisonTab({ projectId, projectName }: { projectId: string; projectN
 
   const { data: allProjects, isLoading: loadingProjects } = useQuery<any[]>({
     queryKey: ['/api/modeling/projects'],
+    select: (res: any) => Array.isArray(res) ? res : (res?.data ?? []),
   });
 
   const otherProjects = useMemo(() => {
@@ -481,6 +482,7 @@ function PortfolioSimulationTab({ projectId, projectName }: { projectId: string;
 
   const { data: allProjects, isLoading: loadingProjects } = useQuery<any[]>({
     queryKey: ['/api/modeling/projects'],
+    select: (res: any) => Array.isArray(res) ? res : (res?.data ?? []),
   });
 
   const { data: simulationData, isLoading: loadingSim, refetch } = useQuery<any>({

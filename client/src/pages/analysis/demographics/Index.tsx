@@ -664,6 +664,7 @@ function LocationAnalysisSection() {
 
   const { data: projects = [], isLoading: projectsLoading } = useQuery<ModelingProject[]>({
     queryKey: ['/api/modeling/projects'],
+    select: (res: any) => Array.isArray(res) ? res : (res?.data ?? []),
   });
   
   const { data: fetchedTargets } = useQuery<TargetDemographics | null>({

@@ -110,6 +110,7 @@ export default function CapitalMarketsPage() {
 
   const { data: modelingProjects } = useQuery<ModelingProject[]>({
     queryKey: ['/api/modeling/projects'],
+    select: (res: any) => Array.isArray(res) ? res : (res?.data ?? []),
   });
 
   const applyToModel = () => {

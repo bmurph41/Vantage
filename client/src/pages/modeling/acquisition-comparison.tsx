@@ -179,6 +179,7 @@ export default function AcquisitionComparison() {
 
   const { data: projects = [], isLoading } = useQuery<any[]>({
     queryKey: ['/api/modeling/projects'],
+    select: (res: any) => Array.isArray(res) ? res : (res?.data ?? []),
   });
 
   const { data: comparisonData, isLoading: comparing } = useQuery<any[]>({

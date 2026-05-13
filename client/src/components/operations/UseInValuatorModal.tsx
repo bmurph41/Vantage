@@ -71,6 +71,7 @@ export function UseInValuatorModal({
   const { data: projects = [] } = useQuery<ValuatorProject[]>({
     queryKey: ["/api/modeling/projects"],
     enabled: open,
+    select: (res: any) => Array.isArray(res) ? res : (res?.data ?? []),
   });
 
   const { data: projectContexts = [] } = useQuery<ProjectContext[]>({

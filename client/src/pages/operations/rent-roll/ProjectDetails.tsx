@@ -584,6 +584,7 @@ function ModelingTab({ projectId, projectName, loading }: { projectId: string; p
 
   const { data: modelingProjects = [] } = useQuery<any[]>({
     queryKey: ['/api/modeling/projects'],
+    select: (res: any) => Array.isArray(res) ? res : (res?.data ?? []),
   });
 
   const { data: metrics, isLoading: metricsLoading } = useQuery<any>({

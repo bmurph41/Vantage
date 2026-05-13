@@ -61,6 +61,7 @@ export default function PnlUpload() {
   // Fetch available modeling projects for association
   const { data: projects = [] } = useQuery<Array<{id: string; name: string}>>({
     queryKey: ['/api/modeling/projects'],
+    select: (res: any) => Array.isArray(res) ? res : (res?.data ?? []),
   });
 
   const uploadMutation = useMutation({
