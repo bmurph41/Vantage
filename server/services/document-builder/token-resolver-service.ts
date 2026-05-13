@@ -21,6 +21,7 @@ import {
   targetDemographics,
 } from '@shared/schema';
 import { MASTER_TOKEN_MAP } from '@shared/document-builder/templates';
+import { getModelConfig } from '@shared/asset-class-model-config';
 
 export interface ResolvedTokenMap {
   [tokenName: string]: string | number | null | object;
@@ -90,22 +91,78 @@ async function resolveDealTokens(ctx: ResolverContext): Promise<ResolvedTokenMap
 
 // ─── Property Tokens ────────────────────────────────────────────────────────
 
+/**
+ * Pick the most likely "total unit count" for an asset class.
+ *
+ * The schema accumulated marina-era fields (totalSlips, totalCapacity) plus
+ * a generic totalUnits column added later. Marina deals still populate
+ * totalSlips; other asset classes populate totalUnits / totalCapacity in
+ * varying ways depending on when the property was authored. Read in
+ * precedence order with the asset-class-natural field first.
+ */
+function pickPrimaryUnitCount(property: any, assetClass: string): number | null {
+  const slips = property.totalSlips ?? null;
+  const units = property.totalUnits ?? null;
+  const capacity = property.totalCapacity ?? null;
+  if (assetClass === 'marina') return slips ?? capacity ?? units ?? null;
+  return units ?? capacity ?? slips ?? null;
+}
+
 async function resolvePropertyTokens(ctx: ResolverContext): Promise<ResolvedTokenMap> {
   const result: ResolvedTokenMap = {};
   try {
     // Find property linked to deal
     const [deal] = await db.select().from(crmDeals).where(eq(crmDeals.id, ctx.dealId)).limit(1);
     const propertyId = (deal as any)?.propertyId;
-    if (!propertyId) return result;
 
-    const [property] = await db.select().from(crmProperties).where(eq(crmProperties.id, propertyId)).limit(1);
-    if (!property) return result;
+    let property: any = null;
+    if (propertyId) {
+      const [p] = await db.select().from(crmProperties).where(eq(crmProperties.id, propertyId)).limit(1);
+      property = p ?? null;
+    }
 
-    result.PROPERTY_ADDRESS = property.address || null;
-    result.PROPERTY_ZIP = property.zipCode || null;
-    result.TOTAL_SLIPS = (property as any).totalSlips || null;
-    result.LINEAR_FEET = (property as any).linearFeet || null;
-    result.MAX_BOAT_LENGTH = (property as any).maxBoatLength || null;
+    // Resolve asset class: project's column wins (FM is the source of truth),
+    // then property's column, then deal's column, defaulting to 'marina' for
+    // backward compat with older docs that pre-date asset-class support.
+    let assetClass = 'marina';
+    try {
+      const projectId = ctx.projectId || await findProjectForDeal(ctx.dealId, ctx.orgId);
+      if (projectId) {
+        const [proj] = await db.select().from(modelingProjects).where(eq(modelingProjects.id, projectId)).limit(1);
+        if (proj && (proj as any).assetClass) assetClass = String((proj as any).assetClass);
+      }
+    } catch {
+      // fall through to property/deal lookups
+    }
+    if (assetClass === 'marina' && property?.assetClass) assetClass = String(property.assetClass);
+    if (assetClass === 'marina' && (deal as any)?.assetClass) assetClass = String((deal as any).assetClass);
+
+    const cfg = getModelConfig(assetClass);
+
+    // Asset-class-agnostic tokens (always populated)
+    result.ASSET_CLASS = assetClass;
+    result.ASSET_CLASS_LABEL = cfg.label;
+    result.PROPERTY_UNIT_LABEL = cfg.terms.unit;
+    result.PROPERTY_UNIT_LABEL_PLURAL = cfg.terms.unitPlural;
+
+    if (property) {
+      result.PROPERTY_ADDRESS = property.address || null;
+      result.PROPERTY_ZIP = property.zipCode || null;
+      result.PROPERTY_UNIT_COUNT = pickPrimaryUnitCount(property, assetClass);
+
+      // Marina-specific physical-detail tokens — only populated when the
+      // deal actually IS a marina. For non-marina assets these remain null
+      // (their placeholder in the template renders as the resolver's "missing"
+      // signal rather than silently rendering a wrong value).
+      if (assetClass === 'marina') {
+        result.TOTAL_SLIPS = (property as any).totalSlips || null;
+        result.LINEAR_FEET = (property as any).linearFeet || null;
+        result.MAX_BOAT_LENGTH = (property as any).maxBoatLength || null;
+      }
+    } else {
+      // No property linked but assetClass tokens still need values.
+      result.PROPERTY_UNIT_COUNT = null;
+    }
   } catch (e) {
     console.error('[TokenResolver] Property resolve error:', e);
   }

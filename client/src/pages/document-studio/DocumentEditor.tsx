@@ -510,7 +510,7 @@ export default function DocumentEditor({ documentId }: DocumentEditorProps) {
   // --- Data fetching ---
   const { data: document, isLoading: docLoading, error: docError } = useDocumentQuery(documentId);
   const { data: sectionLibrary } = useSectionLibrary();
-  const { data: bindingsCatalog } = useBindingsCatalog();
+  const { data: bindingsCatalog } = useBindingsCatalog(document?.assetClass ?? null);
 
   // --- Mutations ---
   const updateDocMutation = useUpdateDocument(documentId);

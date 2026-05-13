@@ -221,7 +221,8 @@ export const documentBuilderKeys = {
   sections: () => [...documentBuilderKeys.config(), 'sections'] as const,
   sectionsForType: (docType: DocumentType) => [...documentBuilderKeys.sections(), docType] as const,
   bindings: () => [...documentBuilderKeys.all, 'bindings'] as const,
-  bindingsCatalog: () => [...documentBuilderKeys.bindings(), 'catalog'] as const,
+  bindingsCatalog: (assetClass?: string | null) =>
+    [...documentBuilderKeys.bindings(), 'catalog', assetClass ?? null] as const,
   ai: () => [...documentBuilderKeys.all, 'ai'] as const,
   aiProviders: () => [...documentBuilderKeys.ai(), 'providers'] as const,
   export: () => [...documentBuilderKeys.all, 'export'] as const,
@@ -448,14 +449,20 @@ export function useReorderSections(documentId: number) {
 // =============================================================================
 
 /**
- * Fetch bindings catalog
+ * Fetch bindings catalog.
+ *
+ * Pass the document's assetClass to filter the catalog to fields that make
+ * sense for that asset class. The server returns the full (marina-flavored)
+ * catalog when assetClass is omitted, for back-compat with older callers.
  */
 export function useBindingsCatalog(
+  assetClass?: string | null,
   options?: Omit<UseQueryOptions<BindingsCatalog>, 'queryKey' | 'queryFn'>
 ) {
+  const query = assetClass ? `?assetClass=${encodeURIComponent(assetClass)}` : '';
   return useQuery({
-    queryKey: documentBuilderKeys.bindingsCatalog(),
-    queryFn: () => apiRequest<BindingsCatalog>('/bindings/catalog'),
+    queryKey: documentBuilderKeys.bindingsCatalog(assetClass),
+    queryFn: () => apiRequest<BindingsCatalog>(`/bindings/catalog${query}`),
     staleTime: 10 * 60 * 1000, // 10 minutes
     ...options,
   });

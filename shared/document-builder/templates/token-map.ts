@@ -72,12 +72,21 @@ export const MASTER_TOKEN_MAP: TokenDefinition[] = [
   { token: 'CONFIDENTIAL_LABEL', label: 'Confidential Label', source: 'manual', description: 'e.g. "PROPRIETARY AND CONFIDENTIAL"', usedIn: ['ic_deck', 'om'] },
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // PROPERTY PHYSICAL DETAILS
+  // ASSET CLASS / GENERIC PROPERTY (works across all asset classes)
   // ═══════════════════════════════════════════════════════════════════════════
-  { token: 'TOTAL_SLIPS', label: 'Total Wet Slips', source: 'property', bindingPath: 'property.totalSlips', format: 'number', description: 'Total numbered wet slips', usedIn: ['ic_deck', 'om'] },
-  { token: 'LINEAR_FEET', label: 'Linear Feet of Dockage', source: 'property', bindingPath: 'property.linearFeet', format: 'number', description: 'Total linear feet of dockage', usedIn: ['om'] },
-  { token: 'AVG_LOA', label: 'Avg LOA (ft)', source: 'rentroll', bindingPath: 'rentroll.avgLOA', format: 'number', description: 'Average length overall of slips', usedIn: ['ic_deck'] },
-  { token: 'MAX_BOAT_LENGTH', label: 'Max Boat Length', source: 'property', bindingPath: 'property.maxBoatLength', format: 'number', description: 'Max accommodated boat length (ft)', usedIn: ['om'] },
+  { token: 'ASSET_CLASS', label: 'Asset Class', source: 'property', bindingPath: 'project.assetClass', format: 'text', description: 'Asset class slug (marina, multifamily, hotel, office, …)', usedIn: ['ic_deck', 'om'] },
+  { token: 'ASSET_CLASS_LABEL', label: 'Asset Class (Display)', source: 'property', bindingPath: 'project.assetClass', format: 'text', description: 'Asset class display label (e.g. "Marina", "Multifamily")', usedIn: ['ic_deck', 'om'] },
+  { token: 'PROPERTY_UNIT_LABEL', label: 'Unit Label', source: 'property', bindingPath: 'project.assetClass', format: 'text', description: 'Asset-class-specific singular unit term (e.g. "slip", "unit", "key")', usedIn: ['ic_deck', 'om'] },
+  { token: 'PROPERTY_UNIT_LABEL_PLURAL', label: 'Unit Label (Plural)', source: 'property', bindingPath: 'project.assetClass', format: 'text', description: 'Asset-class-specific plural unit term (e.g. "slips", "units", "keys")', usedIn: ['ic_deck', 'om'] },
+  { token: 'PROPERTY_UNIT_COUNT', label: 'Total Units', source: 'property', bindingPath: 'property.totalUnits', format: 'number', description: 'Asset-class-agnostic total unit count (slips for marina, units for multifamily, keys for hotel, …)', usedIn: ['ic_deck', 'om'] },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // PROPERTY PHYSICAL DETAILS (marina-specific tokens — null for non-marina)
+  // ═══════════════════════════════════════════════════════════════════════════
+  { token: 'TOTAL_SLIPS', label: 'Total Wet Slips', source: 'property', bindingPath: 'property.totalSlips', format: 'number', description: 'Total numbered wet slips (marina only; null for other asset classes — use PROPERTY_UNIT_COUNT for asset-class-agnostic count)', usedIn: ['ic_deck', 'om'] },
+  { token: 'LINEAR_FEET', label: 'Linear Feet of Dockage', source: 'property', bindingPath: 'property.linearFeet', format: 'number', description: 'Total linear feet of dockage (marina only)', usedIn: ['om'] },
+  { token: 'AVG_LOA', label: 'Avg LOA (ft)', source: 'rentroll', bindingPath: 'rentroll.avgLOA', format: 'number', description: 'Average length overall of slips (marina only)', usedIn: ['ic_deck'] },
+  { token: 'MAX_BOAT_LENGTH', label: 'Max Boat Length', source: 'property', bindingPath: 'property.maxBoatLength', format: 'number', description: 'Max accommodated boat length, ft (marina only)', usedIn: ['om'] },
   { token: 'DOCK_TYPE', label: 'Dock Type', source: 'manual', description: 'e.g. Floating, Fixed', usedIn: ['om'] },
   { token: 'SIZE_RANGE', label: 'Slip Size Range', source: 'manual', description: "e.g. 20' - 150'", usedIn: ['om'] },
   { token: 'DOCKSIDE_DEPTH', label: 'Dockside Depth', source: 'manual', description: 'Water depth at docks', usedIn: ['om'] },

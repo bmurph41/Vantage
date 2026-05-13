@@ -307,7 +307,9 @@ export const DocumentBuilder: React.FC<DocumentBuilderProps> = ({
         store.setDocumentTypeConfigs(configResult.data);
       }
 
-      // Load bindings catalog
+      // Load bindings catalog. We refresh this again in a separate effect
+      // once the document's assetClass is known, since the catalog filters
+      // marina-specific fields out for non-marina deals.
       const bindingsResponse = await fetch('/api/document-builder/bindings/catalog');
       const bindingsResult = await bindingsResponse.json();
       if (bindingsResult.success) {
@@ -317,6 +319,22 @@ export const DocumentBuilder: React.FC<DocumentBuilderProps> = ({
       console.error('Failed to load libraries:', err);
     }
   };
+
+  // Once the document is loaded and its assetClass is known, refetch the
+  // bindings catalog with the asset-class filter applied. The first load
+  // in loadLibraries() runs before the document is hydrated, so the catalog
+  // is initially populated with the back-compat (marina-flavored) shape.
+  useEffect(() => {
+    const assetClass = document?.assetClass;
+    if (!assetClass) return;
+    const ac = encodeURIComponent(assetClass);
+    fetch(`/api/document-builder/bindings/catalog?assetClass=${ac}`)
+      .then((r) => r.json())
+      .then((result) => {
+        if (result.success) store.setBindingsCatalog(result.data);
+      })
+      .catch((err) => console.error('Failed to refresh bindings catalog:', err));
+  }, [document?.assetClass]);
 
   const handleStepClick = (step: BuilderStep) => {
     store.setCurrentStep(step);

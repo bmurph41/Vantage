@@ -506,7 +506,7 @@ export const DataBindingPanel: React.FC = () => {
   const document = useDocument();
   const sectionLibrary = useSectionLibrary();
   const sections = useSections();
-  const bindingsCatalog = useBindingsCatalog();
+  const bindingsCatalog = useBindingsCatalog(document?.assetClass ?? null);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [filterSource, setFilterSource] = useState<DataSource | 'all'>('all');

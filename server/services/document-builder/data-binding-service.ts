@@ -17,6 +17,7 @@ import {
   type ResolvedBinding,
   type DataBindingRequirement,
 } from '../../../shared/document-builder/types';
+import { getModelConfig } from '../../../shared/asset-class-model-config';
 
 // =============================================================================
 // Binding Resolution
@@ -44,47 +45,75 @@ export interface BindingCatalogEntry {
 
 class DataBindingService {
   /**
-   * Get the bindings catalog showing all available data sources and fields
+   * Get the bindings catalog showing all available data sources and fields.
+   *
+   * Pass `assetClass` to filter the property + rent_roll catalogs to fields
+   * that make sense for that asset class. Marina-specific physical fields
+   * (totalSlips, wetSlips, waterFrontage, bodyOfWater, channelDepth,
+   * groundLease*) are returned only for `assetClass === 'marina'` (or when
+   * assetClass is omitted, for backward compatibility with callers that
+   * predate asset-class-aware catalogs).
    */
-  getBindingsCatalog(): Record<string, BindingCatalogEntry> {
+  getBindingsCatalog(assetClass?: string | null): Record<string, BindingCatalogEntry> {
+    const cfg = getModelConfig(assetClass);
+    const isMarina = (assetClass ?? 'marina') === 'marina';
+    const showMarinaFields = isMarina || !assetClass; // legacy callers see full catalog
+
+    // Property fields — generic shape always present; marina-specific fields
+    // appear only when relevant.
+    const propertyFields: BindingCatalogEntry['fields'] = [
+      { key: 'name', label: 'Property Name', type: 'string', path: 'name' },
+      { key: 'address', label: 'Address', type: 'string', path: 'address' },
+      { key: 'city', label: 'City', type: 'string', path: 'city' },
+      { key: 'state', label: 'State', type: 'string', path: 'state' },
+      { key: 'zip', label: 'ZIP Code', type: 'string', path: 'zip' },
+      { key: 'cityState', label: 'City, State', type: 'string', path: 'cityState' },
+      { key: 'assetClass', label: 'Asset Class', type: 'string', path: 'assetClass' },
+      // Generic unit count — uses asset-class-appropriate label (e.g. "Total Slips" / "Total Units" / "Total Keys")
+      { key: 'totalUnits', label: cfg.terms.totalUnitsLabel || 'Total Units', type: 'number', path: 'totalUnits' },
+      { key: 'askingPrice', label: 'Asking Price', type: 'currency', path: 'askingPrice' },
+      { key: 'yearBuilt', label: 'Year Built', type: 'number', path: 'yearBuilt' },
+      { key: 'acreage', label: 'Acreage', type: 'number', path: 'acreage' },
+      { key: 'amenities', label: 'Amenities', type: 'array', path: 'amenities' },
+      { key: 'description', label: 'Description', type: 'string', path: 'description' },
+    ];
+    if (showMarinaFields) {
+      propertyFields.push(
+        { key: 'totalSlips', label: 'Total Slips', type: 'number', path: 'totalSlips' },
+        { key: 'wetSlips', label: 'Wet Slips', type: 'number', path: 'wetSlips' },
+        { key: 'drySlips', label: 'Dry Slips', type: 'number', path: 'drySlips' },
+        { key: 'waterFrontage', label: 'Water Frontage (ft)', type: 'number', path: 'waterFrontage' },
+        { key: 'bodyOfWater', label: 'Body of Water', type: 'string', path: 'bodyOfWater' },
+        { key: 'channelDepth', label: 'Channel Depth', type: 'number', path: 'channelDepth' },
+        { key: 'groundLeaseTerm', label: 'Ground Lease Term', type: 'string', path: 'groundLeaseTerm' },
+        { key: 'groundLeaseLessor', label: 'Ground Lease Lessor', type: 'string', path: 'groundLeaseLessor' },
+      );
+    }
+
+    // Deal fields — same shape; "marinaName" alias kept only for backward
+    // compat with marina templates authored before assetClass support landed.
+    const dealFields: BindingCatalogEntry['fields'] = [
+      { key: 'dealName', label: 'Deal Name', type: 'string', path: 'dealName' },
+      { key: 'value', label: 'Deal Value', type: 'currency', path: 'value' },
+      { key: 'stage', label: 'Deal Stage', type: 'string', path: 'stage' },
+      { key: 'city', label: 'City', type: 'string', path: 'city' },
+      { key: 'state', label: 'State', type: 'string', path: 'state' },
+      { key: 'notes', label: 'Notes', type: 'string', path: 'notes' },
+    ];
+    if (showMarinaFields) {
+      dealFields.push({ key: 'marinaName', label: 'Marina Name', type: 'string', path: 'marinaName' });
+    }
+
     return {
       deal: {
         source: 'deal',
         label: 'Deal Information',
-        fields: [
-          { key: 'dealName', label: 'Deal Name', type: 'string', path: 'dealName' },
-          { key: 'marinaName', label: 'Marina Name', type: 'string', path: 'marinaName' },
-          { key: 'value', label: 'Deal Value', type: 'currency', path: 'value' },
-          { key: 'stage', label: 'Deal Stage', type: 'string', path: 'stage' },
-          { key: 'city', label: 'City', type: 'string', path: 'city' },
-          { key: 'state', label: 'State', type: 'string', path: 'state' },
-          { key: 'notes', label: 'Notes', type: 'string', path: 'notes' },
-        ],
+        fields: dealFields,
       },
       property: {
         source: 'property',
         label: 'Property Details',
-        fields: [
-          { key: 'name', label: 'Property Name', type: 'string', path: 'name' },
-          { key: 'address', label: 'Address', type: 'string', path: 'address' },
-          { key: 'city', label: 'City', type: 'string', path: 'city' },
-          { key: 'state', label: 'State', type: 'string', path: 'state' },
-          { key: 'zip', label: 'ZIP Code', type: 'string', path: 'zip' },
-          { key: 'cityState', label: 'City, State', type: 'string', path: 'cityState' },
-          { key: 'totalSlips', label: 'Total Slips', type: 'number', path: 'totalSlips' },
-          { key: 'wetSlips', label: 'Wet Slips', type: 'number', path: 'wetSlips' },
-          { key: 'drySlips', label: 'Dry Slips', type: 'number', path: 'drySlips' },
-          { key: 'askingPrice', label: 'Asking Price', type: 'currency', path: 'askingPrice' },
-          { key: 'yearBuilt', label: 'Year Built', type: 'number', path: 'yearBuilt' },
-          { key: 'waterFrontage', label: 'Water Frontage (ft)', type: 'number', path: 'waterFrontage' },
-          { key: 'acreage', label: 'Acreage', type: 'number', path: 'acreage' },
-          { key: 'amenities', label: 'Amenities', type: 'array', path: 'amenities' },
-          { key: 'description', label: 'Description', type: 'string', path: 'description' },
-          { key: 'bodyOfWater', label: 'Body of Water', type: 'string', path: 'bodyOfWater' },
-          { key: 'channelDepth', label: 'Channel Depth', type: 'number', path: 'channelDepth' },
-          { key: 'groundLeaseTerm', label: 'Ground Lease Term', type: 'string', path: 'groundLeaseTerm' },
-          { key: 'groundLeaseLessor', label: 'Ground Lease Lessor', type: 'string', path: 'groundLeaseLessor' },
-        ],
+        fields: propertyFields,
       },
       modeling: {
         source: 'modeling',

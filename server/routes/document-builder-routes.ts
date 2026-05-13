@@ -708,7 +708,8 @@ router.post(
 router.get(
   '/bindings/catalog',
   asyncHandler(async (req: Request, res: Response) => {
-    const catalog = dataBindingService.getBindingsCatalog();
+    const assetClass = typeof req.query.assetClass === 'string' ? req.query.assetClass : undefined;
+    const catalog = dataBindingService.getBindingsCatalog(assetClass);
 
     res.json({
       success: true,
