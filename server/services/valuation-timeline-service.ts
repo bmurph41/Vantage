@@ -13,6 +13,58 @@ import {
   salesComps
 } from '@shared/schema';
 import { eq, and, lte, gte, desc, sql, sum } from 'drizzle-orm';
+import { calculateXIRR, type DatedCashFlow } from '@shared/finance/xirr';
+
+/**
+ * Compute project-level returns from the most-basic two-point flow:
+ *   t=createdAt    -purchasePrice  (investment outflow)
+ *   t=asOfDate     +indicatedValue (current paper value)
+ *
+ * Three metrics:
+ *   - irr            (annualized via XIRR on the two-point flow; null if <30 days)
+ *   - equityMultiple (indicatedValue / purchasePrice — unlevered value multiple)
+ *   - cashOnCash     (annualNoi / purchasePrice — unlevered yield)
+ *
+ * These are UNLEVERED proxies. Once capital_stacks debt-input UI lands (memory
+ * project_portfolio_rebuild_plan.md Phase 0 PR-2), this should be re-derived
+ * from equity-only inflows/outflows and include distributions from
+ * fund_capital_movements where the project is fund-linked.
+ */
+function computeProjectReturns(
+  purchasePrice: number | null,
+  indicatedValue: number | null,
+  noi: number,
+  investmentDate: Date | null,
+  asOfDate: Date,
+): { irr: number | null; equityMultiple: number | null; cashOnCash: number | null } | undefined {
+  if (!purchasePrice || purchasePrice <= 0) return undefined;
+  if (!indicatedValue || indicatedValue <= 0) return undefined;
+  if (!investmentDate) return undefined;
+
+  const equityMultiple = indicatedValue / purchasePrice;
+  // Decimal ratio (e.g., 0.0825 for 8.25%). Client `pct()` helper at
+  // AssetDetailDrawer.tsx:28-31 multiplies by 100 — keep both metrics in the
+  // same units to avoid silent 10000× scaling bugs.
+  const cashOnCash = noi > 0 ? noi / purchasePrice : null;
+
+  // IRR requires meaningful holding period to avoid blowup.
+  const daysHeld = (asOfDate.getTime() - investmentDate.getTime()) / 86400000;
+  let irr: number | null = null;
+  if (daysHeld >= 30) {
+    const flows: DatedCashFlow[] = [
+      { date: investmentDate.toISOString().slice(0, 10), amount: -purchasePrice },
+      { date: asOfDate.toISOString().slice(0, 10), amount: indicatedValue },
+    ];
+    const xirr = calculateXIRR(flows);
+    if (xirr.converged && Number.isFinite(xirr.irr)) {
+      // calculateXIRR returns PERCENT (per xirr.ts:22 docstring); convert to
+      // decimal so all stored ratios use the same convention.
+      irr = xirr.irr / 100;
+    }
+  }
+
+  return { irr, equityMultiple, cashOnCash };
+}
 
 export interface ValuationTimelineQuery {
   modelingProjectId: string;
@@ -350,11 +402,13 @@ export class ValuationTimelineService {
         shipStoreMargin: operationsData.shipStore.margin,
         other: 0
       },
-      returns: project.ebitda && purchasePrice ? {
-        irr: null,
-        equityMultiple: null,
-        cashOnCash: null
-      } : undefined,
+      returns: computeProjectReturns(
+        purchasePrice,
+        indicatedValue,
+        noi,
+        project.createdAt ?? null,
+        asOfDate,
+      ),
       compSummary,
       operationsData,
       sources
