@@ -9441,6 +9441,94 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     }
   });
 
+  // ==================== G4 CONSOLIDATED P&L + ADJUSTMENTS ====================
+  // Phase 2 surface for getConsolidatedPnL (shared/types/consolidated-pnl.ts)
+  // and applyAdjustments (modeling_addbacks.is_active +
+  // modeling_projects.adjustments_master_state with audit log).
+
+  app.post('/api/modeling/projects/:projectId/consolidated-pnl', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId as string;
+      const { projectId } = req.params;
+
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+
+      const body = (req.body ?? {}) as Record<string, unknown>;
+      const yearRange = (body.yearRange ?? 'calendar') as
+        | 'calendar' | 'fiscal' | 't12' | 'custom';
+      if (!['calendar', 'fiscal', 't12', 'custom'].includes(yearRange)) {
+        return res.status(400).json({ error: 'Invalid yearRange' });
+      }
+
+      const { getConsolidatedPnL } = await import('../services/consolidated-pnl-service');
+      const response = await getConsolidatedPnL(orgId, projectId, {
+        yearRange,
+        customStart: body.customStart as any,
+        customEnd: body.customEnd as any,
+        fiscalYearStartMonth: body.fiscalYearStartMonth as number | undefined,
+        viewMode: body.viewMode as 'raw' | 'adjusted' | undefined,
+      });
+
+      res.json(response);
+    } catch (error: any) {
+      console.error('Failed to compute consolidated P&L:', error);
+      res.status(500).json({
+        error: { code: 'CONSOLIDATED_PNL_FAILED', message: 'Failed to compute consolidated P&L' },
+      });
+    }
+  });
+
+  app.post('/api/modeling/projects/:projectId/adjustments/apply', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId as string;
+      const userId = req.user.id as string;
+      const { projectId } = req.params;
+
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+
+      const body = (req.body ?? {}) as Record<string, unknown>;
+      const toggles = Array.isArray(body.addbackToggles) ? body.addbackToggles : [];
+      const masterStateChange = body.masterStateChange as
+        | 'all_on' | 'all_off' | 'custom' | undefined;
+
+      if (masterStateChange !== undefined &&
+          !['all_on', 'all_off', 'custom'].includes(masterStateChange)) {
+        return res.status(400).json({ error: 'Invalid masterStateChange' });
+      }
+
+      const { applyAdjustments, InvalidAddbackError } = await import('../services/adjustment-apply-service');
+      try {
+        const result = await applyAdjustments(orgId, projectId, userId, {
+          addbackToggles: toggles as any,
+          masterStateChange,
+        });
+        res.json(result);
+      } catch (err: any) {
+        if (err instanceof InvalidAddbackError) {
+          return res.status(400).json({
+            error: {
+              code: 'INVALID_ADDBACK_IDS',
+              message: err.message,
+              missingAddbackIds: err.missingAddbackIds,
+            },
+          });
+        }
+        throw err;
+      }
+    } catch (error: any) {
+      console.error('Failed to apply adjustments:', error);
+      res.status(500).json({
+        error: { code: 'ADJUSTMENTS_APPLY_FAILED', message: 'Failed to apply adjustments' },
+      });
+    }
+  });
+
   // ==================== SCENARIO COLLABORATION ROUTES ====================
 
   // Helpers

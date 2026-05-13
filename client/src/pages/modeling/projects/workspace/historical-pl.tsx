@@ -88,6 +88,7 @@ import { useDepartmentOrder } from '@/hooks/useDepartmentOrder';
 import { useDisplayOverrides } from '@/hooks/useDisplayOverrides';
 import { DepartmentOrderSettings } from '@/components/modeling/DepartmentOrderSettings';
 import { InlineEditableName } from '@/components/modeling/InlineEditableName';
+import { ConsolidatedPnLView } from '@/components/modeling/ConsolidatedPnLView';
 import type { ProjectConfig, HistoricalPLData, ActualsData } from '@/types/modeling';
 import type { DocIntelUpload } from '@shared/schema';
 import { ExportPdfButton } from '@/components/ui/export-pdf-button';
@@ -154,7 +155,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
     fuel_sales: true,
     ship_store: true
   });
-  const [viewMode, setViewMode] = useState<'single' | 'all' | 'compare'>('single');
+  const [viewMode, setViewMode] = useState<'single' | 'all' | 'compare' | 'consolidated'>('single');
   const [compareYears, setCompareYears] = useState<string[]>([]);
   const [displayMode, setDisplayMode] = useState<'monthly' | 'annual'>('monthly');
   const [showMoM, setShowMoM] = useState(false);
@@ -760,6 +761,10 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                 <BarChart3 className="h-3.5 w-3.5 mr-1.5" />
                 Compare
               </TabsTrigger>
+              <TabsTrigger value="consolidated" className="text-xs px-3" data-testid="tab-consolidated">
+                <Layers className="h-3.5 w-3.5 mr-1.5" />
+                Consolidated
+              </TabsTrigger>
             </TabsList>
           </Tabs>
           
@@ -1302,7 +1307,12 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
             {/* Revenue Source Toggle */}
       <RevenueSourceToggle projectId={projectId} />
 
-      {viewMode === 'compare' ? (
+      {viewMode === 'consolidated' ? (
+        <ConsolidatedPnLView
+          projectId={projectId}
+          onNavigateToInputs={onTabChange ? () => onTabChange('uploads') : undefined}
+        />
+      ) : viewMode === 'compare' ? (
               <div className="overflow-x-auto">
               <Table style={{ width: 'auto', minWidth: 'unset', tableLayout: 'auto' }} className="mx-auto">
                 <colgroup>

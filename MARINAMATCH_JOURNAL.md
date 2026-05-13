@@ -1,5 +1,79 @@
 # MarinaMatch Platform Journal
 
+## ✅ G4 Phase 2 backbone — Consolidated multi-period P&L UI shipped (2026-05-13)
+
+Phase 1 of G4 wrapped 2026-05-07 with a working backend (`getConsolidatedPnL` + `applyAdjustments` + 12-CTE single-roundtrip query). Phase 2 closes the first user-visible surface for the gap: a new "Consolidated" view mode on the Historical P&L tab that shows multiple years side-by-side with addback-adjusted line items, an NOI rollup row, a master adjustment toggle, an Apply-to-Pro-Forma button, and warning banners for unmatched addbacks and projected months.
+
+### Files in this commit
+
+- `server/routes/modeling-routes.ts` — added two routes before the SCENARIO COLLABORATION block:
+  - `POST /api/modeling/projects/:projectId/consolidated-pnl` → calls `getConsolidatedPnL(orgId, projectId, options)`
+  - `POST /api/modeling/projects/:projectId/adjustments/apply` → calls `applyAdjustments(orgId, projectId, userId, request)`, returns 400 with `INVALID_ADDBACK_IDS` and the missing list when `InvalidAddbackError` fires
+- `client/src/hooks/useConsolidatedPnL.ts` — new React Query hook pair: `useConsolidatedPnL` (POST-as-query, keyed by yearRange + bounds) and `useApplyAdjustments` (mutation, invalidates consolidated-pnl + addbacks + pro-forma + actuals + returns + lp-reporting)
+- `client/src/components/modeling/ConsolidatedPnLView.tsx` — new view component (~330 lines) rendering year columns + line-item grid + NOI rollup + variance % column + sticky header with range selector + master state Select + Apply button (amber dot when dirty) + unmatched-addbacks banner + missing-periods banner. Uses FMEmptyState for empty path
+- `client/src/pages/modeling/projects/workspace/historical-pl.tsx` — added 4th view-mode value `'consolidated'`, new TabsTrigger, conditional render branch wrapping the existing single/all/compare body
+
+### Verification
+
+- `tsc -p shared` clean (0 errors, 4GB heap)
+- Per-file tsc on `ConsolidatedPnLView.tsx` + `useConsolidatedPnL.ts` + `consolidated-pnl.ts` types: 0 errors
+- `historical-pl.tsx` tsc shows only pre-existing errors at lines 445/453/458/473/1778/1781 — none in the line ranges I edited (92/157/761-768/1307-1316). Schema.ts errors are the well-documented stabilization #6 mutual-recursive type issue
+- Dev server restarted via `nohup npm run dev` (foreground pkill + `npm run dev &` kills the shell session under Replit's process-group model — workaround needed)
+- `GET /api/health` → 200 after restart
+- `POST /consolidated-pnl` against test project `6b3a9021-...` returns valid payload: 3 years (2022 annual / 2023 annual / 2024 partial 8mo), 10 line items, masterState=`all_on`, 1 unmatched addback, 1 missingPeriods entry, 40 projectedCells — matches Phase 1.6c verification numbers
+- `POST /adjustments/apply` with empty toggles → `{appliedToggles:0, masterStateChanged:false, historyEntries:1}` (always-recorded apply_to_pro_forma audit row)
+- `POST /adjustments/apply` with `masterStateChange:"all_off"` then `"all_on"` → both `historyEntries:2` (master change + apply_to_pro_forma)
+- `POST /adjustments/apply` with fake addbackId → 400 `INVALID_ADDBACK_IDS` (transaction rolled back)
+
+### Decisions made
+
+- **POST not GET for /consolidated-pnl.** Range + view options live in the body; the URL stays clean and the React Query key carries the options as cache discriminator. Same pattern as `/sensitivity-matrix`
+- **Sticky header at top of view, not page.** Inside the existing CardContent, the new view's range selector + master state + Apply button stick to the top of the scroll viewport, not the page chrome
+- **Master state as a Select, not three buttons.** The custom (per addback) option still routes detail toggling to the existing `AddbacksTracker` Sheet drawer in the parent — Phase 2 doesn't duplicate that surface
+- **Apply button amber dot vs disabled.** When dirty, button stays clickable; amber 2.5px dot in upper-right marks unsynced state. When clean, button is disabled (no work to do) unless apply has an error queued
+- **Variance column uses leftmost vs rightmost year, not adjacent-year diffs.** Single rightmost column shows total period-over-period direction at a glance. Year-by-year deltas deferred (would need 2× horizontal width)
+- **Projected cells set is computed once and exposed via footer count, not per-cell badges.** Banner above grid covers the affected-month list; per-cell visual indicator deferred to Phase 3 (would need redesign of the NOI rollup row + projected handling per cell — Phase 1.5's `projectedCells` array is line-month, not year-rollup)
+
+### Phase 2 backbone — what shipped vs. what's deferred
+
+**Shipped (this commit):**
+- ConsolidatedPnLView main grid
+- Year column headers with periodType + isPartial + monthsCovered badges
+- Adjusted vs base amount per cell (line-through on baseAmount when addback applied)
+- NOI rollup row with NOI-direction adjustmentDelta annotation
+- Master adjustment toggle (all_on / all_off / custom)
+- Apply to Pro Forma button + sticky header layout
+- Unmatched addbacks banner (uses `data.unmatchedAddbacks`)
+- Missing periods banner (uses `data.missingPeriods` filtered to where missingMonths.length > 0)
+- Empty state via FMEmptyState
+- Loading skeleton
+- Error retry alert
+- Range selector wired (calendar / fiscal / t12 / custom) — fiscal currently uses default `fiscalYearStartMonth=1` and custom mode lacks a date picker (passes undefined bounds, service errors out — UI doesn't expose custom yet beyond the dropdown option)
+
+**Deferred (filed for Phase 3 or follow-up):**
+- ReconciliationModal — `data.variances` is stub-empty in Phase 1.5; UI placeholder not built yet
+- Per-cell `AppliedAddback` hover provenance — service returns per-line `appliedAddbacks` array but ConsolidatedYearCell strips them at the year level. UI hover needs `lineItems[].annual[].appliedAddbacks` plumbed through
+- Custom range date pickers — Select option exists, but `customStart` / `customEnd` not yet wired to inputs; today picking "Custom Range" issues a request without bounds and surface error retries
+- Per-cell projection indicator (sparkles / dotted underline). Banner suffices for backbone
+- MissingPeriodControl write path (changing `handling` per year). Read path is wired
+
+### Open follow-ups
+
+- Custom range date pickers (~30 min, FILE ONLY)
+- Per-cell AppliedAddback hover provenance (~1h, FILE ONLY)
+- ReconciliationModal once `detectVariances` ships beyond stub (Phase 3)
+- Project journal note: `pkill -f 'tsx server'` + `npm run dev &` from the same shell kills the parent shell session under Replit's process-group model. Use `nohup npm run dev > /tmp/dev.log 2>&1 < /dev/null & disown` instead. Or rely on the `restart-dev` skill (preferred when available)
+- Background G2/G3 verification: both commits (`55888af6` G2 + `8a897010` G3) are on main 107/108 commits back, NOT missing. The handoff was a `git log -30` artifact
+
+### Next session
+
+- Track 1(d): IC tab exposure on deal record (~2-3h, frontend only — 10 IC backend endpoints already built per Document Studio audit memory)
+- Track 1(a): Document Studio asset-class drift cleanup (~4-6h)
+- Track 1(b): Document Studio token resolver gap closure (~3-5h)
+- Track 1(c): LP statement / K-1 PDF output (~3-5h)
+
+---
+
 ## ✅ S3 storage migration — Replit GCS sidecar replaced with own AWS S3 (2026-05-08)
 
 Pre-revenue self-fix for the broken Replit object-storage sidecar (`project_pipeline_inoperative_2026_05_09.md`). All file uploads were failing at the sidecar's placeholder JWT — every doc-intel upload in error state, no production beta possible until resolved. Replaced with own AWS S3 bucket using existing AWS account from MarinaMatch era. Migration completed in 5 commits across one session, with end-to-end pipeline verification closing Phase 4 Gate 1a of G4.
