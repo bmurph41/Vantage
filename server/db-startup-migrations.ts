@@ -17929,7 +17929,16 @@ const MIGRATIONS: Migration[] = [
   { name: "drop: user_settings",        sql: `DROP TABLE IF EXISTS user_settings CASCADE` },
   { name: "drop: settings_audit_log",   sql: `DROP TABLE IF EXISTS settings_audit_log CASCADE` },
   { name: "drop: personal_access_tokens", sql: `DROP TABLE IF EXISTS personal_access_tokens CASCADE` },
-  { name: "drop: organization_settings", sql: `DROP TABLE IF EXISTS organization_settings CASCADE` },
+  { name: "organization_settings: create table", sql: `
+    CREATE TABLE IF NOT EXISTS organization_settings (
+      id SERIAL PRIMARY KEY,
+      org_id TEXT NOT NULL,
+      setting_key TEXT NOT NULL,
+      setting_value TEXT,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE (org_id, setting_key)
+    )
+  ` },
 
   // Communication tracking — email tracking not wired to any active routes
   { name: "drop: email_unsubscribes",    sql: `DROP TABLE IF EXISTS email_unsubscribes CASCADE` },

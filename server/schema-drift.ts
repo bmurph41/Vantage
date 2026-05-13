@@ -52,8 +52,6 @@ const EXTRA_TABLE_ALLOWLIST = new Set<string>([
   "ai_knowledge_documents",
   "ai_knowledge_chunks",
   "ai_global_knowledge",
-  // Org-level settings (dynamically created by google-places-routes.ts)
-  "organization_settings",
   // Document extraction config (dynamically created by document-extraction.ts)
   "extraction_org_config",
   // Listing Intelligence v2 scraper (schema in server/listings/ingestion_v2/schema.ts)

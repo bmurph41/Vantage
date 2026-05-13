@@ -8,26 +8,6 @@ const router = Router();
 // All routes require a valid org context — returns 401 if missing
 router.use(requireStrictOrg());
 
-// Ensure organization_settings table exists
-async function ensureOrgSettingsTable(): Promise<void> {
-  try {
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS organization_settings (
-        id SERIAL PRIMARY KEY,
-        org_id TEXT NOT NULL,
-        setting_key TEXT NOT NULL,
-        setting_value TEXT,
-        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        UNIQUE (org_id, setting_key)
-      )
-    `);
-  } catch (err) {
-    console.error('Failed to create organization_settings table:', err);
-  }
-}
-
-ensureOrgSettingsTable();
-
 // ═══════════════════════════════════════════════════════════════
 // HELPERS
 // ═══════════════════════════════════════════════════════════════
