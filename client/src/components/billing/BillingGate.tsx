@@ -23,7 +23,7 @@ interface SubscriptionResponse {
   } | null;
 }
 
-const TIER_ORDER = ["starter", "growth", "institutional", "enterprise"];
+const TIER_ORDER = ["starter", "investor", "broker", "owner-operator", "institutional"];
 
 function findRequiredTier(
   plans: Record<string, TierDefinition>,

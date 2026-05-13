@@ -124,35 +124,48 @@ interface BillingInvoice {
   createdAt: string;
 }
 
-const TIER_ORDER = ["starter", "growth", "institutional"];
+const TIER_ORDER = ["starter", "investor", "broker", "owner-operator", "institutional"];
 
 const TIER_FEATURE_LABELS: Record<string, string[]> = {
   starter: [
-    "Deal workspace",
-    "Basic CRM",
-    "Financial modeling",
-    "Document vault",
-    "DD checklist",
-    "Basic reporting",
+    "Dashboard overview",
+    "The Docket — industry news & alerts",
+    "Marketplace (browse)",
+    "3 sample sales comps",
+    "Demographics preview",
+    "1 deal workspace (view only)",
   ],
-  growth: [
-    "Everything in Starter",
-    "LP Portal & capital calls",
-    "Workflow automation",
-    "Gantt view",
-    "AI narratives",
-    "Email & SMS alerts",
-    "Lease abstractor",
+  investor: [
+    "Unlimited deal workspaces",
+    "Pro Forma, DCF & Monte Carlo",
+    "Exit Strategy Suite",
+    "Sales & Rate Comps (full)",
+    "Demographics & Capital Markets",
+    "Secure Data Room",
+  ],
+  broker: [
+    "Everything in Analyst",
+    "Full CRM — contacts, companies, properties",
+    "Deal Pipeline & Kanban board",
+    "Tasks, Follow-ups & Forecasting",
+    "Prospecting & Marketing suite",
+    "OM Builder & Due Diligence",
+  ],
+  "owner-operator": [
+    "Everything in Broker",
+    "Full Operations suite",
+    "Tenant & Rent Roll management",
+    "Bookkeeping & Payroll",
+    "Portfolio Analytics",
+    "Revenue center tracking",
   ],
   institutional: [
-    "Everything in Growth",
-    "Portfolio dashboard",
-    "Benchmark engine",
-    "AI underwriting",
-    "Document intelligence",
-    "Fund accounting",
-    "SSO & audit trail",
-    "White label & API access",
+    "Everything in Owner",
+    "Fund Management — capital calls, distributions, NAV",
+    "LP Portal with investor statements",
+    "Analytics Pro — predictive & benchmarking",
+    "API access",
+    "Priority support & onboarding",
   ],
 };
 
@@ -1075,8 +1088,11 @@ export default function BillingSettingsPage() {
                   <CardHeader className="pb-3">
                     <div className="flex items-center justify-between">
                       <CardTitle className="text-lg">{tier.name}</CardTitle>
-                      {tierKey === "growth" && (
+                      {tierKey === "broker" && (
                         <Badge variant="secondary">Popular</Badge>
+                      )}
+                      {tierKey === "institutional" && (
+                        <Badge variant="secondary">Best Value</Badge>
                       )}
                     </div>
                     <CardDescription>
