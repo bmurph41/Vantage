@@ -230,11 +230,12 @@ router.patch('/:id', async (req: AuthenticatedRequest, res: Response) => {
 
     if (updates.length === 1) return res.status(400).json({ error: 'No fields to update' });
 
-    params.push(id);
+    params.push(id, orgId);
     const { rows: [updated] } = await pool.query(
-      `UPDATE prospecting_time_blocks SET ${updates.join(', ')} WHERE id = $${idx} RETURNING *`,
+      `UPDATE prospecting_time_blocks SET ${updates.join(', ')} WHERE id = $${idx} AND org_id = $${idx + 1} RETURNING *`,
       params
     );
+    if (!updated) return res.status(404).json({ error: 'Block not found or access denied' });
 
     // Notify newly added invitees
     if (safeInvitees && safeInvitees.length > 0) {
