@@ -73,7 +73,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { ExportPdfButton } from '@/components/ui/export-pdf-button';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartTooltip, ResponsiveContainer, Legend, ReferenceLine, Area, AreaChart, ComposedChart } from 'recharts';
-import type { ProjectAssumptions, ProFormaData, ActualsData, ModelingProject } from '@/types/modeling';
+import type { ProjectAssumptions, ProFormaData, ActualsData, ModelingProject, LinePositions } from '@/types/modeling';
 import { WorkflowNavigation } from '@/components/modeling/workflow-navigation';
 import { useDepartmentOrder } from '@/hooks/useDepartmentOrder';
 import { useModelingPnlOverrides, VALID_DEPARTMENTS } from '@/hooks/useModelingPnlOverrides';
@@ -613,7 +613,11 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
   // Derive the baseline period from the pro forma engine's latest historical year,
   // falling back to document-based periods
   const latestHistoricalYear = proFormaData?.latestHistoricalYear;
-  const linePositions = proFormaData?.linePositions ?? { managementFee: 'below' as const, capex: 'below' as const, reserves: 'below' as const };
+  const linePositions: LinePositions = (
+    proFormaData?.linePositions
+    ?? (proFormaData?.metrics as Record<string, unknown> | undefined)?.['linePositions'] as LinePositions | undefined
+    ?? { managementFee: 'below', capex: 'below', reserves: 'below' }
+  );
 
   const baselinePeriod = useMemo((): DocumentPeriod | null => {
     // First check if we have a period from documents matching the engine's baseline year
@@ -2275,6 +2279,69 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
 
                   <TableCell className="text-right text-muted-foreground">-</TableCell>
                 </TableRow>
+
+                {viewMode === 'monthly' && (() => {
+                  const monthKmDefs: Array<{ label: string; getValue: (mi: number) => string; color: string }> = [
+                    {
+                      label: 'NOI Margin',
+                      getValue: (mi) => {
+                        const s = calculateMonthSummary(selectedYearInt, mi);
+                        return s.revenue > 0 ? formatPercent((s.noi / s.revenue) * 100, { dash: true }) : '—';
+                      },
+                      color: 'text-green-600 dark:text-green-400',
+                    },
+                    {
+                      label: 'Rev Growth MoM',
+                      getValue: (mi) => {
+                        if (mi === 0) return '—';
+                        const rev = calculateMonthSummary(selectedYearInt, mi).revenue;
+                        const prevRev = calculateMonthSummary(selectedYearInt, mi - 1).revenue;
+                        return prevRev > 0 ? formatPercent(((rev - prevRev) / prevRev) * 100, { showSign: true, dash: true }) : '—';
+                      },
+                      color: 'text-blue-600 dark:text-blue-400',
+                    },
+                    {
+                      label: 'OpEx Ratio',
+                      getValue: (mi) => {
+                        const s = calculateMonthSummary(selectedYearInt, mi);
+                        return s.revenue > 0 ? formatPercent((s.expenses / s.revenue) * 100, { dash: true }) : '—';
+                      },
+                      color: 'text-orange-600 dark:text-orange-400',
+                    },
+                    ...(months.some((_, mi) => calculateMonthSummary(selectedYearInt, mi).debtService > 0) ? [{
+                      label: 'DSCR',
+                      getValue: (mi: number) => {
+                        const s = calculateMonthSummary(selectedYearInt, mi);
+                        return s.debtService > 0 ? (s.noi / s.debtService).toFixed(2) : '—';
+                      },
+                      color: 'text-teal-600 dark:text-teal-400',
+                    }] : []),
+                  ];
+                  return (
+                    <>
+                      <TableRow className="border-t-2 bg-slate-50/60 dark:bg-slate-900/40">
+                        <TableCell colSpan={100} className="sticky left-0 z-10 ws-section-label ws-section-label--compact py-1 text-slate-600 dark:text-slate-400">
+                          Key Metrics
+                        </TableCell>
+                      </TableRow>
+                      {monthKmDefs.map(km => (
+                        <TableRow key={km.label} className="bg-slate-50/30 dark:bg-slate-900/20">
+                          <TableCell className="sticky left-0 bg-background text-muted-foreground z-10">{km.label}</TableCell>
+                          {showHistorical && priorPeriods.map(p => (
+                            <TableCell key={p.id} className="text-right bg-blue-50/60 dark:bg-blue-950/20 text-muted-foreground">—</TableCell>
+                          ))}
+                          <TableCell className="text-right bg-blue-50 dark:bg-blue-950/30 border-x border-blue-200 dark:border-blue-800 text-muted-foreground">—</TableCell>
+                          {months.map((_, mi) => (
+                            <TableCell key={mi} className={`text-right font-medium tabular-nums ${km.color} ${isSeasonalMonth(mi) ? 'bg-green-50 dark:bg-green-950/30' : ''}`}>
+                              {km.getValue(mi)}
+                            </TableCell>
+                          ))}
+                          <TableCell className="text-right text-muted-foreground">—</TableCell>
+                        </TableRow>
+                      ))}
+                    </>
+                  );
+                })()}
 
                 {viewMode === 'annual' && (() => {
                   const kmDefs: Array<{ label: string; getValue: (i: number) => string; color: string }> = [

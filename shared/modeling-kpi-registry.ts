@@ -15,27 +15,40 @@ export interface KpiMetrics {
   // Marina-specific
   totalSlips?: number;
   revenuePerSlip?: number;
+  noiPerSlip?: number;
   slipOccupancy?: number;
+  fuelRevenuePct?: number;
+  serviceRevenuePct?: number;
   // Hotel-specific
   adr?: number;
   revpar?: number;
   hotelOccupancy?: number;
   fbRevenuePct?: number;
-  // Self-storage-specific
-  physicalOccupancy?: number;
-  ratePerSf?: number;
-  // STR-specific
-  avgDailyRate?: number;
-  strOccupancy?: number;
   // Multifamily-specific
   unitCount?: number;
   revPerUnit?: number;
   rentSpread?: number;
   turnoverRate?: number;
+  // Self-storage-specific
+  physicalOccupancy?: number;
+  ratePerSf?: number;
+  climateControlledPct?: number;
+  ecriUpside?: number;
+  // STR-specific
+  avgDailyRate?: number;
+  strOccupancy?: number;
+  revpan?: number;
+  cleaningFeePct?: number;
+  // RV Park-specific
+  rvSiteOccupancy?: number;
+  siteRentPct?: number;
+  storeRevenuePct?: number;
+  cabinRevenuePct?: number;
   // Retail / Office-specific
   walt?: number;
   anchorTenantPct?: number;
   nearTermExpiryPct?: number;
+  pricePerSf?: number;
   // Industrial-specific
   clearHeight?: number;
   dockDoorCount?: number;
@@ -49,8 +62,9 @@ export interface KpiAnnualRow {
   expenses?: number;
   debtService?: number;
   leveredCashFlow?: number;
-  // Operational fields (populated when asset-class engine provides them)
+  // Operational fields populated by asset-class engine when available
   revenuePerSlip?: number;
+  noiPerSlip?: number;
   slipOccupancy?: number;
   adr?: number;
   revpar?: number;
@@ -58,7 +72,9 @@ export interface KpiAnnualRow {
   ratePerSf?: number;
   avgDailyRate?: number;
   strOccupancy?: number;
+  revpan?: number;
   revPerUnit?: number;
+  siteRentPct?: number;
   [key: string]: number | undefined;
 }
 
@@ -75,7 +91,7 @@ export interface ModelingKpiDef {
   benchmarkGood?: number;
   /** Value >= benchmarkWarn (and < benchmarkGood) → amber; below → red. */
   benchmarkWarn?: number;
-  /** When true the benchmark direction is inverted: lower is better (e.g. LTV). */
+  /** When true, benchmark direction is inverted: lower is better (e.g. LTV, OpEx). */
   benchmarkInvert?: boolean;
 }
 
@@ -248,6 +264,29 @@ export const MODELING_KPI_REGISTRY: Record<string, ModelingKpiDef> = {
     benchmarkGood: 5000,
     benchmarkWarn: 3000,
   },
+  noiPerSlip: {
+    key: 'noiPerSlip',
+    label: 'NOI / Slip',
+    format: 'currency',
+    color: 'text-teal-700 dark:text-teal-300',
+    tooltip: 'Annual NOI per slip',
+    compute: (m, rows) => {
+      if (m.noiPerSlip != null) return m.noiPerSlip;
+      if (m.totalSlips && m.totalSlips > 0 && rows?.length) {
+        return (rows[0]?.noi ?? 0) / m.totalSlips;
+      }
+      return null;
+    },
+    computeByYear: (row, m) => {
+      if (row.noiPerSlip != null) return row.noiPerSlip;
+      if (m.totalSlips && m.totalSlips > 0 && row.noi != null) {
+        return row.noi / m.totalSlips;
+      }
+      return null;
+    },
+    benchmarkGood: 2500,
+    benchmarkWarn: 1500,
+  },
   slipOccupancy: {
     key: 'slipOccupancy',
     label: 'Slip Occ.',
@@ -258,6 +297,26 @@ export const MODELING_KPI_REGISTRY: Record<string, ModelingKpiDef> = {
     computeByYear: (row) => row.slipOccupancy ?? null,
     benchmarkGood: 90,
     benchmarkWarn: 75,
+  },
+  fuelRevenuePct: {
+    key: 'fuelRevenuePct',
+    label: 'Fuel Rev %',
+    format: 'percent',
+    color: 'text-yellow-700 dark:text-yellow-300',
+    tooltip: 'Fuel sales as a percentage of total marina revenue',
+    compute: (m) => m.fuelRevenuePct ?? null,
+    benchmarkGood: 20,
+    benchmarkWarn: 10,
+  },
+  serviceRevenuePct: {
+    key: 'serviceRevenuePct',
+    label: 'Service Rev %',
+    format: 'percent',
+    color: 'text-orange-700 dark:text-orange-300',
+    tooltip: 'Service & repair revenue as a percentage of total marina revenue',
+    compute: (m) => m.serviceRevenuePct ?? null,
+    benchmarkGood: 15,
+    benchmarkWarn: 8,
   },
   // ─── Hotel-specific ───────────────────────────────────────────────────
   adr: {
@@ -337,6 +396,125 @@ export const MODELING_KPI_REGISTRY: Record<string, ModelingKpiDef> = {
     benchmarkWarn: 60,
     benchmarkInvert: true,
   },
+  // ─── Self-storage-specific ────────────────────────────────────────────
+  physicalOccupancy: {
+    key: 'physicalOccupancy',
+    label: 'Phys. Occ.',
+    format: 'percent',
+    color: 'text-yellow-600 dark:text-yellow-400',
+    tooltip: 'Physical occupancy rate of storage units',
+    compute: (m) => m.physicalOccupancy ?? null,
+    computeByYear: (row) => row.physicalOccupancy ?? null,
+    benchmarkGood: 90,
+    benchmarkWarn: 80,
+  },
+  ratePerSf: {
+    key: 'ratePerSf',
+    label: 'Rate / SF',
+    format: 'currency',
+    color: 'text-lime-700 dark:text-lime-300',
+    tooltip: 'Street rate per square foot per month',
+    compute: (m) => m.ratePerSf ?? null,
+    computeByYear: (row) => row.ratePerSf ?? null,
+    benchmarkGood: 1.5,
+    benchmarkWarn: 0.9,
+  },
+  climateControlledPct: {
+    key: 'climateControlledPct',
+    label: 'CC Unit %',
+    format: 'percent',
+    color: 'text-sky-700 dark:text-sky-300',
+    tooltip: 'Percentage of units that are climate-controlled',
+    compute: (m) => m.climateControlledPct ?? null,
+    benchmarkGood: 50,
+    benchmarkWarn: 25,
+  },
+  ecriUpside: {
+    key: 'ecriUpside',
+    label: 'ECRI Upside',
+    format: 'percent',
+    color: 'text-emerald-700 dark:text-emerald-300',
+    tooltip: 'Existing Customer Rate Increase upside vs current street rates',
+    compute: (m) => m.ecriUpside ?? null,
+    benchmarkGood: 15,
+    benchmarkWarn: 5,
+  },
+  // ─── STR-specific ─────────────────────────────────────────────────────
+  avgDailyRate: {
+    key: 'avgDailyRate',
+    label: 'Avg Daily Rate',
+    format: 'currency',
+    color: 'text-orange-700 dark:text-orange-300',
+    tooltip: 'Average Daily Rate for short-term rental units',
+    compute: (m) => m.avgDailyRate ?? null,
+    computeByYear: (row) => row.avgDailyRate ?? null,
+    benchmarkGood: 250,
+    benchmarkWarn: 150,
+  },
+  strOccupancy: {
+    key: 'strOccupancy',
+    label: 'STR Occ.',
+    format: 'percent',
+    color: 'text-amber-700 dark:text-amber-300',
+    tooltip: 'Short-term rental occupancy rate',
+    compute: (m) => m.strOccupancy ?? null,
+    computeByYear: (row) => row.strOccupancy ?? null,
+    benchmarkGood: 75,
+    benchmarkWarn: 60,
+  },
+  revpan: {
+    key: 'revpan',
+    label: 'RevPAN',
+    format: 'currency',
+    color: 'text-red-600 dark:text-red-400',
+    tooltip: 'Revenue Per Available Night',
+    compute: (m) => m.revpan ?? null,
+    computeByYear: (row) => row.revpan ?? null,
+    benchmarkGood: 200,
+    benchmarkWarn: 120,
+  },
+  cleaningFeePct: {
+    key: 'cleaningFeePct',
+    label: 'Cleaning Fee %',
+    format: 'percent',
+    color: 'text-stone-600 dark:text-stone-400',
+    tooltip: 'Cleaning fee revenue as a percentage of total STR revenue',
+    compute: (m) => m.cleaningFeePct ?? null,
+    benchmarkGood: 15,
+    benchmarkWarn: 8,
+  },
+  // ─── RV Park-specific ─────────────────────────────────────────────────
+  siteRentPct: {
+    key: 'siteRentPct',
+    label: 'Site Rent %',
+    format: 'percent',
+    color: 'text-green-700 dark:text-green-300',
+    tooltip: 'Site rental revenue as a percentage of total RV park revenue',
+    compute: (m) => m.siteRentPct ?? null,
+    computeByYear: (row) => row.siteRentPct ?? null,
+    benchmarkGood: 65,
+    benchmarkWarn: 50,
+  },
+  storeRevenuePct: {
+    key: 'storeRevenuePct',
+    label: 'Store Rev %',
+    format: 'percent',
+    color: 'text-lime-600 dark:text-lime-400',
+    tooltip: 'Store / retail revenue as a percentage of total revenue',
+    compute: (m) => m.storeRevenuePct ?? null,
+    benchmarkGood: 20,
+    benchmarkWarn: 8,
+  },
+  cabinRevenuePct: {
+    key: 'cabinRevenuePct',
+    label: 'Cabin Rev %',
+    format: 'percent',
+    color: 'text-amber-600 dark:text-amber-400',
+    tooltip: 'Cabin / lodging revenue as a percentage of total RV park revenue',
+    compute: (m) => m.cabinRevenuePct ?? null,
+    benchmarkGood: 25,
+    benchmarkWarn: 10,
+  },
   // ─── Retail / Office-specific ─────────────────────────────────────────
   walt: {
     key: 'walt',
@@ -369,6 +547,16 @@ export const MODELING_KPI_REGISTRY: Record<string, ModelingKpiDef> = {
     benchmarkWarn: 25,
     benchmarkInvert: true,
   },
+  pricePerSf: {
+    key: 'pricePerSf',
+    label: 'Price / SF',
+    format: 'currency',
+    color: 'text-slate-700 dark:text-slate-300',
+    tooltip: 'Purchase price per square foot of gross leasable area',
+    compute: (m) => m.pricePerSf ?? null,
+    benchmarkGood: 300,
+    benchmarkWarn: 150,
+  },
   // ─── Industrial-specific ──────────────────────────────────────────────
   clearHeight: {
     key: 'clearHeight',
@@ -388,52 +576,6 @@ export const MODELING_KPI_REGISTRY: Record<string, ModelingKpiDef> = {
     tooltip: 'Number of dock-high loading doors',
     compute: (m) => m.dockDoorCount ?? null,
   },
-  // ─── Self-storage-specific ────────────────────────────────────────────
-  physicalOccupancy: {
-    key: 'physicalOccupancy',
-    label: 'Phys. Occ.',
-    format: 'percent',
-    color: 'text-yellow-600 dark:text-yellow-400',
-    tooltip: 'Physical occupancy rate of storage units',
-    compute: (m) => m.physicalOccupancy ?? null,
-    computeByYear: (row) => row.physicalOccupancy ?? null,
-    benchmarkGood: 90,
-    benchmarkWarn: 80,
-  },
-  ratePerSf: {
-    key: 'ratePerSf',
-    label: 'Rate / SF',
-    format: 'currency',
-    color: 'text-lime-700 dark:text-lime-300',
-    tooltip: 'Street rate per square foot per month',
-    compute: (m) => m.ratePerSf ?? null,
-    computeByYear: (row) => row.ratePerSf ?? null,
-    benchmarkGood: 1.5,
-    benchmarkWarn: 0.9,
-  },
-  // ─── STR-specific ─────────────────────────────────────────────────────
-  avgDailyRate: {
-    key: 'avgDailyRate',
-    label: 'Avg Daily Rate',
-    format: 'currency',
-    color: 'text-orange-700 dark:text-orange-300',
-    tooltip: 'Average Daily Rate for short-term rental units',
-    compute: (m) => m.avgDailyRate ?? null,
-    computeByYear: (row) => row.avgDailyRate ?? null,
-    benchmarkGood: 250,
-    benchmarkWarn: 150,
-  },
-  strOccupancy: {
-    key: 'strOccupancy',
-    label: 'STR Occ.',
-    format: 'percent',
-    color: 'text-amber-700 dark:text-amber-300',
-    tooltip: 'Short-term rental occupancy rate',
-    compute: (m) => m.strOccupancy ?? null,
-    computeByYear: (row) => row.strOccupancy ?? null,
-    benchmarkGood: 75,
-    benchmarkWarn: 60,
-  },
 };
 
 export type ModelingAssetClass =
@@ -451,15 +593,15 @@ export type ModelingAssetClass =
   | 'default';
 
 export const ASSET_CLASS_KPI_SETS: Record<ModelingAssetClass, string[]> = {
-  marina:       ['irr', 'equityMultiple', 'cashOnCash', 'goingInCapRate', 'exitCapRate', 'stabilizedNoi', 'exitValue', 'noiCagr', 'dscr', 'opexRatio', 'revenuePerSlip', 'slipOccupancy'],
+  marina:       ['irr', 'equityMultiple', 'cashOnCash', 'goingInCapRate', 'exitCapRate', 'stabilizedNoi', 'exitValue', 'noiCagr', 'dscr', 'opexRatio', 'revenuePerSlip', 'noiPerSlip', 'slipOccupancy', 'fuelRevenuePct', 'serviceRevenuePct'],
   multifamily:  ['irr', 'equityMultiple', 'cashOnCash', 'goingInCapRate', 'exitCapRate', 'stabilizedNoi', 'exitValue', 'noiCagr', 'dscr', 'opexRatio', 'revPerUnit', 'rentSpread', 'turnoverRate'],
   hotel:        ['irr', 'equityMultiple', 'cashOnCash', 'goingInCapRate', 'exitCapRate', 'stabilizedNoi', 'exitValue', 'noiCagr', 'dscr', 'opexRatio', 'adr', 'revpar', 'fbRevenuePct'],
-  str:          ['irr', 'equityMultiple', 'cashOnCash', 'goingInCapRate', 'exitCapRate', 'stabilizedNoi', 'noiCagr', 'opexRatio', 'avgDailyRate', 'strOccupancy'],
-  rv_park:      ['irr', 'equityMultiple', 'cashOnCash', 'goingInCapRate', 'exitCapRate', 'stabilizedNoi', 'exitValue', 'noiCagr', 'dscr', 'opexRatio', 'physicalOccupancy'],
-  retail:       ['irr', 'equityMultiple', 'cashOnCash', 'goingInCapRate', 'exitCapRate', 'stabilizedNoi', 'exitValue', 'dscr', 'ltv', 'opexRatio', 'walt', 'anchorTenantPct', 'nearTermExpiryPct'],
-  office:       ['irr', 'equityMultiple', 'cashOnCash', 'goingInCapRate', 'exitCapRate', 'stabilizedNoi', 'exitValue', 'dscr', 'ltv', 'opexRatio', 'walt', 'anchorTenantPct', 'nearTermExpiryPct'],
-  industrial:   ['irr', 'equityMultiple', 'cashOnCash', 'goingInCapRate', 'exitCapRate', 'stabilizedNoi', 'exitValue', 'dscr', 'ltv', 'opexRatio', 'walt', 'clearHeight', 'dockDoorCount'],
-  self_storage: ['irr', 'equityMultiple', 'cashOnCash', 'goingInCapRate', 'exitCapRate', 'stabilizedNoi', 'noiCagr', 'dscr', 'ltv', 'opexRatio', 'physicalOccupancy', 'ratePerSf'],
+  str:          ['irr', 'equityMultiple', 'cashOnCash', 'goingInCapRate', 'exitCapRate', 'stabilizedNoi', 'noiCagr', 'opexRatio', 'avgDailyRate', 'strOccupancy', 'revpan', 'cleaningFeePct'],
+  rv_park:      ['irr', 'equityMultiple', 'cashOnCash', 'goingInCapRate', 'exitCapRate', 'stabilizedNoi', 'exitValue', 'noiCagr', 'dscr', 'opexRatio', 'siteRentPct', 'storeRevenuePct', 'cabinRevenuePct'],
+  retail:       ['irr', 'equityMultiple', 'cashOnCash', 'goingInCapRate', 'exitCapRate', 'stabilizedNoi', 'exitValue', 'dscr', 'ltv', 'opexRatio', 'walt', 'anchorTenantPct', 'nearTermExpiryPct', 'pricePerSf'],
+  office:       ['irr', 'equityMultiple', 'cashOnCash', 'goingInCapRate', 'exitCapRate', 'stabilizedNoi', 'exitValue', 'dscr', 'ltv', 'opexRatio', 'walt', 'anchorTenantPct', 'nearTermExpiryPct', 'pricePerSf'],
+  industrial:   ['irr', 'equityMultiple', 'cashOnCash', 'goingInCapRate', 'exitCapRate', 'stabilizedNoi', 'exitValue', 'dscr', 'ltv', 'opexRatio', 'walt', 'pricePerSf', 'clearHeight', 'dockDoorCount'],
+  self_storage: ['irr', 'equityMultiple', 'cashOnCash', 'goingInCapRate', 'exitCapRate', 'stabilizedNoi', 'noiCagr', 'dscr', 'ltv', 'opexRatio', 'physicalOccupancy', 'ratePerSf', 'climateControlledPct', 'ecriUpside'],
   mixed_use:    ['irr', 'equityMultiple', 'cashOnCash', 'goingInCapRate', 'exitCapRate', 'stabilizedNoi', 'exitValue', 'noiCagr', 'dscr', 'opexRatio'],
   business:     ['irr', 'equityMultiple', 'cashOnCash', 'totalReturn', 'exitValue', 'stabilizedNoi', 'noiCagr', 'opexRatio'],
   default:      ['irr', 'equityMultiple', 'cashOnCash', 'goingInCapRate', 'exitCapRate', 'stabilizedNoi', 'exitValue'],
