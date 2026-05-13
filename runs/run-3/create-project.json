@@ -1,10 +1,10 @@
 {
-  "id": "e9ac5333-06e9-47e7-88a5-669bfd79a88d",
+  "id": "92553b77-f8e4-45ce-9321-cbbb6a65a42b",
   "orgId": "cd3719c3-ef82-4ccc-acb9-261c80fb64b4",
-  "marinaName": "Harborview Marina – Beta Test Fixture",
+  "marinaName": "Beta Mock Marina",
   "purchasePrice": "12500000.00",
-  "year1CapRate": null,
-  "totalStorageUnits": null,
+  "year1CapRate": "7.00",
+  "totalStorageUnits": 220,
   "ebitda": null,
   "dealOutcome": "active",
   "assetClass": "marina",
@@ -14,7 +14,7 @@
   "primaryValuationMetric": "cap_rate",
   "brokerId": null,
   "brokerCompanyId": null,
-  "dealId": "88c100f2-31e5-4229-86cf-59d179d9dd6e",
+  "dealId": "021cbc97-68d6-4bff-8e9e-60a085baa18c",
   "ddProjectId": null,
   "salesCompId": null,
   "rateCompId": null,
@@ -29,59 +29,35 @@
   "customMetrics": {
     "unitMix": [
       {
-        "count": 55,
-        "label": "Wet Slip 30ft",
-        "occupancy": 0.92,
-        "monthlyRent": 495
+        "count": 80,
+        "label": "Wet Slip",
+        "occupancy": 0.9,
+        "monthlyRent": 850
       },
       {
-        "count": 42,
-        "label": "Wet Slip 40ft",
-        "occupancy": 0.89,
-        "monthlyRent": 745
+        "count": 100,
+        "label": "Covered Slip",
+        "occupancy": 0.9,
+        "monthlyRent": 850
       },
       {
-        "count": 28,
-        "label": "Wet Slip 50ft",
-        "occupancy": 0.86,
-        "monthlyRent": 985
-      },
-      {
-        "count": 5,
-        "label": "Mega Yacht Slip 80ft",
-        "occupancy": 0.8,
-        "monthlyRent": 2800
-      },
-      {
-        "count": 45,
-        "label": "Dry Stack Indoor",
-        "occupancy": 0.93,
-        "monthlyRent": 325
-      },
-      {
-        "count": 30,
-        "label": "Dry Stack Outdoor",
-        "occupancy": 0.88,
-        "monthlyRent": 215
-      },
-      {
-        "count": 15,
-        "label": "Transient Slip",
-        "occupancy": 0.65,
-        "monthlyRent": 680
+        "count": 40,
+        "label": "Dry Slip",
+        "occupancy": 0.9,
+        "monthlyRent": 850
       }
     ],
     "inputAssumptions": {
-      "payroll": 385000,
-      "fuel_cogs": 390000,
+      "payroll": 400000,
+      "fuel_cogs": 375000,
       "insurance": 88000,
-      "utilities": 56000,
-      "fuel_sales": 520000,
-      "ship_store": 115000,
-      "boat_rentals": 68000,
-      "service_cogs": 105000,
-      "service_yard": 210000,
-      "admin_general": 44000,
+      "utilities": 60000,
+      "fuel_sales": 500000,
+      "ship_store": 350000,
+      "boat_rentals": 150000,
+      "service_cogs": 125000,
+      "service_yard": 250000,
+      "admin_general": 50000,
       "inSeasonMonths": [
         4,
         5,
@@ -91,10 +67,10 @@
         9,
         10
       ],
-      "property_taxes": 168000,
-      "ship_store_cogs": 72000,
-      "dock_maintenance": 72000,
-      "dredging_reserve": 28000,
+      "property_taxes": 175000,
+      "ship_store_cogs": 210000,
+      "dock_maintenance": 75000,
+      "dredging_reserve": 30000,
       "offSeasonDiscount": 25,
       "property_management": 7
     }
@@ -109,6 +85,6 @@
   "notes": null,
   "createdBy": "85c9cd7a-c453-4dba-9817-d032d5712c4e",
   "updatedBy": null,
-  "createdAt": "2026-05-13T11:41:46.394Z",
-  "updatedAt": "2026-05-13T11:41:46.394Z"
+  "createdAt": "2026-05-13T11:54:52.789Z",
+  "updatedAt": "2026-05-13T11:54:52.789Z"
 }

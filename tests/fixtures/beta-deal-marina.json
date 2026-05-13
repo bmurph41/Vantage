@@ -1,39 +1,37 @@
 {
-  "_comment": "Canonical marina fixture for Task #398 — 10-run financial model validation. DO NOT modify values without updating the report baseline.",
+  "_comment": "Canonical marina fixture for Task #398. Parameters: $12.5M, 220 slips (80 wet / 100 covered / 40 dry), $850/mo avg, $1.25M ancillary, 38% OpEx, 7.0% going-in cap, 7.5% exit cap, 65% LTV / 6.25% / 25yr amort / 2yr IO, 35% equity, seed=42.",
   "project": {
-    "marinaName": "Harborview Marina – Beta Test Fixture",
+    "marinaName": "Beta Mock Marina",
     "assetClass": "marina",
     "city": "Annapolis",
     "state": "MD",
     "purchasePrice": 12500000,
+    "year1CapRate": 7.0,
+    "totalStorageUnits": 220,
     "customMetrics": {
       "inputAssumptions": {
-        "fuel_sales": 520000,
-        "fuel_cogs": 390000,
-        "ship_store": 115000,
-        "ship_store_cogs": 72000,
-        "service_yard": 210000,
-        "service_cogs": 105000,
-        "boat_rentals": 68000,
-        "insurance": 88000,
-        "property_taxes": 168000,
-        "dredging_reserve": 28000,
-        "dock_maintenance": 72000,
-        "utilities": 56000,
-        "property_management": 7,
-        "payroll": 385000,
-        "admin_general": 44000,
-        "inSeasonMonths": [4, 5, 6, 7, 8, 9, 10],
-        "offSeasonDiscount": 25
+        "fuel_sales":           500000,
+        "fuel_cogs":            375000,
+        "ship_store":           350000,
+        "ship_store_cogs":      210000,
+        "service_yard":         250000,
+        "service_cogs":         125000,
+        "boat_rentals":         150000,
+        "insurance":            88000,
+        "property_taxes":       175000,
+        "dredging_reserve":     30000,
+        "dock_maintenance":     75000,
+        "utilities":            60000,
+        "property_management":  7,
+        "payroll":              400000,
+        "admin_general":        50000,
+        "inSeasonMonths":       [4, 5, 6, 7, 8, 9, 10],
+        "offSeasonDiscount":    25
       },
       "unitMix": [
-        { "label": "Wet Slip 30ft",       "count": 55, "monthlyRent": 495,  "occupancy": 0.92 },
-        { "label": "Wet Slip 40ft",       "count": 42, "monthlyRent": 745,  "occupancy": 0.89 },
-        { "label": "Wet Slip 50ft",       "count": 28, "monthlyRent": 985,  "occupancy": 0.86 },
-        { "label": "Mega Yacht Slip 80ft","count":  5, "monthlyRent": 2800, "occupancy": 0.80 },
-        { "label": "Dry Stack Indoor",    "count": 45, "monthlyRent": 325,  "occupancy": 0.93 },
-        { "label": "Dry Stack Outdoor",   "count": 30, "monthlyRent": 215,  "occupancy": 0.88 },
-        { "label": "Transient Slip",      "count": 15, "monthlyRent": 680,  "occupancy": 0.65 }
+        { "label": "Wet Slip",     "count": 80,  "monthlyRent": 850, "occupancy": 0.90 },
+        { "label": "Covered Slip", "count": 100, "monthlyRent": 850, "occupancy": 0.90 },
+        { "label": "Dry Slip",     "count": 40,  "monthlyRent": 850, "occupancy": 0.90 }
       ]
     }
   },
@@ -42,20 +40,21 @@
     "name": "Base Case – 10 yr hold",
     "revenueGrowthRate": 3.5,
     "expenseGrowthRate": 2.5,
-    "exitCapRate": 6.75
+    "exitCapRate": 7.5
   },
   "projectConfig": {
-    "holdPeriod": 10,
-    "acquisitionCloseDate": "2026-01-01"
+    "holdPeriod": 10
   },
   "capitalStack": {
+    "_note": "65% LTV / 6.25% fixed / 25yr amort / 2yr IO. blendedDebtRate decimal (0.0625 = 6.25%). drizzle-zod generates string type for decimal columns — POST as strings.",
     "totalDebt": 8125000,
-    "blendedDebtRate": 0.065,
-    "_blendedDebtRateNote": "Stored as decimal (0.065 = 6.5%). The DCF calculator multiplies totalDebt × blendedDebtRate directly for annual debt service.",
+    "blendedDebtRate": 0.0625,
+    "amortizationYears": 25,
+    "ioYears": 2,
     "holdPeriodYears": 10,
+    "totalEquity": 4375000,
     "lpEquityPct": 90,
-    "gpEquityPct": 10,
-    "totalEquity": 4375000
+    "gpEquityPct": 10
   },
   "dcf": {
     "discountRate": 10
@@ -69,33 +68,43 @@
   "exitScenarios": [
     {
       "scenarioType": "cash_sale",
-      "name": "Base Sale – Year 10",
+      "name": "Net Proceeds – Year 10",
       "isBaseCase": true,
       "holdingPeriodYears": 10,
-      "exitCapRate": "0.0675",
-      "projectedSalePrice": "13562500",
+      "exitCapRate": "0.075",
+      "projectedSalePrice": "13437500",
       "brokerCommissionRate": "0.03",
-      "notes": "Beta test base exit — cash sale"
+      "notes": "Base cash sale — net proceeds at exit cap 7.5%"
     },
     {
       "scenarioType": "exchange_1031",
       "name": "1031 Exchange – Year 10",
       "isBaseCase": false,
       "holdingPeriodYears": 10,
-      "exitCapRate": "0.0675",
-      "projectedSalePrice": "13562500",
+      "exitCapRate": "0.075",
+      "projectedSalePrice": "13437500",
       "brokerCommissionRate": "0.03",
-      "notes": "Like-kind exchange deferral scenario"
+      "notes": "Like-kind exchange — deferred capital gains"
     },
     {
       "scenarioType": "dst_investment",
       "name": "DST Investment – Year 10",
       "isBaseCase": false,
       "holdingPeriodYears": 10,
-      "exitCapRate": "0.0675",
-      "projectedSalePrice": "13562500",
+      "exitCapRate": "0.075",
+      "projectedSalePrice": "13437500",
       "brokerCommissionRate": "0.03",
-      "notes": "Delaware Statutory Trust exit scenario"
+      "notes": "Delaware Statutory Trust — passive fractional ownership"
+    },
+    {
+      "scenarioType": "hybrid",
+      "name": "Waterfall Exit – Year 10",
+      "isBaseCase": false,
+      "holdingPeriodYears": 10,
+      "exitCapRate": "0.075",
+      "projectedSalePrice": "13437500",
+      "brokerCommissionRate": "0.03",
+      "notes": "Hybrid waterfall exit — multi-tranche GP/LP distribution"
     }
   ],
   "waterfall": {
@@ -111,22 +120,10 @@
     "exitProceeds": 14800000,
     "config": {
       "tiers": [
-        {
-          "id": "t1", "name": "Preferred Return",
-          "hurdleRate": 8, "lpSplit": 100, "gpSplit": 0
-        },
-        {
-          "id": "t2", "name": "Catch-Up",
-          "hurdleRate": 8, "lpSplit": 0, "gpSplit": 100
-        },
-        {
-          "id": "t3", "name": "Promote Tier",
-          "hurdleRate": 15, "lpSplit": 80, "gpSplit": 20
-        },
-        {
-          "id": "t4", "name": "Super Promote",
-          "hurdleRate": 99, "lpSplit": 70, "gpSplit": 30
-        }
+        { "id": "t1", "name": "Preferred Return",  "hurdleRate": 8,  "lpSplit": 100, "gpSplit": 0   },
+        { "id": "t2", "name": "GP Catch-Up",        "hurdleRate": 8,  "lpSplit": 0,   "gpSplit": 100 },
+        { "id": "t3", "name": "Promote Tier",       "hurdleRate": 15, "lpSplit": 80,  "gpSplit": 20  },
+        { "id": "t4", "name": "Super Promote",      "hurdleRate": 99, "lpSplit": 70,  "gpSplit": 30  }
       ],
       "preferredReturn": 8,
       "gpCatchUpPercentage": 0.2,

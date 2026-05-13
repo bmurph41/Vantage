@@ -1,5 +1,5 @@
 # Beta Mock Test — Validation Report
-> Task #398 | Generated: 2026-05-13T11:42:36.166Z
+> Task #398 | Generated: 2026-05-13T11:55:46.086Z
 > Fixture: `tests/fixtures/beta-deal-marina.json`
 > Auth: `ALLOW_DEMO_AUTH=true` — Express `authenticateUser` auto-resolves all requests → org cd3719c3-ef82-4ccc-acb9-261c80fb64b4; `x-org-id` on every call.
 > Pipeline: 5 model steps × 10 runs = 50 cells
@@ -37,16 +37,16 @@ was **not modified** by this test script. XIRR/NPV reported here are therefore t
 
 | Run | dcf | monte-carlo | exit-scenarios | waterfall | decision-support | total |
 |-----|-----|-------------|----------------|-----------|------------------|-------|
-| 0 | 935 | 631 | 1588 | 528 | 768 | **4450** |
-| 1 | 870 | 565 | 1540 | 498 | 801 | **4274** |
-| 2 | 861 | 580 | 1501 | 490 | 760 | **4192** |
-| 3 | 893 | 563 | 1512 | 491 | 723 | **4182** |
-| 4 | 888 | 583 | 1523 | 494 | 719 | **4207** |
-| 5 | 898 | 567 | 1476 | 489 | 733 | **4163** |
-| 6 | 884 | 561 | 1540 | 509 | 730 | **4224** |
-| 7 | 866 | 589 | 1538 | 505 | 719 | **4217** |
-| 8 | 864 | 581 | 1609 | 495 | 720 | **4269** |
-| 9 | 867 | 562 | 1532 | 490 | 781 | **4232** |
+| 0 | 855 | 593 | 2016 | 530 | 724 | **4718** |
+| 1 | 849 | 569 | 2029 | 497 | 699 | **4643** |
+| 2 | 853 | 570 | 2053 | 503 | 728 | **4707** |
+| 3 | 863 | 573 | 2031 | 498 | 704 | **4669** |
+| 4 | 819 | 565 | 2016 | 497 | 695 | **4592** |
+| 5 | 809 | 612 | 2016 | 491 | 706 | **4634** |
+| 6 | 861 | 561 | 2023 | 503 | 698 | **4646** |
+| 7 | 807 | 569 | 2069 | 504 | 708 | **4657** |
+| 8 | 841 | 572 | 2087 | 489 | 734 | **4723** |
+| 9 | 859 | 569 | 2045 | 493 | 744 | **4710** |
 
 ---
 
@@ -76,16 +76,16 @@ _None — all 10 runs produced numerically identical financial outputs (ε = 1e-
 
 | Run | seed (from response) | p10 IRR | p50 IRR | p90 IRR |
 |-----|----------------------|---------|---------|---------|
-| 0 | 42 | 13.2030% | 14.8475% | 16.4037% |
-| 1 | 42 | 13.2030% | 14.8475% | 16.4037% |
-| 2 | 42 | 13.2030% | 14.8475% | 16.4037% |
-| 3 | 42 | 13.2030% | 14.8475% | 16.4037% |
-| 4 | 42 | 13.2030% | 14.8475% | 16.4037% |
-| 5 | 42 | 13.2030% | 14.8475% | 16.4037% |
-| 6 | 42 | 13.2030% | 14.8475% | 16.4037% |
-| 7 | 42 | 13.2030% | 14.8475% | 16.4037% |
-| 8 | 42 | 13.2030% | 14.8475% | 16.4037% |
-| 9 | 42 | 13.2030% | 14.8475% | 16.4037% |
+| 0 | 42 | 26.3396% | 28.1528% | 29.8389% |
+| 1 | 42 | 26.3396% | 28.1528% | 29.8389% |
+| 2 | 42 | 26.3396% | 28.1528% | 29.8389% |
+| 3 | 42 | 26.3396% | 28.1528% | 29.8389% |
+| 4 | 42 | 26.3396% | 28.1528% | 29.8389% |
+| 5 | 42 | 26.3396% | 28.1528% | 29.8389% |
+| 6 | 42 | 26.3396% | 28.1528% | 29.8389% |
+| 7 | 42 | 26.3396% | 28.1528% | 29.8389% |
+| 8 | 42 | 26.3396% | 28.1528% | 29.8389% |
+| 9 | 42 | 26.3396% | 28.1528% | 29.8389% |
 
 ---
 
@@ -96,16 +96,16 @@ _None — all 10 runs produced numerically identical financial outputs (ε = 1e-
 
 | Run | XIRR | Levered IRR | Unlevered IRR | NPV | Eq. Mult. | DCF totalDebt | MC p50 | MC seed | WF LP/GP IRR | Exit Scenarios |
 |-----|------|-------------|---------------|-----|-----------|---------------|--------|---------|--------------|---------------|
-| 0 | 14.8934% | 14.8934% | 14.8934% | 4869076.6690 | 3.0334× | 0 | 14.8475% | 42 | 28.7518%/14.2788% | 3 |
-| 1 | 14.8934% | 14.8934% | 14.8934% | 4869076.6690 | 3.0334× | 0 | 14.8475% | 42 | 28.7518%/14.2788% | 3 |
-| 2 | 14.8934% | 14.8934% | 14.8934% | 4869076.6690 | 3.0334× | 0 | 14.8475% | 42 | 28.7518%/14.2788% | 3 |
-| 3 | 14.8934% | 14.8934% | 14.8934% | 4869076.6690 | 3.0334× | 0 | 14.8475% | 42 | 28.7518%/14.2788% | 3 |
-| 4 | 14.8934% | 14.8934% | 14.8934% | 4869076.6690 | 3.0334× | 0 | 14.8475% | 42 | 28.7518%/14.2788% | 3 |
-| 5 | 14.8934% | 14.8934% | 14.8934% | 4869076.6690 | 3.0334× | 0 | 14.8475% | 42 | 28.7518%/14.2788% | 3 |
-| 6 | 14.8934% | 14.8934% | 14.8934% | 4869076.6690 | 3.0334× | 0 | 14.8475% | 42 | 28.7518%/14.2788% | 3 |
-| 7 | 14.8934% | 14.8934% | 14.8934% | 4869076.6690 | 3.0334× | 0 | 14.8475% | 42 | 28.7518%/14.2788% | 3 |
-| 8 | 14.8934% | 14.8934% | 14.8934% | 4869076.6690 | 3.0334× | 0 | 14.8475% | 42 | 28.7518%/14.2788% | 3 |
-| 9 | 14.8934% | 14.8934% | 14.8934% | 4869076.6690 | 3.0334× | 0 | 14.8475% | 42 | 28.7518%/14.2788% | 3 |
+| 0 | 21.0027% | 21.0027% | 21.0027% | 11846515.1161 | 4.1603× | 0 | 28.1528% | 42 | 28.7518%/14.2788% | 4 |
+| 1 | 21.0027% | 21.0027% | 21.0027% | 11846515.1161 | 4.1603× | 0 | 28.1528% | 42 | 28.7518%/14.2788% | 4 |
+| 2 | 21.0027% | 21.0027% | 21.0027% | 11846515.1161 | 4.1603× | 0 | 28.1528% | 42 | 28.7518%/14.2788% | 4 |
+| 3 | 21.0027% | 21.0027% | 21.0027% | 11846515.1161 | 4.1603× | 0 | 28.1528% | 42 | 28.7518%/14.2788% | 4 |
+| 4 | 21.0027% | 21.0027% | 21.0027% | 11846515.1161 | 4.1603× | 0 | 28.1528% | 42 | 28.7518%/14.2788% | 4 |
+| 5 | 21.0027% | 21.0027% | 21.0027% | 11846515.1161 | 4.1603× | 0 | 28.1528% | 42 | 28.7518%/14.2788% | 4 |
+| 6 | 21.0027% | 21.0027% | 21.0027% | 11846515.1161 | 4.1603× | 0 | 28.1528% | 42 | 28.7518%/14.2788% | 4 |
+| 7 | 21.0027% | 21.0027% | 21.0027% | 11846515.1161 | 4.1603× | 0 | 28.1528% | 42 | 28.7518%/14.2788% | 4 |
+| 8 | 21.0027% | 21.0027% | 21.0027% | 11846515.1161 | 4.1603× | 0 | 28.1528% | 42 | 28.7518%/14.2788% | 4 |
+| 9 | 21.0027% | 21.0027% | 21.0027% | 11846515.1161 | 4.1603× | 0 | 28.1528% | 42 | 28.7518%/14.2788% | 4 |
 
 ---
 
@@ -113,35 +113,38 @@ _None — all 10 runs produced numerically identical financial outputs (ε = 1e-
 
 | Metric | Value |
 |--------|-------|
-| XIRR / Levered IRR (`calculateXIRR`) | **14.8934%** |
-| Levered IRR | 14.8934% |
-| Unlevered IRR | 14.8934% |
+| XIRR / Levered IRR (`calculateXIRR`) | **21.0027%** |
+| Levered IRR | 21.0027% |
+| Unlevered IRR | 21.0027% |
 | DCF totalDebt (existing production behaviour) | 0 |
 | DCF equityInvested | 12500000 |
-| NPV (10% discount rate) | 4869076.6690 |
-| Equity Multiple | 3.0334× |
-| MC p10 (seed=42) | 13.2030% |
-| MC p50 (seed=42) | 14.8475% |
-| MC p90 (seed=42) | 16.4037% |
-| MC mean (seed=42) | 14.8274% |
+| NPV (10% discount rate) | 11846515.1161 |
+| Equity Multiple | 4.1603× |
+| MC p10 (seed=42) | 26.3396% |
+| MC p50 (seed=42) | 28.1528% |
+| MC p90 (seed=42) | 29.8389% |
+| MC mean (seed=42) | 28.1305% |
 | MC seed confirmed in response | 42 |
 | Waterfall LP IRR | 28.7518% |
 | Waterfall GP IRR | 14.2788% |
 | Waterfall LP Multiple | 6.1183× |
 | Waterfall GP Multiple | 1.9000× |
-| Exit scenario count per run | 3 |
+| Exit scenario count per run | 4 |
 | Decision Support Enabled | true |
 | Decision Support Entitled | true |
 
 ---
 
-## Exit Scenario Set (3 calls per run)
+## Exit Scenario Set (4 calls per run)
 
-| # | scenarioType | name | holdingPeriodYears | exitCapRate | brokerCommissionRate |
-|---|-------------|------|-------------------|-------------|----------------------|
-| 1 | cash_sale | Base Sale – Year 10 | 10 | 0.0675 | 0.03 |
-| 2 | exchange_1031 | 1031 Exchange – Year 10 | 10 | 0.0675 | 0.03 |
-| 3 | dst_investment | DST Investment – Year 10 | 10 | 0.0675 | 0.03 |
+As specified in Task #398: 1031, DST, Waterfall, Net Proceeds.
+
+| # | scenarioType | name | exitCapRate | brokerCommissionRate |
+|---|-------------|------|-------------|----------------------|
+| 1 | cash_sale | Net Proceeds – Year 10 | 0.075 | 0.03 |
+| 2 | exchange_1031 | 1031 Exchange – Year 10 | 0.075 | 0.03 |
+| 3 | dst_investment | DST Investment – Year 10 | 0.075 | 0.03 |
+| 4 | hybrid | Waterfall Exit – Year 10 | 0.075 | 0.03 |
 
 Results collected into an array → `exit-scenarios.json` per run.
 
@@ -149,20 +152,29 @@ Results collected into an array → `exit-scenarios.json` per run.
 
 ## Fixture Summary
 
-| Parameter | Value |
-|-----------|-------|
-| Property | Harborview Marina – Beta Test Fixture |
+Canonical parameters as specified in Task #398:
+
+| Parameter | Canonical Value |
+|-----------|----------------|
+| Property | Beta Mock Marina |
 | Location | Annapolis, MD |
 | Asset Class | marina |
 | Purchase Price | $12,500,000 |
-| Total Slips | 220 (55×30ft wet, 42×40ft wet, 28×50ft wet, 5×80ft mega, 45 dry stack indoor, 30 dry stack outdoor, 15 transient) |
+| Total Slips | 220 — 80 wet / 100 covered / 40 dry |
+| Avg Slip Rate | $850/mo |
+| Ancillary Income | $1,250,000/yr |
+| OpEx | 38% of revenue |
+| Going-In Cap Rate | 7.0% |
+| Exit Cap Rate | 7.5% |
 | Hold Period | 10 years |
-| Scenario Exit Cap Rate | 6.75% |
 | Revenue Growth | 3.5% / yr |
 | Expense Growth | 2.5% / yr |
-| Capital Stack (DB only) | $8,125,000 @ 6.5% IO (blendedDebtRate=0.065 decimal) |
-| LP / GP Equity | $3,937,500 / $437,500 |
-| Waterfall Structure | 8% pref, 20% GP catch-up, 4-tier promote |
+| Debt | 65% LTV = $8,125,000 @ 6.25% / 25yr amort / 2yr IO |
+| blendedDebtRate | 0.0625 (decimal = 6.25%) |
+| Equity | 35% = $4,375,000 (LP 90% / GP 10%) |
+| LP Contribution | $3,937,500 |
+| GP Contribution | $437,500 |
+| Waterfall | 8% pref, 20% GP catch-up, 4-tier promote |
 | MC N | 500 |
 | MC Seed | 42 → `request.seed ?? Date.now()` — deterministic path |
 | Hurdle IRR | 12% |

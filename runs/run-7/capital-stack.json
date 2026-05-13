@@ -1,7 +1,7 @@
 {
-  "id": "5ae3e15c-d4e3-445a-9137-293e5c5120b5",
+  "id": "568f0893-14e1-4bf5-8315-00eebdda46e1",
   "orgId": "cd3719c3-ef82-4ccc-acb9-261c80fb64b4",
-  "modelingProjectId": "7067c243-13d0-442d-b503-6929f1359c31",
+  "modelingProjectId": "bf7f9dfa-30af-4c20-bc93-49adacecda2b",
   "name": "65% LTV Senior Mortgage",
   "description": null,
   "status": "draft",
@@ -12,7 +12,7 @@
   "totalCapitalization": "12500000.00",
   "totalDebt": "8125000.00",
   "totalEquity": "4375000.00",
-  "blendedDebtRate": "0.0650",
+  "blendedDebtRate": "0.0625",
   "interestRateType": null,
   "maturityDate": null,
   "ltv": null,
@@ -22,6 +22,6 @@
   "noiGrowthRate": "0.0200",
   "isActive": true,
   "createdBy": "85c9cd7a-c453-4dba-9817-d032d5712c4e",
-  "createdAt": "2026-05-13T11:42:15.736Z",
-  "updatedAt": "2026-05-13T11:42:15.736Z"
+  "createdAt": "2026-05-13T11:55:24.236Z",
+  "updatedAt": "2026-05-13T11:55:24.236Z"
 }

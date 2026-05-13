@@ -10,7 +10,7 @@
       },
       {
         "id": "t2",
-        "name": "Catch-Up",
+        "name": "GP Catch-Up",
         "hurdleRate": 8,
         "lpSplit": 0,
         "gpSplit": 100

@@ -108,6 +108,8 @@ interface CapitalStackFixture {
   totalDebt: number;
   blendedDebtRate: number;
   holdPeriodYears: number;
+  amortizationYears?: number;
+  ioYears?: number;
   lpEquityPct?: number;
   gpEquityPct?: number;
   totalEquity: number;
@@ -424,6 +426,12 @@ function extractMetrics(run: RunResult): RunMetrics {
 
 async function executeRun(runIndex: number, fixture: BetaFixture): Promise<RunResult> {
   const runDir = path.join(RUNS_DIR, `run-${runIndex}`);
+  // Wipe any artifacts from previous runs so each execution is a clean slate.
+  if (fs.existsSync(runDir)) {
+    for (const f of fs.readdirSync(runDir)) {
+      fs.unlinkSync(path.join(runDir, f));
+    }
+  }
   fs.mkdirSync(runDir, { recursive: true });
 
   const {
@@ -592,14 +600,10 @@ async function executeRun(runIndex: number, fixture: BetaFixture): Promise<RunRe
   // ── STEP 1: DCF ───────────────────────────────────────────────────────────
   // irr = leveredIrr = XIRR computed via calculateXIRR() (shared/finance/xirr.ts).
   // totalDebt=0 in response is existing production behaviour; not modified here.
+  // No overrides — DCF uses the project's configured values (scenario, config).
   await execStep('dcf', () =>
     apiRequest('POST', `/api/modeling/projects/${projectId}/dcf`, {
       discountRate: dcfFixture.discountRate,
-      overrides: {
-        holdPeriodYears:        configFixture.holdPeriod,
-        revenueGrowthRateDelta: 0.5,
-        exitCapRateDelta:       -0.25,
-      },
     }),
   );
 
@@ -844,13 +848,16 @@ ${metricsRows}
 
 ---
 
-## Exit Scenario Set (3 calls per run)
+## Exit Scenario Set (4 calls per run)
 
-| # | scenarioType | name | holdingPeriodYears | exitCapRate | brokerCommissionRate |
-|---|-------------|------|-------------------|-------------|----------------------|
-| 1 | cash_sale | Base Sale – Year 10 | 10 | 0.0675 | 0.03 |
-| 2 | exchange_1031 | 1031 Exchange – Year 10 | 10 | 0.0675 | 0.03 |
-| 3 | dst_investment | DST Investment – Year 10 | 10 | 0.0675 | 0.03 |
+As specified in Task #398: 1031, DST, Waterfall, Net Proceeds.
+
+| # | scenarioType | name | exitCapRate | brokerCommissionRate |
+|---|-------------|------|-------------|----------------------|
+| 1 | cash_sale | Net Proceeds – Year 10 | 0.075 | 0.03 |
+| 2 | exchange_1031 | 1031 Exchange – Year 10 | 0.075 | 0.03 |
+| 3 | dst_investment | DST Investment – Year 10 | 0.075 | 0.03 |
+| 4 | hybrid | Waterfall Exit – Year 10 | 0.075 | 0.03 |
 
 Results collected into an array → \`exit-scenarios.json\` per run.
 
@@ -858,20 +865,29 @@ Results collected into an array → \`exit-scenarios.json\` per run.
 
 ## Fixture Summary
 
-| Parameter | Value |
-|-----------|-------|
-| Property | Harborview Marina – Beta Test Fixture |
+Canonical parameters as specified in Task #398:
+
+| Parameter | Canonical Value |
+|-----------|----------------|
+| Property | Beta Mock Marina |
 | Location | Annapolis, MD |
 | Asset Class | marina |
 | Purchase Price | $12,500,000 |
-| Total Slips | 220 (55×30ft wet, 42×40ft wet, 28×50ft wet, 5×80ft mega, 45 dry stack indoor, 30 dry stack outdoor, 15 transient) |
+| Total Slips | 220 — 80 wet / 100 covered / 40 dry |
+| Avg Slip Rate | $850/mo |
+| Ancillary Income | $1,250,000/yr |
+| OpEx | 38% of revenue |
+| Going-In Cap Rate | 7.0% |
+| Exit Cap Rate | 7.5% |
 | Hold Period | 10 years |
-| Scenario Exit Cap Rate | 6.75% |
 | Revenue Growth | 3.5% / yr |
 | Expense Growth | 2.5% / yr |
-| Capital Stack (DB only) | $8,125,000 @ 6.5% IO (blendedDebtRate=0.065 decimal) |
-| LP / GP Equity | $3,937,500 / $437,500 |
-| Waterfall Structure | 8% pref, 20% GP catch-up, 4-tier promote |
+| Debt | 65% LTV = $8,125,000 @ 6.25% / 25yr amort / 2yr IO |
+| blendedDebtRate | 0.0625 (decimal = 6.25%) |
+| Equity | 35% = $4,375,000 (LP 90% / GP 10%) |
+| LP Contribution | $3,937,500 |
+| GP Contribution | $437,500 |
+| Waterfall | 8% pref, 20% GP catch-up, 4-tier promote |
 | MC N | 500 |
 | MC Seed | 42 → \`request.seed ?? Date.now()\` — deterministic path |
 | Hurdle IRR | 12% |
