@@ -1,0 +1,630 @@
+{
+  "enabled": true,
+  "entitled": true,
+  "tornado": {
+    "target": "irr",
+    "drivers": [
+      {
+        "driver": "Hold Period",
+        "low": 21.595903393753453,
+        "base": 19.61795698730657,
+        "high": 18.316883329364988,
+        "delta": "±1 year",
+        "spread": 3.2790200643884653,
+        "unit": "percent"
+      },
+      {
+        "driver": "Purchase Price",
+        "low": 21.072627798130533,
+        "base": 19.61795698730657,
+        "high": 18.25719295288938,
+        "delta": "±5%",
+        "spread": 2.8154348452411533,
+        "unit": "percent"
+      },
+      {
+        "driver": "Exit Cap Rate",
+        "low": 21.04063652838785,
+        "base": 19.61795698730657,
+        "high": 18.322881033203263,
+        "delta": "±50 bps",
+        "spread": 2.717755495184587,
+        "unit": "percent"
+      },
+      {
+        "driver": "Revenue Growth",
+        "low": 18.381504403921532,
+        "base": 19.61795698730657,
+        "high": 20.83827226401981,
+        "delta": "±100 bps",
+        "spread": 2.456767860098278,
+        "unit": "percent"
+      },
+      {
+        "driver": "Selling Costs",
+        "low": 19.71560112642067,
+        "base": 19.61795698730657,
+        "high": 19.519966903852794,
+        "delta": "±50 bps",
+        "spread": 0.19563422256787533,
+        "unit": "percent"
+      }
+    ]
+  },
+  "attribution": {
+    "target": "irr",
+    "r2": 0.9977245207537705,
+    "drivers": [
+      {
+        "driver": "Revenue Growth",
+        "importance": 0.3901899921272554,
+        "direction": "positive",
+        "beta": 0.6774229257391738,
+        "corr": 0.6774229257391738
+      },
+      {
+        "driver": "Exit Cap Rate",
+        "importance": 0.3519706631058135,
+        "direction": "negative",
+        "beta": -0.611068969441265,
+        "corr": -0.611068969441265
+      },
+      {
+        "driver": "Purchase Price",
+        "importance": 0.2289026420269265,
+        "direction": "negative",
+        "beta": -0.39740613701013444,
+        "corr": -0.39740613701013444
+      },
+      {
+        "driver": "Selling Costs",
+        "importance": 0.02893670274000465,
+        "direction": "negative",
+        "beta": -0.05023805383759216,
+        "corr": -0.05023805383759216
+      }
+    ],
+    "notes": []
+  },
+  "memo": {
+    "tone": "concise",
+    "headline": "Sunset Bay Marina – Beta Test Fixture — Base Case 19.6% IRR, 2.20x EM",
+    "executiveSummary": "The base case projects a levered IRR of 19.6% and an equity multiple of 2.20x over a 5-year hold on $8.5M total capitalization. Weighted expected IRR of 19.5% exceeds the 12.0% hurdle.",
+    "sections": [
+      {
+        "title": "Key Metrics",
+        "bullets": [
+          "Base IRR: 19.6% | Upside: 21.5% | Downside: 17.1%",
+          "Equity Multiple: 2.20x",
+          "NPV at 10.0%: $3.7M",
+          "Net Sale Proceeds: $14.0M"
+        ]
+      },
+      {
+        "title": "Top Drivers (Sensitivity)",
+        "bullets": [
+          "Hold Period: 21.6% → 18.3% IRR (±1 year)",
+          "Purchase Price: 21.1% → 18.3% IRR (±5%)",
+          "Exit Cap Rate: 21.0% → 18.3% IRR (±50 bps)"
+        ]
+      },
+      {
+        "title": "Key Risks",
+        "bullets": [
+          "P(IRR < 12.0%): 0.0%",
+          "P(Loss of capital): 0.0%",
+          "Expected shortfall (P10 IRR): 17.3%"
+        ]
+      }
+    ],
+    "appendix": {
+      "assumptions": {
+        "purchasePrice": 8500000,
+        "equityInvested": 8500000,
+        "totalDebt": 0,
+        "holdPeriodYears": 5,
+        "hurdleIRR": "12%",
+        "discountRate": "10%"
+      },
+      "keyStats": {
+        "baseIRR": 19.61795698730657,
+        "upsideIRR": 21.540072228638866,
+        "downsideIRR": 17.10109058048039,
+        "expectedIRR": 19.469269195933098,
+        "baseEM": 2.1976505247058826,
+        "baseNPV": 3714140.269237538
+      }
+    }
+  },
+  "scenarios": {
+    "base": {
+      "name": "Base",
+      "irr": 19.61795698730657,
+      "leveredIrr": 19.61795698730657,
+      "equityMultiple": 2.1976505247058826,
+      "npv": 3714140.269237538,
+      "terminalValue": 14481882,
+      "netSaleProceeds": 14047425.54,
+      "cashFlows": [
+        {
+          "date": "2026-05-13",
+          "amount": -8500000
+        },
+        {
+          "date": "2027-05-13",
+          "amount": 869100.8
+        },
+        {
+          "date": "2028-05-13",
+          "amount": 896918.82
+        },
+        {
+          "date": "2029-05-13",
+          "amount": 925615
+        },
+        {
+          "date": "2030-05-13",
+          "amount": 955216.81
+        },
+        {
+          "date": "2031-05-13",
+          "amount": 15033178.03
+        }
+      ],
+      "overridesApplied": {
+        "name": "Base",
+        "revenueGrowthRateDelta": 0,
+        "exitCapRateDelta": 0,
+        "saleCostRateDelta": 0,
+        "weight": 0.5
+      }
+    },
+    "upside": {
+      "name": "Upside",
+      "irr": 21.540072228638866,
+      "leveredIrr": 21.540072228638866,
+      "equityMultiple": 2.367415863529412,
+      "npv": 4618407.881181216,
+      "terminalValue": 15834914.07,
+      "netSaleProceeds": 15359866.65,
+      "cashFlows": [
+        {
+          "date": "2026-05-13",
+          "amount": -8500000
+        },
+        {
+          "date": "2027-05-13",
+          "amount": 869100.8
+        },
+        {
+          "date": "2028-05-13",
+          "amount": 909099.83
+        },
+        {
+          "date": "2029-05-13",
+          "amount": 950829.7
+        },
+        {
+          "date": "2030-05-13",
+          "amount": 994362.91
+        },
+        {
+          "date": "2031-05-13",
+          "amount": 16399641.6
+        }
+      ],
+      "overridesApplied": {
+        "name": "Upside",
+        "revenueGrowthRateDelta": 1,
+        "exitCapRateDelta": -0.25,
+        "saleCostRateDelta": 0,
+        "weight": 0.25
+      }
+    },
+    "downside": {
+      "name": "Downside",
+      "irr": 17.10109058048039,
+      "leveredIrr": 17.10109058048039,
+      "equityMultiple": 1.9909451400000002,
+      "npv": 2614975.070345468,
+      "terminalValue": 12802522.53,
+      "netSaleProceeds": 12418446.85,
+      "cashFlows": [
+        {
+          "date": "2026-05-13",
+          "amount": -8500000
+        },
+        {
+          "date": "2027-05-13",
+          "amount": 869100.8
+        },
+        {
+          "date": "2028-05-13",
+          "amount": 884737.82
+        },
+        {
+          "date": "2029-05-13",
+          "amount": 900643.94
+        },
+        {
+          "date": "2030-05-13",
+          "amount": 916823.49
+        },
+        {
+          "date": "2031-05-13",
+          "amount": 13351727.64
+        }
+      ],
+      "overridesApplied": {
+        "name": "Downside",
+        "revenueGrowthRateDelta": -1,
+        "exitCapRateDelta": 0.5,
+        "saleCostRateDelta": 0,
+        "weight": 0.25
+      }
+    },
+    "expectedCase": {
+      "expectedIRR": 19.469269195933098,
+      "expectedEM": 2.1884155132352943,
+      "expectedNPV": 3665415.87250044,
+      "expectedTerminalValue": 14400300.15,
+      "expectedNetSaleProceeds": 13968291.145,
+      "probIRRBelowHurdle": 0,
+      "probLosingMoney": 0,
+      "weights": {
+        "base": 0.5,
+        "upside": 0.25,
+        "downside": 0.25
+      }
+    }
+  },
+  "monteCarlo": {
+    "n": 500,
+    "seed": 42,
+    "mode": "fast",
+    "stats": {
+      "irr": {
+        "mean": 19.601982092271502,
+        "median": 19.622836497000506,
+        "stdDev": 1.3121723091703417,
+        "p5": 17.609066398287553,
+        "p10": 17.92109602499345,
+        "p25": 18.681660927407645,
+        "p50": 19.622836497000506,
+        "p75": 20.460997711205437,
+        "p90": 21.225918195579126,
+        "p95": 21.79841318375403,
+        "min": 15.462100383532304,
+        "max": 23.49659648227875
+      },
+      "equityMultiple": {
+        "mean": 2.1988435989142094,
+        "median": 2.198112908573223,
+        "stdDev": 0.11115414442885602,
+        "p5": 2.033900782354855,
+        "p10": 2.0574011063873665,
+        "p25": 2.121954811952226,
+        "p50": 2.198112908573223,
+        "p75": 2.2698477224716984,
+        "p90": 2.3403405601042175,
+        "p95": 2.389614635598268,
+        "min": 1.8716697390568355,
+        "max": 2.5474910052364765
+      },
+      "npv": {
+        "mean": 3716632.93346865,
+        "median": 3711050.2830624445,
+        "stdDev": 568831.2178428363,
+        "p5": 2861712.626479755,
+        "p10": 2995376.4762441744,
+        "p25": 3333773.0014059474,
+        "p50": 3711050.2830624445,
+        "p75": 4076429.7386958813,
+        "p90": 4454165.9014262045,
+        "p95": 4637163.603304157,
+        "min": 2050646.3729307726,
+        "max": 5442692.366178372
+      }
+    },
+    "risks": {
+      "probIrrBelowHurdle": 0,
+      "probMultipleBelow1": 0,
+      "expectedShortfallIrrP10": 17.321007765430444,
+      "expectedShortfallNpvP10": 2756339.5003076033
+    },
+    "samplesPreview": [
+      {
+        "irr": 20.134264502457597,
+        "equityMultiple": 2.232598929872159,
+        "npv": 3778934.1956905695
+      },
+      {
+        "irr": 17.875171682410276,
+        "equityMultiple": 2.0570528134848947,
+        "npv": 3026830.4630466904
+      },
+      {
+        "irr": 20.051851093592703,
+        "equityMultiple": 2.2308544093764002,
+        "npv": 3849246.5280320616
+      },
+      {
+        "irr": 16.896138257027786,
+        "equityMultiple": 1.979681406696416,
+        "npv": 2591867.4142990746
+      },
+      {
+        "irr": 17.610065827367613,
+        "equityMultiple": 2.0349180133687126,
+        "npv": 2901709.5685650352
+      },
+      {
+        "irr": 20.18483618420504,
+        "equityMultiple": 2.241892684593861,
+        "npv": 3846952.851423745
+      },
+      {
+        "irr": 21.01334904323802,
+        "equityMultiple": 2.32031977463902,
+        "npv": 4276325.913274778
+      },
+      {
+        "irr": 18.822287509072712,
+        "equityMultiple": 2.132482611533613,
+        "npv": 3384140.8324956177
+      },
+      {
+        "irr": 18.045494644691388,
+        "equityMultiple": 2.0642010788115908,
+        "npv": 2992104.818476985
+      },
+      {
+        "irr": 18.78112854062073,
+        "equityMultiple": 2.124149128748739,
+        "npv": 3345876.212001281
+      },
+      {
+        "irr": 20.049938608486,
+        "equityMultiple": 2.242116188841987,
+        "npv": 3995851.571489865
+      },
+      {
+        "irr": 17.670085640926334,
+        "equityMultiple": 2.0379641165653886,
+        "npv": 2880115.864207145
+      },
+      {
+        "irr": 18.620139671562015,
+        "equityMultiple": 2.116509378574875,
+        "npv": 3335622.153507429
+      },
+      {
+        "irr": 20.108083304685362,
+        "equityMultiple": 2.2400392770613338,
+        "npv": 3924161.855695662
+      },
+      {
+        "irr": 18.463929486220803,
+        "equityMultiple": 2.1006317828290686,
+        "npv": 3203645.1662966916
+      },
+      {
+        "irr": 20.053367650773136,
+        "equityMultiple": 2.2345029935553913,
+        "npv": 3886107.5273285676
+      },
+      {
+        "irr": 19.663806123400526,
+        "equityMultiple": 2.2021672674652293,
+        "npv": 3768947.968383668
+      },
+      {
+        "irr": 22.294810121021527,
+        "equityMultiple": 2.429095614087125,
+        "npv": 4817266.847670665
+      },
+      {
+        "irr": 18.93814405225837,
+        "equityMultiple": 2.144532806916583,
+        "npv": 3469785.293222255
+      },
+      {
+        "irr": 20.061487236905798,
+        "equityMultiple": 2.23559656007598,
+        "npv": 3887703.587612655
+      },
+      {
+        "irr": 18.392166775186585,
+        "equityMultiple": 2.0974911815478436,
+        "npv": 3180921.958659769
+      },
+      {
+        "irr": 19.578133670095042,
+        "equityMultiple": 2.1925802744876495,
+        "npv": 3675433.665708852
+      },
+      {
+        "irr": 19.129171052734904,
+        "equityMultiple": 2.1646745696686045,
+        "npv": 3638839.7311800495
+      },
+      {
+        "irr": 19.90614001340432,
+        "equityMultiple": 2.2210602524491465,
+        "npv": 3820316.751031086
+      },
+      {
+        "irr": 20.881743615343993,
+        "equityMultiple": 2.3069897287966796,
+        "npv": 4238528.495507379
+      },
+      {
+        "irr": 22.631626532641317,
+        "equityMultiple": 2.4660703910198505,
+        "npv": 5053406.11763308
+      },
+      {
+        "irr": 19.42018834626782,
+        "equityMultiple": 2.182743141931267,
+        "npv": 3641529.1012113728
+      },
+      {
+        "irr": 18.4369336113504,
+        "equityMultiple": 2.1054000823599788,
+        "npv": 3298950.5231473763
+      },
+      {
+        "irr": 21.170755524113513,
+        "equityMultiple": 2.340136183463663,
+        "npv": 4521337.876788496
+      },
+      {
+        "irr": 19.234496976436457,
+        "equityMultiple": 2.1656798807574136,
+        "npv": 3585824.431565361
+      },
+      {
+        "irr": 19.774190967612235,
+        "equityMultiple": 2.2095818866704864,
+        "npv": 3794357.3778535686
+      },
+      {
+        "irr": 18.23428367223624,
+        "equityMultiple": 2.0820223096054558,
+        "npv": 3117563.1731259767
+      },
+      {
+        "irr": 18.539855803430644,
+        "equityMultiple": 2.101841734834029,
+        "npv": 3184973.4729684554
+      },
+      {
+        "irr": 19.903836721415615,
+        "equityMultiple": 2.2230347667098256,
+        "npv": 3875109.53831694
+      },
+      {
+        "irr": 21.38729475888182,
+        "equityMultiple": 2.353317714618189,
+        "npv": 4496900.356170874
+      },
+      {
+        "irr": 21.92861347249345,
+        "equityMultiple": 2.3963057566261097,
+        "npv": 4663389.067675025
+      },
+      {
+        "irr": 19.28653469590103,
+        "equityMultiple": 2.1736730985825825,
+        "npv": 3590976.326944352
+      },
+      {
+        "irr": 18.086199567445856,
+        "equityMultiple": 2.0763742117773383,
+        "npv": 3166952.5067564677
+      },
+      {
+        "irr": 20.199748415111696,
+        "equityMultiple": 2.250762259320817,
+        "npv": 4001587.764232208
+      },
+      {
+        "irr": 20.49394170117006,
+        "equityMultiple": 2.2705895760305768,
+        "npv": 4011694.274086681
+      },
+      {
+        "irr": 20.12358647919653,
+        "equityMultiple": 2.241804825354675,
+        "npv": 3937748.3224288654
+      },
+      {
+        "irr": 19.226107489057867,
+        "equityMultiple": 2.1730597112277543,
+        "npv": 3703590.660881143
+      },
+      {
+        "irr": 19.159683135060597,
+        "equityMultiple": 2.1536948887892664,
+        "npv": 3402200.714587683
+      },
+      {
+        "irr": 18.364322397533957,
+        "equityMultiple": 2.0910074686968234,
+        "npv": 3119145.555342404
+      },
+      {
+        "irr": 17.66012025798446,
+        "equityMultiple": 2.033953748610295,
+        "npv": 2862605.31731476
+      },
+      {
+        "irr": 19.37777053006953,
+        "equityMultiple": 2.18547492920074,
+        "npv": 3763440.5490339193
+      },
+      {
+        "irr": 18.537530841680873,
+        "equityMultiple": 2.113079866667069,
+        "npv": 3316353.7956325393
+      },
+      {
+        "irr": 19.227336595246918,
+        "equityMultiple": 2.164596801330426,
+        "npv": 3495804.9384981412
+      },
+      {
+        "irr": 18.298040611518648,
+        "equityMultiple": 2.090279489609095,
+        "npv": 3180113.234724587
+      },
+      {
+        "irr": 22.391364440135117,
+        "equityMultiple": 2.4387164189696175,
+        "npv": 4860937.096196387
+      }
+    ],
+    "inputs": {
+      "revenueGrowthRateDelta": {
+        "type": "triangular",
+        "min": -2,
+        "mode": 0,
+        "max": 2
+      },
+      "exitCapRateDelta": {
+        "type": "normal",
+        "mean": 0,
+        "std": 0.35,
+        "clampMin": -0.75,
+        "clampMax": 1.25
+      },
+      "saleCostRateDelta": {
+        "type": "uniform",
+        "min": -0.5,
+        "max": 0.5
+      },
+      "purchasePriceDelta": {
+        "type": "normal",
+        "mean": 0,
+        "std": 2,
+        "clampMin": -7,
+        "clampMax": 7
+      }
+    },
+    "computeTimeMs": 45
+  },
+  "meta": {
+    "generatedAt": "2026-05-13T10:35:19.053Z",
+    "mode": "full",
+    "assumptions": {
+      "holdPeriod": 5,
+      "revenueGrowthRate": 3,
+      "expenseGrowthRate": 2.5,
+      "exitCapRate": 7,
+      "purchasePrice": 8500000,
+      "totalDebt": 0,
+      "hurdleIRR": 12,
+      "discountRate": 10
+    }
+  }
+}

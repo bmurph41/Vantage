@@ -1,0 +1,189 @@
+{
+  "projectId": "9ca92b7d-665b-4fee-ae6b-221cf2b0049d",
+  "irr": 19.61795698730657,
+  "leveredIrr": 19.61795698730657,
+  "unleveredIrr": 19.61795698730657,
+  "npv": 3714140.269237538,
+  "equityMultiple": 2.1976505247058826,
+  "goingInCapRate": 10.517176470588236,
+  "exitCapRate": 7.000000000000001,
+  "cashOnCashReturn": 10.224715294117647,
+  "purchasePrice": 8500000,
+  "equityInvested": 8500000,
+  "holdPeriodYears": 5,
+  "totalDebt": 0,
+  "blendedDebtRate": 0,
+  "years": [
+    {
+      "year": 1,
+      "label": "Year 1",
+      "noi": 893960,
+      "capex": 24859.2,
+      "ncf": 869100.8,
+      "debtService": 0,
+      "leveredCF": 869100.8,
+      "cashOnCash": 10.224715294117647
+    },
+    {
+      "year": 2,
+      "label": "Year 2",
+      "noi": 922523.8,
+      "capex": 25604.98,
+      "ncf": 896918.82,
+      "debtService": 0,
+      "leveredCF": 896918.82,
+      "cashOnCash": 10.551986117647058
+    },
+    {
+      "year": 3,
+      "label": "Year 3",
+      "noi": 951988.13,
+      "capex": 26373.13,
+      "ncf": 925615,
+      "debtService": 0,
+      "leveredCF": 925615,
+      "cashOnCash": 10.889588235294118
+    },
+    {
+      "year": 4,
+      "label": "Year 4",
+      "noi": 982381.13,
+      "capex": 27164.32,
+      "ncf": 955216.81,
+      "debtService": 0,
+      "leveredCF": 955216.81,
+      "cashOnCash": 11.237844823529413
+    },
+    {
+      "year": 5,
+      "label": "Year 5",
+      "noi": 1013731.74,
+      "capex": 27979.25,
+      "ncf": 985752.49,
+      "debtService": 0,
+      "leveredCF": 985752.49,
+      "cashOnCash": 11.597088117647058
+    }
+  ],
+  "exit": {
+    "exitNOI": 1013731.74,
+    "exitCapRate": 7.000000000000001,
+    "exitValue": 14481882,
+    "sellingCosts": 434456.46,
+    "netSaleProceeds": 14047425.54,
+    "debtPayoff": 0,
+    "netToEquity": 14047425.54
+  },
+  "cashFlows": [
+    {
+      "date": "2026-05-13",
+      "amount": -8500000
+    },
+    {
+      "date": "2027-05-13",
+      "amount": 869100.8
+    },
+    {
+      "date": "2028-05-13",
+      "amount": 896918.82
+    },
+    {
+      "date": "2029-05-13",
+      "amount": 925615
+    },
+    {
+      "date": "2030-05-13",
+      "amount": 955216.81
+    },
+    {
+      "date": "2031-05-13",
+      "amount": 15033178.03
+    }
+  ],
+  "sensitivity": {
+    "target": "irr",
+    "rows": [
+      {
+        "exitCapRate": 6,
+        "values": [
+          20.055756288320705,
+          21.34384645019393,
+          22.614122925156753,
+          23.867761688505908,
+          25.105826033043083
+        ]
+      },
+      {
+        "exitCapRate": 6.5,
+        "values": [
+          18.518046405783764,
+          19.788106995158326,
+          21.04063652838785,
+          22.276790488079527,
+          23.497613726590437
+        ]
+      },
+      {
+        "exitCapRate": 7,
+        "values": [
+          17.127777694831433,
+          18.381504403921532,
+          19.61795698730657,
+          20.83827226401981,
+          22.043478282145447
+        ]
+      },
+      {
+        "exitCapRate": 7.5,
+        "values": [
+          15.862261158842394,
+          17.10109058048039,
+          18.322881033203263,
+          19.528752166284267,
+          20.71971664004478
+        ]
+      },
+      {
+        "exitCapRate": 8,
+        "values": [
+          14.703506153297887,
+          15.928669306848061,
+          17.137009916520714,
+          18.329631772936832,
+          19.507533365223185
+        ]
+      }
+    ],
+    "columns": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ]
+  },
+  "leaseIncome": {
+    "hasLeases": false,
+    "leaseCount": 0,
+    "totalBaseRentAnnual": 0,
+    "totalRecoveryAnnual": 0,
+    "totalEGIAnnual": 0,
+    "inPlaceEGIAnnual": 0,
+    "stabilizedEGIAnnual": 0,
+    "weightedAvgEscalationRate": 0,
+    "leaseBreakdown": []
+  },
+  "yearlyLeaseIncome": [],
+  "meta": {
+    "source": "proForma",
+    "generatedAt": "2026-05-13T10:35:14.865Z",
+    "discountRate": 10,
+    "hasDebt": false,
+    "overridesApplied": false,
+    "leaseIncomeInjected": false,
+    "useLeaseIncomeForDcf": null,
+    "revenueGrowthRateUsed": 3,
+    "leaseEscalationRateUsed": null,
+    "acquisitionDate": "2026-05-13"
+  }
+}
