@@ -176,7 +176,7 @@ router.patch('/:id', async (req: AuthenticatedRequest, res: Response) => {
     };
 
     const { rows: [existing] } = await pool.query(
-      `SELECT id, invited_user_ids, title FROM prospecting_time_blocks WHERE id = $1 AND org_id = $2`,
+      `SELECT id, invited_user_ids, title, start_at, end_at FROM prospecting_time_blocks WHERE id = $1 AND org_id = $2`,
       [id, orgId]
     );
     if (!existing) return res.status(404).json({ error: 'Block not found' });
@@ -193,9 +193,13 @@ router.patch('/:id', async (req: AuthenticatedRequest, res: Response) => {
     const VALID_BLOCK_TYPES = [
       'prospecting_call', 'site_tour', 'loi_review', 'team_meeting', 'admin', 'other',
     ];
-    if (startAt !== undefined && endAt !== undefined) {
-      const sMs = new Date(startAt).getTime();
-      const eMs = new Date(endAt).getTime();
+
+    // Validate interval using effective values (incoming or existing row)
+    {
+      const effStart = startAt ?? existing.start_at;
+      const effEnd   = endAt   ?? existing.end_at;
+      const sMs = new Date(effStart).getTime();
+      const eMs = new Date(effEnd).getTime();
       if (isNaN(sMs) || isNaN(eMs) || eMs <= sMs) {
         return res.status(400).json({ error: 'endAt must be after startAt' });
       }

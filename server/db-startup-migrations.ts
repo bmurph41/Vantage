@@ -19938,6 +19938,8 @@ const MIGRATIONS: Migration[] = [
   { name: "prospecting_time_blocks: org_start_idx", sql: `CREATE INDEX IF NOT EXISTS ptb_org_start_idx ON prospecting_time_blocks (org_id, start_at)` },
   { name: "prospecting_time_blocks: org_creator_idx", sql: `CREATE INDEX IF NOT EXISTS ptb_org_creator_idx ON prospecting_time_blocks (org_id, created_by)` },
   { name: "prospecting_time_blocks: block_type_check", sql: `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ptb_block_type_check') THEN ALTER TABLE prospecting_time_blocks ADD CONSTRAINT ptb_block_type_check CHECK (block_type IN ('prospecting_call','site_tour','loi_review','team_meeting','admin','other')); END IF; END $$` },
+  { name: "prospecting_time_blocks: start_at_timestamptz", sql: `ALTER TABLE prospecting_time_blocks ALTER COLUMN start_at TYPE timestamptz USING start_at AT TIME ZONE 'UTC'` },
+  { name: "prospecting_time_blocks: end_at_timestamptz", sql: `ALTER TABLE prospecting_time_blocks ALTER COLUMN end_at TYPE timestamptz USING end_at AT TIME ZONE 'UTC'` },
 ];
 
 /**
