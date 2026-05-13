@@ -977,6 +977,36 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
       });
     });
 
+    // Append Key Metrics section (Exit Value, IRR, Equity Multiple) if available
+    const numDataCols = (showHistorical ? priorPeriods.length : 0) + (baselinePeriod ? 1 : 0) + years.length + 1; // +1 for CAGR
+    const csvCell = (v: string) => (v.includes(',') || v.includes('"') || v.includes('\n')) ? `"${v.replace(/"/g, '""')}"` : v;
+    const buildMetricRow = (category: string, label: string, lastYearValue: string) => {
+      const row = [csvCell(category), csvCell(label)];
+      for (let i = 0; i < numDataCols; i++) {
+        row.push(csvCell(i === numDataCols - 2 ? lastYearValue : '—')); // numDataCols-2 = last year col (before CAGR)
+      }
+      return row.join(',');
+    };
+
+    const exitVal = proFormaData?.metrics?.exitValue;
+    const irrVal = proFormaData?.metrics?.irr;
+    const emVal = proFormaData?.metrics?.equityMultiple;
+
+    const hasKeyMetrics = (exitVal != null && exitVal > 0) || (irrVal != null && isFinite(irrVal) && irrVal !== 0) || (emVal != null && emVal > 0);
+    if (hasKeyMetrics) {
+      csvRows.push(['Key Metrics', '', ...Array(numDataCols).fill('')].join(','));
+      if (exitVal != null && exitVal > 0) {
+        const formatted = `$${exitVal.toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
+        csvRows.push(buildMetricRow('Key Metrics', 'Exit Value', formatted));
+      }
+      if (irrVal != null && isFinite(irrVal) && irrVal !== 0) {
+        csvRows.push(buildMetricRow('Key Metrics', 'IRR', `${(irrVal * 100).toFixed(2)}%`));
+      }
+      if (emVal != null && emVal > 0) {
+        csvRows.push(buildMetricRow('Key Metrics', 'Equity Multiple', `${emVal.toFixed(2)}x`));
+      }
+    }
+
     const csvContent = csvRows.join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
