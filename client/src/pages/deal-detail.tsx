@@ -21,6 +21,7 @@ import { format } from "date-fns";
 import {
   CrmRecordPage, RecordFieldGroup, RecordField, AssociationCard, AssociationRow,
 } from "@/components/crm/CrmRecordPage";
+import { DealIcTab } from "@/components/crm/DealIcTab";
 import ConvertToProjectModal from "@/components/modals/convert-to-project-modal";
 import DocumentGeneratorModal from "@/components/modals/document-generator-modal";
 import { ComposeEmailModal } from "@/components/email/compose-email-modal";
@@ -1092,6 +1093,11 @@ export default function DealDetail() {
             value: 'phase-gates',
             label: 'Approvals',
             content: <PhaseGatesPanel dealId={dealId} />,
+          },
+          {
+            value: 'ic',
+            label: 'IC',
+            content: <DealIcTab dealId={dealId} />,
           },
           {
             value: 'discussion',

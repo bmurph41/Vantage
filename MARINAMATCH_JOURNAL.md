@@ -1,5 +1,63 @@
 # MarinaMatch Platform Journal
 
+## ✅ IC tab on deal record — Track 1(d) shipped (2026-05-13)
+
+Surfaced the existing 14-endpoint Investment Committee backend (`server/routes/ic-routes.ts`, mounted at `/api/ic`) as a new "IC" tab on the deal record page. Frontend wiring only — no backend changes. Per the Deal Workspace audit memory (2026-05-07): `ic-routes.ts` and `icMemos` schema with voting workflow have existed for some time; the deal-detail.tsx 13-tab CrmRecordPage shell had no IC entry.
+
+### Files in this commit
+
+- `client/src/components/crm/DealIcTab.tsx` (new, ~530 lines) — list view of memos + detail view with votes + comments + create-memo dialog. Resolves the deal's first linked modeling project via `/api/modeling/projects` filter (same pattern as `DealModelsTab`), since `ic_memos.modeling_project_id` is the FK
+- `client/src/pages/deal-detail.tsx` — 2-line addition: import + new tab entry between "Approvals" and "Discussion" (`value: 'ic', label: 'IC'`)
+
+### What the tab covers
+
+| IC endpoint | Tab surfaces |
+|---|---|
+| `GET /api/ic/memos?projectId=...` | Memo list (cards with title, memo number, status badge, dates) |
+| `POST /api/ic/memos` | "New Memo" dialog (title + executive summary minimum) |
+| `GET /api/ic/memos/:id` | Memo detail view (includes inline votes + comments arrays) |
+| `POST /api/ic/memos/:id/submit` | "Submit for review" button (gated on draft / revision_requested status) |
+| `POST /api/ic/memos/:id/votes` | Cast vote: approve / conditional_approve / reject / abstain + optional note |
+| `POST /api/ic/memos/:id/comments` | Add comment textarea |
+
+### What is intentionally NOT in this commit (filed for follow-up)
+
+- Committee member management UI (`GET/POST/PATCH/DELETE /members` not surfaced — admin-tier setup work, separate from per-deal IC flow)
+- Memo PATCH (editing the structured sections: investmentThesis / marketOverview / propertyDescription / financialSummary / riskFactors / mitigationStrategies / recommendation / conditions). Today's dialog only captures title + executiveSummary; deeper editing routes to Document Studio
+- Conditional-approval `conditions[]` capture as a structured field (vote `comments` field is one-line text only)
+- Memo PDF generation (Document Studio handles this — IC tab links to that surface in a future pass)
+- Comment resolution (`PATCH /api/ic/comments/:id/resolve` not yet wired)
+- Empty-state CTA to "Create modeling project" when deal has no linked FM yet (placeholder text only; user must use the existing Convert-to-DD flow)
+
+### Verification
+
+- `tsc -p shared` clean (unchanged from G4 Phase 2)
+- Per-file tsc on `DealIcTab.tsx` clean (0 errors)
+- `deal-detail.tsx` diff is +6 lines; pre-existing tsc errors in the file are unrelated to my edits
+- No server restart needed (client-side only)
+- Smoke-tested all 4 lifecycle endpoints with CSRF token against test project `6b3a9021`:
+  - GET `/api/ic/members` → 200
+  - GET `/api/ic/memos?projectId=...` → 200, `[]`
+  - POST `/api/ic/memos` → 201, memo `IC-2026-001` created in `draft` status
+  - POST `/api/ic/memos/:id/submit` → 200, status `pending_review` + `submittedAt` stamped
+  - GET `/api/ic/memos/:id` → 200, returns memo + votes[] + comments[] aggregated
+  - POST `/api/ic/memos/:id/comments` → 201, comment row created
+  - Cleaned up test memo + comment via raw SQL after smoke
+
+### Gotchas
+
+- **IC memos are keyed by `modelingProjectId`, not `dealId`**. The tab resolves the first linked modeling project via the same filter `DealModelsTab` uses (`/api/modeling/projects` then `p.dealId === current`). If a deal has multiple linked projects (rare), today's tab uses the first match. For deals with no linked FM, the tab shows a clean empty state pointing to the Convert-to-DD flow
+- **POST routes are CSRF-protected**. The smoke harness had to prime a `csrf_token` cookie via GET `/api/auth/me` and echo it back in `x-csrf-token`. Real browsers handle this automatically; relevant only for backend smoke scripts
+- **Comments endpoint accepts `body` or `content`**. Smoke sent both for safety; checked legacy compat by inspection. Verify the canonical field-name choice in a future cleanup pass
+
+### Next session
+
+- Track 1(a): Document Studio asset-class drift cleanup (~4-6h)
+- Track 1(b): Document Studio token resolver gap closure (~3-5h)
+- Track 1(c): LP statement / K-1 PDF output (~3-5h)
+
+---
+
 ## ✅ G4 Phase 2 backbone — Consolidated multi-period P&L UI shipped (2026-05-13)
 
 Phase 1 of G4 wrapped 2026-05-07 with a working backend (`getConsolidatedPnL` + `applyAdjustments` + 12-CTE single-roundtrip query). Phase 2 closes the first user-visible surface for the gap: a new "Consolidated" view mode on the Historical P&L tab that shows multiple years side-by-side with addback-adjusted line items, an NOI rollup row, a master adjustment toggle, an Apply-to-Pro-Forma button, and warning banners for unmatched addbacks and projected months.
