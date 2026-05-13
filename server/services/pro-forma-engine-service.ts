@@ -1289,8 +1289,15 @@ export class ProFormaEngineService {
     }
     const totalLeveredDistributions = totalLeveredDistD.toNumber();
 
-    const leveredXirrResult = calculateXIRR(leveredDatedCashFlows, 0.1);
-    const annualizedIrr = new Decimal(leveredXirrResult).times(10000).round().dividedBy(100).toNumber();
+    // Guard: skip XIRR when there is no equity invested (e.g. no purchase price set) to avoid
+    // NaN/Infinity propagating into metrics.irr.  calculateXIRR already returns 0 when it does
+    // not converge, but an initial cash-flow of exactly 0 can cause unpredictable results in some
+    // XIRR implementations, so we short-circuit here and let metrics.irr stay 0.
+    const leveredXirrResult = totalEquityInvestedD.gt(0)
+      ? calculateXIRR(leveredDatedCashFlows, 0.1)
+      : 0;
+    const rawIrr = new Decimal(leveredXirrResult).times(10000).round().dividedBy(100).toNumber();
+    const annualizedIrr = Number.isFinite(rawIrr) ? rawIrr : 0;
 
     // Levered equity multiple
     const equityMultiple = totalEquityInvestedD.gt(0) ? totalLeveredDistD.dividedBy(totalEquityInvestedD).toNumber() : 0;
@@ -1316,8 +1323,11 @@ export class ProFormaEngineService {
     }
     const totalUnleveredDistributions = totalUnleveredDistD.toNumber();
 
-    const unleveredXirrResult = calculateXIRR(unleveredDatedCashFlows, 0.1);
-    const unleveredIrr = new Decimal(unleveredXirrResult).times(10000).round().dividedBy(100).toNumber();
+    const unleveredXirrResult = totalUnleveredInvestmentD.gt(0)
+      ? calculateXIRR(unleveredDatedCashFlows, 0.1)
+      : 0;
+    const rawUnleveredIrr = new Decimal(unleveredXirrResult).times(10000).round().dividedBy(100).toNumber();
+    const unleveredIrr = Number.isFinite(rawUnleveredIrr) ? rawUnleveredIrr : 0;
 
     // Unlevered equity multiple
     const unleveredEquityMultiple = totalUnleveredInvestmentD.gt(0) ? totalUnleveredDistD.dividedBy(totalUnleveredInvestmentD).toNumber() : 0;

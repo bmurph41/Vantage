@@ -2413,22 +2413,25 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                       color: 'text-teal-600 dark:text-teal-400',
                     }] : []),
                     ...(() => {
-                      const pp = Number((project as Record<string, unknown>)?.purchasePrice)
-                        || Number((assumptions?.exitAssumptions as Record<string, number> | undefined)?.['purchasePrice'])
-                        || 0;
-                      return pp && pp > 0 ? [{
-                        label: 'Going-In Cap',
-                        getValue: (i: number) => {
-                          if (i !== 0) return '—';
+                      const goingInCap = proFormaData?.metrics?.goingInCapRate
+                        ?? ((() => {
+                          const pp = Number((project as Record<string, unknown>)?.purchasePrice)
+                            || Number((assumptions?.exitAssumptions as Record<string, number> | undefined)?.['purchasePrice'])
+                            || 0;
+                          if (pp <= 0) return null;
                           const noi = calculateYearSummary(0).noi;
-                          return formatPercent((noi / pp) * 100, { dash: true });
-                        },
+                          return (noi / pp) * 100;
+                        })());
+                      return goingInCap != null && goingInCap > 0 ? [{
+                        label: 'Going-In Cap',
+                        getValue: (i: number) => i === 0 ? formatPercent(goingInCap, { dash: true }) : '—',
                         color: 'text-sky-600 dark:text-sky-400',
                       }] : [];
                     })(),
                     ...(() => {
-                      const exitRate = (assumptions?.exitAssumptions as Record<string, number> | undefined)?.['exitCapRate'];
-                      return exitRate && exitRate > 0 ? [{
+                      const exitRate = proFormaData?.metrics?.exitCapRate
+                        ?? (assumptions?.exitAssumptions as Record<string, number> | undefined)?.['exitCapRate'];
+                      return exitRate != null && exitRate > 0 ? [{
                         label: 'Exit Cap Rate',
                         getValue: (i: number) => {
                           return i === years.length - 1 ? formatPercent(exitRate, { dash: true }) : '—';
