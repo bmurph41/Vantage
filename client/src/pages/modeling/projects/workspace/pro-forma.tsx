@@ -2436,6 +2436,36 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                         color: 'text-indigo-600 dark:text-indigo-400',
                       }] : [];
                     })(),
+                    ...(() => {
+                      const exitVal = (proFormaData?.metrics as Record<string, number> | undefined)?.exitValue;
+                      return exitVal && exitVal > 0 ? [{
+                        label: 'Exit Value',
+                        getValue: (i: number) => {
+                          return i === years.length - 1 ? formatCurrency(exitVal, { dash: true }) : '—';
+                        },
+                        color: 'text-violet-600 dark:text-violet-400',
+                      }] : [];
+                    })(),
+                    ...(() => {
+                      const irrVal = (proFormaData?.metrics as Record<string, number> | undefined)?.irr;
+                      return irrVal && irrVal !== 0 ? [{
+                        label: 'IRR',
+                        getValue: (i: number) => {
+                          return i === years.length - 1 ? formatPercent(irrVal, { dash: true }) : '—';
+                        },
+                        color: 'text-emerald-600 dark:text-emerald-400',
+                      }] : [];
+                    })(),
+                    ...(() => {
+                      const emVal = (proFormaData?.metrics as Record<string, number> | undefined)?.equityMultiple;
+                      return emVal && emVal > 0 ? [{
+                        label: 'Equity Multiple',
+                        getValue: (i: number) => {
+                          return i === years.length - 1 ? `${emVal.toFixed(2)}x` : '—';
+                        },
+                        color: 'text-amber-600 dark:text-amber-400',
+                      }] : [];
+                    })(),
                   ];
                   return (
                     <>
