@@ -23,6 +23,11 @@ import {
   Trash2,
   ExternalLink,
   Clock,
+  Phone,
+  Users,
+  Mail,
+  MapPin,
+  Activity,
 } from "lucide-react";
 import { ProspectingNav } from "./ProspectingNav";
 import {
@@ -33,6 +38,7 @@ import {
   BLOCK_TYPES,
   DEFAULT_COLORS,
   typeColor,
+  crmActivityColor,
   blockHeight,
   HOUR_HEIGHT,
   DAY_START_HOUR,
@@ -536,7 +542,7 @@ export default function Schedule() {
     },
   });
 
-  const { data: crmActivitiesPage } = useQuery<{ data: CrmActivityItem[] }>({
+  const { data: crmActivitiesPage, isLoading: isCrmLoading } = useQuery<{ data: CrmActivityItem[] }>({
     queryKey: ["/api/crm/activities", rangeStart.toISOString(), rangeEnd.toISOString()],
     queryFn: async () => {
       const res = await fetch(
@@ -867,19 +873,42 @@ export default function Schedule() {
 
       {/* Mobile list fallback (screens < md) */}
       <div className="md:hidden flex-1 overflow-auto space-y-2">
-        {isLoading
+        {isLoading || isCrmLoading
           ? [0, 1, 2].map((i) => <div key={i} className="h-14 rounded border"><div className="h-full w-full animate-pulse bg-muted" /></div>)
-          : blocks.length === 0
-            ? <p className="text-sm text-muted-foreground text-center pt-8">No time blocks for this period.</p>
-            : [...blocks]
-                .sort((a, b) => new Date(a.start_at).getTime() - new Date(b.start_at).getTime())
-                .map((b) => {
+          : (() => {
+              const crmIcon = (type: string) => {
+                switch (type) {
+                  case "call": return <Phone className="w-4 h-4 shrink-0" />;
+                  case "meeting": return <Users className="w-4 h-4 shrink-0" />;
+                  case "email": return <Mail className="w-4 h-4 shrink-0" />;
+                  case "tour":
+                  case "site_tour": return <MapPin className="w-4 h-4 shrink-0" />;
+                  default: return <Activity className="w-4 h-4 shrink-0" />;
+                }
+              };
+
+              type ListItem =
+                | { kind: "block"; sortTime: number; data: TimeBlock }
+                | { kind: "crm"; sortTime: number; data: CrmActivityItem };
+
+              const merged: ListItem[] = [
+                ...blocks.map((b): ListItem => ({ kind: "block", sortTime: new Date(b.start_at).getTime(), data: b })),
+                ...crmActivities.map((a): ListItem => ({ kind: "crm", sortTime: new Date(a.scheduledAt).getTime(), data: a })),
+              ].sort((a, b) => a.sortTime - b.sortTime);
+
+              if (merged.length === 0) {
+                return <p className="text-sm text-muted-foreground text-center pt-8">No items for this period.</p>;
+              }
+
+              return merged.map((item) => {
+                if (item.kind === "block") {
+                  const b = item.data;
                   const color = typeColor(b.block_type, b.color);
                   return (
                     <div
-                      key={b.id}
-                      className="flex items-center gap-3 p-3 rounded border border-l-4 cursor-pointer hover:bg-muted/30"
-                      style={{ borderLeftColor: color }}
+                      key={`block-${b.id}`}
+                      className="flex items-center gap-3 p-3 rounded border cursor-pointer hover:bg-muted/30"
+                      style={{ borderLeftWidth: 4, borderLeftColor: color }}
                       onClick={() => openEdit(b)}
                     >
                       <div className="flex-1 min-w-0">
@@ -891,7 +920,29 @@ export default function Schedule() {
                       {b.synced_to_calendar && <Calendar className="w-4 h-4 shrink-0" style={{ color }} />}
                     </div>
                   );
-                })
+                } else {
+                  const a = item.data;
+                  const color = crmActivityColor(a.type);
+                  return (
+                    <div
+                      key={`crm-${a.id}`}
+                      className="flex items-center gap-3 p-3 rounded border cursor-pointer hover:bg-muted/30"
+                      style={{ borderLeftWidth: 4, borderLeftStyle: "dashed", borderLeftColor: color }}
+                      onClick={() => handleCrmActivityClick(a)}
+                    >
+                      <span style={{ color }}>{crmIcon(a.type)}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{a.subject}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {format(parseISO(a.scheduledAt), "EEE MMM d · h:mm a")}
+                          {a.duration ? ` · ${a.duration}m` : ""}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                }
+              });
+            })()
         }
       </div>
 

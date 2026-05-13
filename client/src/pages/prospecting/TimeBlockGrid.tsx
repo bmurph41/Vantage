@@ -103,7 +103,7 @@ const CRM_ACTIVITY_COLORS: Record<string, string> = {
   task:    "#64748b",
 };
 
-function crmActivityColor(type: string) {
+export function crmActivityColor(type: string) {
   return CRM_ACTIVITY_COLORS[type] ?? "#64748b";
 }
 
