@@ -1,3 +1,8 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /internal/
+
 User-agent: GPTBot
 Disallow: /
 
@@ -27,6 +32,3 @@ Disallow: /
 
 User-agent: cohere-ai
 Disallow: /
-
-User-agent: *
-Disallow: /api/

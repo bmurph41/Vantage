@@ -47,8 +47,10 @@ export function configureEnhancedSecurityHeaders(app: Express) {
     // Prevent MIME-type sniffing
     res.setHeader('X-Content-Type-Options', 'nosniff');
 
-    // Prevent search engine indexing of API and internal pages
-    res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+    // Prevent search engine indexing of API and internal routes only
+    if (req.path.startsWith('/api/') || req.path.startsWith('/internal/')) {
+      res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+    }
 
     // Prevent framing (clickjacking protection)
     res.setHeader('X-Frame-Options', 'DENY');
