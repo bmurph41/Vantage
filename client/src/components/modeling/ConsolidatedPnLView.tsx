@@ -25,6 +25,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { formatCurrency } from '@/lib/utils';
 import { useConsolidatedPnL, useApplyAdjustments } from '@/hooks/useConsolidatedPnL';
 import type {
@@ -32,6 +33,8 @@ import type {
   ConsolidatedLineItem,
   ConsolidatedPnLOptions,
   ConsolidatedPnLResponse,
+  MissingPeriodReport,
+  ProjectionSource,
   YearColumn,
   YearRangeMode,
 } from '@shared/types/consolidated-pnl';
@@ -60,11 +63,70 @@ function sortLines(items: ConsolidatedLineItem[]): ConsolidatedLineItem[] {
   });
 }
 
-function YearHeader({ year }: { year: YearColumn }) {
+const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;
+
+function formatSource(source: ProjectionSource): string {
+  switch (source) {
+    case 'auto:prior_year_yoy': return 'Prior-year YoY';
+    case 'auto:trailing_3mo':   return 'Trailing 3-month';
+    case 'gap':                 return 'Gap (no projection)';
+  }
+}
+
+interface YearProjectionInfo {
+  report: MissingPeriodReport;
+  methods: Array<{ source: ProjectionSource; months: number[] }>;
+}
+
+function YearHeader({
+  year,
+  projectionInfo,
+}: {
+  year: YearColumn;
+  projectionInfo?: YearProjectionInfo;
+}) {
+  const hasProjections = !!projectionInfo && projectionInfo.report.missingMonths.length > 0;
   return (
     <th className="px-3 py-2 text-right font-semibold text-foreground whitespace-nowrap" data-testid={`year-header-${year.year}`}>
       <div className="flex flex-col items-end gap-1">
-        <span className="text-sm">{year.year}</span>
+        <span className="text-sm">
+          {year.year}
+          {hasProjections && projectionInfo && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span
+                    className="ml-0.5 text-amber-600 cursor-help"
+                    data-testid={`projection-indicator-${year.year}`}
+                    aria-label={`${projectionInfo.report.missingMonths.length} of 12 months projected`}
+                  >
+                    *
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs">
+                  <div className="text-xs space-y-1">
+                    <div className="font-semibold">
+                      {projectionInfo.report.missingMonths.length} of 12 months projected
+                    </div>
+                    <div className="text-muted-foreground">
+                      Handling: {projectionInfo.report.handling}
+                    </div>
+                    {projectionInfo.methods.length > 0 && (
+                      <div className="pt-1 mt-1 border-t border-border space-y-0.5">
+                        {projectionInfo.methods.map((b) => (
+                          <div key={b.source}>
+                            <span className="font-medium">{formatSource(b.source)}:</span>{' '}
+                            {b.months.map((m) => MONTH_NAMES[m - 1]).join(', ')}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
+        </span>
         <div className="flex items-center gap-1.5 text-[10px] font-normal text-muted-foreground">
           {year.periodType === 'year' ? (
             <Badge variant="outline" className="h-4 px-1 text-[10px]">Annual</Badge>
@@ -116,6 +178,30 @@ export function ConsolidatedPnLView({ projectId, onNavigateToInputs }: Props) {
     );
   }, [data]);
 
+  const projectionByYear = useMemo<Map<number, YearProjectionInfo>>(() => {
+    const m = new Map<number, YearProjectionInfo>();
+    if (!data) return m;
+    for (const report of data.missingPeriods) {
+      m.set(report.year, { report, methods: [] });
+    }
+    for (const cell of data.projectedCells) {
+      const info = m.get(cell.year);
+      if (!info) continue;
+      let bucket = info.methods.find((b) => b.source === cell.source);
+      if (!bucket) {
+        bucket = { source: cell.source, months: [] };
+        info.methods.push(bucket);
+      }
+      bucket.months.push(cell.month);
+    }
+    m.forEach((info) => {
+      info.methods.forEach((b) => {
+        b.months.sort((x: number, y: number) => x - y);
+      });
+    });
+    return m;
+  }, [data]);
+
   if (isLoading) {
     return (
       <div className="space-y-3" data-testid="consolidated-pnl-loading">
@@ -161,6 +247,7 @@ export function ConsolidatedPnLView({ projectId, onNavigateToInputs }: Props) {
     apply,
     pendingMaster,
     projectedSet,
+    projectionByYear,
     isFetching,
   });
 }
@@ -175,6 +262,7 @@ interface RenderArgs {
   apply: ReturnType<typeof useApplyAdjustments>;
   pendingMaster: AdjustmentMasterState | null;
   projectedSet: Set<ProjectedKey>;
+  projectionByYear: Map<number, YearProjectionInfo>;
   isFetching: boolean;
 }
 
@@ -182,7 +270,7 @@ function renderView(args: RenderArgs) {
   const {
     data, yearRange, setYearRange,
     effectiveMaster, setPendingMaster, dirty, apply, pendingMaster,
-    projectedSet, isFetching,
+    projectedSet, projectionByYear, isFetching,
   } = args;
 
   const lines = sortLines(data.lineItems);
@@ -319,7 +407,13 @@ function renderView(args: RenderArgs) {
                 <tr>
                   <th className="px-3 py-2 text-left font-semibold text-foreground">Line item</th>
                   <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">Category</th>
-                  {data.years.map((y) => <YearHeader key={y.year} year={y} />)}
+                  {data.years.map((y) => (
+                    <YearHeader
+                      key={y.year}
+                      year={y}
+                      projectionInfo={projectionByYear.get(y.year)}
+                    />
+                  ))}
                   {data.years.length > 1 && (
                     <th className="px-3 py-2 text-right font-semibold text-foreground whitespace-nowrap">
                       Δ {data.years[0]?.year} → {data.years[data.years.length - 1]?.year}
