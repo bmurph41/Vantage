@@ -55,7 +55,9 @@ export type CrmActivityItem = {
   duration?: number | null;
   entityType?: string | null;
   entityId?: string | null;
+  entityName?: string | null;
   status?: string | null;
+  notes?: string | null;
 };
 
 export const BLOCK_TYPES = [

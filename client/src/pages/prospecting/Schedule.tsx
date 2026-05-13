@@ -508,6 +508,127 @@ function BlockDrawer({
   );
 }
 
+// ── CRM Activity Detail Panel ─────────────────────────────────────────────────
+
+const CRM_TYPE_ICONS: Record<string, React.ReactNode> = {
+  call:     <Phone className="w-4 h-4" />,
+  meeting:  <Users className="w-4 h-4" />,
+  email:    <Mail className="w-4 h-4" />,
+  tour:     <MapPin className="w-4 h-4" />,
+  site_tour:<MapPin className="w-4 h-4" />,
+  task:     <Activity className="w-4 h-4" />,
+};
+
+function crmTypeLabel(type: string) {
+  return type.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function crmRecordLabel(entityType?: string | null) {
+  if (!entityType) return "CRM Record";
+  return entityType.replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function CrmActivityDetailPanel({
+  activity,
+  onClose,
+  onViewRecord,
+}: {
+  activity: CrmActivityItem | null;
+  onClose: () => void;
+  onViewRecord: (a: CrmActivityItem) => void;
+}) {
+  if (!activity) return null;
+
+  const scheduledDate = activity.scheduledAt ? parseISO(activity.scheduledAt) : null;
+  const durationMins = activity.duration ?? null;
+
+  function formatDuration(mins: number | null): string {
+    if (mins === null) return "—";
+    if (mins >= 60) {
+      const h = Math.floor(mins / 60);
+      const m = mins % 60;
+      return m > 0 ? `${h}h ${m}m` : `${h}h`;
+    }
+    return `${mins}m`;
+  }
+
+  return (
+    <Sheet open={!!activity} onOpenChange={(o) => !o && onClose()}>
+      <SheetContent className="w-[380px] sm:w-[440px] overflow-y-auto">
+        <SheetHeader className="pb-4">
+          <div className="flex items-center gap-2">
+            {CRM_TYPE_ICONS[activity.type] ?? <Activity className="w-4 h-4" />}
+            <SheetTitle className="text-base">{activity.subject}</SheetTitle>
+          </div>
+        </SheetHeader>
+
+        <div className="space-y-4">
+          {/* Type */}
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">Type</span>
+            <span className="font-medium capitalize">{crmTypeLabel(activity.type)}</span>
+          </div>
+
+          {/* Scheduled time */}
+          {scheduledDate && (
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground flex items-center gap-1">
+                <Clock className="w-3.5 h-3.5" />
+                Scheduled
+              </span>
+              <span className="font-medium">{format(scheduledDate, "MMM d, yyyy 'at' h:mm a")}</span>
+            </div>
+          )}
+
+          {/* Duration */}
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">Duration</span>
+            <span className="font-medium">{formatDuration(durationMins)}</span>
+          </div>
+
+          {/* Status */}
+          {activity.status && (
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">Status</span>
+              <span className="font-medium capitalize">{activity.status.replace(/_/g, " ")}</span>
+            </div>
+          )}
+
+          {/* Entity */}
+          {activity.entityName && (
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">{crmRecordLabel(activity.entityType)}</span>
+              <span className="font-medium">{activity.entityName}</span>
+            </div>
+          )}
+
+          {/* Notes */}
+          {activity.notes && (
+            <div className="space-y-1.5">
+              <p className="text-sm text-muted-foreground">Notes</p>
+              <div className="rounded-md border bg-muted/30 px-3 py-2.5 text-sm whitespace-pre-wrap">
+                {activity.notes}
+              </div>
+            </div>
+          )}
+
+          {/* View CRM Record button */}
+          <div className="pt-2">
+            <Button
+              className="w-full"
+              variant="outline"
+              onClick={() => onViewRecord(activity)}
+            >
+              <ExternalLink className="w-4 h-4 mr-2" />
+              View {crmRecordLabel(activity.entityType)}
+            </Button>
+          </div>
+        </div>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
 // ── Main Schedule Page ────────────────────────────────────────────────────────
 
 export default function Schedule() {
@@ -521,6 +642,7 @@ export default function Schedule() {
   );
   const [selectedDay, setSelectedDay] = useState<Date>(new Date());
   const [drawer, setDrawer] = useState<DrawerState>({ open: false, mode: "create" });
+  const [crmDetailActivity, setCrmDetailActivity] = useState<CrmActivityItem | null>(null);
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
   const [resizeHeights, setResizeHeights] = useState<Record<string, number>>({});
   const resizeRef = useRef<{ blockId: string; startY: number; origEndAtMs: number; origHeight: number } | null>(null);
@@ -558,7 +680,11 @@ export default function Schedule() {
   );
 
   const handleCrmActivityClick = useCallback((activity: CrmActivityItem) => {
-    if (!activity.entityId) return;
+    setCrmDetailActivity(activity);
+  }, []);
+
+  const navigateToCrmRecord = useCallback((activity: CrmActivityItem) => {
+    if (!activity.entityId) { navigate(`/crm/activities`); return; }
     switch (activity.entityType) {
       case "contact": navigate(`/crm/contacts/${activity.entityId}`); break;
       case "deal":    navigate(`/crm/deals/${activity.entityId}`); break;
@@ -993,6 +1119,13 @@ export default function Schedule() {
           onDelete={(id, scope) => deleteMutation.mutate({ id, scope })}
         />
       )}
+
+      {/* CRM Activity Detail Panel */}
+      <CrmActivityDetailPanel
+        activity={crmDetailActivity}
+        onClose={() => setCrmDetailActivity(null)}
+        onViewRecord={(a) => { setCrmDetailActivity(null); navigateToCrmRecord(a); }}
+      />
     </div>
   );
 }
