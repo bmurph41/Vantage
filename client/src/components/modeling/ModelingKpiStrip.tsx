@@ -3,11 +3,30 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import { queryClient, apiRequest } from '@/lib/queryClient';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Info, ChevronDown, ChevronUp, Settings2, RotateCcw, ArrowUp, ArrowDown } from 'lucide-react';
+import { Info, ChevronDown, ChevronUp, Settings2, RotateCcw, ArrowUp, ArrowDown, GripVertical } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatCurrency, formatPercent } from '@/lib/utils';
 import { getKpisForAssetClass, MODELING_KPI_REGISTRY, type ModelingKpiDef, type KpiAnnualRow } from '@shared/modeling-kpi-registry';
 import type { ProFormaData } from '@/types/modeling';
+import {
+  DndContext,
+  DragOverlay,
+  PointerSensor,
+  KeyboardSensor,
+  useSensor,
+  useSensors,
+  closestCenter,
+  type DragEndEvent,
+  type DragStartEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  horizontalListSortingStrategy,
+  arrayMove,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 interface ModelingKpiStripProps {
   proFormaData?: ProFormaData | null;
@@ -107,6 +126,103 @@ function computeKpiValues(
   return { primary, baselineVal, stabilizedVal, sparkValues, displayValue, valueColor, showBaselineStab };
 }
 
+// ─── KPI Card content (shared between sortable card and drag overlay) ──────────
+
+interface KpiCardContentProps {
+  kpi: ModelingKpiDef;
+  primary: number | null;
+  baselineVal: number | null;
+  stabilizedVal: number | null;
+  sparkValues: (number | null)[];
+  valueColor: string;
+  showBaselineStab: boolean;
+  isDragOverlay?: boolean;
+}
+
+function KpiCardContent({
+  kpi,
+  primary,
+  baselineVal,
+  stabilizedVal,
+  sparkValues,
+  valueColor,
+  showBaselineStab,
+  isDragOverlay,
+}: KpiCardContentProps) {
+  return (
+    <div className={cn('px-4 py-3', isDragOverlay && 'shadow-lg border rounded-lg bg-card min-w-[120px]')}>
+      <div className="flex items-center gap-1 mb-1">
+        <GripVertical className="h-3 w-3 text-muted-foreground/30 shrink-0 -ml-1" aria-hidden />
+        <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider leading-none">
+          {kpi.label}
+        </p>
+        {kpi.tooltip && !isDragOverlay && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Info className="h-2.5 w-2.5 text-muted-foreground/50 cursor-help shrink-0" />
+            </TooltipTrigger>
+            <TooltipContent side="top" className="text-xs max-w-[200px]">
+              {kpi.tooltip}
+            </TooltipContent>
+          </Tooltip>
+        )}
+      </div>
+
+      {showBaselineStab ? (
+        <div className="flex items-end justify-between gap-2">
+          <div>
+            <p className={cn('text-base font-bold tabular-nums leading-tight', valueColor)}>
+              {formatKpiValue(baselineVal, kpi.format)}
+            </p>
+            <p className="text-[10px] text-muted-foreground leading-none mt-0.5">
+              Yr1 &nbsp;→&nbsp;
+              <span className={cn('font-medium', valueColor)}>
+                {stabilizedVal !== null ? formatKpiValue(stabilizedVal, kpi.format) : '—'}
+              </span>
+              {' '}stab
+            </p>
+          </div>
+          <Sparkline values={sparkValues} colorClass={valueColor} />
+        </div>
+      ) : (
+        <p className={cn('text-base font-bold tabular-nums leading-tight', valueColor)}>
+          {formatKpiValue(primary, kpi.format)}
+        </p>
+      )}
+    </div>
+  );
+}
+
+// ─── Sortable KPI Card ─────────────────────────────────────────────────────────
+
+interface SortableKpiCardProps extends KpiCardContentProps {
+  isBeingDragged: boolean;
+}
+
+function SortableKpiCard({ isBeingDragged, ...contentProps }: SortableKpiCardProps) {
+  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: contentProps.kpi.key });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      {...listeners}
+      className={cn(
+        'flex-1 min-w-[120px] cursor-grab active:cursor-grabbing touch-none select-none',
+        isBeingDragged && 'opacity-40',
+      )}
+    >
+      <KpiCardContent {...contentProps} />
+    </div>
+  );
+}
+
 // ─── Settings Popover ─────────────────────────────────────────────────────────
 
 interface KpiSettingsPopoverProps {
@@ -163,7 +279,7 @@ function KpiSettingsPopover({
           {effectiveOrderedKeys.length > 0 ? (
             <>
               <p className="px-2 pt-1.5 pb-0.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-                Pinned · use arrows to reorder
+                Pinned · drag cards on strip or use arrows to reorder
               </p>
               {effectiveOrderedKeys.map((key, idx) => {
                 const kpi = MODELING_KPI_REGISTRY[key];
@@ -297,6 +413,7 @@ export function ModelingKpiStrip({ proFormaData, assetClass, className, projectI
 
   const [localOrderedKeys, setLocalOrderedKeys] = useState<string[] | null>(null);
   const [popoverOpen, setPopoverOpen] = useState(false);
+  const [activeDragId, setActiveDragId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!popoverOpen) {
@@ -342,6 +459,33 @@ export function ModelingKpiStrip({ proFormaData, assetClass, className, projectI
     }
     setPopoverOpen(open);
   }, [localOrderedKeys, projectId, saveMutation]);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  const handleDragStart = useCallback((event: DragStartEvent) => {
+    setActiveDragId(String(event.active.id));
+  }, []);
+
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
+    setActiveDragId(null);
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    setLocalOrderedKeys((prev) => {
+      const base = prev ?? [...defaultOrderedKeys];
+      const oldIndex = base.indexOf(String(active.id));
+      const newIndex = base.indexOf(String(over.id));
+      if (oldIndex === -1 || newIndex === -1) return base;
+      const reordered = arrayMove(base, oldIndex, newIndex);
+      if (projectId) {
+        saveMutation.mutate(reordered);
+      }
+      return reordered;
+    });
+  }, [defaultOrderedKeys, projectId, saveMutation]);
 
   // Shared popover props
   const settingsProps: KpiSettingsPopoverProps = {
@@ -416,56 +560,58 @@ export function ModelingKpiStrip({ proFormaData, assetClass, className, projectI
   const displayedCards = expanded ? visible : visible.slice(0, MAX_VISIBLE);
   const hasMore = visible.length > MAX_VISIBLE;
 
+  const activeCard = activeDragId ? visible.find((v) => v.kpi.key === activeDragId) ?? null : null;
+
   return (
     <TooltipProvider>
       <div className={cn('space-y-1', className)}>
-        <div className={cn(
-          'flex flex-wrap gap-0 divide-x divide-border border rounded-lg bg-card overflow-hidden',
-        )}>
-          {displayedCards.map(({ kpi, primary, baselineVal, stabilizedVal, sparkValues, valueColor, showBaselineStab }) => (
-            <div key={kpi.key} className="flex-1 min-w-[120px] px-4 py-3">
-              <div className="flex items-center gap-1 mb-1">
-                <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider leading-none">
-                  {kpi.label}
-                </p>
-                {kpi.tooltip && (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Info className="h-2.5 w-2.5 text-muted-foreground/50 cursor-help shrink-0" />
-                    </TooltipTrigger>
-                    <TooltipContent side="top" className="text-xs max-w-[200px]">
-                      {kpi.tooltip}
-                    </TooltipContent>
-                  </Tooltip>
-                )}
-              </div>
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+          onDragCancel={() => setActiveDragId(null)}
+        >
+          <SortableContext
+            items={displayedCards.map((c) => c.kpi.key)}
+            strategy={horizontalListSortingStrategy}
+          >
+            <div className={cn(
+              'flex flex-wrap gap-0 divide-x divide-border border rounded-lg bg-card overflow-hidden',
+            )}>
+              {displayedCards.map(({ kpi, primary, baselineVal, stabilizedVal, sparkValues, valueColor, showBaselineStab }) => (
+                <SortableKpiCard
+                  key={kpi.key}
+                  kpi={kpi}
+                  primary={primary}
+                  baselineVal={baselineVal}
+                  stabilizedVal={stabilizedVal}
+                  sparkValues={sparkValues}
+                  valueColor={valueColor}
+                  showBaselineStab={showBaselineStab}
+                  isBeingDragged={activeDragId === kpi.key}
+                />
+              ))}
 
-              {showBaselineStab ? (
-                <div className="flex items-end justify-between gap-2">
-                  <div>
-                    <p className={cn('text-base font-bold tabular-nums leading-tight', valueColor)}>
-                      {formatKpiValue(baselineVal, kpi.format)}
-                    </p>
-                    <p className="text-[10px] text-muted-foreground leading-none mt-0.5">
-                      Yr1 &nbsp;→&nbsp;
-                      <span className={cn('font-medium', valueColor)}>
-                        {stabilizedVal !== null ? formatKpiValue(stabilizedVal, kpi.format) : '—'}
-                      </span>
-                      {' '}stab
-                    </p>
-                  </div>
-                  <Sparkline values={sparkValues} colorClass={valueColor} />
-                </div>
-              ) : (
-                <p className={cn('text-base font-bold tabular-nums leading-tight', valueColor)}>
-                  {formatKpiValue(primary, kpi.format)}
-                </p>
-              )}
+              {projectId && <KpiSettingsPopover {...settingsProps} />}
             </div>
-          ))}
+          </SortableContext>
 
-          {projectId && <KpiSettingsPopover {...settingsProps} />}
-        </div>
+          <DragOverlay>
+            {activeCard && (
+              <KpiCardContent
+                kpi={activeCard.kpi}
+                primary={activeCard.primary}
+                baselineVal={activeCard.baselineVal}
+                stabilizedVal={activeCard.stabilizedVal}
+                sparkValues={activeCard.sparkValues}
+                valueColor={activeCard.valueColor}
+                showBaselineStab={activeCard.showBaselineStab}
+                isDragOverlay
+              />
+            )}
+          </DragOverlay>
+        </DndContext>
 
         {hasMore && (
           <button
