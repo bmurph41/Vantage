@@ -1,6 +1,6 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Info } from 'lucide-react';
+import { Info, ChevronDown, ChevronUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatCurrency, formatPercent } from '@/lib/utils';
 import { getKpisForAssetClass, type ModelingKpiDef, type KpiAnnualRow } from '@shared/modeling-kpi-registry';
@@ -122,13 +122,18 @@ export function ModelingKpiStrip({ proFormaData, assetClass, className }: Modeli
   const visible = computed.filter((c) => c.primary !== null || c.baselineVal !== null);
   if (visible.length === 0) return null;
 
+  const MAX_VISIBLE = 8;
+  const [expanded, setExpanded] = useState(false);
+  const displayedCards = expanded ? visible : visible.slice(0, MAX_VISIBLE);
+  const hasMore = visible.length > MAX_VISIBLE;
+
   return (
     <TooltipProvider>
+      <div className={cn('space-y-1', className)}>
       <div className={cn(
         'flex flex-wrap gap-0 divide-x divide-border border rounded-lg bg-card overflow-hidden',
-        className
       )}>
-        {visible.map(({ kpi, primary, baselineVal, stabilizedVal, sparkValues, valueColor, showBaselineStab }) => (
+        {displayedCards.map(({ kpi, primary, baselineVal, stabilizedVal, sparkValues, valueColor, showBaselineStab }) => (
           <div key={kpi.key} className="flex-1 min-w-[120px] px-4 py-3">
             <div className="flex items-center gap-1 mb-1">
               <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider leading-none">
@@ -169,6 +174,19 @@ export function ModelingKpiStrip({ proFormaData, assetClass, className }: Modeli
             )}
           </div>
         ))}
+      </div>
+      {hasMore && (
+        <button
+          onClick={() => setExpanded((e) => !e)}
+          className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors px-1"
+        >
+          {expanded ? (
+            <><ChevronUp className="h-3 w-3" /> Show fewer KPIs</>
+          ) : (
+            <><ChevronDown className="h-3 w-3" /> Show {visible.length - MAX_VISIBLE} more KPIs</>
+          )}
+        </button>
+      )}
       </div>
     </TooltipProvider>
   );
