@@ -1,7 +1,7 @@
 {
-  "id": "f4584543-100c-46d0-88e1-10dd48ca2c91",
+  "id": "bf074530-4fb1-4dce-a178-576f66b15709",
   "orgId": "cd3719c3-ef82-4ccc-acb9-261c80fb64b4",
-  "modelingProjectId": "79e9dd7d-3f04-4799-94fd-57377f5b1e2e",
+  "modelingProjectId": "ac3efca6-9397-44ac-ad80-ce3f83d6de54",
   "name": "65% LTV Senior Mortgage",
   "description": null,
   "status": "draft",
@@ -22,6 +22,6 @@
   "noiGrowthRate": "0.0200",
   "isActive": true,
   "createdBy": "85c9cd7a-c453-4dba-9817-d032d5712c4e",
-  "createdAt": "2026-05-13T11:36:11.233Z",
-  "updatedAt": "2026-05-13T11:36:11.233Z"
+  "createdAt": "2026-05-13T11:42:22.909Z",
+  "updatedAt": "2026-05-13T11:42:22.909Z"
 }

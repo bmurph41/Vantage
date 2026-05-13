@@ -1,5 +1,5 @@
 {
-  "id": "b3e976b6-2cd3-444e-ae46-fa47ff5ea196",
+  "id": "ebe69112-620a-4c5f-b342-f0d51d932579",
   "orgId": "cd3719c3-ef82-4ccc-acb9-261c80fb64b4",
   "marinaName": "Harborview Marina – Beta Test Fixture",
   "purchasePrice": "12500000.00",
@@ -14,7 +14,7 @@
   "primaryValuationMetric": "cap_rate",
   "brokerId": null,
   "brokerCompanyId": null,
-  "dealId": "7021445a-8583-4b70-80bf-2f9ab8789a35",
+  "dealId": "a7029714-188c-4d00-93dc-f02f17d8628f",
   "ddProjectId": null,
   "salesCompId": null,
   "rateCompId": null,
@@ -109,6 +109,6 @@
   "notes": null,
   "createdBy": "85c9cd7a-c453-4dba-9817-d032d5712c4e",
   "updatedBy": null,
-  "createdAt": "2026-05-13T11:35:12.637Z",
-  "updatedAt": "2026-05-13T11:35:12.637Z"
+  "createdAt": "2026-05-13T11:41:22.024Z",
+  "updatedAt": "2026-05-13T11:41:22.024Z"
 }
