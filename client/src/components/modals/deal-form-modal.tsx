@@ -1516,7 +1516,7 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
                       <div className="mb-3">
                         <Label className="text-xs text-muted-foreground mb-1 block">Quick-fill from Google Places</Label>
                         <GooglePlaceSearch
-                          placeholder="Search for a marina or address..."
+                          placeholder="Search by property name or address..."
                           onSelect={(place) => {
                             if (place.address) {
                               const parts = place.address.split(',').map((s: string) => s.trim());

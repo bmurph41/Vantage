@@ -189,7 +189,7 @@ function PropertyOverview({ pending }: { pending: PendingProperty }) {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-0">
-          <DataRow label="Marina Name" value={pending.marinaName} />
+          <DataRow label="Property Name" value={pending.marinaName} />
           <DataRow label="Address" value={pending.address} />
           <DataRow label="City" value={pending.city} />
           <DataRow label="State" value={pending.state} />
@@ -243,7 +243,7 @@ function CompanyComparison({ pending, existing }: { pending: PendingCompany; exi
 function PropertyComparison({ pending, existing }: { pending: PendingProperty; existing: Property | null }) {
   return (
     <div className="space-y-1">
-      <ComparisonRow label="Marina Name" existingValue={existing?.marinaName} newValue={pending.marinaName} />
+      <ComparisonRow label="Property Name" existingValue={existing?.marinaName} newValue={pending.marinaName} />
       <ComparisonRow label="Address" existingValue={existing?.address} newValue={pending.address} />
       <ComparisonRow label="City" existingValue={existing?.city} newValue={pending.city} />
       <ComparisonRow label="State" existingValue={existing?.state} newValue={pending.state} />

@@ -1193,7 +1193,7 @@ export default function DebtScenariosIndex() {
               <ul className="list-disc list-inside space-y-1 text-blue-800">
                 <li><strong>DSCR 1.20-1.25x:</strong> Minimum acceptable for most lenders</li>
                 <li><strong>DSCR 1.35x+:</strong> Preferred for agency loans</li>
-                <li><strong>LTV 65-75%:</strong> Typical for marina acquisitions</li>
+                <li><strong>LTV 65-75%:</strong> Typical for real estate acquisitions</li>
                 <li><strong>Debt Yield 10%+:</strong> Strong loan performance indicator</li>
                 <li><strong>Balloon Payment:</strong> Occurs when loan term is shorter than amortization period</li>
               </ul>

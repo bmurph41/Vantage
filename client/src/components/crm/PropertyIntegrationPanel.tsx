@@ -44,7 +44,7 @@ function SalesCompCard({ comp, linkMetadata, onUnlink }: {
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-2">
               <Building2 className="w-4 h-4 text-blue-600" />
-              <span className="font-semibold text-sm">{comp.marinaName || "Unnamed Marina"}</span>
+              <span className="font-semibold text-sm">{comp.marinaName || "Unnamed Property"}</span>
               {linkMetadata?.isPrimary && (
                 <Badge variant="secondary" className="bg-amber-100 text-amber-800">
                   <Star className="w-3 h-3 mr-1" />
@@ -105,7 +105,7 @@ function RateCompCard({ comp, linkMetadata, onUnlink }: {
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-2">
               <TrendingUp className="w-4 h-4 text-green-600" />
-              <span className="font-semibold text-sm">{comp.marinaName || "Unnamed Marina"}</span>
+              <span className="font-semibold text-sm">{comp.marinaName || "Unnamed Property"}</span>
               {linkMetadata?.isPrimary && (
                 <Badge variant="secondary" className="bg-amber-100 text-amber-800">
                   <Star className="w-3 h-3 mr-1" />
@@ -279,7 +279,7 @@ function LinkCompModal({ isOpen, onClose, propertyId, compType }: {
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
             <Input
-              placeholder="Search by marina name, city, or state..."
+              placeholder="Search by property name, city, or state..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10"

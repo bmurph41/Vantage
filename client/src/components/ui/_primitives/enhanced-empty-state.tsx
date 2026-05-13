@@ -159,7 +159,7 @@ export function CRMEmptyState({ onCreateDeal }: { onCreateDeal?: () => void }) {
     <EnhancedEmptyState
       icon={Search}
       title="No deals yet"
-      description="Start tracking your marina acquisition pipeline by adding your first deal."
+      description="Start tracking your acquisition pipeline by adding your first deal."
       variant="illustration"
       primaryAction={{
         label: "Add First Deal",
@@ -204,7 +204,7 @@ export function ModelingEmptyState({ onCreateProject }: { onCreateProject?: () =
     <EnhancedEmptyState
       icon={Search}
       title="No modeling projects"
-      description="Create your first valuation model to analyze a marina acquisition opportunity."
+      description="Create your first valuation model to analyze a property acquisition opportunity."
       variant="illustration"
       primaryAction={{
         label: "Create Project",
@@ -237,7 +237,7 @@ export function OperationsEmptyState({ moduleName }: { moduleName: string }) {
       }}
       tips={[
         "Connected integrations sync data automatically",
-        "Live data flows to your valuation models for owned marinas",
+        "Live data flows to your valuation models for owned properties",
         "View historical trends and performance metrics",
       ]}
     />

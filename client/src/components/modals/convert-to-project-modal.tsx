@@ -228,7 +228,7 @@ export default function ConvertToProjectModal({ isOpen, onClose, deal }: Convert
                       <div className="space-y-0.5">
                         <FormLabel className="text-base">Location Details</FormLabel>
                         <FormDescription>
-                          Copy city, state, marina name, and dock location
+                          Copy city, state, property name, and location details
                         </FormDescription>
                       </div>
                       <FormControl>

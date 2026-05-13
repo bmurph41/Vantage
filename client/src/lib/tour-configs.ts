@@ -53,7 +53,7 @@ export const dashboardTourSteps: TourStep[] = [
 export const crmDealsTourSteps: TourStep[] = [
   {
     target: '[data-tour="deals-header"]',
-    content: "Manage all your marina acquisition deals from this central hub. Track progress from initial contact to closing.",
+    content: "Manage all your acquisition deals from this central hub. Track progress from initial contact to closing.",
     title: "Deal Pipeline",
     placement: "bottom",
     disableBeacon: true,
@@ -66,7 +66,7 @@ export const crmDealsTourSteps: TourStep[] = [
   },
   {
     target: '[data-tour="deals-add"]',
-    content: "Create a new deal with our guided wizard. Enter the marina details and we'll set up everything you need.",
+    content: "Create a new deal with our guided wizard. Enter the property details and we'll set up everything you need.",
     title: "Add New Deal",
     placement: "left",
   },
@@ -251,7 +251,7 @@ export const rentRollTourSteps: TourStep[] = [
 export const valuatorTourSteps: TourStep[] = [
   {
     target: '[data-tour="valuator-inputs"]',
-    content: "Enter marina financials and operating metrics. Data can sync from your rent roll and operations modules.",
+    content: "Enter property financials and operating metrics. Data can sync from your rent roll and operations modules.",
     title: "Valuation Inputs",
     placement: "right",
     disableBeacon: true,
@@ -291,7 +291,7 @@ export const valuatorTourSteps: TourStep[] = [
 export const portfolioTourSteps: TourStep[] = [
   {
     target: '[data-tour="portfolio-overview"]',
-    content: "Your portfolio at a glance - all owned marinas with key performance metrics.",
+    content: "Your portfolio at a glance - all owned properties with key performance metrics.",
     title: "Portfolio Overview",
     placement: "bottom",
     disableBeacon: true,
@@ -304,7 +304,7 @@ export const portfolioTourSteps: TourStep[] = [
   },
   {
     target: '[data-tour="portfolio-add"]',
-    content: "Add a new marina to your portfolio to start tracking operations.",
+    content: "Add a new property to your portfolio to start tracking operations.",
     title: "Add Property",
     placement: "left",
   },

@@ -1816,9 +1816,9 @@ export default function CompanyFormModal({ isOpen, onClose, company, pendingComp
                       name="marinaName"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Marina Name *</FormLabel>
+                          <FormLabel>Property Name *</FormLabel>
                           <FormControl>
-                            <Input placeholder="Marina name" className="bg-white dark:bg-slate-900" {...field} data-testid="input-new-property-name" />
+                            <Input placeholder="Property name" className="bg-white dark:bg-slate-900" {...field} data-testid="input-new-property-name" />
                           </FormControl>
                           <FormMessage />
                         </FormItem>

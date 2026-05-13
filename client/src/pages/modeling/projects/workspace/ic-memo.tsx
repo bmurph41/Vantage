@@ -72,12 +72,17 @@ function generateExecutiveSummary(project: any, financials: ProjectFinancials | 
   const irr = returns?.leveragedIRR || returns?.irr || 0;
   const em = returns?.equityMultiple || 0;
 
-  return `${name} is a ${project?.totalUnits || '—'}-slip marina located in ${location}. ` +
+  const assetClass = project?.assetClass || project?.propertyType || 'marina';
+  const isMarina = assetClass === 'marina' || assetClass === 'marina_wet_storage' || assetClass === 'marina_dry_storage';
+  const propertyDesc = isMarina
+    ? `a ${project?.totalUnits || '—'}-slip marina`
+    : `a ${project?.totalUnits ? project.totalUnits + '-unit ' : ''}${assetClass.replace(/_/g, ' ')} property`;
+  return `${name} is ${propertyDesc} located in ${location}. ` +
     `The proposed acquisition price is ${formatCurrency(price)}, representing a ${capRate.toFixed(2)}% going-in cap rate. ` +
     `The investment is projected to generate a ${irr.toFixed(1)}% leveraged IRR and ${em.toFixed(2)}x equity multiple ` +
     `over the anticipated hold period. ` +
-    `The property encompasses approximately ${project?.acreage || '—'} acres of waterfront real estate ` +
-    `with a diversified revenue base including slip rentals, fuel sales, and ancillary services.`;
+    `The property encompasses approximately ${project?.acreage || '—'} acres ` +
+    `with a diversified revenue base.`;
 }
 
 function generateInvestmentThesis(project: any, financials: ProjectFinancials | null, returns: any): string {
@@ -101,7 +106,13 @@ function generateInvestmentThesis(project: any, financials: ProjectFinancials | 
     bullets.push(`In-place NOI of ${formatCurrency(noi)} (${impliedCapRate.toFixed(1)}% cap rate) provides downside protection with contractual revenue base.`);
   }
 
-  bullets.push(`Marina sector benefits from high barriers to entry (permitting, waterfront scarcity) and favorable supply-demand dynamics.`);
+  const assetClass2 = project?.assetClass || project?.propertyType || 'marina';
+  const isMarina2 = assetClass2 === 'marina' || assetClass2 === 'marina_wet_storage' || assetClass2 === 'marina_dry_storage';
+  if (isMarina2) {
+    bullets.push(`Marina sector benefits from high barriers to entry (permitting, waterfront scarcity) and favorable supply-demand dynamics.`);
+  } else {
+    bullets.push(`Asset class benefits from high barriers to entry and favorable supply-demand dynamics in the target submarket.`);
+  }
 
   return bullets.map(b => `- ${b}`).join('\n');
 }
@@ -130,8 +141,11 @@ function generateMarketOverview(project: any, comps: any[]): string {
   const lines: string[] = [];
   const location = [project?.city, project?.state].filter(Boolean).join(', ') || 'the subject market';
 
-  lines.push(`The ${location} submarket demonstrates strong fundamentals for marina operations. ` +
-    `Waterfront properties in this region benefit from year-round boating seasons and growing recreational demand.`);
+  const assetClass3 = project?.assetClass || project?.propertyType || 'marina';
+  const isMarina3 = assetClass3 === 'marina' || assetClass3 === 'marina_wet_storage' || assetClass3 === 'marina_dry_storage';
+  lines.push(isMarina3
+    ? `The ${location} submarket demonstrates strong fundamentals for marina operations. Waterfront properties in this region benefit from year-round boating seasons and growing recreational demand.`
+    : `The ${location} submarket demonstrates strong demand fundamentals for the target asset class.`);
   lines.push('');
 
   if (comps && comps.length > 0) {
@@ -141,7 +155,7 @@ function generateMarketOverview(project: any, comps: any[]): string {
         `${comp.totalUnits || '—'} slips, ${comp.distance ? comp.distance + ' mi' : 'nearby'}`);
     });
   } else {
-    lines.push('Competitive landscape analysis pending — comparable marina data to be sourced from market survey.');
+    lines.push('Competitive landscape analysis pending — comparable property data to be sourced from market survey.');
   }
 
   lines.push('');
@@ -182,7 +196,7 @@ function generateCapitalStructure(debt: DebtTerms | null, project: any): string 
   if (!debt) {
     const price = project?.purchasePrice || project?.estimatedValue || 0;
     return `Acquisition Price: ${formatCurrency(price)}\n` +
-      `Debt terms to be determined — typical marina financing at 60-65% LTV, 5.5-7.0% rate, 25-year amortization.\n` +
+      `Debt terms to be determined — typical acquisition financing at 60-70% LTV, 5.5-7.0% rate, 25-year amortization.\n` +
       `Equity requirement estimated at ${formatCurrency(price * 0.35)} (35% of total capitalization).`;
   }
 
@@ -242,7 +256,7 @@ function generateRiskFactors(financials: ProjectFinancials | null, debt: DebtTer
   if (financials && financials.totalRevenue > 0) {
     const margin = (financials.noi / financials.totalRevenue) * 100;
     if (margin < 35) {
-      risks.push(`Operating margin of ${margin.toFixed(0)}% is below marina industry median (~40-45%) — operational improvements needed to reach stabilization.`);
+      risks.push(`Operating margin of ${margin.toFixed(0)}% is below industry median — operational improvements needed to reach stabilization.`);
     }
   }
 

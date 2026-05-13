@@ -40,7 +40,7 @@ const QUICK_START_STEPS: QuickStartStep[] = [
   {
     id: "create-deal",
     title: "Create Your First Deal",
-    description: "Start analyzing a marina acquisition with financial modeling tools",
+    description: "Start analyzing a property acquisition with financial modeling tools",
     icon: Briefcase,
     href: "/modeling/projects",
     tourId: "modeling-projects",

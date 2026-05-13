@@ -16,7 +16,7 @@ export default function ScenariosPage() {
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Debt Scenarios</h1>
         <p className="text-muted-foreground mt-1">
-          Model debt structures and financing options for your marina acquisitions
+          Model debt structures and financing options for your property acquisitions
         </p>
       </div>
 

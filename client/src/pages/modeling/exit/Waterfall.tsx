@@ -170,8 +170,8 @@ const PRESET_TEMPLATES: WaterfallPreset[] = [
   },
   {
     id: 'marina-standard',
-    name: 'Marina Standard',
-    description: 'Typical marina acquisition structure with moderate promote',
+    name: 'Standard',
+    description: 'Standard acquisition structure with moderate promote',
     tiers: [
       { id: 't1', name: 'Base (0-10% IRR)', hurdleRate: 10, lpSplit: 80, gpSplit: 20 },
       { id: 't2', name: 'Performance (10-15% IRR)', hurdleRate: 15, lpSplit: 75, gpSplit: 25 },

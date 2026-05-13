@@ -117,7 +117,7 @@ export function DealTemplateSelector({ open, onOpenChange }: DealTemplateSelecto
   
   const [step, setStep] = useState<"select" | "details">("select");
   const [selectedTemplate, setSelectedTemplate] = useState<DealTemplate | null>(null);
-  const [marinaName, setMarinaName] = useState("");
+  const [propertyName, setPropertyName] = useState("");
   const [address, setAddress] = useState("");
   const [address2, setAddress2] = useState("");
   const [city, setCity] = useState("");
@@ -132,7 +132,7 @@ export function DealTemplateSelector({ open, onOpenChange }: DealTemplateSelecto
       return apiRequest('/api/modeling/projects', {
         method: 'POST',
         body: JSON.stringify({
-          marinaName,
+          marinaName: propertyName,
           address: address || null,
           addressLine2: address2 || null,
           city: city || null,
@@ -152,7 +152,7 @@ export function DealTemplateSelector({ open, onOpenChange }: DealTemplateSelecto
       queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects'] });
       toast({ 
         title: "Project Created!", 
-        description: `${marinaName} has been created using the ${selectedTemplate?.name} template.` 
+        description: `${propertyName} has been created using the ${selectedTemplate?.name} template.` 
       });
       onOpenChange(false);
       resetForm();
@@ -170,7 +170,7 @@ export function DealTemplateSelector({ open, onOpenChange }: DealTemplateSelecto
   function resetForm() {
     setStep("select");
     setSelectedTemplate(null);
-    setMarinaName("");
+    setPropertyName("");
     setAddress("");
     setAddress2("");
     setCity("");
@@ -189,8 +189,8 @@ export function DealTemplateSelector({ open, onOpenChange }: DealTemplateSelecto
   }
 
   function handleCreate() {
-    if (!marinaName.trim()) {
-      toast({ title: "Error", description: "Marina name is required", variant: "destructive" });
+    if (!propertyName.trim()) {
+      toast({ title: "Error", description: "Property name is required", variant: "destructive" });
       return;
     }
     createProjectMutation.mutate();
@@ -210,7 +210,7 @@ export function DealTemplateSelector({ open, onOpenChange }: DealTemplateSelecto
           <DialogDescription>
             {step === "select" 
               ? "Start with a template that matches your deal type for optimal setup"
-              : "Enter the marina details to create your project"
+              : "Enter the property details to create your project"
             }
           </DialogDescription>
         </DialogHeader>
@@ -268,15 +268,15 @@ export function DealTemplateSelector({ open, onOpenChange }: DealTemplateSelecto
 
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="marinaName" className="flex items-center gap-2">
+                <Label htmlFor="propertyName" className="flex items-center gap-2">
                   <Anchor className="h-4 w-4" />
-                  Marina Name *
+                  Property Name *
                 </Label>
                 <Input
-                  id="marinaName"
-                  placeholder="e.g., Sunset Bay Marina"
-                  value={marinaName}
-                  onChange={(e) => setMarinaName(e.target.value)}
+                  id="propertyName"
+                  placeholder="e.g., Oakdale Yacht Club"
+                  value={propertyName}
+                  onChange={(e) => setPropertyName(e.target.value)}
                   autoFocus
                 />
               </div>
@@ -288,7 +288,7 @@ export function DealTemplateSelector({ open, onOpenChange }: DealTemplateSelecto
                 </Label>
                 <Input
                   id="address"
-                  placeholder="e.g., 123 Marina Drive"
+                  placeholder="e.g., 123 Harbor Way"
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
                 />
@@ -373,7 +373,7 @@ export function DealTemplateSelector({ open, onOpenChange }: DealTemplateSelecto
           {step === "details" && (
             <Button 
               onClick={handleCreate}
-              disabled={createProjectMutation.isPending || !marinaName.trim()}
+              disabled={createProjectMutation.isPending || !propertyName.trim()}
               className="bg-[#1E4FAB] hover:bg-[#1a4294]"
             >
               {createProjectMutation.isPending ? "Creating..." : "Create Project"}

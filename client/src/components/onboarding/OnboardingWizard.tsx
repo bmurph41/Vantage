@@ -1139,7 +1139,7 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
         </h3>
         <p className="text-muted-foreground mt-2">
           Let's get you set up with Vantage, your all-in-one platform for 
-          marina acquisitions and portfolio management.
+          real estate acquisitions and portfolio management.
         </p>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 pt-4">

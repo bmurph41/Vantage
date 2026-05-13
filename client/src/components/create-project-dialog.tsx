@@ -374,7 +374,7 @@ export function CreateProjectDialog({ trigger }: CreateProjectDialogProps) {
                   <FormDescription>
                     {field.value === "portfolio" 
                       ? "A portfolio project groups multiple properties with individual DD tracking and a summary view." 
-                      : "A single property project tracks DD for one marina."}
+                      : "A single property project tracks DD for one property."}
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
@@ -389,7 +389,7 @@ export function CreateProjectDialog({ trigger }: CreateProjectDialogProps) {
                   <FormLabel>Project Name *</FormLabel>
                   <FormControl>
                     <Input 
-                      placeholder={watchedProjectType === "portfolio" ? "e.g. USVI Portfolio" : "e.g. Sunset Marina DD"} 
+                      placeholder={watchedProjectType === "portfolio" ? "e.g. USVI Portfolio" : "e.g. Oakdale Yacht Club DD"} 
                       {...field} 
                     />
                   </FormControl>
@@ -398,7 +398,7 @@ export function CreateProjectDialog({ trigger }: CreateProjectDialogProps) {
                       {form.watch("marinaName") === field.value ? (
                         <span className="text-xs text-green-600 flex items-center gap-1">
                           <Anchor className="h-3 w-3" />
-                          Using as Marina Name
+                          Using as Property Name
                         </span>
                       ) : (
                         <Button
@@ -409,7 +409,7 @@ export function CreateProjectDialog({ trigger }: CreateProjectDialogProps) {
                           onClick={() => form.setValue("marinaName", field.value, { shouldDirty: true })}
                         >
                           <Anchor className="h-3 w-3 mr-1" />
-                          Use as Marina Name
+                          Use as Property Name
                         </Button>
                       )}
                     </div>
@@ -571,13 +571,13 @@ export function CreateProjectDialog({ trigger }: CreateProjectDialogProps) {
                     value={addressInputValue}
                     onChangeText={setAddressInputValue}
                     onSelectAddress={handleAddressSelect}
-                    placeholder="Search for a marina or enter an address..."
+                    placeholder="Search by property name or address..."
                     searchType="all"
                   />
                   <p className="text-sm text-muted-foreground">
                     {hasLinkedDealOrProperty
                       ? "Address auto-populated from linked record. You can change it if needed."
-                      : "Search for a marina or enter an address."}
+                      : "Search by property name or enter an address."}
                   </p>
                 </div>
 
@@ -666,7 +666,7 @@ export function CreateProjectDialog({ trigger }: CreateProjectDialogProps) {
                           <CardContent className="pt-4 pb-3">
                             <div className="flex items-start justify-between mb-3">
                               <span className="text-sm font-medium text-muted-foreground">
-                                Marina {index + 1}
+                                Property {index + 1}
                               </span>
                               <Button
                                 type="button"
@@ -680,9 +680,9 @@ export function CreateProjectDialog({ trigger }: CreateProjectDialogProps) {
                             </div>
                             <div className="space-y-3">
                               <div>
-                                <Label className="text-sm">Marina Name *</Label>
+                                <Label className="text-sm">Property Name *</Label>
                                 <Input
-                                  placeholder="e.g. Sunset Marina"
+                                  placeholder="e.g. Oakdale Yacht Club"
                                   value={prop.name}
                                   onChange={(e) => updatePortfolioProperty(prop.id, { name: e.target.value })}
                                   className="mt-1"
@@ -694,7 +694,7 @@ export function CreateProjectDialog({ trigger }: CreateProjectDialogProps) {
                                   value={prop.addressInputValue}
                                   onChangeText={(val) => updatePortfolioProperty(prop.id, { addressInputValue: val })}
                                   onSelectAddress={(addr) => handlePortfolioAddressSelect(prop.id, addr)}
-                                  placeholder="Search for marina or address..."
+                                  placeholder="Search by property name or address..."
                                   searchType="all"
                                   className="mt-1"
                                 />
@@ -716,7 +716,7 @@ export function CreateProjectDialog({ trigger }: CreateProjectDialogProps) {
                         onClick={addPortfolioProperty}
                       >
                         <Plus className="h-4 w-4 mr-1" />
-                        Add Another Marina
+                        Add Another Property
                       </Button>
                     </div>
                   </ScrollArea>
