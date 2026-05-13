@@ -1446,7 +1446,10 @@ export function registerModelingRoutes(
       const orgId = req.user.orgId;
       const { quickBooksService } = await import('../services/quickbooks-service');
       const status = await quickBooksService.getConnectionStatus(orgId);
-      res.json(status);
+      res.json({
+        ...status,
+        isConfigured: quickBooksService.isQuickBooksConfigured(),
+      });
     } catch (error: any) {
       console.error('Failed to get QuickBooks status:', error);
       res.status(500).json({ error: 'Failed to get connection status' });
