@@ -1524,7 +1524,7 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                 size="sm"
                 onClick={() => setShowPctRev(!showPctRev)}
                 className="h-8 text-xs font-mono"
-                disabled={!(baselineSummary && (baselineSummary.revenue ?? 0) > 0)}
+                disabled={!((baselineSummary && (baselineSummary.revenue ?? 0) > 0) || years.some((_, i) => getCategoryProjectedTotal('Revenue', i) > 0))}
               >
                 % Rev
               </Button>
@@ -2319,7 +2319,8 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                       return pp && pp > 0 ? [{
                         label: 'Going-In Cap',
                         getValue: (i: number) => {
-                          const noi = calculateYearSummary(i).noi;
+                          if (i !== 0) return '—';
+                          const noi = calculateYearSummary(0).noi;
                           return formatPercent((noi / pp) * 100, { dash: true });
                         },
                         color: 'text-sky-600 dark:text-sky-400',

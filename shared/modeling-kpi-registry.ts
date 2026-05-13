@@ -8,6 +8,10 @@ export interface KpiMetrics {
   totalReturn?: number;
   minDscr?: number;
   ltv?: number;
+  // Universal operational
+  equityInvested?: number;
+  cashOnCash?: number;
+  opexRatio?: number;
   // Marina-specific
   totalSlips?: number;
   revenuePerSlip?: number;
@@ -23,8 +27,18 @@ export interface KpiMetrics {
   // STR-specific
   avgDailyRate?: number;
   strOccupancy?: number;
-  // RV Park
-  rvSiteOccupancy?: number;
+  // Multifamily-specific
+  unitCount?: number;
+  revPerUnit?: number;
+  rentSpread?: number;
+  turnoverRate?: number;
+  // Retail / Office-specific
+  walt?: number;
+  anchorTenantPct?: number;
+  nearTermExpiryPct?: number;
+  // Industrial-specific
+  clearHeight?: number;
+  dockDoorCount?: number;
   [key: string]: number | undefined;
 }
 
@@ -34,6 +48,7 @@ export interface KpiAnnualRow {
   revenue?: number;
   expenses?: number;
   debtService?: number;
+  leveredCashFlow?: number;
   // Operational fields (populated when asset-class engine provides them)
   revenuePerSlip?: number;
   slipOccupancy?: number;
@@ -43,7 +58,7 @@ export interface KpiAnnualRow {
   ratePerSf?: number;
   avgDailyRate?: number;
   strOccupancy?: number;
-  rvSiteOccupancy?: number;
+  revPerUnit?: number;
   [key: string]: number | undefined;
 }
 
@@ -56,15 +71,16 @@ export interface ModelingKpiDef {
   compute: (metrics: KpiMetrics, annualProjections?: KpiAnnualRow[]) => number | null;
   /** Per-year computation for baseline/stabilized display and sparkline. */
   computeByYear?: (annualRow: KpiAnnualRow, metrics: KpiMetrics) => number | null;
-  /** Value >= benchmarkGood → green (good). */
+  /** Value >= benchmarkGood → green. */
   benchmarkGood?: number;
-  /** Value >= benchmarkWarn (and < benchmarkGood) → amber (caution); below → red. */
+  /** Value >= benchmarkWarn (and < benchmarkGood) → amber; below → red. */
   benchmarkWarn?: number;
   /** When true the benchmark direction is inverted: lower is better (e.g. LTV). */
   benchmarkInvert?: boolean;
 }
 
 export const MODELING_KPI_REGISTRY: Record<string, ModelingKpiDef> = {
+  // ─── Universal return metrics ─────────────────────────────────────────
   irr: {
     key: 'irr',
     label: 'Levered IRR',
@@ -84,6 +100,24 @@ export const MODELING_KPI_REGISTRY: Record<string, ModelingKpiDef> = {
     compute: (m) => m.equityMultiple ?? null,
     benchmarkGood: 2.0,
     benchmarkWarn: 1.5,
+  },
+  cashOnCash: {
+    key: 'cashOnCash',
+    label: 'Cash-on-Cash',
+    format: 'percent',
+    color: 'text-emerald-700 dark:text-emerald-300',
+    tooltip: 'Year 1 levered cash flow as a percentage of equity invested',
+    compute: (m, rows) => {
+      if (m.cashOnCash != null) return m.cashOnCash;
+      if (!rows?.length || !m.equityInvested || m.equityInvested <= 0) return null;
+      return ((rows[0]?.leveredCashFlow ?? 0) / m.equityInvested) * 100;
+    },
+    computeByYear: (row, m) => {
+      if (!m.equityInvested || m.equityInvested <= 0) return null;
+      return ((row.leveredCashFlow ?? 0) / m.equityInvested) * 100;
+    },
+    benchmarkGood: 8,
+    benchmarkWarn: 5,
   },
   goingInCapRate: {
     key: 'goingInCapRate',
@@ -129,6 +163,28 @@ export const MODELING_KPI_REGISTRY: Record<string, ModelingKpiDef> = {
     compute: (m) => m.totalReturn ?? null,
     benchmarkGood: 20,
     benchmarkWarn: 12,
+  },
+  // ─── Universal operational metrics ───────────────────────────────────
+  opexRatio: {
+    key: 'opexRatio',
+    label: 'OpEx Ratio',
+    format: 'percent',
+    color: 'text-orange-500 dark:text-orange-400',
+    tooltip: 'Operating expenses as a percentage of revenue',
+    compute: (m, rows) => {
+      if (m.opexRatio != null) return m.opexRatio;
+      if (!rows?.length) return null;
+      const row = rows[0];
+      if (!row?.revenue || row.revenue <= 0) return null;
+      return ((row.expenses ?? 0) / row.revenue) * 100;
+    },
+    computeByYear: (row) => {
+      if (!row?.revenue || row.revenue <= 0) return null;
+      return ((row.expenses ?? 0) / row.revenue) * 100;
+    },
+    benchmarkGood: 50,
+    benchmarkWarn: 65,
+    benchmarkInvert: true,
   },
   noiCagr: {
     key: 'noiCagr',
@@ -236,6 +292,102 @@ export const MODELING_KPI_REGISTRY: Record<string, ModelingKpiDef> = {
     benchmarkGood: 30,
     benchmarkWarn: 15,
   },
+  // ─── Multifamily-specific ─────────────────────────────────────────────
+  revPerUnit: {
+    key: 'revPerUnit',
+    label: 'Rev / Unit',
+    format: 'currency',
+    color: 'text-violet-700 dark:text-violet-300',
+    tooltip: 'Annual revenue per residential unit',
+    compute: (m, rows) => {
+      if (m.revPerUnit != null) return m.revPerUnit;
+      if (m.unitCount && m.unitCount > 0 && rows?.length) {
+        return (rows[0]?.revenue ?? 0) / m.unitCount;
+      }
+      return null;
+    },
+    computeByYear: (row, m) => {
+      if (row.revPerUnit != null) return row.revPerUnit;
+      if (m.unitCount && m.unitCount > 0 && row.revenue != null) {
+        return row.revenue / m.unitCount;
+      }
+      return null;
+    },
+    benchmarkGood: 18000,
+    benchmarkWarn: 12000,
+  },
+  rentSpread: {
+    key: 'rentSpread',
+    label: 'Rent Spread',
+    format: 'percent',
+    color: 'text-purple-600 dark:text-purple-400',
+    tooltip: 'Spread between new lease rates and expiring lease rates',
+    compute: (m) => m.rentSpread ?? null,
+    benchmarkGood: 10,
+    benchmarkWarn: 3,
+  },
+  turnoverRate: {
+    key: 'turnoverRate',
+    label: 'Turnover Rate',
+    format: 'percent',
+    color: 'text-pink-500 dark:text-pink-300',
+    tooltip: 'Percentage of units turned over per year',
+    compute: (m) => m.turnoverRate ?? null,
+    benchmarkGood: 40,
+    benchmarkWarn: 60,
+    benchmarkInvert: true,
+  },
+  // ─── Retail / Office-specific ─────────────────────────────────────────
+  walt: {
+    key: 'walt',
+    label: 'WALT',
+    format: 'number',
+    color: 'text-amber-700 dark:text-amber-300',
+    tooltip: 'Weighted Average Lease Term remaining (years)',
+    compute: (m) => m.walt ?? null,
+    benchmarkGood: 7,
+    benchmarkWarn: 3,
+  },
+  anchorTenantPct: {
+    key: 'anchorTenantPct',
+    label: 'Anchor %',
+    format: 'percent',
+    color: 'text-yellow-700 dark:text-yellow-300',
+    tooltip: 'Percentage of gross leasable area occupied by anchor tenants',
+    compute: (m) => m.anchorTenantPct ?? null,
+    benchmarkGood: 50,
+    benchmarkWarn: 25,
+  },
+  nearTermExpiryPct: {
+    key: 'nearTermExpiryPct',
+    label: 'Near-Term Expiry',
+    format: 'percent',
+    color: 'text-red-500 dark:text-red-400',
+    tooltip: 'Percentage of leases expiring within 12 months',
+    compute: (m) => m.nearTermExpiryPct ?? null,
+    benchmarkGood: 10,
+    benchmarkWarn: 25,
+    benchmarkInvert: true,
+  },
+  // ─── Industrial-specific ──────────────────────────────────────────────
+  clearHeight: {
+    key: 'clearHeight',
+    label: 'Clear Height',
+    format: 'number',
+    color: 'text-slate-600 dark:text-slate-400',
+    tooltip: 'Average clear height of the industrial facility (feet)',
+    compute: (m) => m.clearHeight ?? null,
+    benchmarkGood: 32,
+    benchmarkWarn: 24,
+  },
+  dockDoorCount: {
+    key: 'dockDoorCount',
+    label: 'Dock Doors',
+    format: 'number',
+    color: 'text-stone-600 dark:text-stone-400',
+    tooltip: 'Number of dock-high loading doors',
+    compute: (m) => m.dockDoorCount ?? null,
+  },
   // ─── Self-storage-specific ────────────────────────────────────────────
   physicalOccupancy: {
     key: 'physicalOccupancy',
@@ -299,18 +451,18 @@ export type ModelingAssetClass =
   | 'default';
 
 export const ASSET_CLASS_KPI_SETS: Record<ModelingAssetClass, string[]> = {
-  marina:       ['irr', 'equityMultiple', 'goingInCapRate', 'exitCapRate', 'stabilizedNoi', 'exitValue', 'noiCagr', 'dscr', 'revenuePerSlip', 'slipOccupancy'],
-  multifamily:  ['irr', 'equityMultiple', 'goingInCapRate', 'exitCapRate', 'stabilizedNoi', 'exitValue', 'noiCagr', 'dscr', 'physicalOccupancy'],
-  hotel:        ['irr', 'equityMultiple', 'goingInCapRate', 'exitCapRate', 'stabilizedNoi', 'exitValue', 'noiCagr', 'dscr', 'adr', 'revpar', 'fbRevenuePct'],
-  str:          ['irr', 'equityMultiple', 'goingInCapRate', 'exitCapRate', 'stabilizedNoi', 'noiCagr', 'avgDailyRate', 'strOccupancy'],
-  rv_park:      ['irr', 'equityMultiple', 'goingInCapRate', 'exitCapRate', 'stabilizedNoi', 'exitValue', 'noiCagr', 'dscr', 'physicalOccupancy'],
-  retail:       ['irr', 'equityMultiple', 'goingInCapRate', 'exitCapRate', 'stabilizedNoi', 'exitValue', 'dscr', 'ltv'],
-  office:       ['irr', 'equityMultiple', 'goingInCapRate', 'exitCapRate', 'stabilizedNoi', 'exitValue', 'dscr', 'ltv'],
-  industrial:   ['irr', 'equityMultiple', 'goingInCapRate', 'exitCapRate', 'stabilizedNoi', 'exitValue', 'dscr', 'ltv'],
-  self_storage: ['irr', 'equityMultiple', 'goingInCapRate', 'exitCapRate', 'stabilizedNoi', 'noiCagr', 'dscr', 'ltv', 'physicalOccupancy', 'ratePerSf'],
-  mixed_use:    ['irr', 'equityMultiple', 'goingInCapRate', 'exitCapRate', 'stabilizedNoi', 'exitValue', 'noiCagr', 'dscr'],
-  business:     ['irr', 'equityMultiple', 'totalReturn', 'exitValue', 'stabilizedNoi', 'noiCagr'],
-  default:      ['irr', 'equityMultiple', 'goingInCapRate', 'exitCapRate', 'stabilizedNoi', 'exitValue'],
+  marina:       ['irr', 'equityMultiple', 'cashOnCash', 'goingInCapRate', 'exitCapRate', 'stabilizedNoi', 'exitValue', 'noiCagr', 'dscr', 'opexRatio', 'revenuePerSlip', 'slipOccupancy'],
+  multifamily:  ['irr', 'equityMultiple', 'cashOnCash', 'goingInCapRate', 'exitCapRate', 'stabilizedNoi', 'exitValue', 'noiCagr', 'dscr', 'opexRatio', 'revPerUnit', 'rentSpread', 'turnoverRate'],
+  hotel:        ['irr', 'equityMultiple', 'cashOnCash', 'goingInCapRate', 'exitCapRate', 'stabilizedNoi', 'exitValue', 'noiCagr', 'dscr', 'opexRatio', 'adr', 'revpar', 'fbRevenuePct'],
+  str:          ['irr', 'equityMultiple', 'cashOnCash', 'goingInCapRate', 'exitCapRate', 'stabilizedNoi', 'noiCagr', 'opexRatio', 'avgDailyRate', 'strOccupancy'],
+  rv_park:      ['irr', 'equityMultiple', 'cashOnCash', 'goingInCapRate', 'exitCapRate', 'stabilizedNoi', 'exitValue', 'noiCagr', 'dscr', 'opexRatio', 'physicalOccupancy'],
+  retail:       ['irr', 'equityMultiple', 'cashOnCash', 'goingInCapRate', 'exitCapRate', 'stabilizedNoi', 'exitValue', 'dscr', 'ltv', 'opexRatio', 'walt', 'anchorTenantPct', 'nearTermExpiryPct'],
+  office:       ['irr', 'equityMultiple', 'cashOnCash', 'goingInCapRate', 'exitCapRate', 'stabilizedNoi', 'exitValue', 'dscr', 'ltv', 'opexRatio', 'walt', 'anchorTenantPct', 'nearTermExpiryPct'],
+  industrial:   ['irr', 'equityMultiple', 'cashOnCash', 'goingInCapRate', 'exitCapRate', 'stabilizedNoi', 'exitValue', 'dscr', 'ltv', 'opexRatio', 'walt', 'clearHeight', 'dockDoorCount'],
+  self_storage: ['irr', 'equityMultiple', 'cashOnCash', 'goingInCapRate', 'exitCapRate', 'stabilizedNoi', 'noiCagr', 'dscr', 'ltv', 'opexRatio', 'physicalOccupancy', 'ratePerSf'],
+  mixed_use:    ['irr', 'equityMultiple', 'cashOnCash', 'goingInCapRate', 'exitCapRate', 'stabilizedNoi', 'exitValue', 'noiCagr', 'dscr', 'opexRatio'],
+  business:     ['irr', 'equityMultiple', 'cashOnCash', 'totalReturn', 'exitValue', 'stabilizedNoi', 'noiCagr', 'opexRatio'],
+  default:      ['irr', 'equityMultiple', 'cashOnCash', 'goingInCapRate', 'exitCapRate', 'stabilizedNoi', 'exitValue'],
 };
 
 export function getKpisForAssetClass(assetClass?: string | null): ModelingKpiDef[] {
