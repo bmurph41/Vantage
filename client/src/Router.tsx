@@ -351,11 +351,18 @@ function SidebarLoader() {
   );
 }
 
+// Module-level guard: only trigger the onboarding check once per browser session,
+// regardless of how many times UnifiedLayout mounts (i.e. across navigations).
+let _onboardingSessionChecked = false;
+
 // Hook to check if user should see onboarding
 function useOnboardingCheck() {
   const [showOnboarding, setShowOnboarding] = useState(false);
   
   useEffect(() => {
+    if (_onboardingSessionChecked) return;
+    _onboardingSessionChecked = true;
+
     const hasSeenOnboarding = localStorage.getItem('vantage_onboarding_complete');
     if (!hasSeenOnboarding) {
       const timer = setTimeout(() => setShowOnboarding(true), 1000);
