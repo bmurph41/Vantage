@@ -14,7 +14,7 @@ import {
 } from "@dnd-kit/core";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { CalendarDays, Calendar, Phone, Users, Mail, MapPin } from "lucide-react";
+import { CalendarDays, Calendar, Phone, Users, Mail, MapPin, CheckCircle } from "lucide-react";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -137,7 +137,8 @@ export function CrmActivityChip({
   activity: CrmActivityItem;
   onClick: (a: CrmActivityItem) => void;
 }) {
-  const color = crmActivityColor(activity.type);
+  const isCompleted = activity.status === "completed";
+  const color = isCompleted ? "#9ca3af" : crmActivityColor(activity.type);
   const top = blockTop(activity.scheduledAt);
   const endAt = crmActivityEndAt(activity);
   const height = Math.max(blockHeight(activity.scheduledAt, endAt), 22);
@@ -148,19 +149,22 @@ export function CrmActivityChip({
       style={{
         top,
         height,
-        backgroundColor: color + "18",
-        borderLeft: `4px dashed ${color}`,
+        backgroundColor: isCompleted ? "#f3f4f6" : color + "18",
+        borderLeft: `4px ${isCompleted ? "solid" : "dashed"} ${color}`,
         zIndex: 5,
+        opacity: isCompleted ? 0.75 : 1,
       }}
       onClick={() => onClick(activity)}
-      title={`CRM: ${activity.subject}`}
+      title={`CRM: ${activity.subject}${isCompleted ? " (Completed)" : ""}`}
     >
       <div className="flex items-center gap-1" style={{ color }}>
-        {crmActivityIcon(activity.type)}
-        <p className="text-xs font-medium leading-tight truncate">{activity.subject}</p>
+        {isCompleted ? <CheckCircle className="w-3 h-3" /> : crmActivityIcon(activity.type)}
+        <p className="text-xs font-medium leading-tight truncate" style={{ textDecoration: isCompleted ? "line-through" : undefined }}>{activity.subject}</p>
       </div>
       {height > 32 && (
-        <p className="text-xs text-muted-foreground mt-0.5 truncate capitalize">{activity.type}</p>
+        <p className="text-xs text-muted-foreground mt-0.5 truncate capitalize">
+          {isCompleted ? "Completed" : activity.type}
+        </p>
       )}
     </div>
   );

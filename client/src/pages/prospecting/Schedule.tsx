@@ -28,6 +28,7 @@ import {
   Mail,
   MapPin,
   Activity,
+  CheckCircle,
 } from "lucide-react";
 import { ProspectingNav } from "./ProspectingNav";
 import {
@@ -532,13 +533,34 @@ function CrmActivityDetailPanel({
   activity,
   onClose,
   onViewRecord,
+  onActivityUpdated,
 }: {
   activity: CrmActivityItem | null;
   onClose: () => void;
   onViewRecord: (a: CrmActivityItem) => void;
+  onActivityUpdated: (updated: CrmActivityItem) => void;
 }) {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  const markCompleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await apiRequest("POST", `/api/crm/activities/${id}/complete`);
+      return res.json();
+    },
+    onSuccess: (updated) => {
+      onActivityUpdated({ ...activity!, status: "completed", ...updated });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/activities"] });
+      toast({ title: "Activity marked as complete" });
+    },
+    onError: () => {
+      toast({ title: "Failed to update activity", variant: "destructive" });
+    },
+  });
+
   if (!activity) return null;
 
+  const isCompleted = activity.status === "completed";
   const scheduledDate = activity.scheduledAt ? parseISO(activity.scheduledAt) : null;
   const durationMins = activity.duration ?? null;
 
@@ -587,12 +609,12 @@ function CrmActivityDetailPanel({
           </div>
 
           {/* Status */}
-          {activity.status && (
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Status</span>
-              <span className="font-medium capitalize">{activity.status.replace(/_/g, " ")}</span>
-            </div>
-          )}
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">Status</span>
+            <span className="font-medium capitalize">
+              {activity.status ? activity.status.replace(/_/g, " ") : "—"}
+            </span>
+          </div>
 
           {/* Entity */}
           {activity.entityName && (
@@ -612,8 +634,23 @@ function CrmActivityDetailPanel({
             </div>
           )}
 
+          {/* Mark as Complete button */}
+          {!isCompleted && (
+            <div className="pt-1">
+              <Button
+                className="w-full"
+                variant="default"
+                onClick={() => markCompleteMutation.mutate(activity.id)}
+                disabled={markCompleteMutation.isPending}
+              >
+                <CheckCircle className="w-4 h-4 mr-2" />
+                {markCompleteMutation.isPending ? "Saving…" : "Mark as Complete"}
+              </Button>
+            </div>
+          )}
+
           {/* View CRM Record button */}
-          <div className="pt-2">
+          <div className={isCompleted ? "pt-1" : ""}>
             <Button
               className="w-full"
               variant="outline"
@@ -1048,19 +1085,28 @@ export default function Schedule() {
                   );
                 } else {
                   const a = item.data;
-                  const color = crmActivityColor(a.type);
+                  const isCrmDone = a.status === "completed";
+                  const color = isCrmDone ? "#9ca3af" : crmActivityColor(a.type);
                   return (
                     <div
                       key={`crm-${a.id}`}
                       className="flex items-center gap-3 p-3 rounded border cursor-pointer hover:bg-muted/30"
-                      style={{ borderLeftWidth: 4, borderLeftStyle: "dashed", borderLeftColor: color }}
+                      style={{
+                        borderLeftWidth: 4,
+                        borderLeftStyle: isCrmDone ? "solid" : "dashed",
+                        borderLeftColor: color,
+                        opacity: isCrmDone ? 0.75 : 1,
+                        backgroundColor: isCrmDone ? "rgb(243 244 246)" : undefined,
+                      }}
                       onClick={() => handleCrmActivityClick(a)}
                     >
-                      <span style={{ color }}>{crmIcon(a.type)}</span>
+                      <span style={{ color }}>
+                        {isCrmDone ? <CheckCircle className="w-4 h-4 shrink-0" /> : crmIcon(a.type)}
+                      </span>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{a.subject}</p>
+                        <p className="text-sm font-medium truncate" style={{ textDecoration: isCrmDone ? "line-through" : undefined }}>{a.subject}</p>
                         <p className="text-xs text-muted-foreground">
-                          {format(parseISO(a.scheduledAt), "EEE MMM d · h:mm a")}
+                          {isCrmDone ? "Completed · " : ""}{format(parseISO(a.scheduledAt), "EEE MMM d · h:mm a")}
                           {a.duration ? ` · ${a.duration}m` : ""}
                         </p>
                       </div>
@@ -1125,6 +1171,7 @@ export default function Schedule() {
         activity={crmDetailActivity}
         onClose={() => setCrmDetailActivity(null)}
         onViewRecord={(a) => { setCrmDetailActivity(null); navigateToCrmRecord(a); }}
+        onActivityUpdated={(updated) => setCrmDetailActivity(updated)}
       />
     </div>
   );
