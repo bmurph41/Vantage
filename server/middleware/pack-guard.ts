@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { packService, PackType } from "../services/pack-service";
+import { isLocalhostRequest } from "../utils/auth-helpers";
 
 declare global {
   namespace Express {
@@ -31,8 +32,10 @@ export function requirePack(...requiredPacks: PackType[]) {
       const activePacks = await packService.getActivePacks(user.orgId);
       req.activePacks = activePacks;
 
-      // Demo bypass: when running in demo mode and no packs configured, allow access
-      if (process.env.ALLOW_DEMO_AUTH === "true" && activePacks.length === 0) {
+      // Demo bypass: when running in demo mode and no packs configured, allow access.
+      // Localhost-gated so production traffic cannot trigger fail-open even if
+      // ALLOW_DEMO_AUTH is mistakenly set.
+      if (process.env.ALLOW_DEMO_AUTH === "true" && activePacks.length === 0 && isLocalhostRequest(req)) {
         return next();
       }
 
@@ -110,8 +113,10 @@ export function requireRentRoll() {
       const activePacks = await packService.getActivePacks(user.orgId);
       req.activePacks = activePacks;
 
-      // Demo bypass: allow access when no packs configured in demo mode
-      if (process.env.ALLOW_DEMO_AUTH === "true" && activePacks.length === 0) {
+      // Demo bypass: allow access when no packs configured in demo mode.
+      // Localhost-gated so production traffic cannot trigger fail-open even if
+      // ALLOW_DEMO_AUTH is mistakenly set.
+      if (process.env.ALLOW_DEMO_AUTH === "true" && activePacks.length === 0 && isLocalhostRequest(req)) {
         return next();
       }
 

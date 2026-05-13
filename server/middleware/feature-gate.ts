@@ -3,6 +3,7 @@ import { db } from "../db";
 import { billingFeatureFlags, billingSubscriptions, billingUsageMetrics, crmDeals, users } from "@shared/schema";
 import { eq, and, sql, count } from "drizzle-orm";
 import { SUBSCRIPTION_TIERS } from "../services/billing-service";
+import { isLocalhostRequest } from "../utils/auth-helpers";
 
 /**
  * Middleware: require a specific billing feature to be enabled for the org.
@@ -23,8 +24,10 @@ export function requireFeature(feature: string) {
         return next();
       }
 
-      // Demo bypass: if no subscription exists and running in demo/dev mode, allow access
-      if (process.env.ALLOW_DEMO_AUTH === "true") {
+      // Demo bypass: if no subscription exists and running in demo/dev mode on
+      // localhost, allow access. Localhost-gated so production traffic cannot
+      // trigger fail-open even if ALLOW_DEMO_AUTH is mistakenly set.
+      if (process.env.ALLOW_DEMO_AUTH === "true" && isLocalhostRequest(req)) {
         const [sub] = await db.select().from(billingSubscriptions).where(eq(billingSubscriptions.orgId, user.orgId));
         if (!sub) return next();
       }
@@ -92,8 +95,8 @@ export function checkUsageLimit(limitType: LimitType) {
         return next();
       }
 
-      // Demo bypass
-      if (process.env.ALLOW_DEMO_AUTH === "true") {
+      // Demo bypass: localhost only (defense-in-depth against env-var-leak).
+      if (process.env.ALLOW_DEMO_AUTH === "true" && isLocalhostRequest(req)) {
         const [sub] = await db.select().from(billingSubscriptions).where(eq(billingSubscriptions.orgId, user.orgId));
         if (!sub) return next();
       }

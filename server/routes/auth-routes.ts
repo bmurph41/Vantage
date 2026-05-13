@@ -11,6 +11,7 @@ import { z } from 'zod';
 import { sendEmailVerification, sendMagicLinkEmail, generateVerificationToken } from '../services/email-service';
 import { CONSENT_VERSION } from '@shared/consent-constants';
 import { getAllUserPermissions } from '../middleware/authorization';
+import { isLocalhostRequest } from '../utils/auth-helpers';
 
 declare global {
   namespace Express {
@@ -674,7 +675,7 @@ router.get('/me', async (req: Request, res: Response) => {
       }
     }
     
-    if (process.env.ALLOW_DEMO_AUTH === 'true') {
+    if (process.env.ALLOW_DEMO_AUTH === 'true' && isLocalhostRequest(req)) {
       return res.json({
         id: '85c9cd7a-c453-4dba-9817-d032d5712c4e',
         email: 'brettmurphy41@gmail.com',

@@ -9,9 +9,13 @@ import { setTenantContext, clearTenantContext } from './tenant-context';
 import { db } from '../db';
 import { users } from '../../shared/schema';
 import { eq } from 'drizzle-orm';
+import { isLocalhostRequest } from '../utils/auth-helpers';
 
 if (process.env.ALLOW_DEMO_AUTH === 'true') {
-  console.warn('[AUTH] ⚠️ ALLOW_DEMO_AUTH is enabled — demo credentials active. Do NOT use in production.');
+  console.warn(
+    '[AUTH] ⚠️ ALLOW_DEMO_AUTH is enabled — demo credentials active ONLY for localhost requests. ' +
+    'Demo auth cannot be triggered from non-localhost regardless of env var state.'
+  );
 }
 
 const PUBLIC_PATHS = ['/api/auth/', '/api/health', '/api/stripe/webhook', '/api/legal/', '/api/config', '/api/packs/catalog'];
@@ -74,7 +78,7 @@ export async function authenticateUser(req: Request, res: Response, next: NextFu
       }
     }
 
-    if (!resolvedUser && process.env.ALLOW_DEMO_AUTH === 'true') {
+    if (!resolvedUser && process.env.ALLOW_DEMO_AUTH === 'true' && isLocalhostRequest(req)) {
       console.warn('[AUTH] Using demo auth fallback for request:', req.originalUrl);
       resolvedUser = {
         id: "85c9cd7a-c453-4dba-9817-d032d5712c4e",

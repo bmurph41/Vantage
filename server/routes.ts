@@ -22,6 +22,7 @@ import { findCompanyDuplicates, type CompanyDuplicateMatch } from "./services/co
 import { requirePermission, requireRole } from "./middleware/rbac";
 import { requireEntitlement } from "./middleware/feature-gate";
 import { requireNotBeta } from "./middleware/require-not-beta";
+import { isLocalhostRequest } from "./utils/auth-helpers";
 import { AuditService } from "./services/audit-service";
 import { setTenantContext, clearTenantContext } from "./middleware/tenant-context";
 import { enforceTenant, requireTenantMatch } from "./middleware/tenant-isolation";
@@ -528,7 +529,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       //    both resolve the same admin user when no real session is present.
       //    Also triggers if a DB user was found but has no orgId (e.g. Replit OAuth
       //    user created without an org assignment yet).
-      if ((!resolvedUser || !resolvedUser.orgId) && process.env.ALLOW_DEMO_AUTH === 'true') {
+      if ((!resolvedUser || !resolvedUser.orgId) && process.env.ALLOW_DEMO_AUTH === 'true' && isLocalhostRequest(req)) {
         resolvedUser = { id: "85c9cd7a-c453-4dba-9817-d032d5712c4e", orgId: "cd3719c3-ef82-4ccc-acb9-261c80fb64b4", role: "owner", email: "brettmurphy41@gmail.com", name: "Brett Murphy" };
       }
       
