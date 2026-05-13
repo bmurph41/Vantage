@@ -266,45 +266,95 @@ router.get('/documents/:documentId/download-pdf', async (req: Request, res: Resp
 // Brand Settings
 // ---------------------------------------------------------------------------
 
-// In-memory brand settings store (would be DB in production)
-const brandSettingsStore = new Map<string, any>();
+// Brand settings — persisted in organization_brand_settings (Day 4 sub-fix 4b).
+// Previously an in-memory Map that was wiped on every restart and divergent
+// across horizontal replicas.
+
+const DEFAULT_BRAND_SETTINGS = {
+  primaryColor: '#1e3a5f',
+  secondaryColor: '#c9a96e',
+  fontFamily: 'sans-serif',
+  logoUrl: null as string | null,
+  companyName: '',
+};
 
 router.get('/brand-settings', async (req: Request, res: Response) => {
+  const orgId = getOrgId(req);
+  if (!orgId) {
+    return res.status(401).json({ error: 'Unauthenticated' });
+  }
   try {
-    const orgId = getOrgId(req) || 'default';
-    const settings = brandSettingsStore.get(orgId) || {
-      primaryColor: '#1e3a5f',
-      secondaryColor: '#c9a96e',
-      fontFamily: 'sans-serif',
-      logoUrl: null,
-      companyName: '',
-    };
-    res.json(settings);
+    const { pool } = await import('../db');
+    const result = await pool.query(
+      `SELECT primary_color, secondary_color, font_family, logo_url, company_name, settings_json, updated_at
+         FROM organization_brand_settings WHERE org_id = $1`,
+      [orgId],
+    );
+    if (result.rows.length === 0) {
+      return res.json(DEFAULT_BRAND_SETTINGS);
+    }
+    const row = result.rows[0];
+    return res.json({
+      primaryColor: row.primary_color ?? DEFAULT_BRAND_SETTINGS.primaryColor,
+      secondaryColor: row.secondary_color ?? DEFAULT_BRAND_SETTINGS.secondaryColor,
+      fontFamily: row.font_family ?? DEFAULT_BRAND_SETTINGS.fontFamily,
+      logoUrl: row.logo_url ?? null,
+      companyName: row.company_name ?? '',
+      ...(row.settings_json ?? {}),
+      updatedAt: row.updated_at,
+    });
   } catch (error) {
     console.error('Error fetching brand settings:', error);
-    res.status(500).json({ error: 'Failed to fetch brand settings' });
+    return res.status(500).json({ error: 'Failed to fetch brand settings' });
   }
 });
 
 router.put('/brand-settings', async (req: Request, res: Response) => {
+  const orgId = getOrgId(req);
+  if (!orgId) {
+    return res.status(401).json({ error: 'Unauthenticated' });
+  }
   try {
-    const orgId = getOrgId(req) || 'default';
-    const { primaryColor, secondaryColor, fontFamily, logoUrl, companyName } = req.body;
+    const { primaryColor, secondaryColor, fontFamily, logoUrl, companyName, ...rest } = req.body ?? {};
+    const settingsJson = Object.keys(rest).length > 0 ? rest : null;
 
-    const settings = {
-      primaryColor: primaryColor || '#1e3a5f',
-      secondaryColor: secondaryColor || '#c9a96e',
-      fontFamily: fontFamily || 'sans-serif',
-      logoUrl: logoUrl || null,
-      companyName: companyName || '',
-      updatedAt: new Date().toISOString(),
-    };
-
-    brandSettingsStore.set(orgId, settings);
-    res.json(settings);
+    const { pool } = await import('../db');
+    const result = await pool.query(
+      `INSERT INTO organization_brand_settings
+         (org_id, primary_color, secondary_color, font_family, logo_url, company_name, settings_json)
+       VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb)
+       ON CONFLICT (org_id) DO UPDATE
+         SET primary_color = EXCLUDED.primary_color,
+             secondary_color = EXCLUDED.secondary_color,
+             font_family = EXCLUDED.font_family,
+             logo_url = EXCLUDED.logo_url,
+             company_name = EXCLUDED.company_name,
+             settings_json = EXCLUDED.settings_json,
+             updated_at = NOW()
+       RETURNING primary_color, secondary_color, font_family, logo_url, company_name, settings_json, updated_at`,
+      [
+        orgId,
+        primaryColor ?? DEFAULT_BRAND_SETTINGS.primaryColor,
+        secondaryColor ?? DEFAULT_BRAND_SETTINGS.secondaryColor,
+        fontFamily ?? DEFAULT_BRAND_SETTINGS.fontFamily,
+        logoUrl ?? null,
+        companyName ?? '',
+        settingsJson ? JSON.stringify(settingsJson) : null,
+      ],
+    );
+    const row = result.rows[0];
+    return res.json({
+      primaryColor: row.primary_color,
+      secondaryColor: row.secondary_color,
+      fontFamily: row.font_family,
+      logoUrl: row.logo_url,
+      companyName: row.company_name,
+      ...(row.settings_json ?? {}),
+      updatedAt: row.updated_at,
+    });
   } catch (error) {
     console.error('Error saving brand settings:', error);
-    res.status(500).json({ error: 'Failed to save brand settings' });
+    return res.status(500).json({ error: 'Failed to save brand settings' });
   }
 });
 

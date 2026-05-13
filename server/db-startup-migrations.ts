@@ -19963,6 +19963,28 @@ const MIGRATIONS: Migration[] = [
   },
   { name: "stripe_events: idx_status", sql: `CREATE INDEX IF NOT EXISTS idx_stripe_events_status ON stripe_events (processing_status)` },
   { name: "stripe_events: idx_received_at", sql: `CREATE INDEX IF NOT EXISTS idx_stripe_events_received_at ON stripe_events (received_at DESC)` },
+
+  // organization_brand_settings — Day 4 sub-fix 4b. Per-org OM brand kit
+  // (logo, colors, font, company name). Moved off the in-memory Map in
+  // om-builder-routes.ts so settings survive restarts and horizontal scale.
+  {
+    name: "organization_brand_settings: create table",
+    sql: `
+      CREATE TABLE IF NOT EXISTS organization_brand_settings (
+        id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+        org_id varchar NOT NULL UNIQUE REFERENCES organizations(id) ON DELETE CASCADE,
+        primary_color varchar(20),
+        secondary_color varchar(20),
+        font_family varchar(100),
+        logo_url text,
+        company_name text,
+        settings_json jsonb,
+        created_at timestamp with time zone DEFAULT now() NOT NULL,
+        updated_at timestamp with time zone DEFAULT now() NOT NULL
+      )
+    `,
+  },
+  { name: "organization_brand_settings: idx_org_id", sql: `CREATE INDEX IF NOT EXISTS idx_brand_settings_org_id ON organization_brand_settings (org_id)` },
 ];
 
 /**

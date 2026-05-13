@@ -28679,6 +28679,21 @@ export const stripeEvents = pgTable("stripe_events", {
 export type StripeEvent = typeof stripeEvents.$inferSelect;
 export type InsertStripeEvent = typeof stripeEvents.$inferInsert;
 
+export const organizationBrandSettings = pgTable("organization_brand_settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id, { onDelete: "cascade" }).unique(),
+  primaryColor: varchar("primary_color", { length: 20 }),
+  secondaryColor: varchar("secondary_color", { length: 20 }),
+  fontFamily: varchar("font_family", { length: 100 }),
+  logoUrl: text("logo_url"),
+  companyName: text("company_name"),
+  settingsJson: jsonb("settings_json"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+export type OrganizationBrandSettings = typeof organizationBrandSettings.$inferSelect;
+export type InsertOrganizationBrandSettings = typeof organizationBrandSettings.$inferInsert;
+
 export const billingInvoices = pgTable("billing_invoices", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   orgId: varchar("org_id").notNull().references(() => organizations.id),
