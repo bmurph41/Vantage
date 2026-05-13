@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  format, startOfWeek, addDays, addWeeks, subWeeks,
+  format, startOfWeek, startOfDay, addDays, addWeeks, subWeeks,
   isSameDay, parseISO, differenceInMinutes,
 } from "date-fns";
 import {
@@ -505,14 +505,16 @@ export default function Schedule() {
 
   const weekEnd = addDays(weekStart, 7);
 
+  const rangeStart = viewMode === "week" ? weekStart : startOfDay(selectedDay);
+  const rangeEnd   = viewMode === "week" ? weekEnd   : addDays(startOfDay(selectedDay), 1);
+
   const { data: blocks = [], isLoading } = useQuery<TimeBlock[]>({
-    queryKey: ["/api/prospecting/time-blocks", weekStart.toISOString()],
+    queryKey: ["/api/prospecting/time-blocks", rangeStart.toISOString(), rangeEnd.toISOString()],
     queryFn: async () => {
-      const start = weekStart.toISOString();
-      const end = weekEnd.toISOString();
-      const res = await fetch(`/api/prospecting/time-blocks?start=${start}&end=${end}`, {
-        credentials: "include",
-      });
+      const res = await fetch(
+        `/api/prospecting/time-blocks?start=${rangeStart.toISOString()}&end=${rangeEnd.toISOString()}`,
+        { credentials: "include" }
+      );
       if (!res.ok) throw new Error("Failed to load blocks");
       return res.json();
     },
@@ -556,13 +558,13 @@ export default function Schedule() {
 
   const bulkCalPushMutation = useMutation({
     mutationFn: async (ids: string[]) => {
-      return apiRequest("POST", "/api/prospecting/time-blocks/bulk-push-calendar", { ids });
+      const res = await apiRequest("POST", "/api/prospecting/time-blocks/bulk-push-calendar", { ids });
+      return res.json() as Promise<{ pushed?: number; failed?: number }>;
     },
-    onSuccess: (data: unknown) => {
-      const d = data as { pushed?: number; failed?: number };
+    onSuccess: (data) => {
       toast({
-        title: `Pushed ${d?.pushed ?? 0} block(s) to Google Calendar`,
-        description: d?.failed ? `${d.failed} failed` : undefined,
+        title: `Pushed ${data?.pushed ?? 0} block(s) to Google Calendar`,
+        description: data?.failed ? `${data.failed} failed` : undefined,
       });
       queryClient.invalidateQueries({ queryKey: ["/api/prospecting/time-blocks"] });
     },

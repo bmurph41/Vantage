@@ -109,13 +109,14 @@ router.post('/', async (req: AuthenticatedRequest, res: Response) => {
     }
 
     // Validate invitees belong to the same org
-    if (invitedUserIds.length > 0) {
+    let safeInvitees: string[] = [...invitedUserIds];
+    if (safeInvitees.length > 0) {
       const { rows: validUsers } = await pool.query(
         `SELECT id FROM users WHERE id = ANY($1::uuid[]) AND org_id = $2`,
-        [invitedUserIds, orgId]
+        [safeInvitees, orgId]
       );
       const validIds = validUsers.map((u: { id: string }) => u.id);
-      invitedUserIds = invitedUserIds.filter((id) => validIds.includes(id));
+      safeInvitees = safeInvitees.filter((id) => validIds.includes(id));
     }
 
     const { rows: [block] } = await pool.query(
@@ -123,12 +124,12 @@ router.post('/', async (req: AuthenticatedRequest, res: Response) => {
          (org_id, created_by, title, block_type, start_at, end_at, notes, color, invited_user_ids)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
        RETURNING *`,
-      [orgId, userId, title, resolvedBlockType, startAt, endAt, notes ?? null, color, JSON.stringify(invitedUserIds)]
+      [orgId, userId, title, resolvedBlockType, startAt, endAt, notes ?? null, color, JSON.stringify(safeInvitees)]
     );
 
     // Notify invited team members
-    if (invitedUserIds.length > 0) {
-      await notifyInvitees(invitedUserIds, orgId, userId, block.id, title);
+    if (safeInvitees.length > 0) {
+      await notifyInvitees(safeInvitees, orgId, userId, block.id, title);
     }
 
     // Optionally push to Google Calendar immediately
