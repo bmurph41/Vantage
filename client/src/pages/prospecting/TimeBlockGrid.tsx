@@ -200,6 +200,20 @@ export function DraggableBlockChip({
     ? { transform: `translate(${transform.x}px, ${transform.y}px)` }
     : {};
 
+  if (isDragging) {
+    return (
+      <div
+        ref={setNodeRef}
+        style={{
+          top,
+          height: Math.max(height, 22),
+          borderColor: color,
+        }}
+        className="absolute left-1 right-1 rounded border border-dashed bg-transparent select-none pointer-events-none"
+      />
+    );
+  }
+
   return (
     <div
       ref={setNodeRef}
@@ -208,7 +222,6 @@ export function DraggableBlockChip({
         height: Math.max(height, 22),
         backgroundColor: color + "22",
         borderLeftColor: color,
-        opacity: isDragging ? 0.4 : 1,
         ...style,
       }}
       className="absolute left-1 right-1 rounded px-1.5 py-1 overflow-hidden shadow-sm border-l-4 select-none group"
@@ -321,6 +334,7 @@ export function TimeBlockGrid({
   setViewMode,
 }: TimeBlockGridProps) {
   const [overId, setOverId] = useState<string | null>(null);
+  const [dragWidth, setDragWidth] = useState<number>(150);
 
   const blocksForDay = (day: Date) =>
     blocks.filter((b) => isSameDay(parseISO(b.start_at), day));
@@ -332,6 +346,12 @@ export function TimeBlockGrid({
 
   const activeDragBlock = activeDragId ? blocks.find((b) => b.id === activeDragId) : null;
 
+  function handleDragStart(event: DragStartEvent) {
+    const w = event.active.rect.current.initial?.width;
+    if (w) setDragWidth(w);
+    onDragStart(event);
+  }
+
   function handleDragOver(event: DragOverEvent) {
     setOverId(event.over ? String(event.over.id) : null);
   }
@@ -342,7 +362,7 @@ export function TimeBlockGrid({
   }
 
   return (
-    <DndContext sensors={sensors} onDragStart={onDragStart} onDragOver={handleDragOver} onDragEnd={handleDragEnd}>
+    <DndContext sensors={sensors} onDragStart={handleDragStart} onDragOver={handleDragOver} onDragEnd={handleDragEnd}>
       <div className="flex-1 overflow-auto border rounded-lg bg-background">
         {/* Day header row */}
         <div
@@ -505,7 +525,7 @@ export function TimeBlockGrid({
             style={{
               backgroundColor: typeColor(activeDragBlock.block_type, activeDragBlock.color) + "33",
               borderLeftColor: typeColor(activeDragBlock.block_type, activeDragBlock.color),
-              width: 150,
+              width: dragWidth,
               height: Math.max(blockHeight(activeDragBlock.start_at, activeDragBlock.end_at), 40),
             }}
           >
