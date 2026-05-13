@@ -1439,6 +1439,7 @@ export class ProFormaEngineService {
         avgDscr,
         debtYield,
         ltv,
+        equityInvested: totalEquityInvested,
       },
       
       errors,

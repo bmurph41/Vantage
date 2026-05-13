@@ -57,6 +57,13 @@ export interface KpiMetrics {
   dockDoorCount?: number;
   // Hotel additional
   roomsRevPct?: number;
+  // Balance sheet fields (populated from uploaded financial statements or derived)
+  currentAssets?: number;
+  currentLiabilities?: number;
+  inventory?: number;
+  totalLiabilities?: number;
+  netWorth?: number;
+  cogs?: number;
   [key: string]: number | undefined;
 }
 
@@ -82,6 +89,7 @@ export interface KpiAnnualRow {
   revpan?: number;
   revPerUnit?: number;
   siteRentPct?: number;
+  cogs?: number;
   [key: string]: number | undefined;
 }
 
@@ -609,6 +617,102 @@ export const MODELING_KPI_REGISTRY: Record<string, ModelingKpiDef> = {
     benchmarkGood: 300,
     benchmarkWarn: 150,
   },
+  // ─── Balance sheet ratios ─────────────────────────────────────────────
+  currentRatio: {
+    key: 'currentRatio',
+    label: 'Current Ratio',
+    format: 'number',
+    color: 'text-sky-600 dark:text-sky-400',
+    tooltip: 'Current Assets ÷ Current Liabilities — measures short-term solvency; sourced from balance sheet uploads',
+    compute: (m) => {
+      if (m.currentAssets == null || !m.currentLiabilities || m.currentLiabilities <= 0) return null;
+      return m.currentAssets / m.currentLiabilities;
+    },
+    benchmarkGood: 2.0,
+    benchmarkWarn: 1.0,
+  },
+  quickRatio: {
+    key: 'quickRatio',
+    label: 'Quick Ratio',
+    format: 'number',
+    color: 'text-teal-600 dark:text-teal-400',
+    tooltip: '(Current Assets − Inventory) ÷ Current Liabilities — excludes less-liquid inventory; sourced from balance sheet uploads',
+    compute: (m) => {
+      if (m.currentAssets == null || !m.currentLiabilities || m.currentLiabilities <= 0) return null;
+      return (m.currentAssets - (m.inventory ?? 0)) / m.currentLiabilities;
+    },
+    benchmarkGood: 1.0,
+    benchmarkWarn: 0.5,
+  },
+  inventoryTurnover: {
+    key: 'inventoryTurnover',
+    label: 'Inventory Turns',
+    format: 'number',
+    color: 'text-amber-600 dark:text-amber-400',
+    tooltip: 'COGS ÷ Inventory — how many times inventory cycles per year; higher is more efficient',
+    compute: (m, rows) => {
+      if (!m.inventory || m.inventory <= 0) return null;
+      const cogs = m.cogs ?? rows?.[0]?.cogs;
+      if (!cogs) return null;
+      return cogs / m.inventory;
+    },
+    computeByYear: (row, m) => {
+      if (!m.inventory || m.inventory <= 0) return null;
+      if (!row.cogs) return null;
+      return row.cogs / m.inventory;
+    },
+    benchmarkGood: 6,
+    benchmarkWarn: 3,
+  },
+  debtToWorth: {
+    key: 'debtToWorth',
+    label: 'Debt-to-Worth',
+    format: 'number',
+    color: 'text-red-500 dark:text-red-400',
+    tooltip: 'Total Debt ÷ Net Worth — leverage at acquisition; derived from LTV when balance sheet data is unavailable',
+    compute: (m) => {
+      if (m.totalLiabilities != null && m.netWorth != null && m.netWorth > 0) {
+        return m.totalLiabilities / m.netWorth;
+      }
+      if (m.ltv != null && m.ltv > 0 && m.ltv < 100) {
+        return m.ltv / (100 - m.ltv);
+      }
+      if (m.purchasePrice && m.equityInvested && m.equityInvested > 0) {
+        const debt = m.purchasePrice - m.equityInvested;
+        return debt > 0 ? debt / m.equityInvested : 0;
+      }
+      return null;
+    },
+    benchmarkGood: 1.0,
+    benchmarkWarn: 2.0,
+    benchmarkInvert: true,
+  },
+  netProfitToOwnerCapital: {
+    key: 'netProfitToOwnerCapital',
+    label: 'NP / Owner Capital',
+    format: 'percent',
+    color: 'text-emerald-700 dark:text-emerald-300',
+    tooltip: 'Net Operating Income ÷ Owner\'s Capital — return on equity invested; Year 1 → Stabilized',
+    compute: (m, rows) => {
+      const capital = m.equityInvested && m.equityInvested > 0
+        ? m.equityInvested
+        : (m.purchasePrice && m.ltv != null ? m.purchasePrice * (1 - m.ltv / 100) : null);
+      if (!capital || capital <= 0) return null;
+      const noi = rows?.[0]?.noi ?? m.year1Noi;
+      if (noi == null) return null;
+      return (noi / capital) * 100;
+    },
+    computeByYear: (row, m) => {
+      const capital = m.equityInvested && m.equityInvested > 0
+        ? m.equityInvested
+        : (m.purchasePrice && m.ltv != null ? m.purchasePrice * (1 - m.ltv / 100) : null);
+      if (!capital || capital <= 0) return null;
+      if (row.noi == null) return null;
+      return (row.noi / capital) * 100;
+    },
+    benchmarkGood: 12,
+    benchmarkWarn: 7,
+  },
   // ─── Industrial-specific ──────────────────────────────────────────────
   clearHeight: {
     key: 'clearHeight',
@@ -645,18 +749,18 @@ export type ModelingAssetClass =
   | 'default';
 
 export const ASSET_CLASS_KPI_SETS: Record<ModelingAssetClass, string[]> = {
-  marina:       ['irr', 'equityMultiple', 'cashOnCash', 'goingInCapRate', 'noiMargin', 'dscr', 'opexRatio', 'exitCapRate', 'stabilizedNoi', 'exitValue', 'noiCagr', 'revenuePerSlip', 'noiPerSlip', 'slipOccupancy', 'fuelRevenuePct', 'serviceRevenuePct'],
-  multifamily:  ['irr', 'equityMultiple', 'cashOnCash', 'goingInCapRate', 'noiMargin', 'dscr', 'opexRatio', 'exitCapRate', 'stabilizedNoi', 'exitValue', 'noiCagr', 'occupancyRate', 'revPerUnit', 'rentSpread', 'turnoverRate'],
-  hotel:        ['irr', 'equityMultiple', 'cashOnCash', 'goingInCapRate', 'noiMargin', 'dscr', 'opexRatio', 'exitCapRate', 'stabilizedNoi', 'exitValue', 'noiCagr', 'occupancyRate', 'adr', 'revpar', 'roomsRevPct', 'fbRevenuePct'],
-  str:          ['irr', 'equityMultiple', 'cashOnCash', 'goingInCapRate', 'noiMargin', 'dscr', 'opexRatio', 'exitCapRate', 'stabilizedNoi', 'noiCagr', 'avgDailyRate', 'strOccupancy', 'revpan', 'cleaningFeePct'],
-  rv_park:      ['irr', 'equityMultiple', 'cashOnCash', 'goingInCapRate', 'noiMargin', 'dscr', 'opexRatio', 'exitCapRate', 'stabilizedNoi', 'exitValue', 'noiCagr', 'siteRentPct', 'storeRevenuePct', 'cabinRevenuePct'],
-  retail:       ['irr', 'equityMultiple', 'cashOnCash', 'goingInCapRate', 'noiMargin', 'dscr', 'ltv', 'opexRatio', 'exitCapRate', 'stabilizedNoi', 'exitValue', 'occupancyRate', 'walt', 'anchorTenantPct', 'nearTermExpiryPct', 'pricePerSf'],
-  office:       ['irr', 'equityMultiple', 'cashOnCash', 'goingInCapRate', 'noiMargin', 'dscr', 'ltv', 'opexRatio', 'exitCapRate', 'stabilizedNoi', 'exitValue', 'occupancyRate', 'walt', 'anchorTenantPct', 'nearTermExpiryPct', 'pricePerSf'],
-  industrial:   ['irr', 'equityMultiple', 'cashOnCash', 'goingInCapRate', 'noiMargin', 'dscr', 'ltv', 'opexRatio', 'exitCapRate', 'stabilizedNoi', 'exitValue', 'walt', 'pricePerSf', 'clearHeight', 'dockDoorCount'],
-  self_storage: ['irr', 'equityMultiple', 'cashOnCash', 'goingInCapRate', 'noiMargin', 'dscr', 'ltv', 'opexRatio', 'exitCapRate', 'stabilizedNoi', 'noiCagr', 'physicalOccupancy', 'ratePerSf', 'climateControlledPct', 'ecriUpside'],
-  mixed_use:    ['irr', 'equityMultiple', 'cashOnCash', 'goingInCapRate', 'noiMargin', 'dscr', 'opexRatio', 'exitCapRate', 'stabilizedNoi', 'exitValue', 'noiCagr'],
-  business:     ['irr', 'equityMultiple', 'cashOnCash', 'goingInCapRate', 'exitCapRate', 'noiMargin', 'dscr', 'opexRatio', 'totalReturn', 'exitValue', 'stabilizedNoi', 'noiCagr'],
-  default:      ['irr', 'equityMultiple', 'cashOnCash', 'goingInCapRate', 'noiMargin', 'dscr', 'opexRatio', 'exitCapRate', 'stabilizedNoi', 'exitValue'],
+  marina:       ['irr', 'equityMultiple', 'cashOnCash', 'goingInCapRate', 'noiMargin', 'dscr', 'opexRatio', 'exitCapRate', 'stabilizedNoi', 'exitValue', 'noiCagr', 'revenuePerSlip', 'noiPerSlip', 'slipOccupancy', 'fuelRevenuePct', 'serviceRevenuePct', 'debtToWorth', 'netProfitToOwnerCapital', 'currentRatio', 'quickRatio', 'inventoryTurnover'],
+  multifamily:  ['irr', 'equityMultiple', 'cashOnCash', 'goingInCapRate', 'noiMargin', 'dscr', 'opexRatio', 'exitCapRate', 'stabilizedNoi', 'exitValue', 'noiCagr', 'occupancyRate', 'revPerUnit', 'rentSpread', 'turnoverRate', 'debtToWorth', 'netProfitToOwnerCapital'],
+  hotel:        ['irr', 'equityMultiple', 'cashOnCash', 'goingInCapRate', 'noiMargin', 'dscr', 'opexRatio', 'exitCapRate', 'stabilizedNoi', 'exitValue', 'noiCagr', 'occupancyRate', 'adr', 'revpar', 'roomsRevPct', 'fbRevenuePct', 'debtToWorth', 'netProfitToOwnerCapital'],
+  str:          ['irr', 'equityMultiple', 'cashOnCash', 'goingInCapRate', 'noiMargin', 'dscr', 'opexRatio', 'exitCapRate', 'stabilizedNoi', 'noiCagr', 'avgDailyRate', 'strOccupancy', 'revpan', 'cleaningFeePct', 'debtToWorth', 'netProfitToOwnerCapital'],
+  rv_park:      ['irr', 'equityMultiple', 'cashOnCash', 'goingInCapRate', 'noiMargin', 'dscr', 'opexRatio', 'exitCapRate', 'stabilizedNoi', 'exitValue', 'noiCagr', 'siteRentPct', 'storeRevenuePct', 'cabinRevenuePct', 'debtToWorth', 'netProfitToOwnerCapital', 'currentRatio', 'quickRatio', 'inventoryTurnover'],
+  retail:       ['irr', 'equityMultiple', 'cashOnCash', 'goingInCapRate', 'noiMargin', 'dscr', 'ltv', 'opexRatio', 'exitCapRate', 'stabilizedNoi', 'exitValue', 'occupancyRate', 'walt', 'anchorTenantPct', 'nearTermExpiryPct', 'pricePerSf', 'debtToWorth', 'netProfitToOwnerCapital'],
+  office:       ['irr', 'equityMultiple', 'cashOnCash', 'goingInCapRate', 'noiMargin', 'dscr', 'ltv', 'opexRatio', 'exitCapRate', 'stabilizedNoi', 'exitValue', 'occupancyRate', 'walt', 'anchorTenantPct', 'nearTermExpiryPct', 'pricePerSf', 'debtToWorth', 'netProfitToOwnerCapital'],
+  industrial:   ['irr', 'equityMultiple', 'cashOnCash', 'goingInCapRate', 'noiMargin', 'dscr', 'ltv', 'opexRatio', 'exitCapRate', 'stabilizedNoi', 'exitValue', 'walt', 'pricePerSf', 'clearHeight', 'dockDoorCount', 'debtToWorth', 'netProfitToOwnerCapital'],
+  self_storage: ['irr', 'equityMultiple', 'cashOnCash', 'goingInCapRate', 'noiMargin', 'dscr', 'ltv', 'opexRatio', 'exitCapRate', 'stabilizedNoi', 'noiCagr', 'physicalOccupancy', 'ratePerSf', 'climateControlledPct', 'ecriUpside', 'debtToWorth', 'netProfitToOwnerCapital'],
+  mixed_use:    ['irr', 'equityMultiple', 'cashOnCash', 'goingInCapRate', 'noiMargin', 'dscr', 'opexRatio', 'exitCapRate', 'stabilizedNoi', 'exitValue', 'noiCagr', 'debtToWorth', 'netProfitToOwnerCapital'],
+  business:     ['irr', 'equityMultiple', 'cashOnCash', 'goingInCapRate', 'exitCapRate', 'noiMargin', 'dscr', 'opexRatio', 'totalReturn', 'exitValue', 'stabilizedNoi', 'noiCagr', 'debtToWorth', 'netProfitToOwnerCapital', 'currentRatio', 'quickRatio', 'inventoryTurnover'],
+  default:      ['irr', 'equityMultiple', 'cashOnCash', 'goingInCapRate', 'noiMargin', 'dscr', 'opexRatio', 'exitCapRate', 'stabilizedNoi', 'exitValue', 'debtToWorth', 'netProfitToOwnerCapital'],
 };
 
 export function getKpisForAssetClass(assetClass?: string | null): ModelingKpiDef[] {

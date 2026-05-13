@@ -92,6 +92,9 @@ export interface ProFormaMetrics {
   revenueGrowthRate: number;
   expenseGrowthRate: number;
   totalReturn: number;
+  equityInvested?: number;
+  ltv?: number;
+  minDscr?: number;
   [key: string]: unknown;
 }
 
