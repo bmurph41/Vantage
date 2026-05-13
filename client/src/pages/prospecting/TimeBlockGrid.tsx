@@ -12,7 +12,7 @@ import {
 } from "@dnd-kit/core";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { CalendarDays, Calendar } from "lucide-react";
+import { CalendarDays, Calendar, Phone, Users, Mail, MapPin } from "lucide-react";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -35,6 +35,17 @@ export type TimeBlock = {
   google_calendar_event_id?: string;
   invited_user_ids: string[];
   creator_name?: string;
+};
+
+export type CrmActivityItem = {
+  id: string;
+  type: string;
+  subject: string;
+  scheduledAt: string;
+  duration?: number | null;
+  entityType?: string | null;
+  entityId?: string | null;
+  status?: string | null;
 };
 
 export const BLOCK_TYPES = [
@@ -69,6 +80,76 @@ export function typeLabel(blockType: string) {
 
 export function typeColor(blockType: string, overrideColor?: string) {
   return overrideColor || DEFAULT_COLORS[blockType] || "#3b82f6";
+}
+
+// ── CRM Activity helpers ───────────────────────────────────────────────────────
+
+const CRM_ACTIVITY_COLORS: Record<string, string> = {
+  call:    "#0ea5e9",
+  meeting: "#7c3aed",
+  email:   "#f97316",
+  tour:    "#10b981",
+  site_tour: "#10b981",
+  task:    "#64748b",
+};
+
+function crmActivityColor(type: string) {
+  return CRM_ACTIVITY_COLORS[type] ?? "#64748b";
+}
+
+function crmActivityIcon(type: string) {
+  switch (type) {
+    case "call": return <Phone className="w-3 h-3" />;
+    case "meeting": return <Users className="w-3 h-3" />;
+    case "email": return <Mail className="w-3 h-3" />;
+    case "tour":
+    case "site_tour": return <MapPin className="w-3 h-3" />;
+    default: return null;
+  }
+}
+
+function crmActivityEndAt(activity: CrmActivityItem): string {
+  const start = parseISO(activity.scheduledAt);
+  const durationMs = (activity.duration ?? 60) * 60_000;
+  return new Date(start.getTime() + durationMs).toISOString();
+}
+
+// ── CRM Activity chip (read-only, striped left border) ──────────────────────
+
+export function CrmActivityChip({
+  activity,
+  onClick,
+}: {
+  activity: CrmActivityItem;
+  onClick: (a: CrmActivityItem) => void;
+}) {
+  const color = crmActivityColor(activity.type);
+  const top = blockTop(activity.scheduledAt);
+  const endAt = crmActivityEndAt(activity);
+  const height = Math.max(blockHeight(activity.scheduledAt, endAt), 22);
+
+  return (
+    <div
+      className="absolute left-1 right-1 rounded px-1.5 py-1 overflow-hidden shadow-sm cursor-pointer hover:brightness-95"
+      style={{
+        top,
+        height,
+        backgroundColor: color + "18",
+        borderLeft: `4px dashed ${color}`,
+        zIndex: 5,
+      }}
+      onClick={() => onClick(activity)}
+      title={`CRM: ${activity.subject}`}
+    >
+      <div className="flex items-center gap-1" style={{ color }}>
+        {crmActivityIcon(activity.type)}
+        <p className="text-xs font-medium leading-tight truncate">{activity.subject}</p>
+      </div>
+      {height > 32 && (
+        <p className="text-xs text-muted-foreground mt-0.5 truncate capitalize">{activity.type}</p>
+      )}
+    </div>
+  );
 }
 
 // ── Draggable block chip ──────────────────────────────────────────────────────
@@ -182,6 +263,7 @@ export function DroppableHourCell({ id, onClick }: { id: string; onClick: () => 
 
 export type TimeBlockGridProps = {
   blocks: TimeBlock[];
+  crmActivities?: CrmActivityItem[];
   days: Date[];
   hours: number[];
   viewMode: "week" | "day";
@@ -195,12 +277,14 @@ export type TimeBlockGridProps = {
   openEdit: (block: TimeBlock) => void;
   onCalendarPush: (id: string) => void;
   onResizeStart: (blockId: string, startY: number, origEndAtMs: number) => void;
+  onCrmActivityClick: (activity: CrmActivityItem) => void;
   setSelectedDay: (d: Date) => void;
   setViewMode: (v: "week" | "day") => void;
 };
 
 export function TimeBlockGrid({
   blocks,
+  crmActivities = [],
   days,
   hours,
   viewMode,
@@ -214,11 +298,17 @@ export function TimeBlockGrid({
   openEdit,
   onCalendarPush,
   onResizeStart,
+  onCrmActivityClick,
   setSelectedDay,
   setViewMode,
 }: TimeBlockGridProps) {
   const blocksForDay = (day: Date) =>
     blocks.filter((b) => isSameDay(parseISO(b.start_at), day));
+
+  const crmActivitiesForDay = (day: Date) =>
+    crmActivities.filter(
+      (a) => a.scheduledAt && isSameDay(parseISO(a.scheduledAt), day)
+    );
 
   const activeDragBlock = activeDragId ? blocks.find((b) => b.id === activeDragId) : null;
 
@@ -276,6 +366,7 @@ export function TimeBlockGrid({
           {/* Day columns */}
           {days.map((day) => {
             const dayBlocks = blocksForDay(day);
+            const dayCrmActivities = crmActivitiesForDay(day);
             const dayIso = format(day, "yyyy-MM-dd");
 
             return (
@@ -313,6 +404,14 @@ export function TimeBlockGrid({
                         heightOverride={resizeHeights[b.id]}
                       />
                     ))}
+
+                {!isLoading && dayCrmActivities.map((a) => (
+                  <CrmActivityChip
+                    key={`crm-${a.id}`}
+                    activity={a}
+                    onClick={onCrmActivityClick}
+                  />
+                ))}
 
                 {isSameDay(day, new Date()) && (() => {
                   const now = new Date();

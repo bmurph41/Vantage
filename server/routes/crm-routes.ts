@@ -2436,7 +2436,9 @@ export function registerCRMRoutes(
       const pag = parsePagination(req.query, { pageSize: 50 });
       const entityType = typeof req.query.entityType === 'string' ? req.query.entityType : undefined;
       const entityId = typeof req.query.entityId === 'string' ? req.query.entityId : undefined;
-      const allActivities = await storage.getCrmActivitiesForOrg(req.user.orgId, { entityType, entityId });
+      const start = typeof req.query.start === 'string' ? new Date(req.query.start) : undefined;
+      const end = typeof req.query.end === 'string' ? new Date(req.query.end) : undefined;
+      const allActivities = await storage.getCrmActivitiesForOrg(req.user.orgId, { entityType, entityId, start, end });
       const total = allActivities.length;
       const paged = allActivities.slice(pag.offset, pag.offset + pag.limit);
       res.json(paginatedResponse(paged, total, pag));

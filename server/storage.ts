@@ -111,7 +111,7 @@ import {
   type InsertTenantRolloverAssumptions,
 } from "../db/schema-commercial-tenants";
 import { db } from "./db";
-import { eq, and, desc, asc, sql, inArray, isNull, isNotNull, or, count, ilike } from "drizzle-orm";
+import { eq, and, desc, asc, sql, inArray, isNull, isNotNull, or, count, ilike, gte, lte } from "drizzle-orm";
 import { VdrStorage } from "./vdr-storage";
 import { VdrPermissionService } from "./vdr-permission-service";
 
@@ -498,7 +498,7 @@ export interface IStorage {
 
   // CRM - Activities
   getCrmActivity(id: string): Promise<CrmActivity | undefined>;
-  getCrmActivitiesForOrg(orgId: string, opts?: { entityType?: string; entityId?: string; limit?: number; offset?: number }): Promise<CrmActivity[]>;
+  getCrmActivitiesForOrg(orgId: string, opts?: { entityType?: string; entityId?: string; start?: Date; end?: Date; limit?: number; offset?: number }): Promise<CrmActivity[]>;
   getCrmActivitiesByDeal(dealId: string): Promise<CrmActivity[]>;
   getCrmActivitiesByLead(leadId: string): Promise<CrmActivity[]>;
   getCrmActivitiesByContact(contactId: string): Promise<CrmActivity[]>;
@@ -3988,11 +3988,14 @@ export class DatabaseStorage implements IStorage {
     return activity || undefined;
   }
 
-  async getCrmActivitiesForOrg(orgId: string, opts?: { entityType?: string; entityId?: string; limit?: number; offset?: number }): Promise<CrmActivity[]> {
+  async getCrmActivitiesForOrg(orgId: string, opts?: { entityType?: string; entityId?: string; start?: Date; end?: Date; limit?: number; offset?: number }): Promise<CrmActivity[]> {
     const conds = [eq(crmActivities.orgId, orgId)];
     if (opts?.entityType) conds.push(eq(crmActivities.entityType, opts.entityType));
     if (opts?.entityId) conds.push(eq(crmActivities.entityId, opts.entityId));
-    let q = db.select().from(crmActivities).where(and(...conds)).orderBy(desc(crmActivities.createdAt));
+    if (opts?.start) conds.push(gte(crmActivities.scheduledAt, opts.start));
+    if (opts?.end) conds.push(lte(crmActivities.scheduledAt, opts.end));
+    const orderCol = (opts?.start || opts?.end) ? crmActivities.scheduledAt : crmActivities.createdAt;
+    let q = db.select().from(crmActivities).where(and(...conds)).orderBy(desc(orderCol));
     if (opts?.limit) q = (q as any).limit(opts.limit);
     if (opts?.offset) q = (q as any).offset(opts.offset);
     return q;

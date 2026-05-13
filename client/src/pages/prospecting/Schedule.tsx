@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import {
   format, startOfWeek, startOfDay, addDays, addWeeks, subWeeks, parseISO,
 } from "date-fns";
@@ -27,6 +28,7 @@ import { ProspectingNav } from "./ProspectingNav";
 import {
   TimeBlockGrid,
   TimeBlock,
+  CrmActivityItem,
   BLOCK_TYPES,
   DEFAULT_COLORS,
   typeColor,
@@ -296,6 +298,7 @@ function BlockDrawer({
 export default function Schedule() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const [, navigate] = useLocation();
 
   const [viewMode, setViewMode] = useState<"week" | "day">("week");
   const [weekStart, setWeekStart] = useState<Date>(() =>
@@ -323,6 +326,33 @@ export default function Schedule() {
       return res.json();
     },
   });
+
+  const { data: crmActivitiesPage } = useQuery<{ data: CrmActivityItem[] }>({
+    queryKey: ["/api/crm/activities", rangeStart.toISOString(), rangeEnd.toISOString()],
+    queryFn: async () => {
+      const res = await fetch(
+        `/api/crm/activities?start=${rangeStart.toISOString()}&end=${rangeEnd.toISOString()}&pageSize=100`,
+        { credentials: "include" }
+      );
+      if (!res.ok) return { data: [] };
+      return res.json();
+    },
+  });
+  const crmActivities: CrmActivityItem[] = (crmActivitiesPage?.data ?? []).filter(
+    (a) => !!a.scheduledAt
+  );
+
+  const handleCrmActivityClick = useCallback((activity: CrmActivityItem) => {
+    if (!activity.entityId) return;
+    switch (activity.entityType) {
+      case "contact": navigate(`/crm/contacts/${activity.entityId}`); break;
+      case "deal":    navigate(`/crm/deals/${activity.entityId}`); break;
+      case "company": navigate(`/crm/companies/${activity.entityId}`); break;
+      case "property": navigate(`/crm/properties/${activity.entityId}`); break;
+      case "lead":    navigate(`/crm/leads`); break;
+      default:        navigate(`/crm/activities`); break;
+    }
+  }, [navigate]);
 
   const { data: orgUsers = [] } = useQuery<OrgUser[]>({
     queryKey: ["/api/users"],
@@ -616,6 +646,10 @@ export default function Schedule() {
             {t.label}
           </span>
         ))}
+        <span className="flex items-center gap-1.5 text-xs text-muted-foreground border-l pl-3">
+          <span className="w-2.5 h-2.5 rounded border-2 border-dashed border-sky-500" />
+          CRM Activity
+        </span>
       </div>
 
       {/* Mobile list fallback (screens < md) */}
@@ -652,6 +686,7 @@ export default function Schedule() {
       <div className="hidden md:flex md:flex-col md:flex-1 md:min-h-0">
         <TimeBlockGrid
           blocks={blocks}
+          crmActivities={crmActivities}
           days={days}
           hours={hours}
           viewMode={viewMode}
@@ -665,6 +700,7 @@ export default function Schedule() {
           openEdit={openEdit}
           onCalendarPush={(id) => calPushMutation.mutate(id)}
           onResizeStart={handleResizeStart}
+          onCrmActivityClick={handleCrmActivityClick}
           setSelectedDay={setSelectedDay}
           setViewMode={setViewMode}
         />
@@ -674,9 +710,12 @@ export default function Schedule() {
       <div className="mt-3 flex items-center gap-4 text-xs text-muted-foreground">
         <span className="flex items-center gap-1">
           <Clock className="w-3 h-3" />
-          {blocks.length} block{blocks.length !== 1 ? "s" : ""} this week
+          {blocks.length} block{blocks.length !== 1 ? "s" : ""}
         </span>
         <span>{blocks.filter((b) => b.synced_to_calendar).length} synced to Google Calendar</span>
+        {crmActivities.length > 0 && (
+          <span>{crmActivities.length} CRM activit{crmActivities.length !== 1 ? "ies" : "y"}</span>
+        )}
       </div>
 
       {/* Drawer */}
