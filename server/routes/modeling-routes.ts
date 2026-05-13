@@ -2469,40 +2469,27 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
 
       const pageKey = `modeling:kpi-strip:${projectId}`;
 
-      // Upsert into user-scoped preferences table.
-      // kpiConfig is an unrestricted jsonb column; we store a plain string[]
-      // here (modeling KPI keys) rather than the CRM-oriented KpiConfigItem[]
-      // shape used by the /api/user-preferences/kpis/:pageKey endpoint.
-      // We use a sql template to write the raw JSON array without touching
-      // the Drizzle-typed insert path that expects KpiConfigItem objects.
-      const [existing] = await db
-        .select()
-        .from(userKpiPreferences)
-        .where(and(
-          eq(userKpiPreferences.userId, userId),
-          eq(userKpiPreferences.orgId, orgId),
-          eq(userKpiPreferences.pageKey, pageKey),
-        ))
-        .limit(1);
+      // Upsert into user-scoped preferences table using the unique constraint
+      // on (userId, orgId, pageKey) to avoid a select-then-insert race.
+      //
+      // Note on typing: kpiConfig is an unrestricted jsonb column shared
+      // between multiple feature areas.  For this page key we store a plain
+      // string[] (ordered list of KPI registry keys) rather than the
+      // CRM-oriented KpiConfigItem[] shape validated by the
+      // /api/user-preferences/kpis/:pageKey endpoint.  The sql template cast
+      // is intentional — it is the correct Drizzle pattern for writing a
+      // raw JSON value when the TS-inferred column type is narrower than the
+      // underlying JSONB storage.  TODO: relax kpiConfigItemSchema to a
+      // discriminated union so this page key can be written with typed inserts.
+      const kpiJson = sql`${JSON.stringify(validKeys)}::jsonb`;
 
-      if (existing) {
-        await db
-          .update(userKpiPreferences)
-          .set({
-            kpiConfig: sql`${JSON.stringify(validKeys)}::jsonb`,
-            lastModified: new Date(),
-          })
-          .where(eq(userKpiPreferences.id, existing.id));
-      } else {
-        await db
-          .insert(userKpiPreferences)
-          .values({
-            userId,
-            orgId,
-            pageKey,
-            kpiConfig: sql`${JSON.stringify(validKeys)}::jsonb`,
-          });
-      }
+      await db
+        .insert(userKpiPreferences)
+        .values({ userId, orgId, pageKey, kpiConfig: kpiJson })
+        .onConflictDoUpdate({
+          target: [userKpiPreferences.userId, userKpiPreferences.orgId, userKpiPreferences.pageKey],
+          set: { kpiConfig: kpiJson, lastModified: new Date() },
+        });
 
       res.json({ success: true, enabledKeys: validKeys });
     } catch (error: any) {
