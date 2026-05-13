@@ -1,45 +1,60 @@
 {
+  "_comment": "Canonical marina fixture for Task #398 — 10-run financial model validation. DO NOT modify values without updating the report baseline.",
   "project": {
-    "marinaName": "Sunset Bay Marina – Beta Test Fixture",
+    "marinaName": "Harborview Marina – Beta Test Fixture",
     "assetClass": "marina",
-    "city": "Sarasota",
-    "state": "FL",
-    "purchasePrice": 8500000,
+    "city": "Annapolis",
+    "state": "MD",
+    "purchasePrice": 12500000,
     "customMetrics": {
       "inputAssumptions": {
-        "fuel_sales": 320000,
-        "fuel_cogs": 240000,
-        "ship_store": 85000,
-        "ship_store_cogs": 52000,
-        "service_yard": 145000,
-        "service_cogs": 72000,
-        "boat_rentals": 48000,
-        "insurance": 64000,
-        "property_taxes": 112000,
-        "dredging_reserve": 22000,
-        "dock_maintenance": 58000,
-        "utilities": 43000,
-        "property_management": 8,
-        "payroll": 285000,
-        "admin_general": 32000,
+        "fuel_sales": 520000,
+        "fuel_cogs": 390000,
+        "ship_store": 115000,
+        "ship_store_cogs": 72000,
+        "service_yard": 210000,
+        "service_cogs": 105000,
+        "boat_rentals": 68000,
+        "insurance": 88000,
+        "property_taxes": 168000,
+        "dredging_reserve": 28000,
+        "dock_maintenance": 72000,
+        "utilities": 56000,
+        "property_management": 7,
+        "payroll": 385000,
+        "admin_general": 44000,
         "inSeasonMonths": [4, 5, 6, 7, 8, 9, 10],
         "offSeasonDiscount": 25
       },
       "unitMix": [
-        { "label": "Wet Slip 30ft", "count": 48, "monthlyRent": 480, "occupancy": 0.91 },
-        { "label": "Wet Slip 40ft", "count": 32, "monthlyRent": 720, "occupancy": 0.88 },
-        { "label": "Wet Slip 50ft", "count": 18, "monthlyRent": 950, "occupancy": 0.85 },
-        { "label": "Dry Stack Indoor", "count": 80, "monthlyRent": 310, "occupancy": 0.92 },
-        { "label": "Dry Stack Outdoor", "count": 40, "monthlyRent": 195, "occupancy": 0.87 },
-        { "label": "Transient Slip", "count": 12, "monthlyRent": 650, "occupancy": 0.68 }
+        { "label": "Wet Slip 30ft",       "count": 55, "monthlyRent": 495,  "occupancy": 0.92 },
+        { "label": "Wet Slip 40ft",       "count": 42, "monthlyRent": 745,  "occupancy": 0.89 },
+        { "label": "Wet Slip 50ft",       "count": 28, "monthlyRent": 985,  "occupancy": 0.86 },
+        { "label": "Mega Yacht Slip 80ft","count":  5, "monthlyRent": 2800, "occupancy": 0.80 },
+        { "label": "Dry Stack Indoor",    "count": 45, "monthlyRent": 325,  "occupancy": 0.93 },
+        { "label": "Dry Stack Outdoor",   "count": 30, "monthlyRent": 215,  "occupancy": 0.88 },
+        { "label": "Transient Slip",      "count": 15, "monthlyRent": 680,  "occupancy": 0.65 }
       ]
     }
   },
   "scenario": {
+    "scenarioType": "base",
+    "name": "Base Case – 10 yr hold",
     "revenueGrowthRate": 3.5,
     "expenseGrowthRate": 2.5,
-    "exitCapRate": 6.75,
-    "holdPeriod": 7
+    "exitCapRate": 6.75
+  },
+  "projectConfig": {
+    "holdPeriod": 10,
+    "acquisitionCloseDate": "2026-01-01"
+  },
+  "capitalStack": {
+    "totalDebt": 8125000,
+    "blendedDebtRate": 6.5,
+    "holdPeriodYears": 10,
+    "lpEquityPct": 90,
+    "gpEquityPct": 10,
+    "totalEquity": 4375000
   },
   "dcf": {
     "discountRate": 10
@@ -51,17 +66,52 @@
     "discountRate": 10
   },
   "exitScenario": {
-    "name": "Base Exit – Year 7",
-    "exitYear": 7,
+    "name": "Base Sale – Year 10",
+    "exitYear": 10,
     "exitCapRate": 6.75,
     "sellingCostPct": 3.0,
-    "notes": "Beta test base exit scenario"
+    "notes": "Beta test base exit — canonical fixture"
+  },
+  "waterfall": {
+    "scenarioVersionId": "00000000-0000-0000-0000-000000004200",
+    "totalInvestment": 12500000,
+    "lpContribution": 3937500,
+    "gpContribution": 437500,
+    "holdingPeriodYears": 10,
+    "annualCashFlows": [
+      862000, 892000, 924000, 956000, 990000,
+      1025000, 1061000, 1098000, 1137000, 1177000
+    ],
+    "exitProceeds": 14800000,
+    "config": {
+      "tiers": [
+        {
+          "id": "t1", "name": "Preferred Return",
+          "hurdleRate": 8, "lpSplit": 100, "gpSplit": 0
+        },
+        {
+          "id": "t2", "name": "Catch-Up",
+          "hurdleRate": 8, "lpSplit": 0, "gpSplit": 100
+        },
+        {
+          "id": "t3", "name": "Promote Tier",
+          "hurdleRate": 15, "lpSplit": 80, "gpSplit": 20
+        },
+        {
+          "id": "t4", "name": "Super Promote",
+          "hurdleRate": 99, "lpSplit": 70, "gpSplit": 30
+        }
+      ],
+      "preferredReturn": 8,
+      "gpCatchUpPercentage": 0.2,
+      "isEuropean": false,
+      "clawbackProvision": true,
+      "managementFeeRate": 1.5,
+      "acquisitionFeeRate": 1.0,
+      "dispositionFeeRate": 0.5
+    }
   },
   "decisionSupport": {
-    "mode": "full",
-    "includeMonteCarlo": true,
-    "monteCarloSeed": 42,
-    "monteCarloN": 500,
     "hurdleIRR": 12,
     "discountRate": 10,
     "memoTone": "concise"

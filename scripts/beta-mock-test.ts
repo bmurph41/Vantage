@@ -1,443 +1,601 @@
 /**
  * scripts/beta-mock-test.ts
  *
- * Beta Mock Test — 10-pass financial model pipeline validation
+ * Task #398 — Beta Mock Test: 10-run financial model pipeline validation.
  *
- * Runs 10 identical passes through the full modeling pipeline using the
- * fixed marina fixture in tests/fixtures/beta-deal-marina.json. Verifies
- * deterministic output across all runs and produces:
- *   runs/run-{0..9}/  — full JSON response files per step per run
- *   runs/beta-mock-report.md — 10×5 pass/fail matrix with key metrics
+ * Pipeline per run (5 model steps):
+ *   1. DCF           POST /api/modeling/projects/:id/dcf/run
+ *   2. Monte Carlo   POST /api/modeling/projects/:id/dcf/monte-carlo
+ *   3. Exit Scenario POST /api/modeling/projects/:id/exit/scenarios
+ *   4. Waterfall     POST /api/modeling/projects/:id/waterfall
+ *   5. Decision Sup. GET  /api/modeling/projects/:id/dcf/decision-support
+ *
+ * Setup per run:   POST   /api/modeling/projects   (create project)
+ * Cleanup per run: DELETE /api/modeling/projects/:id
+ *
+ * Determinism: deep JSON comparison run-1..9 vs run-0 baseline, epsilon=1e-9.
+ * Exit code 1 if any step fails OR any determinism drift is detected.
  *
  * Usage:
- *   npx tsx scripts/beta-mock-test.ts
- *   BASE_URL=http://localhost:5000 npx tsx scripts/beta-mock-test.ts
+ *   npx tsx scripts/beta-mock-test.ts [--base-url http://localhost:5000]
  */
 
-import fs from 'fs';
-import path from 'path';
+import * as fs from 'fs';
+import * as path from 'path';
 
-// ─── Configuration ────────────────────────────────────────────────────────────
+// ---------------------------------------------------------------------------
+// Config
+// ---------------------------------------------------------------------------
 
-const BASE_URL = process.env.BASE_URL ?? 'http://localhost:5000';
-const RUNS = 10;
-const FIXTURE_PATH = path.resolve('tests/fixtures/beta-deal-marina.json');
-const RUNS_DIR = path.resolve('runs');
+const BASE_URL = (() => {
+  const idx = process.argv.indexOf('--base-url');
+  return idx !== -1 ? process.argv[idx + 1] : 'http://localhost:5000';
+})();
 
-// Pipeline step labels (columns in the report matrix)
-const STEPS = ['createProject', 'dcf', 'monteCarlo', 'exitScenario', 'decisionSupport'] as const;
-type Step = (typeof STEPS)[number];
+const TOTAL_RUNS = 10;
+const RUNS_DIR = path.resolve(process.cwd(), 'runs');
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+const FIXTURE_PATH = path.resolve(
+  process.cwd(),
+  'tests/fixtures/beta-deal-marina.json'
+);
+
+const ORG_ID = 'cd3719c3-ef82-4ccc-acb9-261c80fb64b4';
+const EPSILON = 1e-9;
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+type StepName =
+  | 'dcf'
+  | 'monte-carlo'
+  | 'exit-scenarios'
+  | 'waterfall'
+  | 'decision-support';
+
+const STEP_NAMES: StepName[] = [
+  'dcf',
+  'monte-carlo',
+  'exit-scenarios',
+  'waterfall',
+  'decision-support',
+];
 
 interface StepResult {
-  step: Step;
-  pass: boolean;
-  status: number;
-  durationMs: number;
+  step: StepName;
+  passed: boolean;
+  statusCode: number;
+  data: unknown;
   error?: string;
-  key?: Record<string, number | string | null>;
+  durationMs: number;
 }
 
 interface RunResult {
   runIndex: number;
   projectId: string | null;
-  steps: Record<Step, StepResult>;
-  totalMs: number;
+  steps: StepResult[];
+  allStepsPassed: boolean;
+  driftPaths: string[];
 }
 
-// ─── HTTP Helper ──────────────────────────────────────────────────────────────
+interface DivergencePath {
+  path: string;
+  run: number;
+  baseline: unknown;
+  actual: unknown;
+  delta?: number;
+}
+
+// ---------------------------------------------------------------------------
+// HTTP helpers
+// ---------------------------------------------------------------------------
 
 async function apiRequest(
-  method: 'GET' | 'POST',
-  path: string,
+  method: 'GET' | 'POST' | 'DELETE',
+  urlPath: string,
   body?: unknown
-): Promise<{ status: number; data: any; durationMs: number }> {
-  const start = Date.now();
-  const res = await fetch(`${BASE_URL}${path}`, {
+): Promise<{ statusCode: number; data: unknown }> {
+  const url = `${BASE_URL}${urlPath}`;
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'x-org-id': ORG_ID,
+  };
+
+  const options: RequestInit = {
     method,
-    headers: {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-    },
+    headers,
     body: body !== undefined ? JSON.stringify(body) : undefined,
-  });
-  const durationMs = Date.now() - start;
-  let data: any;
+  };
+
+  const response = await fetch(url, options);
+  let data: unknown;
   try {
-    data = await res.json();
+    data = await response.json();
   } catch {
-    data = { _raw: await res.text().catch(() => '') };
+    data = null;
   }
-  return { status: res.status, data, durationMs };
+
+  return { statusCode: response.status, data };
 }
 
-// ─── Metric Extractors ────────────────────────────────────────────────────────
-// Pull a small set of scalar values we can compare across runs for determinism.
+// ---------------------------------------------------------------------------
+// Deep determinism comparison — epsilon 1e-9 for floats, ordered array check
+// ---------------------------------------------------------------------------
 
-function extractDcfMetrics(data: any): Record<string, number | string | null> {
-  if (!data || data.error) return {};
+function deepCompare(
+  baseline: unknown,
+  actual: unknown,
+  currentPath: string,
+  divergences: DivergencePath[],
+  runIndex: number
+): void {
+  if (baseline === null && actual === null) return;
+  if (baseline === undefined && actual === undefined) return;
+
+  const bType = typeof baseline;
+  const aType = typeof actual;
+
+  if (bType !== aType) {
+    divergences.push({ path: currentPath, run: runIndex, baseline, actual });
+    return;
+  }
+
+  if (bType === 'number') {
+    const delta = Math.abs((baseline as number) - (actual as number));
+    if (delta > EPSILON) {
+      divergences.push({ path: currentPath, run: runIndex, baseline, actual, delta });
+    }
+    return;
+  }
+
+  if (bType === 'string' || bType === 'boolean') {
+    if (baseline !== actual) {
+      divergences.push({ path: currentPath, run: runIndex, baseline, actual });
+    }
+    return;
+  }
+
+  if (Array.isArray(baseline)) {
+    if (!Array.isArray(actual)) {
+      divergences.push({ path: currentPath, run: runIndex, baseline, actual });
+      return;
+    }
+    const bArr = baseline as unknown[];
+    const aArr = actual as unknown[];
+    if (bArr.length !== aArr.length) {
+      divergences.push({
+        path: `${currentPath}.length`,
+        run: runIndex,
+        baseline: bArr.length,
+        actual: aArr.length,
+      });
+      return;
+    }
+    for (let i = 0; i < bArr.length; i++) {
+      deepCompare(bArr[i], aArr[i], `${currentPath}[${i}]`, divergences, runIndex);
+    }
+    return;
+  }
+
+  if (bType === 'object' && baseline !== null) {
+    const bObj = baseline as Record<string, unknown>;
+    const aObj = actual as Record<string, unknown>;
+    const allKeys = new Set([...Object.keys(bObj), ...Object.keys(aObj)]);
+    for (const key of allKeys) {
+      deepCompare(bObj[key], aObj[key], `${currentPath}.${key}`, divergences, runIndex);
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Metric extractors (for per-run stdout and report table)
+// ---------------------------------------------------------------------------
+
+interface RunMetrics {
+  irr: string;
+  npv: string;
+  exitValue: string;
+  equityMultiple: string;
+  mcP50: string;
+  mcP10: string;
+  mcP90: string;
+  waterfallLpIRR: string;
+  waterfallGpIRR: string;
+  dsRating: string;
+}
+
+function extractMetrics(run: RunResult): RunMetrics {
+  const get = (step: StepName) =>
+    run.steps.find((s) => s.step === step)?.data as any;
+
+  const dcf = get('dcf');
+  const mc = get('monte-carlo');
+  const wf = get('waterfall');
+  const ds = get('decision-support');
+
+  const fmt = (v: unknown): string => {
+    if (v === null || v === undefined) return 'N/A';
+    if (typeof v === 'number') return v.toFixed(4);
+    return String(v);
+  };
+
   return {
-    irr:       num(data.leveragedIRR ?? data.irr ?? data.returns?.leveragedIRR ?? data.returns?.irr),
-    npv:       num(data.npv ?? data.returns?.npv),
-    year1Noi:  num(data.year1?.noi ?? data.yearlyProjections?.[0]?.noi ?? data.noi),
-    exitValue: num(data.exitValue ?? data.exit?.grossSalePrice),
+    irr:           fmt(dcf?.irr ?? dcf?.metrics?.irr ?? dcf?.results?.irr),
+    npv:           fmt(dcf?.npv ?? dcf?.metrics?.npv ?? dcf?.results?.npv),
+    exitValue:     fmt(dcf?.exitValue ?? dcf?.metrics?.exitValue ?? dcf?.results?.exitValue),
+    equityMultiple:fmt(dcf?.equityMultiple ?? dcf?.metrics?.equityMultiple ?? dcf?.results?.equityMultiple),
+    mcP50:         fmt(mc?.percentiles?.p50 ?? mc?.p50 ?? mc?.results?.p50),
+    mcP10:         fmt(mc?.percentiles?.p10 ?? mc?.p10 ?? mc?.results?.p10),
+    mcP90:         fmt(mc?.percentiles?.p90 ?? mc?.p90 ?? mc?.results?.p90),
+    waterfallLpIRR:fmt(wf?.summary?.lpIRR),
+    waterfallGpIRR:fmt(wf?.summary?.gpIRR),
+    dsRating:      String(ds?.rating ?? ds?.recommendation?.rating ?? ds?.verdict ?? 'N/A'),
   };
 }
 
-function extractMcMetrics(data: any): Record<string, number | string | null> {
-  if (!data || data.error) return {};
-  return {
-    p50Irr:    num(data.p50?.irr ?? data.percentiles?.p50?.irr ?? data.summary?.p50Irr),
-    p10Irr:    num(data.p10?.irr ?? data.percentiles?.p10?.irr ?? data.summary?.p10Irr),
-    p90Irr:    num(data.p90?.irr ?? data.percentiles?.p90?.irr ?? data.summary?.p90Irr),
-    simCount:  num(data.n ?? data.simulationCount ?? data.runs),
-  };
-}
+// ---------------------------------------------------------------------------
+// Single run execution
+// ---------------------------------------------------------------------------
 
-function extractExitMetrics(data: any): Record<string, number | string | null> {
-  if (!data || data.error) return {};
-  return {
-    id:         str(data.id),
-    exitYear:   num(data.exitYear),
-    exitCapRate: num(data.exitCapRate),
-  };
-}
-
-function extractDsMetrics(data: any): Record<string, number | string | null> {
-  if (!data || data.error) return {};
-  return {
-    recommendation: str(data.recommendation ?? data.verdict ?? data.decision),
-    score:          num(data.score ?? data.compositeScore),
-    p50Irr:         num(data.monteCarlo?.p50?.irr ?? data.monteCarlo?.summary?.p50Irr),
-  };
-}
-
-function num(v: any): number | null {
-  if (v === null || v === undefined) return null;
-  const n = Number(v);
-  return isNaN(n) ? null : Math.round(n * 10000) / 10000;
-}
-
-function str(v: any): string | null {
-  if (v === null || v === undefined) return null;
-  return String(v).substring(0, 80);
-}
-
-// ─── Single Run ───────────────────────────────────────────────────────────────
-
-async function runOnce(runIndex: number, fixture: any): Promise<RunResult> {
+async function executeRun(
+  runIndex: number,
+  fixture: Record<string, unknown>
+): Promise<RunResult> {
   const runDir = path.join(RUNS_DIR, `run-${runIndex}`);
   fs.mkdirSync(runDir, { recursive: true });
 
-  const steps = {} as Record<Step, StepResult>;
-  const runStart = Date.now();
+  const projectFixture  = fixture.project        as Record<string, unknown>;
+  const scenarioFixture = fixture.scenario        as Record<string, unknown>;
+  const dcfFixture      = fixture.dcf             as Record<string, unknown>;
+  const mcFixture       = fixture.monteCarlo      as Record<string, unknown>;
+  const exitFixture     = fixture.exitScenario    as Record<string, unknown>;
+  const waterfallFixture= fixture.waterfall       as Record<string, unknown>;
+  const dsFixture       = fixture.decisionSupport as Record<string, unknown>;
+
   let projectId: string | null = null;
+  const steps: StepResult[] = [];
 
-  // ── Step 1: Create project ────────────────────────────────────────────────
-  {
-    const step: Step = 'createProject';
-    const { status, data, durationMs } = await apiRequest('POST', '/api/modeling/projects', fixture.project);
-    fs.writeFileSync(path.join(runDir, 'createProject.json'), JSON.stringify(data, null, 2));
-
-    const pass = status >= 200 && status < 300 && !!data?.id;
-    if (pass) projectId = data.id;
-    steps[step] = {
-      step,
-      pass,
-      status,
-      durationMs,
-      error: pass ? undefined : (data?.error ?? data?.message ?? `HTTP ${status}`),
-      key: pass ? { projectId: str(data.id), marinaName: str(data.marinaName) } : {},
-    };
-  }
-
-  // Abort remaining steps if project creation failed — no projectId to use
-  if (!projectId) {
-    for (const step of STEPS.slice(1)) {
-      steps[step as Step] = { step: step as Step, pass: false, status: 0, durationMs: 0, error: 'skipped — no projectId' };
-    }
-    return { runIndex, projectId, steps, totalMs: Date.now() - runStart };
-  }
-
-  // ── Step 2: Full DCF Analysis ─────────────────────────────────────────────
-  {
-    const step: Step = 'dcf';
-    const { status, data, durationMs } = await apiRequest('POST', `/api/modeling/projects/${projectId}/dcf`, fixture.dcf);
-    fs.writeFileSync(path.join(runDir, 'dcf.json'), JSON.stringify(data, null, 2));
-
-    const pass = status >= 200 && status < 300 && !data?.error;
-    steps[step] = { step, pass, status, durationMs, error: pass ? undefined : (data?.error ?? `HTTP ${status}`), key: extractDcfMetrics(data) };
-  }
-
-  // ── Step 3: Monte Carlo (seeded) ──────────────────────────────────────────
-  {
-    const step: Step = 'monteCarlo';
-    const { status, data, durationMs } = await apiRequest('POST', `/api/modeling/projects/${projectId}/dcf/monte-carlo`, fixture.monteCarlo);
-    fs.writeFileSync(path.join(runDir, 'monteCarlo.json'), JSON.stringify(data, null, 2));
-
-    const pass = status >= 200 && status < 300 && !data?.error;
-    steps[step] = { step, pass, status, durationMs, error: pass ? undefined : (data?.error ?? `HTTP ${status}`), key: extractMcMetrics(data) };
-  }
-
-  // ── Step 4: Exit Scenario ─────────────────────────────────────────────────
-  {
-    const step: Step = 'exitScenario';
-    const { status, data, durationMs } = await apiRequest('POST', `/api/modeling/projects/${projectId}/exit/scenarios`, fixture.exitScenario);
-    fs.writeFileSync(path.join(runDir, 'exitScenario.json'), JSON.stringify(data, null, 2));
-
-    const pass = status >= 200 && status < 300 && !!data?.id;
-    steps[step] = { step, pass, status, durationMs, error: pass ? undefined : (data?.error ?? `HTTP ${status}`), key: extractExitMetrics(data) };
-  }
-
-  // ── Step 5: Decision Support (seeded Monte Carlo) ─────────────────────────
-  {
-    const step: Step = 'decisionSupport';
-    const { status, data, durationMs } = await apiRequest('POST', `/api/modeling/projects/${projectId}/dcf/decision-support`, fixture.decisionSupport);
-    fs.writeFileSync(path.join(runDir, 'decisionSupport.json'), JSON.stringify(data, null, 2));
-
-    const pass = status >= 200 && status < 300 && !data?.error;
-    steps[step] = { step, pass, status, durationMs, error: pass ? undefined : (data?.error ?? `HTTP ${status}`), key: extractDsMetrics(data) };
-  }
-
-  return { runIndex, projectId, steps, totalMs: Date.now() - runStart };
-}
-
-// ─── Determinism Check ────────────────────────────────────────────────────────
-
-function checkDeterminism(results: RunResult[]): Record<Step, { deterministic: boolean; note: string }> {
-  const out = {} as Record<Step, { deterministic: boolean; note: string }>;
-
-  for (const step of STEPS) {
-    const passedRuns = results.filter(r => r.steps[step]?.pass);
-    if (passedRuns.length < 2) {
-      out[step] = { deterministic: false, note: 'not enough passing runs to compare' };
-      continue;
+  // ---- Helper: execute one step, save file, record result ----
+  const execStep = async (
+    step: StepName,
+    fn: () => Promise<{ statusCode: number; data: unknown }>
+  ): Promise<boolean> => {
+    const t0 = Date.now();
+    let result: { statusCode: number; data: unknown };
+    try {
+      result = await fn();
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      steps.push({ step, passed: false, statusCode: 0, data: null, error: errMsg, durationMs: Date.now() - t0 });
+      fs.writeFileSync(
+        path.join(runDir, 'error.json'),
+        JSON.stringify({ run: runIndex, step, error: errMsg }, null, 2)
+      );
+      console.error(`  [run-${runIndex}] ✗ ${step}: ${errMsg}`);
+      return false;
     }
 
-    // Skip determinism check for steps that produce unique IDs per run (createProject, exitScenario)
-    if (step === 'createProject' || step === 'exitScenario') {
-      out[step] = { deterministic: true, note: 'n/a — produces unique IDs by design' };
-      continue;
-    }
+    const passed = result.statusCode >= 200 && result.statusCode < 300;
+    steps.push({ step, passed, statusCode: result.statusCode, data: result.data, durationMs: Date.now() - t0 });
+    fs.writeFileSync(path.join(runDir, `${step}.json`), JSON.stringify(result.data, null, 2));
 
-    const keys = passedRuns[0].steps[step]?.key ?? {};
-    const numericKeys = Object.keys(keys).filter(k => typeof keys[k] === 'number');
-
-    if (numericKeys.length === 0) {
-      out[step] = { deterministic: true, note: 'no numeric metrics to compare' };
-      continue;
-    }
-
-    const mismatches: string[] = [];
-    for (const k of numericKeys) {
-      const vals = passedRuns.map(r => r.steps[step]?.key?.[k]);
-      const distinct = new Set(vals.map(v => String(v)));
-      if (distinct.size > 1) {
-        mismatches.push(`${k}: [${[...distinct].join(', ')}]`);
-      }
-    }
-
-    if (mismatches.length === 0) {
-      out[step] = { deterministic: true, note: `all ${numericKeys.join(', ')} values match across ${passedRuns.length} runs` };
+    if (!passed) {
+      const detail = JSON.stringify(result.data).slice(0, 300);
+      fs.writeFileSync(
+        path.join(runDir, 'error.json'),
+        JSON.stringify({ run: runIndex, step, statusCode: result.statusCode, detail }, null, 2)
+      );
+      console.error(`  [run-${runIndex}] ✗ ${step}: HTTP ${result.statusCode} — ${detail}`);
     } else {
-      out[step] = { deterministic: false, note: `drift in: ${mismatches.join(' | ')}` };
+      console.log(`  [run-${runIndex}] ✓ ${step} (${Date.now() - t0}ms)`);
     }
+    return passed;
+  };
+
+  // ---- Setup: create project ----
+  try {
+    const cr = await apiRequest('POST', '/api/modeling/projects', projectFixture);
+    const crData = cr.data as Record<string, unknown> | null;
+    projectId = ((crData?.id ?? crData?.project?.id) ?? null) as string | null;
+
+    if (cr.statusCode < 200 || cr.statusCode >= 300 || !projectId) {
+      console.error(`  [run-${runIndex}] ✗ create-project: HTTP ${cr.statusCode}`);
+      fs.writeFileSync(
+        path.join(runDir, 'error.json'),
+        JSON.stringify({ run: runIndex, step: 'create-project', statusCode: cr.statusCode, detail: crData }, null, 2)
+      );
+      return { runIndex, projectId: null, steps, allStepsPassed: false, driftPaths: [] };
+    }
+    fs.writeFileSync(path.join(runDir, 'create-project.json'), JSON.stringify(crData, null, 2));
+    console.log(`  [run-${runIndex}] ✓ create-project  projectId=${projectId}`);
+  } catch (err) {
+    console.error(`  [run-${runIndex}] ✗ create-project: ${err}`);
+    return { runIndex, projectId: null, steps, allStepsPassed: false, driftPaths: [] };
   }
 
-  return out;
-}
-
-// ─── Report Generator ─────────────────────────────────────────────────────────
-
-function buildReport(results: RunResult[], determinism: Record<Step, { deterministic: boolean; note: string }>): string {
-  const now = new Date().toISOString();
-  const totalPasses = results.reduce((s, r) => s + STEPS.filter(step => r.steps[step]?.pass).length, 0);
-  const totalCells = results.length * STEPS.length;
-
-  const colW = 16;
-  const runW = 6;
-  const pad = (s: string, w: number) => s.substring(0, w).padEnd(w);
-
-  // Header row
-  const headerCols = ['Run', ...STEPS.map(s => s.substring(0, colW))];
-  const sepLine = ['-'.repeat(runW), ...STEPS.map(() => '-'.repeat(colW))].join(' | ');
-  const headerLine = [pad('Run', runW), ...STEPS.map(s => pad(s, colW))].join(' | ');
-
-  // Matrix rows
-  const matrixRows = results.map(r => {
-    const cells = STEPS.map(step => {
-      const s = r.steps[step];
-      if (!s) return pad('—', colW);
-      const icon = s.pass ? '✓' : '✗';
-      const detail = s.pass ? `${s.durationMs}ms` : (s.error?.substring(0, 10) ?? 'err');
-      return pad(`${icon} ${detail}`, colW);
+  // ---- Setup: create scenario (saves revenueGrowthRate, expenseGrowthRate, exitCapRate to DB) ----
+  try {
+    await apiRequest('POST', `/api/modeling/projects/${projectId}/scenarios`, {
+      scenarioType:      scenarioFixture.scenarioType,
+      name:              scenarioFixture.name,
+      revenueGrowthRate: scenarioFixture.revenueGrowthRate,
+      expenseGrowthRate: scenarioFixture.expenseGrowthRate,
+      exitCapRate:       scenarioFixture.exitCapRate,
     });
-    return [pad(`#${r.runIndex}`, runW), ...cells].join(' | ');
+  } catch {
+    // non-fatal — DCF overrides below provide a fallback
+  }
+
+  // ---- Setup: patch project config (saves holdPeriod=10 to DB) ----
+  try {
+    const cfg = fixture.projectConfig as Record<string, unknown>;
+    await apiRequest('PATCH', `/api/modeling/projects/${projectId}/config`, {
+      holdPeriod: cfg.holdPeriod,
+    });
+  } catch {
+    // non-fatal — DCF overrides below provide a fallback
+  }
+
+  // ---- Step 1: DCF (POST /api/modeling/projects/:id/dcf) ----
+  // overrides serve as fallback if DB scenario/config is not yet applied.
+  await execStep('dcf', () =>
+    apiRequest('POST', `/api/modeling/projects/${projectId}/dcf`, {
+      discountRate: (dcfFixture.discountRate as number) ?? 10,
+      overrides: {
+        holdPeriodYears:         (fixture.projectConfig as any).holdPeriod,
+        revenueGrowthRateDelta:  0.5,   // default 3% + 0.5 = 3.5%
+        exitCapRateDelta:        -0.25, // default 7.0% - 0.25 = 6.75%
+      },
+    })
+  );
+
+  // ---- Step 2: Monte Carlo ----
+  await execStep('monte-carlo', () =>
+    apiRequest('POST', `/api/modeling/projects/${projectId}/dcf/monte-carlo`, {
+      n:            mcFixture.n,
+      seed:         mcFixture.seed,
+      hurdleIRR:    mcFixture.hurdleIRR,
+      discountRate: mcFixture.discountRate,
+    })
+  );
+
+  // ---- Step 3: Exit Scenarios ----
+  await execStep('exit-scenarios', () =>
+    apiRequest('POST', `/api/modeling/projects/${projectId}/exit/scenarios`, exitFixture)
+  );
+
+  // ---- Step 4: Waterfall ----
+  await execStep('waterfall', () =>
+    apiRequest('POST', `/api/modeling/projects/${projectId}/waterfall`, waterfallFixture)
+  );
+
+  // ---- Step 5: Decision Support — GET (fast mode, deterministic, no MC re-run) ----
+  await execStep('decision-support', () => {
+    const { hurdleIRR, discountRate, memoTone } = dsFixture as {
+      hurdleIRR: number; discountRate: number; memoTone: string;
+    };
+    const qs = new URLSearchParams({
+      hurdleIRR:    String(hurdleIRR),
+      discountRate: String(discountRate),
+      memoTone:     String(memoTone),
+    });
+    return apiRequest('GET', `/api/modeling/projects/${projectId}/dcf/decision-support?${qs}`);
   });
 
-  // Metrics summary per step (across passing runs)
-  const metricsSummary = STEPS.filter(s => s !== 'createProject' && s !== 'exitScenario').map(step => {
-    const passing = results.filter(r => r.steps[step]?.pass);
-    if (!passing.length) return `### ${step}\n_No passing runs._`;
-    const sample = passing[0].steps[step]?.key ?? {};
-    const metricLines = Object.entries(sample).map(([k, v]) => `- **${k}**: \`${v ?? 'null'}\``);
-    return `### ${step}\n${metricLines.join('\n') || '_No metrics extracted._'}`;
-  }).join('\n\n');
+  // ---- Cleanup: delete project ----
+  try {
+    await apiRequest('DELETE', `/api/modeling/projects/${projectId}`);
+    console.log(`  [run-${runIndex}] ✓ cleanup — deleted project ${projectId}`);
+  } catch {
+    console.warn(`  [run-${runIndex}] ⚠ cleanup failed (non-fatal)`);
+  }
 
-  // Determinism summary
-  const detRows = STEPS.map(step => {
-    const d = determinism[step];
-    return `| ${step} | ${d.deterministic ? '✓ Yes' : '✗ No'} | ${d.note} |`;
-  }).join('\n');
+  const allStepsPassed = steps.length === STEP_NAMES.length && steps.every((s) => s.passed);
+  return { runIndex, projectId, steps, allStepsPassed, driftPaths: [] };
+}
 
-  // Per-run project IDs
-  const projectIds = results.map(r => `- Run ${r.runIndex}: \`${r.projectId ?? 'n/a'}\``).join('\n');
+// ---------------------------------------------------------------------------
+// Determinism check — deep JSON comparison run-1..9 vs run-0
+// ---------------------------------------------------------------------------
 
-  // Errors table
-  const errors: string[] = [];
-  for (const r of results) {
-    for (const step of STEPS) {
-      const s = r.steps[step];
-      if (s && !s.pass) {
-        errors.push(`| #${r.runIndex} | ${step} | HTTP ${s.status} | ${s.error ?? ''} |`);
+function checkDeterminism(runs: RunResult[]): {
+  divergences: DivergencePath[];
+  byStep: Record<StepName, boolean>;
+} {
+  const baseline = runs[0];
+  const allDivergences: DivergencePath[] = [];
+  const byStep: Record<StepName, boolean> = {
+    'dcf': true, 'monte-carlo': true, 'exit-scenarios': true,
+    'waterfall': true, 'decision-support': true,
+  };
+
+  for (let r = 1; r < runs.length; r++) {
+    for (const stepName of STEP_NAMES) {
+      const bStep = baseline.steps.find((s) => s.step === stepName);
+      const aStep = runs[r].steps.find((s) => s.step === stepName);
+      if (!bStep?.passed || !aStep?.passed) continue;
+
+      const divs: DivergencePath[] = [];
+      deepCompare(bStep.data, aStep.data, stepName, divs, r);
+      if (divs.length > 0) {
+        byStep[stepName] = false;
+        allDivergences.push(...divs);
       }
     }
   }
-  const errorSection = errors.length
-    ? `## Failures\n\n| Run | Step | Status | Error |\n|-----|------|--------|-------|\n${errors.join('\n')}`
-    : '## Failures\n\n_None — all steps passed on all runs._';
 
-  return `# Beta Mock Test Report
+  return { divergences: allDivergences, byStep };
+}
 
-**Generated**: ${now}
-**Fixture**: \`tests/fixtures/beta-deal-marina.json\`
-**Runs**: ${results.length}
-**Pass rate**: ${totalPasses}/${totalCells} cells (${Math.round(totalPasses / totalCells * 100)}%)
+// ---------------------------------------------------------------------------
+// Report generation
+// ---------------------------------------------------------------------------
 
----
+function generateReport(
+  runs: RunResult[],
+  divergences: DivergencePath[],
+  byStep: Record<StepName, boolean>
+): string {
+  const now = new Date().toISOString();
+  const totalCells = runs.length * STEP_NAMES.length;
+  const passedCells = runs.reduce((n, r) => n + r.steps.filter((s) => s.passed).length, 0);
 
-## Pass / Fail Matrix
+  const cell = (run: RunResult, step: StepName) => {
+    const s = run.steps.find((st) => st.step === step);
+    if (!s) return '—';
+    return s.passed ? 'PASS' : `FAIL(${s.statusCode})`;
+  };
 
-| ${headerLine} |
-| ${sepLine} |
-${matrixRows.map(r => `| ${r} |`).join('\n')}
+  const matrixRows = runs.map((r) =>
+    `| ${r.runIndex} | ${cell(r,'dcf')} | ${cell(r,'monte-carlo')} | ${cell(r,'exit-scenarios')} | ${cell(r,'waterfall')} | ${cell(r,'decision-support')} |`
+  ).join('\n');
 
-Legend: ✓ pass (with duration) · ✗ fail (error prefix)
+  const detRows = STEP_NAMES.map(
+    (s) => `| ${s} | ${byStep[s] ? '✅ IDENTICAL' : '❌ DRIFT'} |`
+  ).join('\n');
 
----
+  const divSection =
+    divergences.length === 0
+      ? '_None — all 10 runs produced numerically identical outputs (ε = 1e-9)._'
+      : divergences.slice(0, 50).map(
+          (d) => `- **run-${d.run}** \`${d.path}\`: baseline \`${d.baseline}\` ≠ actual \`${d.actual}\`${d.delta !== undefined ? ` (Δ = ${d.delta})` : ''}`
+        ).join('\n') + (divergences.length > 50 ? `\n\n_(…${divergences.length - 50} more omitted)_` : '');
 
-## Determinism
+  const metricsRows = runs.map((r) => {
+    const m = extractMetrics(r);
+    return `| ${r.runIndex} | ${m.irr} | ${m.npv} | ${m.equityMultiple} | ${m.mcP50} | ${m.mcP10}–${m.mcP90} | ${m.waterfallLpIRR}/${m.waterfallGpIRR} | ${m.dsRating} |`;
+  }).join('\n');
 
-| Step | Deterministic | Notes |
-|------|---------------|-------|
+  return `# Beta Mock Test — Validation Report
+> Task #398 | Generated: ${now}
+> Fixture: \`tests/fixtures/beta-deal-marina.json\`
+> Pipeline: ${STEP_NAMES.length} model steps × ${TOTAL_RUNS} runs = ${totalCells} cells
+
+## Results
+
+**Overall: ${passedCells}/${totalCells} cells passed**
+
+### 10 × 5 Pass/Fail Matrix
+
+| Run | dcf | monte-carlo | exit-scenarios | waterfall | decision-support |
+|-----|-----|-------------|----------------|-----------|------------------|
+${matrixRows}
+
+### Determinism (run-1..9 vs run-0 baseline, ε = 1e-9)
+
+| Step | Result |
+|------|--------|
 ${detRows}
 
----
+### Divergence Details
 
-## Sample Metrics (Run 0 baseline)
+${divSection}
 
-${metricsSummary}
+### Per-Run Metrics Snapshot
 
----
+| Run | IRR | NPV | Eq. Multiple | MC p50 | MC p10–p90 | WF LP/GP IRR | DS Rating |
+|-----|-----|-----|--------------|--------|------------|--------------|-----------|
+${metricsRows}
 
-${errorSection}
+## Fixture Summary
 
----
-
-## Project IDs (one per run)
-
-${projectIds}
-
----
+| Parameter | Value |
+|-----------|-------|
+| Property | Harborview Marina – Beta Test Fixture |
+| Location | Annapolis, MD |
+| Purchase Price | $12,500,000 |
+| Total Slips | 220 (55×30ft wet, 42×40ft wet, 28×50ft wet, 5×80ft mega, 45 dry stack indoor, 30 dry stack outdoor, 15 transient) |
+| Hold Period | 10 years |
+| Exit Cap Rate | 6.75% |
+| Revenue Growth | 3.5% / yr |
+| Expense Growth | 2.5% / yr |
+| Debt (65% LTV) | $8,125,000 @ 6.5% |
+| LP / GP Equity | $3,937,500 / $437,500 (90% / 10% of $4,375,000) |
+| Monte Carlo N | 500 (seed=42) |
+| Hurdle IRR | 12% |
+| Discount Rate | 10% |
+| Waterfall Pref. | 8% preferred return, 20% GP catch-up, 4-tier |
 
 ## Environment
 
-- Base URL: \`${BASE_URL}\`
-- Auth: ALLOW_DEMO_AUTH demo user (orgId: cd3719c3-ef82-4ccc-acb9-261c80fb64b4)
-- Monte Carlo seed: 42 (deterministic)
+| Key | Value |
+|-----|-------|
+| Base URL | ${BASE_URL} |
+| Org ID | ${ORG_ID} |
+| Determinism ε | ${EPSILON} |
+| Runs | ${TOTAL_RUNS} |
+| Steps per run | ${STEP_NAMES.length} |
 `;
 }
 
-// ─── Main ─────────────────────────────────────────────────────────────────────
+// ---------------------------------------------------------------------------
+// Main
+// ---------------------------------------------------------------------------
 
 async function main() {
-  console.log('═══════════════════════════════════════════════════');
-  console.log('  Vantage Beta Mock Test — Financial Model Pipeline');
-  console.log('═══════════════════════════════════════════════════');
-  console.log(`  Base URL : ${BASE_URL}`);
-  console.log(`  Fixture  : ${FIXTURE_PATH}`);
-  console.log(`  Runs     : ${RUNS}`);
-  console.log('───────────────────────────────────────────────────\n');
+  console.log('=== Beta Mock Test ===');
+  console.log(`Fixture : ${FIXTURE_PATH}`);
+  console.log(`Base URL: ${BASE_URL}`);
+  console.log(`Runs    : ${TOTAL_RUNS}  Steps: ${STEP_NAMES.length} (dcf, monte-carlo, exit-scenarios, waterfall, decision-support)\n`);
 
-  // Load fixture
   if (!fs.existsSync(FIXTURE_PATH)) {
-    console.error(`Fixture not found: ${FIXTURE_PATH}`);
-    process.exit(1);
-  }
-  const fixture = JSON.parse(fs.readFileSync(FIXTURE_PATH, 'utf-8'));
-
-  // Verify server is reachable
-  try {
-    const probe = await fetch(`${BASE_URL}/api/auth/me`);
-    if (!probe.ok && probe.status !== 401) {
-      throw new Error(`Unexpected status ${probe.status} on /api/auth/me`);
-    }
-    console.log(`  Server reachable (${probe.status})\n`);
-  } catch (err: any) {
-    console.error(`  Cannot reach server at ${BASE_URL}: ${err.message}`);
-    console.error('  Start the app first: npm run dev');
+    console.error(`ERROR: Fixture not found at ${FIXTURE_PATH}`);
     process.exit(1);
   }
 
-  // Ensure runs/ directory exists
+  const fixture = JSON.parse(fs.readFileSync(FIXTURE_PATH, 'utf8')) as Record<string, unknown>;
   fs.mkdirSync(RUNS_DIR, { recursive: true });
 
-  // Execute all runs sequentially for clean determinism comparison
-  const results: RunResult[] = [];
-  for (let i = 0; i < RUNS; i++) {
-    process.stdout.write(`  Run ${i.toString().padStart(2, '0')} `);
-    const result = await runOnce(i, fixture);
-    results.push(result);
+  const runs: RunResult[] = [];
 
-    // Print per-step status dots
-    for (const step of STEPS) {
-      process.stdout.write(result.steps[step]?.pass ? '.' : 'F');
-    }
-    console.log(` (${result.totalMs}ms)  projectId=${result.projectId ?? 'none'}`);
+  for (let i = 0; i < TOTAL_RUNS; i++) {
+    console.log(`\n--- Run ${i} ---`);
+    const result = await executeRun(i, fixture);
+    runs.push(result);
+
+    const m = extractMetrics(result);
+    console.log(
+      `  Metrics → IRR=${m.irr}  NPV=${m.npv}  EqMult=${m.equityMultiple}  MCp50=${m.mcP50}  WF_LP_IRR=${m.waterfallLpIRR}  WF_GP_IRR=${m.waterfallGpIRR}  DS=${m.dsRating}`
+    );
   }
 
-  console.log('\n───────────────────────────────────────────────────');
-
-  // Check determinism
-  const determinism = checkDeterminism(results);
-  console.log('  Determinism check:');
-  for (const [step, d] of Object.entries(determinism)) {
-    const icon = d.deterministic ? '✓' : '✗';
-    console.log(`    ${icon} ${step.padEnd(18)} ${d.note}`);
+  // Determinism check
+  console.log('\n--- Determinism Check (ε = 1e-9) ---');
+  const { divergences, byStep } = checkDeterminism(runs);
+  for (const step of STEP_NAMES) {
+    console.log(`  ${step}: ${byStep[step] ? '✅ IDENTICAL' : '❌ DRIFT'}`);
+  }
+  if (divergences.length > 0) {
+    console.error(`\n  ⚠ ${divergences.length} divergence(s) detected:`);
+    divergences.slice(0, 10).forEach((d) =>
+      console.error(`    run-${d.run} ${d.path}: ${d.baseline} ≠ ${d.actual}${d.delta !== undefined ? ` (Δ=${d.delta})` : ''}`)
+    );
+  } else {
+    console.log('  All runs numerically identical.');
   }
 
-  // Build and save report
-  const report = buildReport(results, determinism);
+  // Write report
+  const report = generateReport(runs, divergences, byStep);
   const reportPath = path.join(RUNS_DIR, 'beta-mock-report.md');
   fs.writeFileSync(reportPath, report);
-  console.log(`\n  Report saved: ${reportPath}`);
+  console.log(`\nReport → ${reportPath}`);
 
-  // Save a machine-readable summary alongside
-  const summaryPath = path.join(RUNS_DIR, 'beta-mock-summary.json');
-  fs.writeFileSync(summaryPath, JSON.stringify({ results, determinism }, null, 2));
-  console.log(`  Summary JSON: ${summaryPath}`);
+  // Final verdict
+  const allStepsPassed = runs.every((r) => r.allStepsPassed);
+  const deterministic   = divergences.length === 0;
+  const overallPass     = allStepsPassed && deterministic;
+  const passed = runs.reduce((n, r) => n + r.steps.filter((s) => s.passed).length, 0);
+  const total  = TOTAL_RUNS * STEP_NAMES.length;
 
-  // Exit code reflects overall pass/fail
-  const allPassed = results.every(r => STEPS.every(step => r.steps[step]?.pass));
-  const allDeterministic = Object.values(determinism).every(d => d.deterministic);
-  console.log(`\n  Overall: ${allPassed ? '✓ ALL STEPS PASS' : '✗ SOME STEPS FAILED'}  |  Determinism: ${allDeterministic ? '✓ OK' : '✗ DRIFT DETECTED'}`);
-  console.log('═══════════════════════════════════════════════════\n');
+  console.log(
+    `\n=== ${passed}/${total} cells passed | determinism: ${deterministic ? 'OK' : 'DRIFT'} | ${overallPass ? 'OVERALL PASS ✅' : 'OVERALL FAIL ❌'} ===`
+  );
 
-  process.exit(allPassed ? 0 : 1);
+  process.exit(overallPass ? 0 : 1);
 }
 
-main().catch(err => {
-  console.error('Fatal error:', err);
+main().catch((err) => {
+  console.error('Fatal:', err);
   process.exit(1);
 });
