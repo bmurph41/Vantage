@@ -95,9 +95,25 @@ export function ModelingKpiStrip({ proFormaData, assetClass, className }: Modeli
         stabilizedVal = allVals[stabIdx] ?? null;
       }
 
+      // For KPIs without computeByYear, try to derive per-year values via compute() on each row
+      if (!kpi.computeByYear && annualProjections.length > 0) {
+        const perYearVals = annualProjections.map((row) => {
+          const rowMetrics = { ...metrics, ...row };
+          return kpi.compute(rowMetrics, [row]);
+        });
+        const yr1 = perYearVals[0] ?? null;
+        const stabIdx = Math.min(2, annualProjections.length - 1);
+        const stab = perYearVals[stabIdx] ?? null;
+        if (yr1 !== null || stab !== null) {
+          baselineVal = yr1;
+          stabilizedVal = stab;
+          sparkValues = perYearVals;
+        }
+      }
+
       const displayValue = baselineVal ?? primary;
       const valueColor = getBenchmarkColor(displayValue, kpi);
-      const showBaselineStab = kpi.computeByYear != null && baselineVal !== null;
+      const showBaselineStab = (kpi.computeByYear != null || sparkValues.length > 0) && baselineVal !== null;
 
       return { kpi, primary, baselineVal, stabilizedVal, sparkValues, displayValue, valueColor, showBaselineStab };
     });

@@ -44,6 +44,9 @@ export interface KpiMetrics {
   siteRentPct?: number;
   storeRevenuePct?: number;
   cabinRevenuePct?: number;
+  // Universal operational — generic fields populated by engine for any asset class
+  noiMargin?: number;
+  occupancyRate?: number;
   // Retail / Office-specific
   walt?: number;
   anchorTenantPct?: number;
@@ -52,6 +55,8 @@ export interface KpiMetrics {
   // Industrial-specific
   clearHeight?: number;
   dockDoorCount?: number;
+  // Hotel additional
+  roomsRevPct?: number;
   [key: string]: number | undefined;
 }
 
@@ -63,6 +68,8 @@ export interface KpiAnnualRow {
   debtService?: number;
   leveredCashFlow?: number;
   // Operational fields populated by asset-class engine when available
+  occupancyRate?: number;
+  noiMargin?: number;
   revenuePerSlip?: number;
   noiPerSlip?: number;
   slipOccupancy?: number;
@@ -226,8 +233,53 @@ export const MODELING_KPI_REGISTRY: Record<string, ModelingKpiDef> = {
     color: 'text-teal-600 dark:text-teal-400',
     tooltip: 'Minimum Debt Service Coverage Ratio over hold period',
     compute: (m) => m.minDscr ?? null,
+    computeByYear: (row) => {
+      if (!row.debtService || row.debtService <= 0) return null;
+      return (row.noi ?? 0) / row.debtService;
+    },
     benchmarkGood: 1.5,
     benchmarkWarn: 1.25,
+  },
+  noiMargin: {
+    key: 'noiMargin',
+    label: 'NOI Margin',
+    format: 'percent',
+    color: 'text-green-600 dark:text-green-400',
+    tooltip: 'Net Operating Income as a percentage of revenue',
+    compute: (m, rows) => {
+      if (m.noiMargin != null) return m.noiMargin;
+      if (!rows?.length) return null;
+      const row = rows[0];
+      if (!row?.revenue || row.revenue <= 0) return null;
+      return ((row.noi ?? 0) / row.revenue) * 100;
+    },
+    computeByYear: (row) => {
+      if (!row.revenue || row.revenue <= 0) return null;
+      return ((row.noi ?? 0) / row.revenue) * 100;
+    },
+    benchmarkGood: 40,
+    benchmarkWarn: 25,
+  },
+  occupancyRate: {
+    key: 'occupancyRate',
+    label: 'Occupancy',
+    format: 'percent',
+    color: 'text-blue-600 dark:text-blue-400',
+    tooltip: 'Physical or economic occupancy rate',
+    compute: (m) => m.occupancyRate ?? null,
+    computeByYear: (row) => row.occupancyRate ?? null,
+    benchmarkGood: 90,
+    benchmarkWarn: 80,
+  },
+  roomsRevPct: {
+    key: 'roomsRevPct',
+    label: 'Rooms Rev %',
+    format: 'percent',
+    color: 'text-fuchsia-700 dark:text-fuchsia-300',
+    tooltip: 'Rooms revenue as a percentage of total hotel revenue',
+    compute: (m) => m.roomsRevPct ?? null,
+    benchmarkGood: 65,
+    benchmarkWarn: 50,
   },
   ltv: {
     key: 'ltv',
@@ -593,18 +645,18 @@ export type ModelingAssetClass =
   | 'default';
 
 export const ASSET_CLASS_KPI_SETS: Record<ModelingAssetClass, string[]> = {
-  marina:       ['irr', 'equityMultiple', 'cashOnCash', 'goingInCapRate', 'exitCapRate', 'stabilizedNoi', 'exitValue', 'noiCagr', 'dscr', 'opexRatio', 'revenuePerSlip', 'noiPerSlip', 'slipOccupancy', 'fuelRevenuePct', 'serviceRevenuePct'],
-  multifamily:  ['irr', 'equityMultiple', 'cashOnCash', 'goingInCapRate', 'exitCapRate', 'stabilizedNoi', 'exitValue', 'noiCagr', 'dscr', 'opexRatio', 'revPerUnit', 'rentSpread', 'turnoverRate'],
-  hotel:        ['irr', 'equityMultiple', 'cashOnCash', 'goingInCapRate', 'exitCapRate', 'stabilizedNoi', 'exitValue', 'noiCagr', 'dscr', 'opexRatio', 'adr', 'revpar', 'fbRevenuePct'],
-  str:          ['irr', 'equityMultiple', 'cashOnCash', 'goingInCapRate', 'exitCapRate', 'stabilizedNoi', 'noiCagr', 'opexRatio', 'avgDailyRate', 'strOccupancy', 'revpan', 'cleaningFeePct'],
-  rv_park:      ['irr', 'equityMultiple', 'cashOnCash', 'goingInCapRate', 'exitCapRate', 'stabilizedNoi', 'exitValue', 'noiCagr', 'dscr', 'opexRatio', 'siteRentPct', 'storeRevenuePct', 'cabinRevenuePct'],
-  retail:       ['irr', 'equityMultiple', 'cashOnCash', 'goingInCapRate', 'exitCapRate', 'stabilizedNoi', 'exitValue', 'dscr', 'ltv', 'opexRatio', 'walt', 'anchorTenantPct', 'nearTermExpiryPct', 'pricePerSf'],
-  office:       ['irr', 'equityMultiple', 'cashOnCash', 'goingInCapRate', 'exitCapRate', 'stabilizedNoi', 'exitValue', 'dscr', 'ltv', 'opexRatio', 'walt', 'anchorTenantPct', 'nearTermExpiryPct', 'pricePerSf'],
-  industrial:   ['irr', 'equityMultiple', 'cashOnCash', 'goingInCapRate', 'exitCapRate', 'stabilizedNoi', 'exitValue', 'dscr', 'ltv', 'opexRatio', 'walt', 'pricePerSf', 'clearHeight', 'dockDoorCount'],
-  self_storage: ['irr', 'equityMultiple', 'cashOnCash', 'goingInCapRate', 'exitCapRate', 'stabilizedNoi', 'noiCagr', 'dscr', 'ltv', 'opexRatio', 'physicalOccupancy', 'ratePerSf', 'climateControlledPct', 'ecriUpside'],
-  mixed_use:    ['irr', 'equityMultiple', 'cashOnCash', 'goingInCapRate', 'exitCapRate', 'stabilizedNoi', 'exitValue', 'noiCagr', 'dscr', 'opexRatio'],
-  business:     ['irr', 'equityMultiple', 'cashOnCash', 'totalReturn', 'exitValue', 'stabilizedNoi', 'noiCagr', 'opexRatio'],
-  default:      ['irr', 'equityMultiple', 'cashOnCash', 'goingInCapRate', 'exitCapRate', 'stabilizedNoi', 'exitValue'],
+  marina:       ['irr', 'equityMultiple', 'cashOnCash', 'goingInCapRate', 'noiMargin', 'dscr', 'opexRatio', 'exitCapRate', 'stabilizedNoi', 'exitValue', 'noiCagr', 'revenuePerSlip', 'noiPerSlip', 'slipOccupancy', 'fuelRevenuePct', 'serviceRevenuePct'],
+  multifamily:  ['irr', 'equityMultiple', 'cashOnCash', 'goingInCapRate', 'noiMargin', 'dscr', 'opexRatio', 'exitCapRate', 'stabilizedNoi', 'exitValue', 'noiCagr', 'occupancyRate', 'revPerUnit', 'rentSpread', 'turnoverRate'],
+  hotel:        ['irr', 'equityMultiple', 'cashOnCash', 'goingInCapRate', 'noiMargin', 'dscr', 'opexRatio', 'exitCapRate', 'stabilizedNoi', 'exitValue', 'noiCagr', 'occupancyRate', 'adr', 'revpar', 'roomsRevPct', 'fbRevenuePct'],
+  str:          ['irr', 'equityMultiple', 'cashOnCash', 'goingInCapRate', 'noiMargin', 'dscr', 'opexRatio', 'exitCapRate', 'stabilizedNoi', 'noiCagr', 'avgDailyRate', 'strOccupancy', 'revpan', 'cleaningFeePct'],
+  rv_park:      ['irr', 'equityMultiple', 'cashOnCash', 'goingInCapRate', 'noiMargin', 'dscr', 'opexRatio', 'exitCapRate', 'stabilizedNoi', 'exitValue', 'noiCagr', 'siteRentPct', 'storeRevenuePct', 'cabinRevenuePct'],
+  retail:       ['irr', 'equityMultiple', 'cashOnCash', 'goingInCapRate', 'noiMargin', 'dscr', 'ltv', 'opexRatio', 'exitCapRate', 'stabilizedNoi', 'exitValue', 'occupancyRate', 'walt', 'anchorTenantPct', 'nearTermExpiryPct', 'pricePerSf'],
+  office:       ['irr', 'equityMultiple', 'cashOnCash', 'goingInCapRate', 'noiMargin', 'dscr', 'ltv', 'opexRatio', 'exitCapRate', 'stabilizedNoi', 'exitValue', 'occupancyRate', 'walt', 'anchorTenantPct', 'nearTermExpiryPct', 'pricePerSf'],
+  industrial:   ['irr', 'equityMultiple', 'cashOnCash', 'goingInCapRate', 'noiMargin', 'dscr', 'ltv', 'opexRatio', 'exitCapRate', 'stabilizedNoi', 'exitValue', 'walt', 'pricePerSf', 'clearHeight', 'dockDoorCount'],
+  self_storage: ['irr', 'equityMultiple', 'cashOnCash', 'goingInCapRate', 'noiMargin', 'dscr', 'ltv', 'opexRatio', 'exitCapRate', 'stabilizedNoi', 'noiCagr', 'physicalOccupancy', 'ratePerSf', 'climateControlledPct', 'ecriUpside'],
+  mixed_use:    ['irr', 'equityMultiple', 'cashOnCash', 'goingInCapRate', 'noiMargin', 'dscr', 'opexRatio', 'exitCapRate', 'stabilizedNoi', 'exitValue', 'noiCagr'],
+  business:     ['irr', 'equityMultiple', 'cashOnCash', 'noiMargin', 'opexRatio', 'totalReturn', 'exitValue', 'stabilizedNoi', 'noiCagr'],
+  default:      ['irr', 'equityMultiple', 'cashOnCash', 'goingInCapRate', 'noiMargin', 'dscr', 'opexRatio', 'exitCapRate', 'stabilizedNoi', 'exitValue'],
 };
 
 export function getKpisForAssetClass(assetClass?: string | null): ModelingKpiDef[] {
