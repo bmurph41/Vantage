@@ -570,6 +570,23 @@ function CrmActivityDetailPanel({
     },
   });
 
+  const reopenMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await apiRequest("PUT", `/api/crm/activities/${id}`, {
+        status: "scheduled",
+      });
+      return res.json();
+    },
+    onSuccess: (updated) => {
+      onActivityUpdated({ ...activity!, status: "scheduled", ...updated });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/activities"] });
+      toast({ title: "Activity reopened" });
+    },
+    onError: () => {
+      toast({ title: "Failed to reopen activity", variant: "destructive" });
+    },
+  });
+
   if (!activity) return null;
 
   const isCompleted = activity.status === "completed";
@@ -643,6 +660,21 @@ function CrmActivityDetailPanel({
               <div className="rounded-md border bg-muted/30 px-3 py-2.5 text-sm whitespace-pre-wrap">
                 {activity.notes}
               </div>
+            </div>
+          )}
+
+          {/* Reopen */}
+          {isCompleted && (
+            <div className="pt-1">
+              <Button
+                className="w-full"
+                variant="outline"
+                onClick={() => reopenMutation.mutate(activity.id)}
+                disabled={reopenMutation.isPending}
+              >
+                <CheckCircle className="w-4 h-4 mr-2" />
+                {reopenMutation.isPending ? "Reopening…" : "Reopen Activity"}
+              </Button>
             </div>
           )}
 
