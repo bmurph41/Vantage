@@ -1524,6 +1524,7 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                 size="sm"
                 onClick={() => setShowPctRev(!showPctRev)}
                 className="h-8 text-xs font-mono"
+                disabled={!(baselineSummary && (baselineSummary.revenue ?? 0) > 0)}
               >
                 % Rev
               </Button>
@@ -2276,34 +2277,64 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                 </TableRow>
 
                 {viewMode === 'annual' && (() => {
-                  const m = (proFormaData as any)?.metrics;
-                  if (!m) return null;
-                  const kmRows = [
-                    { label: 'Going-In Cap Rate', value: m.goingInCapRate != null ? formatPercent(m.goingInCapRate, { dash: true }) : null },
-                    { label: 'Exit Cap Rate',      value: m.exitCapRate     != null ? formatPercent(m.exitCapRate,     { dash: true }) : null },
-                    { label: 'IRR',                value: m.irr             != null ? formatPercent(m.irr,             { dash: true }) : null },
-                    { label: 'Equity Multiple',    value: m.equityMultiple  != null ? `${Number(m.equityMultiple).toFixed(2)}x`        : null },
-                    { label: 'Exit Value',         value: m.exitValue       != null ? formatCurrency(m.exitValue,      { dash: true }) : null },
-                  ].filter(r => r.value != null);
-                  if (kmRows.length === 0) return null;
+                  const kmDefs: Array<{ label: string; getValue: (i: number) => string; color: string }> = [
+                    {
+                      label: 'NOI Margin',
+                      getValue: (i) => {
+                        const rev = getCategoryProjectedTotal('Revenue', i);
+                        const s = calculateYearSummary(i);
+                        return rev > 0 ? formatPercent((s.noi / rev) * 100, { dash: true }) : '—';
+                      },
+                      color: 'text-green-600 dark:text-green-400',
+                    },
+                    {
+                      label: 'Rev Growth YoY',
+                      getValue: (i) => {
+                        if (i === 0) return '—';
+                        const rev = getCategoryProjectedTotal('Revenue', i);
+                        const prevRev = getCategoryProjectedTotal('Revenue', i - 1);
+                        return prevRev > 0 ? formatPercent(((rev - prevRev) / prevRev) * 100, { showSign: true, dash: true }) : '—';
+                      },
+                      color: 'text-blue-600 dark:text-blue-400',
+                    },
+                    {
+                      label: 'OpEx Ratio',
+                      getValue: (i) => {
+                        const rev = getCategoryProjectedTotal('Revenue', i);
+                        const opex = getCategoryProjectedTotal('COGS', i) + getCategoryProjectedTotal('Expenses', i);
+                        return rev > 0 ? formatPercent((opex / rev) * 100, { dash: true }) : '—';
+                      },
+                      color: 'text-orange-600 dark:text-orange-400',
+                    },
+                    ...(years.some((_, i) => calculateYearSummary(i).debtService > 0) ? [{
+                      label: 'DSCR',
+                      getValue: (i: number) => {
+                        const s = calculateYearSummary(i);
+                        return s.debtService > 0 ? (s.noi / s.debtService).toFixed(2) : '—';
+                      },
+                      color: 'text-teal-600 dark:text-teal-400',
+                    }] : []),
+                  ];
                   return (
                     <>
-                      <TableRow className="border-t-2 bg-amber-50/40 dark:bg-amber-950/20">
-                        <TableCell colSpan={100} className="sticky left-0 z-10 ws-section-label ws-section-label--compact py-1 text-amber-700 dark:text-amber-400">
+                      <TableRow className="border-t-2 bg-slate-50/60 dark:bg-slate-900/40">
+                        <TableCell colSpan={100} className="sticky left-0 z-10 ws-section-label ws-section-label--compact py-1 text-slate-600 dark:text-slate-400">
                           Key Metrics
                         </TableCell>
                       </TableRow>
-                      {kmRows.map(row => (
-                        <TableRow key={row.label} className="bg-amber-50/20 dark:bg-amber-950/10">
-                          <TableCell className="sticky left-0 bg-background text-muted-foreground z-10">{row.label}</TableCell>
+                      {kmDefs.map(km => (
+                        <TableRow key={km.label} className="bg-slate-50/30 dark:bg-slate-900/20">
+                          <TableCell className="sticky left-0 bg-background text-muted-foreground z-10">{km.label}</TableCell>
                           {showHistorical && priorPeriods.map(p => (
                             <TableCell key={p.id} className="text-right bg-blue-50/60 dark:bg-blue-950/20 text-muted-foreground">—</TableCell>
                           ))}
                           <TableCell className="text-right bg-blue-50 dark:bg-blue-950/30 border-x border-blue-200 dark:border-blue-800 text-muted-foreground">—</TableCell>
                           {years.map((_, i) => (
-                            <TableCell key={i} className="text-right text-muted-foreground">—</TableCell>
+                            <TableCell key={i} className={`text-right font-medium tabular-nums ${km.color}`}>
+                              {km.getValue(i)}
+                            </TableCell>
                           ))}
-                          <TableCell className="text-right font-semibold text-amber-700 dark:text-amber-400">{row.value}</TableCell>
+                          <TableCell className="text-right text-muted-foreground">—</TableCell>
                         </TableRow>
                       ))}
                     </>
@@ -2330,14 +2361,14 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                         const summary = calculateMonthSummary(selectedYearInt, monthIndex);
                         return (
                           <TableCell key={monthIndex} className={`text-right text-red-500 ${isSeasonalMonth(monthIndex) ? 'bg-green-50 dark:bg-green-950/30' : ''}`}>
-                            ({formatCurrency(summary.managementFee, { dash: true })})
+                            {showPctRev ? fmtCell(summary.managementFee, getMonthlyTotal('Revenue', selectedYearInt, monthIndex)) : `(${formatCurrency(summary.managementFee, { dash: true })})`}
                           </TableCell>
                         );
                       })
                     ) : (
                       years.map((_, i) => {
                         const summary = calculateYearSummary(i);
-                        return <TableCell key={i} className="text-right text-red-500">({formatCurrency(summary.managementFee, { dash: true })})</TableCell>;
+                        return <TableCell key={i} className="text-right text-red-500">{showPctRev ? fmtCell(summary.managementFee, getCategoryProjectedTotal('Revenue', i)) : `(${formatCurrency(summary.managementFee, { dash: true })})`}</TableCell>;
                       })
                     )}
                     <TableCell className="text-right text-muted-foreground">-</TableCell>
@@ -2354,14 +2385,14 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                         const summary = calculateMonthSummary(selectedYearInt, monthIndex);
                         return (
                           <TableCell key={monthIndex} className={`text-right text-red-500 ${isSeasonalMonth(monthIndex) ? 'bg-green-50 dark:bg-green-950/30' : ''}`}>
-                            ({formatCurrency(summary.capex, { dash: true })})
+                            {showPctRev ? fmtCell(summary.capex, getMonthlyTotal('Revenue', selectedYearInt, monthIndex)) : `(${formatCurrency(summary.capex, { dash: true })})`}
                           </TableCell>
                         );
                       })
                     ) : (
                       years.map((_, i) => {
                         const summary = calculateYearSummary(i);
-                        return <TableCell key={i} className="text-right text-red-500">({formatCurrency(summary.capex, { dash: true })})</TableCell>;
+                        return <TableCell key={i} className="text-right text-red-500">{showPctRev ? fmtCell(summary.capex, getCategoryProjectedTotal('Revenue', i)) : `(${formatCurrency(summary.capex, { dash: true })})`}</TableCell>;
                       })
                     )}
                     <TableCell className="text-right text-muted-foreground">-</TableCell>
@@ -2378,14 +2409,14 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                         const summary = calculateMonthSummary(selectedYearInt, monthIndex);
                         return (
                           <TableCell key={monthIndex} className={`text-right text-red-500 ${isSeasonalMonth(monthIndex) ? 'bg-green-50 dark:bg-green-950/30' : ''}`}>
-                            ({formatCurrency(summary.reserves, { dash: true })})
+                            {showPctRev ? fmtCell(summary.reserves, getMonthlyTotal('Revenue', selectedYearInt, monthIndex)) : `(${formatCurrency(summary.reserves, { dash: true })})`}
                           </TableCell>
                         );
                       })
                     ) : (
                       years.map((_, i) => {
                         const summary = calculateYearSummary(i);
-                        return <TableCell key={i} className="text-right text-red-500">({formatCurrency(summary.reserves, { dash: true })})</TableCell>;
+                        return <TableCell key={i} className="text-right text-red-500">{showPctRev ? fmtCell(summary.reserves, getCategoryProjectedTotal('Revenue', i)) : `(${formatCurrency(summary.reserves, { dash: true })})`}</TableCell>;
                       })
                     )}
                     <TableCell className="text-right text-muted-foreground">-</TableCell>
@@ -2402,7 +2433,7 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                         const summary = calculateMonthSummary(selectedYearInt, monthIndex);
                         return (
                           <TableCell key={monthIndex} className={`text-right ${summary.cashFlowBeforeDebtService >= 0 ? 'text-amber-700 dark:text-amber-400' : 'text-red-600'} ${isSeasonalMonth(monthIndex) ? 'bg-green-50 dark:bg-green-950/30' : ''}`}>
-                            {formatCurrency(summary.cashFlowBeforeDebtService, { dash: true })}
+                            {fmtCell(summary.cashFlowBeforeDebtService, getMonthlyTotal('Revenue', selectedYearInt, monthIndex))}
                           </TableCell>
                         );
                       })
@@ -2411,7 +2442,7 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                         const summary = calculateYearSummary(i);
                         return (
                           <TableCell key={i} className={`text-right ${summary.cashFlowBeforeDebtService >= 0 ? 'text-amber-700 dark:text-amber-400' : 'text-red-600'}`}>
-                            {formatCurrency(summary.cashFlowBeforeDebtService, { dash: true })}
+                            {fmtCell(summary.cashFlowBeforeDebtService, getCategoryProjectedTotal('Revenue', i))}
                           </TableCell>
                         );
                       })
@@ -2440,14 +2471,14 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                         const summary = calculateMonthSummary(selectedYearInt, monthIndex);
                         return (
                           <TableCell key={monthIndex} className={`text-right text-red-500 ${isSeasonalMonth(monthIndex) ? 'bg-green-50 dark:bg-green-950/30' : ''}`}>
-                            ({formatCurrency(summary.debtService, { dash: true })})
+                            {showPctRev ? fmtCell(summary.debtService, getMonthlyTotal('Revenue', selectedYearInt, monthIndex)) : `(${formatCurrency(summary.debtService, { dash: true })})`}
                           </TableCell>
                         );
                       })
                     ) : (
                       years.map((_, i) => {
                         const summary = calculateYearSummary(i);
-                        return <TableCell key={i} className="text-right text-red-500">({formatCurrency(summary.debtService, { dash: true })})</TableCell>;
+                        return <TableCell key={i} className="text-right text-red-500">{showPctRev ? fmtCell(summary.debtService, getCategoryProjectedTotal('Revenue', i)) : `(${formatCurrency(summary.debtService, { dash: true })})`}</TableCell>;
                       })
                     )}
                     <TableCell className="text-right text-muted-foreground">-</TableCell>
@@ -2464,7 +2495,7 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                         const summary = calculateMonthSummary(selectedYearInt, monthIndex);
                         return (
                           <TableCell key={monthIndex} className={`text-right ${summary.leveredCashFlow >= 0 ? 'text-emerald-600' : 'text-red-600'} ${isSeasonalMonth(monthIndex) ? 'bg-green-50 dark:bg-green-950/30' : ''}`}>
-                            {formatCurrency(summary.leveredCashFlow, { dash: true })}
+                            {fmtCell(summary.leveredCashFlow, getMonthlyTotal('Revenue', selectedYearInt, monthIndex))}
                           </TableCell>
                         );
                       })
@@ -2473,7 +2504,7 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                         const summary = calculateYearSummary(i);
                         return (
                           <TableCell key={i} className={`text-right ${summary.leveredCashFlow >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                            {formatCurrency(summary.leveredCashFlow, { dash: true })}
+                            {fmtCell(summary.leveredCashFlow, getCategoryProjectedTotal('Revenue', i))}
                           </TableCell>
                         );
                       })

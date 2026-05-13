@@ -569,6 +569,11 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
     return dataByYear;
   }, [allYearsActualsData, yearRange, getCategoryOverride]);
 
+  const canShowPctRev = useMemo(() =>
+    yearRange.some(y => Object.values(annualDataByYear[y]?.['Revenue'] ?? {}).some(v => v > 0)),
+    [yearRange, annualDataByYear]
+  );
+
   const annualSubcatDeptMap = useMemo(() => {
     if (!allYearsActualsData?.byYear) return {};
     const map: Record<string, string> = {};
@@ -982,6 +987,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                 size="sm"
                 onClick={() => setShowPctRev(!showPctRev)}
                 className="h-8 text-xs font-mono"
+                disabled={!canShowPctRev}
               >
                 % Rev
               </Button>
@@ -1232,6 +1238,8 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                     const catTotalB = getAnnualCategoryTotal(category, yearB);
                     const catDollarChange = catTotalB - catTotalA;
                     const catPctChange = calcGrowthRate(catTotalB, catTotalA);
+                    const revA = getAnnualCategoryTotal('Revenue', yearA);
+                    const revB = getAnnualCategoryTotal('Revenue', yearB);
 
                     return (
                       <Fragment key={category}>
@@ -1250,8 +1258,8 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                             <>
                               <TableRow className="bg-muted font-bold border-t-2">
                                 <TableCell className="whitespace-nowrap sticky left-0 z-10 bg-muted border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] px-3 py-2 text-sm">Gross Profit</TableCell>
-                                <TableCell className="text-right text-sm font-bold bg-muted px-3 py-2 tabular-nums">{hasDataA ? formatCurrency(gpA, { dash: true }) : '-'}</TableCell>
-                                <TableCell className="text-right text-sm font-bold bg-muted px-3 py-2 tabular-nums">{hasDataB ? formatCurrency(gpB, { dash: true }) : '-'}</TableCell>
+                                <TableCell className="text-right text-sm font-bold bg-muted px-3 py-2 tabular-nums">{hasDataA ? fmtCell(gpA, revA) : '-'}</TableCell>
+                                <TableCell className="text-right text-sm font-bold bg-muted px-3 py-2 tabular-nums">{hasDataB ? fmtCell(gpB, revB) : '-'}</TableCell>
                                 <TableCell className={`text-right text-sm font-bold bg-muted px-3 py-2 tabular-nums ${gpDollarChange >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                                   {hasDataA && hasDataB ? formatCurrency(gpDollarChange, { dash: true }) : 'N/A'}
                                 </TableCell>
@@ -1323,10 +1331,10 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                             </div>
                           </TableCell>
                           <TableCell className={`text-right font-bold text-sm px-3 py-2 tabular-nums ${!hasDataA ? 'text-muted-foreground/50' : ''}`}>
-                            {hasDataA ? formatCurrency(catTotalA, { dash: true }) : '-'}
+                            {hasDataA ? fmtCell(catTotalA, revA) : '-'}
                           </TableCell>
                           <TableCell className={`text-right font-bold text-sm px-3 py-2 tabular-nums ${!hasDataB ? 'text-muted-foreground/50' : ''}`}>
-                            {hasDataB ? formatCurrency(catTotalB, { dash: true }) : '-'}
+                            {hasDataB ? fmtCell(catTotalB, revB) : '-'}
                           </TableCell>
                           <TableCell className={`text-right font-bold text-sm px-3 py-2 tabular-nums ${catDollarChange >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                             {hasDataA && hasDataB ? formatCurrency(catDollarChange, { dash: true }) : 'N/A'}
@@ -1382,10 +1390,10 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                                     </div>
                                   </TableCell>
                                   <TableCell className={`text-right text-xs font-medium text-muted-foreground bg-slate-50 dark:bg-slate-900 px-3 py-1.5 tabular-nums`}>
-                                    {hasDataA ? formatCurrency(deptTotalA, { dash: true }) : '-'}
+                                    {hasDataA ? fmtCell(deptTotalA, revA) : '-'}
                                   </TableCell>
                                   <TableCell className={`text-right text-xs font-medium text-muted-foreground bg-slate-50 dark:bg-slate-900 px-3 py-1.5 tabular-nums`}>
-                                    {hasDataB ? formatCurrency(deptTotalB, { dash: true }) : '-'}
+                                    {hasDataB ? fmtCell(deptTotalB, revB) : '-'}
                                   </TableCell>
                                   <TableCell className={`text-right text-xs font-medium bg-slate-50 dark:bg-slate-900 px-3 py-1.5 tabular-nums ${deptDollarChange >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                                     {hasDataA && hasDataB ? formatCurrency(deptDollarChange, { dash: true }) : 'N/A'}
@@ -1446,10 +1454,10 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                                         </div>
                                       </TableCell>
                                       <TableCell className={`text-right text-xs px-3 py-1.5 tabular-nums ${!hasDataA ? 'text-muted-foreground/50' : ''}`}>
-                                        {hasDataA && subAmountA !== 0 ? formatCurrency(subAmountA, { dash: true }) : '-'}
+                                        {hasDataA && subAmountA !== 0 ? fmtCell(subAmountA, revA) : '-'}
                                       </TableCell>
                                       <TableCell className={`text-right text-xs px-3 py-1.5 tabular-nums ${!hasDataB ? 'text-muted-foreground/50' : ''}`}>
-                                        {hasDataB && subAmountB !== 0 ? formatCurrency(subAmountB, { dash: true }) : '-'}
+                                        {hasDataB && subAmountB !== 0 ? fmtCell(subAmountB, revB) : '-'}
                                       </TableCell>
                                       <TableCell className={`text-right text-xs px-3 py-1.5 tabular-nums ${subDollarChange >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                                         {hasDataA && hasDataB ? formatCurrency(subDollarChange, { dash: true }) : 'N/A'}
@@ -1490,10 +1498,10 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                         <TableRow className="bg-primary/10 font-bold border-t-2">
                           <TableCell className="whitespace-nowrap sticky left-0 z-10 bg-blue-50 dark:bg-blue-950 border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] px-3 py-2 text-sm">{config?.bottomLineMetric === 'ebitda' ? 'EBITDA' : 'NOI'}</TableCell>
                           <TableCell className={`text-right text-sm font-bold bg-primary/10 px-3 py-2 tabular-nums ${!hasDataA ? 'text-muted-foreground/50' : noiA >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                            {hasDataA ? formatCurrency(noiA, { dash: true }) : '-'}
+                            {hasDataA ? fmtCell(noiA, revA) : '-'}
                           </TableCell>
                           <TableCell className={`text-right text-sm font-bold bg-primary/10 px-3 py-2 tabular-nums ${!hasDataB ? 'text-muted-foreground/50' : noiB >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                            {hasDataB ? formatCurrency(noiB, { dash: true }) : '-'}
+                            {hasDataB ? fmtCell(noiB, revB) : '-'}
                           </TableCell>
                           <TableCell className={`text-right text-sm font-bold bg-primary/10 px-3 py-2 tabular-nums ${noiDollarChange >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                             {hasDataA && hasDataB ? formatCurrency(noiDollarChange, { dash: true }) : 'N/A'}
@@ -2123,7 +2131,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                               return (
                                 <Fragment key={year}>
                                   <TableCell className={`text-right text-sm font-bold bg-muted px-3 py-2 tabular-nums ${!hasData ? 'text-muted-foreground/50' : ''}`}>
-                                    {hasData ? formatCurrency(gp, { dash: true }) : '-'}
+                                    {hasData ? fmtCell(gp, revenue) : '-'}
                                   </TableCell>
                                   {showGrowthCols && yi > 0 && (
                                     <TableCell className="text-right text-[10px] bg-muted/10 px-1 py-2 tabular-nums">
@@ -2212,7 +2220,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                           return (
                             <Fragment key={year}>
                               <TableCell className={`text-right font-bold text-sm px-3 py-2 tabular-nums ${!hasData ? 'text-muted-foreground/50' : ''}`}>
-                                {hasData ? formatCurrency(total, { dash: true }) : '-'}
+                                {hasData ? fmtCell(total, getAnnualCategoryTotal('Revenue', year)) : '-'}
                               </TableCell>
                               {showGrowthCols && yi > 0 && (
                                 <TableCell className="text-right text-[10px] bg-muted/10 px-1 py-2 tabular-nums">
@@ -2284,7 +2292,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                                   return (
                                     <Fragment key={year}>
                                       <TableCell className={`text-right text-xs font-medium text-muted-foreground bg-slate-50 dark:bg-slate-900 px-3 py-1.5 tabular-nums ${!hasData ? 'text-muted-foreground/50' : ''}`}>
-                                        {hasData ? formatCurrency(deptTotal, { dash: true }) : '-'}
+                                        {hasData ? fmtCell(deptTotal, getAnnualCategoryTotal('Revenue', year)) : '-'}
                                       </TableCell>
                                       {showGrowthCols && yi > 0 && (
                                         <TableCell className="text-right text-[10px] bg-muted/10 px-1 py-1.5 tabular-nums">
@@ -2364,7 +2372,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                                     return (
                                       <Fragment key={year}>
                                         <TableCell className={`text-right text-xs px-3 py-1.5 tabular-nums ${!hasData ? 'text-muted-foreground/50' : ''}`}>
-                                          {hasData && amount !== 0 ? formatCurrency(amount, { dash: true }) : '-'}
+                                          {hasData && amount !== 0 ? fmtCell(amount, getAnnualCategoryTotal('Revenue', year)) : '-'}
                                         </TableCell>
                                         {showGrowthCols && yi > 0 && (
                                           <TableCell className="text-right text-[10px] bg-muted/10 px-1 py-1.5 tabular-nums">
@@ -2398,7 +2406,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                       return (
                         <Fragment key={year}>
                           <TableCell className={`text-right text-sm font-bold bg-primary/10 px-3 py-2 tabular-nums ${!hasData ? 'text-muted-foreground/50' : noi >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                            {hasData ? formatCurrency(noi, { dash: true }) : '-'}
+                            {hasData ? fmtCell(noi, revenue) : '-'}
                           </TableCell>
                           {showGrowthCols && yi > 0 && (
                             <TableCell className="text-right text-[10px] bg-muted/10 px-1 py-2 tabular-nums">

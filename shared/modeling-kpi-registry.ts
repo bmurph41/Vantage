@@ -1,10 +1,28 @@
+export interface KpiMetrics {
+  irr?: number;
+  equityMultiple?: number;
+  goingInCapRate?: number;
+  exitCapRate?: number;
+  stabilizedNoi?: number;
+  exitValue?: number;
+  totalReturn?: number;
+  minDscr?: number;
+  ltv?: number;
+  [key: string]: number | undefined;
+}
+
+export interface KpiAnnualRow {
+  noi?: number;
+  [key: string]: number | undefined;
+}
+
 export interface ModelingKpiDef {
   key: string;
   label: string;
   format: 'currency' | 'percent' | 'multiple' | 'number';
   color: string;
   tooltip?: string;
-  compute: (metrics: Record<string, any>, annualProjections?: any[]) => number | null;
+  compute: (metrics: KpiMetrics, annualProjections?: KpiAnnualRow[]) => number | null;
 }
 
 export const MODELING_KPI_REGISTRY: Record<string, ModelingKpiDef> = {

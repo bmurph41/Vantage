@@ -28,8 +28,8 @@ export function ModelingKpiStrip({ proFormaData, assetClass, className }: Modeli
 
   const computed = useMemo(() => {
     if (!proFormaData) return [];
-    const metrics = ((proFormaData as any).metrics || {}) as Record<string, any>;
-    const annualProjections = (proFormaData as any).annualProjections as any[] | undefined;
+    const metrics = proFormaData.metrics ?? {};
+    const annualProjections = proFormaData.annualProjections;
     return kpis.map((kpi) => ({
       kpi,
       value: kpi.compute(metrics, annualProjections),

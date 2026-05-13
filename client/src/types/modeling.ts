@@ -77,6 +77,7 @@ export interface ProFormaData {
   annualProjections?: AnnualProjection[];
   monthlyProjections?: MonthlyProjection[];
   latestHistoricalYear?: number;
+  metrics?: Record<string, number>;
   [key: string]: unknown;
 }
 
