@@ -2402,11 +2402,37 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     }
   });
 
-  // ─── KPI Strip Configuration ────────────────────
+  // ─── KPI Strip Configuration (user-scoped per project) ─────────────────────
+  // Preferences are stored per-user per-project so each collaborator has their
+  // own layout without affecting teammates.  Page key convention:
+  //   "modeling:kpi-strip:{projectId}"
+  // Fall-back chain: user pref → project-level legacy value → null (defaults)
   app.get('/api/modeling/projects/:projectId/kpi-strip-config', authenticateUser, async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
+      const userId = req.user.id;
       const { projectId } = req.params;
+
+      const pageKey = `modeling:kpi-strip:${projectId}`;
+
+      // 1. Check user-scoped preference first
+      const [userPref] = await db
+        .select()
+        .from(userKpiPreferences)
+        .where(and(
+          eq(userKpiPreferences.userId, userId),
+          eq(userKpiPreferences.orgId, orgId),
+          eq(userKpiPreferences.pageKey, pageKey),
+        ))
+        .limit(1);
+
+      if (userPref) {
+        // kpiConfig stores the string[] directly for this use-case
+        const enabledKeys = Array.isArray(userPref.kpiConfig) ? userPref.kpiConfig as unknown as string[] : null;
+        return res.json({ enabledKeys });
+      }
+
+      // 2. Fall back to legacy project-level value (migration path for existing data)
       const project = await storage.getModelingProject(projectId, orgId);
       if (!project) return res.status(404).json({ error: 'Project not found' });
       const cm = (project.customMetrics as any) || {};
@@ -2430,16 +2456,33 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
       if (!enabledKeys.every((k: unknown) => typeof k === 'string')) {
         return res.status(400).json({ error: 'enabledKeys must be an array of strings' });
       }
-      // Import registry to validate and dedupe keys against known KPIs
+      // Validate and dedupe keys against the known KPI registry
       const { MODELING_KPI_REGISTRY } = await import('@shared/modeling-kpi-registry');
       const validKeys = [...new Set((enabledKeys as string[]).filter((k) => k in MODELING_KPI_REGISTRY))];
 
-      const project = await storage.getModelingProject(projectId, orgId);
-      if (!project) return res.status(404).json({ error: 'Project not found' });
+      const pageKey = `modeling:kpi-strip:${projectId}`;
 
-      const existingMetrics = (project.customMetrics as any) || {};
-      const updatedMetrics = { ...existingMetrics, kpiStripEnabledKeys: validKeys };
-      await storage.updateModelingProject(projectId, { customMetrics: updatedMetrics, updatedBy: userId }, orgId);
+      // Upsert into user-scoped preferences table
+      const [existing] = await db
+        .select()
+        .from(userKpiPreferences)
+        .where(and(
+          eq(userKpiPreferences.userId, userId),
+          eq(userKpiPreferences.orgId, orgId),
+          eq(userKpiPreferences.pageKey, pageKey),
+        ))
+        .limit(1);
+
+      if (existing) {
+        await db
+          .update(userKpiPreferences)
+          .set({ kpiConfig: validKeys as any, lastModified: new Date() })
+          .where(eq(userKpiPreferences.id, existing.id));
+      } else {
+        await db
+          .insert(userKpiPreferences)
+          .values({ userId, orgId, pageKey, kpiConfig: validKeys as any });
+      }
 
       res.json({ success: true, enabledKeys: validKeys });
     } catch (error: any) {
