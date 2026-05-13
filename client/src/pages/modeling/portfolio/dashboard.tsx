@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import {
@@ -87,9 +88,28 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   );
 };
 
+const STAGES = [
+  { key: 'all',            label: 'All' },
+  { key: 'pipeline',       label: 'Pipeline' },
+  { key: 'under_loi',      label: 'Under LOI' },
+  { key: 'under_contract', label: 'Under Contract' },
+  { key: 'owned',          label: 'Owned Assets' },
+  { key: 'passed',         label: 'Passed / Dead' },
+];
+
 export default function PortfolioModelingDashboard() {
+  const [stage, setStage] = useState<string>('all');
+
   const { data, isLoading } = useQuery<PortfolioSummary>({
-    queryKey: ["/api/portfolio/summary"],
+    queryKey: ["/api/portfolio/summary", stage],
+    queryFn: async () => {
+      const url = stage === 'all'
+        ? '/api/portfolio/summary'
+        : `/api/portfolio/summary?stage=${stage}`;
+      const res = await fetch(url, { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to fetch portfolio summary');
+      return res.json();
+    },
   });
 
   const formattedTrend = (data?.noiTrend || []).map((r) => ({
@@ -104,14 +124,18 @@ export default function PortfolioModelingDashboard() {
     totalNoi: r.totalNoi,
   }));
 
+  const activeStageLabel = STAGES.find((s) => s.key === stage)?.label || 'All';
+
   return (
     <div className="flex-1 overflow-y-auto bg-gray-50 p-6 space-y-6">
       {/* ── Header ── */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Portfolio Dashboard</h1>
           <p className="text-sm text-gray-500 mt-0.5">
-            Aggregated KPIs across all modeling projects
+            {stage === 'all'
+              ? 'Aggregated KPIs across all modeling projects'
+              : `Filtered by: ${activeStageLabel}`}
           </p>
         </div>
         {data?.generatedAt && (
@@ -120,6 +144,28 @@ export default function PortfolioModelingDashboard() {
             <span>Updated {format(new Date(data.generatedAt), "MMM d, h:mm a")}</span>
           </div>
         )}
+      </div>
+
+      {/* ── Stage Toggle ── */}
+      <div className="inline-flex items-center gap-0.5 bg-gray-100 rounded-lg p-1 flex-wrap">
+        {STAGES.map((s) => (
+          <button
+            key={s.key}
+            onClick={() => setStage(s.key)}
+            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all whitespace-nowrap ${
+              stage === s.key
+                ? 'bg-white shadow-sm text-gray-900'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            {s.label}
+            {stage === s.key && s.key !== 'all' && data?.dealCount != null && (
+              <span className="ml-1.5 text-[10px] font-semibold text-blue-600">
+                {data.dealCount}
+              </span>
+            )}
+          </button>
+        ))}
       </div>
 
       {/* ── KPI Cards ── */}

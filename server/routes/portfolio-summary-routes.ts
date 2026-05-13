@@ -17,11 +17,26 @@ import { sql } from "drizzle-orm";
 
 const router = Router();
 
+// ─── Stage filter helpers ─────────────────────────────────────────────────────
+
+const STAGE_SQL: Record<string, string> = {
+  all: '',
+  pipeline: `AND mp.deal_outcome = 'active'`,
+  under_loi: `AND mp.deal_outcome = 'active' AND mp.uw_stage = 'initial_screening'`,
+  under_contract: `AND mp.deal_outcome = 'active' AND mp.uw_stage IN ('data_collection','building_model','sensitivity_analysis','ic_review','approved')`,
+  owned: `AND mp.deal_outcome = 'won'`,
+  passed: `AND mp.deal_outcome IN ('lost','passed')`,
+};
+
 // ─── GET /summary ────────────────────────────────────────────────────────────
 router.get("/summary", async (req: any, res) => {
   try {
     const orgId = (req.user?.orgId || req.tenantId) as string;
     if (!orgId) return res.status(401).json({ error: "Unauthorized" });
+
+    const rawStage = (req.query.stage as string) || 'all';
+    const stage = Object.prototype.hasOwnProperty.call(STAGE_SQL, rawStage) ? rawStage : 'all';
+    const sc = STAGE_SQL[stage];
 
     const projectAgg = await db.execute(sql`
       SELECT
@@ -33,6 +48,7 @@ router.get("/summary", async (req: any, res) => {
         COALESCE(AVG(mp.year_1_cap_rate), 0)::numeric(8,4)     AS avg_cap_rate
       FROM modeling_projects mp
       WHERE mp.org_id = ${orgId}
+      ${sql.raw(sc)}
     `);
 
     const core = (projectAgg.rows[0] || {}) as any;
@@ -46,6 +62,7 @@ router.get("/summary", async (req: any, res) => {
       INNER JOIN modeling_projects mp ON mp.id = cs.modeling_project_id
       WHERE mp.org_id = ${orgId}
         AND cs.is_active = true
+      ${sql.raw(sc)}
     `);
 
     const stackData = (stackAgg.rows[0] || {}) as any;
@@ -55,6 +72,7 @@ router.get("/summary", async (req: any, res) => {
       FROM capital_stacks cs
       INNER JOIN modeling_projects mp ON mp.id = cs.modeling_project_id
       WHERE mp.org_id = ${orgId} AND cs.is_active = true
+      ${sql.raw(sc)}
     `);
 
     const avgDscr = Number((dscrAgg.rows[0] as any)?.avg_dscr || 0);
@@ -64,6 +82,7 @@ router.get("/summary", async (req: any, res) => {
       FROM valuation_snapshots vs
       INNER JOIN modeling_projects mp ON mp.id = vs.modeling_project_id
       WHERE mp.org_id = ${orgId} AND vs.irr IS NOT NULL
+      ${sql.raw(sc)}
     `);
 
     const avgLeveredIrr = Number((irrAgg.rows[0] as any)?.avg_irr || 0);
@@ -76,6 +95,7 @@ router.get("/summary", async (req: any, res) => {
         COALESCE(SUM(mp.ebitda), 0)::numeric         AS total_noi
       FROM modeling_projects mp
       WHERE mp.org_id = ${orgId}
+      ${sql.raw(sc)}
       GROUP BY mp.asset_class
       ORDER BY count DESC
     `);
@@ -89,6 +109,7 @@ router.get("/summary", async (req: any, res) => {
       FROM modeling_projects mp
       WHERE mp.org_id = ${orgId}
         AND mp.created_at >= NOW() - INTERVAL '12 months'
+      ${sql.raw(sc)}
       GROUP BY DATE_TRUNC('month', mp.created_at)
       ORDER BY month ASC
     `);
