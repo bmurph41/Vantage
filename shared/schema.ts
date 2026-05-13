@@ -30116,6 +30116,8 @@ export const prospectingTimeBlocks = pgTable("prospecting_time_blocks", {
   googleCalendarEventId: text("google_calendar_event_id"),
   syncedToCalendar: boolean("synced_to_calendar").default(false),
   invitedUserIds: jsonb("invited_user_ids").default("[]"),
+  parentBlockId: varchar("parent_block_id"),
+  recurrenceRule: jsonb("recurrence_rule"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({

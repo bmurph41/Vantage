@@ -35,6 +35,16 @@ export type TimeBlock = {
   google_calendar_event_id?: string;
   invited_user_ids: string[];
   creator_name?: string;
+  parent_block_id?: string | null;
+  recurrence_rule?: RecurrenceRule | null;
+};
+
+export type RecurrenceRule = {
+  freq: "daily" | "weekly" | "custom";
+  days?: number[];
+  endType: "date" | "count";
+  endDate?: string;
+  count?: number;
 };
 
 export type CrmActivityItem = {

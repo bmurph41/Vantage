@@ -19940,6 +19940,8 @@ const MIGRATIONS: Migration[] = [
   { name: "prospecting_time_blocks: block_type_check", sql: `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ptb_block_type_check') THEN ALTER TABLE prospecting_time_blocks ADD CONSTRAINT ptb_block_type_check CHECK (block_type IN ('prospecting_call','site_tour','loi_review','team_meeting','admin','other')); END IF; END $$` },
   { name: "prospecting_time_blocks: start_at_timestamptz", sql: `ALTER TABLE prospecting_time_blocks ALTER COLUMN start_at TYPE timestamptz USING start_at AT TIME ZONE 'UTC'` },
   { name: "prospecting_time_blocks: end_at_timestamptz", sql: `ALTER TABLE prospecting_time_blocks ALTER COLUMN end_at TYPE timestamptz USING end_at AT TIME ZONE 'UTC'` },
+  { name: "prospecting_time_blocks: add parent_block_id", sql: `ALTER TABLE prospecting_time_blocks ADD COLUMN IF NOT EXISTS parent_block_id varchar` },
+  { name: "prospecting_time_blocks: add recurrence_rule", sql: `ALTER TABLE prospecting_time_blocks ADD COLUMN IF NOT EXISTS recurrence_rule jsonb` },
 ];
 
 /**

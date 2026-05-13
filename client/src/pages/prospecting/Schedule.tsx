@@ -28,6 +28,7 @@ import { ProspectingNav } from "./ProspectingNav";
 import {
   TimeBlockGrid,
   TimeBlock,
+  RecurrenceRule,
   CrmActivityItem,
   BLOCK_TYPES,
   DEFAULT_COLORS,
@@ -49,6 +50,8 @@ function buildIso(dateStr: string, timeStr: string): string {
   return new Date(`${dateStr}T${timeStr}:00`).toISOString();
 }
 
+const DOW_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
 // ── Drawer (create / edit) ────────────────────────────────────────────────────
 
 type DrawerMode = "create" | "edit";
@@ -58,6 +61,14 @@ type DrawerState = {
   mode: DrawerMode;
   block?: TimeBlock;
   defaultStart?: Date;
+};
+
+type RecurrenceForm = {
+  freq: "none" | "daily" | "weekly" | "custom";
+  days: number[];
+  endType: "date" | "count";
+  endDate: string;
+  count: number;
 };
 
 type BlockForm = {
@@ -71,6 +82,12 @@ type BlockForm = {
   invited_user_ids: string[];
 };
 
+function defaultEndDate(): string {
+  const d = new Date();
+  d.setMonth(d.getMonth() + 1);
+  return format(d, "yyyy-MM-dd");
+}
+
 function BlockDrawer({
   drawerState,
   orgUsers,
@@ -82,10 +99,11 @@ function BlockDrawer({
   orgUsers: OrgUser[];
   onClose: () => void;
   onSaved: () => void;
-  onDelete?: (id: string) => void;
+  onDelete?: (id: string, scope: "this" | "all") => void;
 }) {
   const { toast } = useToast();
   const isEdit = drawerState.mode === "edit" && drawerState.block;
+  const isRecurring = !!drawerState.block?.parent_block_id;
 
   const initialStart = drawerState.block
     ? parseISO(drawerState.block.start_at)
@@ -105,12 +123,46 @@ function BlockDrawer({
     invited_user_ids: drawerState.block?.invited_user_ids ?? [],
   });
 
+  const [recurrence, setRecurrence] = useState<RecurrenceForm>({
+    freq: "none",
+    days: [],
+    endType: "date",
+    endDate: defaultEndDate(),
+    count: 10,
+  });
+
+  const [editScope, setEditScope] = useState<"this" | "all">("this");
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
   const setField = <K extends keyof BlockForm>(k: K, v: BlockForm[K]) =>
     setForm((f) => ({ ...f, [k]: v }));
 
+  const setRecField = <K extends keyof RecurrenceForm>(k: K, v: RecurrenceForm[K]) =>
+    setRecurrence((r) => ({ ...r, [k]: v }));
+
+  const toggleDay = (day: number) =>
+    setRecField(
+      "days",
+      recurrence.days.includes(day)
+        ? recurrence.days.filter((d) => d !== day)
+        : [...recurrence.days, day].sort()
+    );
+
+  const buildRecurrenceRule = (): RecurrenceRule | undefined => {
+    if (recurrence.freq === "none") return undefined;
+    const rule: RecurrenceRule = {
+      freq: recurrence.freq === "weekly" ? "weekly" : recurrence.freq === "daily" ? "daily" : "custom",
+      endType: recurrence.endType,
+    };
+    if (recurrence.endType === "date") rule.endDate = recurrence.endDate;
+    else rule.count = recurrence.count;
+    if (recurrence.freq === "custom") rule.days = recurrence.days;
+    return rule;
+  };
+
   const saveMutation = useMutation({
     mutationFn: async () => {
-      const payload = {
+      const payload: Record<string, unknown> = {
         title:          form.title,
         blockType:      form.block_type,
         startAt:        buildIso(form.start_date, form.start_time),
@@ -121,14 +173,21 @@ function BlockDrawer({
         pushToCalendar: form.push_to_calendar,
       };
       if (isEdit) {
+        if (isRecurring) payload.editScope = editScope;
         const res = await apiRequest("PATCH", `/api/prospecting/time-blocks/${drawerState.block!.id}`, payload);
         return res.json();
       }
+      const rule = buildRecurrenceRule();
+      if (rule) payload.recurrenceRule = rule;
       const res = await apiRequest("POST", "/api/prospecting/time-blocks", payload);
       return res.json();
     },
-    onSuccess: (data: { calendarError?: string }) => {
-      toast({ title: isEdit ? "Block updated" : "Block created" });
+    onSuccess: (data: { calendarError?: string; seriesCount?: number }) => {
+      if (data?.seriesCount && data.seriesCount > 1) {
+        toast({ title: `${data.seriesCount} recurring blocks created` });
+      } else {
+        toast({ title: isEdit ? "Block updated" : "Block created" });
+      }
       if (data?.calendarError) {
         toast({
           title: "Calendar sync failed",
@@ -219,6 +278,124 @@ function BlockDrawer({
             />
           </div>
 
+          {/* ── Repeat section (create mode only) ─────────────────────── */}
+          {!isEdit && (
+            <div className="space-y-2 border rounded-md p-3">
+              <div className="flex items-center gap-2">
+                <Clock className="w-4 h-4 text-muted-foreground" />
+                <Label className="font-medium">Repeat</Label>
+              </div>
+
+              <div className="flex flex-wrap gap-1.5">
+                {(["none", "daily", "weekly", "custom"] as const).map((f) => (
+                  <button
+                    key={f}
+                    type="button"
+                    onClick={() => setRecField("freq", f)}
+                    className={`px-2.5 py-1 text-xs rounded-full border transition-colors ${
+                      recurrence.freq === f
+                        ? "bg-blue-600 text-white border-blue-600"
+                        : "border-border hover:bg-muted"
+                    }`}
+                  >
+                    {f === "none" ? "None" : f === "daily" ? "Daily" : f === "weekly" ? "Weekly" : "Custom days"}
+                  </button>
+                ))}
+              </div>
+
+              {recurrence.freq === "custom" && (
+                <div className="flex flex-wrap gap-1.5 mt-1">
+                  {DOW_LABELS.map((label, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => toggleDay(idx)}
+                      className={`w-9 h-9 text-xs rounded-full border font-medium transition-colors ${
+                        recurrence.days.includes(idx)
+                          ? "bg-blue-600 text-white border-blue-600"
+                          : "border-border hover:bg-muted"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {recurrence.freq !== "none" && (
+                <div className="space-y-2 pt-1">
+                  <div className="flex gap-4 text-sm">
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input
+                        type="radio"
+                        checked={recurrence.endType === "date"}
+                        onChange={() => setRecField("endType", "date")}
+                      />
+                      End on date
+                    </label>
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input
+                        type="radio"
+                        checked={recurrence.endType === "count"}
+                        onChange={() => setRecField("endType", "count")}
+                      />
+                      After N times
+                    </label>
+                  </div>
+                  {recurrence.endType === "date" ? (
+                    <Input
+                      type="date"
+                      value={recurrence.endDate}
+                      onChange={(e) => setRecField("endDate", e.target.value)}
+                    />
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        min={2}
+                        max={365}
+                        value={recurrence.count}
+                        onChange={(e) => setRecField("count", Number(e.target.value))}
+                        className="w-24"
+                      />
+                      <span className="text-sm text-muted-foreground">occurrences</span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Edit scope for recurring blocks ───────────────────────── */}
+          {isEdit && isRecurring && (
+            <div className="space-y-1.5 border rounded-md p-3 bg-muted/30">
+              <Label className="text-xs text-muted-foreground uppercase tracking-wide">Edit scope</Label>
+              <div className="flex gap-3 text-sm">
+                <label className="flex items-center gap-1.5 cursor-pointer">
+                  <input
+                    type="radio"
+                    checked={editScope === "this"}
+                    onChange={() => setEditScope("this")}
+                  />
+                  This block only
+                </label>
+                <label className="flex items-center gap-1.5 cursor-pointer">
+                  <input
+                    type="radio"
+                    checked={editScope === "all"}
+                    onChange={() => setEditScope("all")}
+                  />
+                  All blocks in series
+                </label>
+              </div>
+              {editScope === "all" && (
+                <p className="text-xs text-muted-foreground">
+                  Title, type, notes, and color update for all blocks. Date &amp; time changes apply only to this block.
+                </p>
+              )}
+            </div>
+          )}
+
           {orgUsers.length > 0 && (
             <div className="space-y-1">
               <Label>Invite Team Members</Label>
@@ -272,21 +449,53 @@ function BlockDrawer({
             <Button
               className="flex-1"
               onClick={() => saveMutation.mutate()}
-              disabled={saveMutation.isPending || !form.title}
+              disabled={saveMutation.isPending || !form.title || (recurrence.freq === "custom" && recurrence.days.length === 0 && !isEdit)}
             >
-              {saveMutation.isPending ? "Saving…" : isEdit ? "Save Changes" : "Create Block"}
+              {saveMutation.isPending ? "Saving…" : isEdit ? "Save Changes" : recurrence.freq !== "none" ? "Create Recurring Blocks" : "Create Block"}
             </Button>
-            {isEdit && onDelete && drawerState.block && (
+            {isEdit && onDelete && drawerState.block && !showDeleteConfirm && (
               <Button
                 variant="outline"
                 size="icon"
                 className="text-red-500 hover:text-red-700"
-                onClick={() => onDelete(drawerState.block!.id)}
+                onClick={() => isRecurring ? setShowDeleteConfirm(true) : onDelete(drawerState.block!.id, "this")}
               >
                 <Trash2 className="w-4 h-4" />
               </Button>
             )}
           </div>
+
+          {/* ── Delete scope confirm for recurring blocks ─────────────── */}
+          {showDeleteConfirm && isRecurring && (
+            <div className="border border-red-200 rounded-md p-3 space-y-2 bg-red-50 dark:bg-red-950/20">
+              <p className="text-sm font-medium text-red-700 dark:text-red-400">Delete recurring block</p>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="flex-1 border-red-300 text-red-700 hover:bg-red-100"
+                  onClick={() => { onDelete!(drawerState.block!.id, "this"); setShowDeleteConfirm(false); }}
+                >
+                  This block only
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="flex-1 border-red-300 text-red-700 hover:bg-red-100"
+                  onClick={() => { onDelete!(drawerState.block!.id, "all"); setShowDeleteConfirm(false); }}
+                >
+                  All in series
+                </Button>
+              </div>
+              <button
+                type="button"
+                className="text-xs text-muted-foreground hover:underline w-full text-center"
+                onClick={() => setShowDeleteConfirm(false)}
+              >
+                Cancel
+              </button>
+            </div>
+          )}
         </div>
       </SheetContent>
     </Sheet>
@@ -418,10 +627,14 @@ export default function Schedule() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: async (id: string) =>
-      apiRequest("DELETE", `/api/prospecting/time-blocks/${id}`, undefined),
-    onSuccess: () => {
-      toast({ title: "Block deleted" });
+    mutationFn: async ({ id, scope }: { id: string; scope: "this" | "all" }) => {
+      const url = scope === "all"
+        ? `/api/prospecting/time-blocks/${id}?deleteScope=all`
+        : `/api/prospecting/time-blocks/${id}`;
+      return apiRequest("DELETE", url, undefined);
+    },
+    onSuccess: (_, vars) => {
+      toast({ title: vars.scope === "all" ? "All blocks in series deleted" : "Block deleted" });
       queryClient.invalidateQueries({ queryKey: ["/api/prospecting/time-blocks"] });
       setDrawer({ open: false, mode: "create" });
     },
@@ -726,7 +939,7 @@ export default function Schedule() {
           orgUsers={orgUsers}
           onClose={() => setDrawer((d) => ({ ...d, open: false }))}
           onSaved={handleSaved}
-          onDelete={(id) => deleteMutation.mutate(id)}
+          onDelete={(id, scope) => deleteMutation.mutate({ id, scope })}
         />
       )}
     </div>

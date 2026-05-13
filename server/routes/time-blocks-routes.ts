@@ -44,6 +44,66 @@ async function notifyInvitees(
   }
 }
 
+type RecurrenceRule = {
+  freq: 'daily' | 'weekly' | 'custom';
+  days?: number[];
+  endType: 'date' | 'count';
+  endDate?: string;
+  count?: number;
+};
+
+function generateOccurrenceDates(
+  startAt: string,
+  endAt: string,
+  rule: RecurrenceRule
+): Array<{ startAt: string; endAt: string }> {
+  const MAX_OCCURRENCES = 365;
+  const start = new Date(startAt);
+  const end = new Date(endAt);
+  const durationMs = end.getTime() - start.getTime();
+
+  const endDate = rule.endType === 'date' && rule.endDate
+    ? new Date(rule.endDate + 'T23:59:59Z')
+    : null;
+  const maxCount = rule.endType === 'count' && rule.count
+    ? Math.min(rule.count, MAX_OCCURRENCES)
+    : MAX_OCCURRENCES;
+
+  const occurrences: Array<{ startAt: string; endAt: string }> = [];
+  let current = new Date(start);
+
+  while (occurrences.length < maxCount) {
+    if (endDate && current > endDate) break;
+
+    if (rule.freq === 'daily') {
+      occurrences.push({
+        startAt: current.toISOString(),
+        endAt: new Date(current.getTime() + durationMs).toISOString(),
+      });
+      current = new Date(current.getTime() + 24 * 60 * 60 * 1000);
+    } else if (rule.freq === 'weekly') {
+      occurrences.push({
+        startAt: current.toISOString(),
+        endAt: new Date(current.getTime() + durationMs).toISOString(),
+      });
+      current = new Date(current.getTime() + 7 * 24 * 60 * 60 * 1000);
+    } else if (rule.freq === 'custom' && rule.days && rule.days.length > 0) {
+      const dayOfWeek = current.getDay();
+      if (rule.days.includes(dayOfWeek)) {
+        occurrences.push({
+          startAt: current.toISOString(),
+          endAt: new Date(current.getTime() + durationMs).toISOString(),
+        });
+      }
+      current = new Date(current.getTime() + 24 * 60 * 60 * 1000);
+    } else {
+      break;
+    }
+  }
+
+  return occurrences;
+}
+
 // GET /api/prospecting/time-blocks?start=ISO&end=ISO
 router.get('/', async (req: AuthenticatedRequest, res: Response) => {
   try {
@@ -90,9 +150,11 @@ router.post('/', async (req: AuthenticatedRequest, res: Response) => {
       color = '#3b82f6',
       invitedUserIds = [],
       pushToCalendar = false,
+      recurrenceRule,
     } = req.body as {
       title: string; blockType?: string; startAt: string; endAt: string;
       notes?: string; color?: string; invitedUserIds?: string[]; pushToCalendar?: boolean;
+      recurrenceRule?: RecurrenceRule;
     };
 
     const VALID_BLOCK_TYPES = [
@@ -120,45 +182,121 @@ router.post('/', async (req: AuthenticatedRequest, res: Response) => {
       safeInvitees = safeInvitees.filter((id) => validIds.includes(id));
     }
 
-    const { rows: [block] } = await pool.query(
-      `INSERT INTO prospecting_time_blocks
-         (org_id, created_by, title, block_type, start_at, end_at, notes, color, invited_user_ids)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
-       RETURNING *`,
-      [orgId, userId, title, resolvedBlockType, startAt, endAt, notes ?? null, color, JSON.stringify(safeInvitees)]
-    );
+    // ── Non-recurring: single block ──────────────────────────────────────────
+    if (!recurrenceRule || recurrenceRule.freq === undefined) {
+      const { rows: [block] } = await pool.query(
+        `INSERT INTO prospecting_time_blocks
+           (org_id, created_by, title, block_type, start_at, end_at, notes, color, invited_user_ids)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+         RETURNING *`,
+        [orgId, userId, title, resolvedBlockType, startAt, endAt, notes ?? null, color, JSON.stringify(safeInvitees)]
+      );
 
-    // Notify invited team members
-    if (safeInvitees.length > 0) {
-      await notifyInvitees(safeInvitees, orgId, userId, block.id, title);
+      if (safeInvitees.length > 0) {
+        await notifyInvitees(safeInvitees, orgId, userId, block.id, title);
+      }
+
+      if (pushToCalendar) {
+        try {
+          const attendeeEmails = await getEmailsForUserIds(invitedUserIds, orgId);
+          const calEvent = await createCalendarEvent({
+            title: `[Time Block] ${title}`,
+            description: notes ?? '',
+            startDate: startAt,
+            endDate: endAt,
+            attendees: attendeeEmails,
+          });
+          await pool.query(
+            `UPDATE prospecting_time_blocks
+             SET google_calendar_event_id = $1, synced_to_calendar = true
+             WHERE id = $2`,
+            [calEvent.id, block.id]
+          );
+          block.google_calendar_event_id = calEvent.id;
+          block.synced_to_calendar = true;
+          block.calendar_link = calEvent.htmlLink;
+        } catch (calErr) {
+          console.warn('[time-blocks] Calendar push failed (non-fatal):', calErr);
+        }
+      }
+
+      return res.status(201).json(block);
     }
 
-    // Optionally push to Google Calendar immediately
+    // ── Recurring: generate all occurrences ───────────────────────────────────
+    const occurrences = generateOccurrenceDates(startAt, endAt, recurrenceRule);
+    if (occurrences.length === 0) {
+      return res.status(400).json({ error: 'Recurrence rule produced no occurrences' });
+    }
+
+    // Insert first block (parent)
+    const { rows: [firstBlock] } = await pool.query(
+      `INSERT INTO prospecting_time_blocks
+         (org_id, created_by, title, block_type, start_at, end_at, notes, color, invited_user_ids, recurrence_rule)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+       RETURNING *`,
+      [orgId, userId, title, resolvedBlockType,
+        occurrences[0].startAt, occurrences[0].endAt,
+        notes ?? null, color, JSON.stringify(safeInvitees),
+        JSON.stringify(recurrenceRule)]
+    );
+    const parentId = firstBlock.id;
+
+    // Set parent_block_id on the first block to itself (marks it as part of a series)
+    await pool.query(
+      `UPDATE prospecting_time_blocks SET parent_block_id = $1 WHERE id = $1`,
+      [parentId]
+    );
+    firstBlock.parent_block_id = parentId;
+
+    // Insert remaining occurrences
+    const siblings: Array<Record<string, unknown>> = [];
+    for (let i = 1; i < occurrences.length; i++) {
+      const { rows: [sibling] } = await pool.query(
+        `INSERT INTO prospecting_time_blocks
+           (org_id, created_by, title, block_type, start_at, end_at, notes, color, invited_user_ids, parent_block_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+         RETURNING *`,
+        [orgId, userId, title, resolvedBlockType,
+          occurrences[i].startAt, occurrences[i].endAt,
+          notes ?? null, color, JSON.stringify(safeInvitees), parentId]
+      );
+      siblings.push(sibling);
+    }
+
+    if (safeInvitees.length > 0) {
+      await notifyInvitees(safeInvitees, orgId, userId, parentId, title);
+    }
+
+    // Push parent block to Google Calendar if requested (non-fatal; siblings are not auto-pushed)
     if (pushToCalendar) {
       try {
-        const attendeeEmails = await getEmailsForUserIds(invitedUserIds, orgId);
+        const attendeeEmails = await getEmailsForUserIds(safeInvitees, orgId);
         const calEvent = await createCalendarEvent({
           title: `[Time Block] ${title}`,
           description: notes ?? '',
-          startDate: startAt,
-          endDate: endAt,
+          startDate: occurrences[0].startAt,
+          endDate: occurrences[0].endAt,
           attendees: attendeeEmails,
         });
         await pool.query(
           `UPDATE prospecting_time_blocks
            SET google_calendar_event_id = $1, synced_to_calendar = true
            WHERE id = $2`,
-          [calEvent.id, block.id]
+          [calEvent.id, parentId]
         );
-        block.google_calendar_event_id = calEvent.id;
-        block.synced_to_calendar = true;
-        block.calendar_link = calEvent.htmlLink;
+        firstBlock.google_calendar_event_id = calEvent.id;
+        firstBlock.synced_to_calendar = true;
       } catch (calErr) {
-        console.warn('[time-blocks] Calendar push failed (non-fatal):', calErr);
+        console.warn('[time-blocks] Calendar push for recurring series parent failed (non-fatal):', calErr);
       }
     }
 
-    res.status(201).json(block);
+    res.status(201).json({
+      block: firstBlock,
+      seriesCount: occurrences.length,
+      parentBlockId: parentId,
+    });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Internal server error';
     res.status(msg === 'Unauthorized' ? 401 : 500).json({ error: msg });
@@ -170,13 +308,14 @@ router.patch('/:id', async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { orgId, userId } = getOrgUser(req);
     const { id } = req.params;
-    const { title, blockType, startAt, endAt, notes, color, invitedUserIds, pushToCalendar } = req.body as {
+    const { title, blockType, startAt, endAt, notes, color, invitedUserIds, pushToCalendar, editScope } = req.body as {
       title?: string; blockType?: string; startAt?: string; endAt?: string;
       notes?: string; color?: string; invitedUserIds?: string[]; pushToCalendar?: boolean;
+      editScope?: 'this' | 'all';
     };
 
     const { rows: [existing] } = await pool.query(
-      `SELECT id, invited_user_ids, title, start_at, end_at FROM prospecting_time_blocks WHERE id = $1 AND org_id = $2`,
+      `SELECT id, invited_user_ids, title, start_at, end_at, parent_block_id FROM prospecting_time_blocks WHERE id = $1 AND org_id = $2`,
       [id, orgId]
     );
     if (!existing) return res.status(404).json({ error: 'Block not found' });
@@ -230,6 +369,87 @@ router.patch('/:id', async (req: AuthenticatedRequest, res: Response) => {
 
     if (updates.length === 1) return res.status(400).json({ error: 'No fields to update' });
 
+    // ── Edit scope: "all" updates all siblings in the series ─────────────────
+    if (editScope === 'all' && existing.parent_block_id) {
+      const seriesId = existing.parent_block_id;
+
+      // For "edit all", we update title/type/notes/color/invitees on all siblings
+      // but preserve each block's individual start_at/end_at times
+      const seriesUpdates: string[] = [];
+      const seriesParams: unknown[] = [];
+      let sIdx = 1;
+      const addSeriesField = (col: string, val: unknown) => {
+        seriesUpdates.push(`${col} = $${sIdx++}`);
+        seriesParams.push(val);
+      };
+
+      if (title !== undefined) addSeriesField('title', title);
+      if (blockType !== undefined) addSeriesField('block_type', VALID_BLOCK_TYPES.includes(blockType) ? blockType : 'other');
+      if (notes !== undefined) addSeriesField('notes', notes);
+      if (color !== undefined) addSeriesField('color', color);
+      if (safeInvitees !== undefined) addSeriesField('invited_user_ids', JSON.stringify(safeInvitees));
+      seriesUpdates.push(`updated_at = NOW()`);
+
+      if (seriesUpdates.length > 1) {
+        seriesParams.push(seriesId, orgId);
+        await pool.query(
+          `UPDATE prospecting_time_blocks SET ${seriesUpdates.join(', ')}
+           WHERE parent_block_id = $${sIdx} AND org_id = $${sIdx + 1}`,
+          seriesParams
+        );
+      }
+
+      // Also update the block itself (including any start_at/end_at changes)
+      params.push(id, orgId);
+      const { rows: [updated] } = await pool.query(
+        `UPDATE prospecting_time_blocks SET ${updates.join(', ')} WHERE id = $${idx} AND org_id = $${idx + 1} RETURNING *`,
+        params
+      );
+      if (!updated) return res.status(404).json({ error: 'Block not found or access denied' });
+
+      // Notify newly added invitees (same as single-block path)
+      if (safeInvitees && safeInvitees.length > 0) {
+        const prevIds: string[] = Array.isArray(existing.invited_user_ids) ? existing.invited_user_ids : [];
+        const newInvitees = safeInvitees.filter((uid: string) => !prevIds.includes(uid));
+        if (newInvitees.length > 0) {
+          await notifyInvitees(newInvitees, orgId, userId, id, updated.title ?? existing.title);
+        }
+      }
+
+      // Push to Google Calendar if requested and this block not yet synced
+      let calendarError: string | null = null;
+      if (pushToCalendar && !updated.synced_to_calendar) {
+        try {
+          const attendeeEmails: string[] = [];
+          if (updated.invited_user_ids?.length) {
+            const { rows: attendees } = await pool.query(
+              `SELECT email FROM users WHERE id::text = ANY($1::text[])`,
+              [updated.invited_user_ids]
+            );
+            attendeeEmails.push(...attendees.map((u: { email: string }) => u.email));
+          }
+          const calEvent = await createCalendarEvent({
+            title: updated.title,
+            startDate: updated.start_at,
+            endDate: updated.end_at,
+            description: updated.notes ?? undefined,
+            attendees: attendeeEmails,
+          });
+          await pool.query(
+            `UPDATE prospecting_time_blocks SET synced_to_calendar = true, google_calendar_event_id = $1 WHERE id = $2`,
+            [calEvent?.id ?? null, id]
+          );
+          updated.synced_to_calendar = true;
+          updated.google_calendar_event_id = calEvent?.id ?? null;
+        } catch (calErr) {
+          calendarError = calErr instanceof Error ? calErr.message : 'Calendar push failed';
+        }
+      }
+
+      return res.json({ ...updated, editedAll: true, calendarError });
+    }
+
+    // ── Edit single block ─────────────────────────────────────────────────────
     params.push(id, orgId);
     const { rows: [updated] } = await pool.query(
       `UPDATE prospecting_time_blocks SET ${updates.join(', ')} WHERE id = $${idx} AND org_id = $${idx + 1} RETURNING *`,
@@ -287,6 +507,34 @@ router.patch('/:id', async (req: AuthenticatedRequest, res: Response) => {
 router.delete('/:id', async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { orgId } = getOrgUser(req);
+    const deleteScope = req.query.deleteScope as string | undefined;
+
+    if (deleteScope === 'all') {
+      // Find the block to get its parent_block_id
+      const { rows: [block] } = await pool.query(
+        `SELECT parent_block_id FROM prospecting_time_blocks WHERE id = $1 AND org_id = $2`,
+        [req.params.id, orgId]
+      );
+      if (!block) return res.status(404).json({ error: 'Block not found' });
+
+      const seriesId = block.parent_block_id;
+      if (seriesId) {
+        await pool.query(
+          `DELETE FROM prospecting_time_blocks WHERE parent_block_id = $1 AND org_id = $2`,
+          [seriesId, orgId]
+        );
+        res.json({ success: true, deletedAll: true });
+      } else {
+        // Not part of a series, just delete this one
+        await pool.query(
+          `DELETE FROM prospecting_time_blocks WHERE id = $1 AND org_id = $2`,
+          [req.params.id, orgId]
+        );
+        res.json({ success: true });
+      }
+      return;
+    }
+
     const { rows } = await pool.query(
       `DELETE FROM prospecting_time_blocks WHERE id = $1 AND org_id = $2 RETURNING id`,
       [req.params.id, orgId]
