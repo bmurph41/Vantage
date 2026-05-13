@@ -442,7 +442,7 @@ export default function PropertyAnalytics({ dateRange }: PropertyAnalyticsProps)
                       )}
                       {selectedMetric === 'time' && (
                         <Badge variant="secondary">
-                          Coming soon
+                          Days-on-market not yet tracked
                         </Badge>
                       )}
                     </div>

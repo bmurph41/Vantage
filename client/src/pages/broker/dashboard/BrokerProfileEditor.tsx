@@ -129,7 +129,7 @@ export default function BrokerProfileEditor() {
                 placeholder="https://..."
               />
               <p className="text-xs text-muted-foreground mt-1">
-                Direct file upload coming soon. Paste a public image URL for now.
+                Paste a public image URL.
               </p>
             </div>
             <div>
