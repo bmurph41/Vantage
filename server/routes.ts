@@ -368,6 +368,7 @@ import { registerCRMRoutes } from "./routes/crm-routes";
 import { registerModelingRoutes } from "./routes/modeling-routes";
 import { registerExternalRoutes } from "./routes/external-routes";
 import { registerOperationsRoutes } from "./routes/operations-routes";
+import timeBlocksRouter from "./routes/time-blocks-routes";
 
 // Calendar validation schemas
 const calendarQuerySchema = z.object({
@@ -693,6 +694,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/dd-review", authenticateUser, enforceTenant, ddReviewRouter);
   app.use("/api/prospecting", authenticateUser, requireProspecting());
   app.use("/api/prospecting", authenticateUser, campaignExecutionRoutes);
+  app.use("/api/prospecting/time-blocks", authenticateUser, requireProspecting(), timeBlocksRouter);
   app.use("/api/sla", getSlaRouter());
   registerCommentRoutes(app);
   app.use("/api/email-marketing", authenticateUser, emailMarketingRoutes);

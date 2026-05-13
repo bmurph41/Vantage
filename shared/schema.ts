@@ -30101,3 +30101,32 @@ export const extractionTemplates = pgTable("extraction_templates", {
 }));
 export type ExtractionTemplate = typeof extractionTemplates.$inferSelect;
 export type InsertExtractionTemplate = typeof extractionTemplates.$inferInsert;
+
+// ── Prospecting Time Blocks ────────────────────────────────────────────────
+export const prospectingTimeBlocks = pgTable("prospecting_time_blocks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  title: text("title").notNull(),
+  blockType: text("block_type").notNull().default("prospecting_call"),
+  startAt: timestamp("start_at").notNull(),
+  endAt: timestamp("end_at").notNull(),
+  notes: text("notes"),
+  color: text("color").default("#3b82f6"),
+  googleCalendarEventId: text("google_calendar_event_id"),
+  syncedToCalendar: boolean("synced_to_calendar").default(false),
+  invitedUserIds: jsonb("invited_user_ids").default("[]"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  orgStartIdx: index("ptb_org_start_idx").on(table.orgId, table.startAt),
+  orgCreatorIdx: index("ptb_org_creator_idx").on(table.orgId, table.createdBy),
+}));
+
+export type ProspectingTimeBlock = typeof prospectingTimeBlocks.$inferSelect;
+export const insertProspectingTimeBlockSchema = createInsertSchema(prospectingTimeBlocks).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertProspectingTimeBlock = z.infer<typeof insertProspectingTimeBlockSchema>;

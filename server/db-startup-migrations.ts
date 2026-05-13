@@ -19912,6 +19912,31 @@ const MIGRATIONS: Migration[] = [
   // broker_registration_events — uncovered indexes
   { name: "broker_registration_events: add index broker_reg_events_reg_idx", sql: `CREATE INDEX IF NOT EXISTS broker_reg_events_reg_idx ON broker_registration_events (registration_id)` },
   { name: "broker_registration_events: add index broker_reg_events_created_at_idx", sql: `CREATE INDEX IF NOT EXISTS broker_reg_events_created_at_idx ON broker_registration_events (registration_id, created_at)` },
+
+  // ── prospecting_time_blocks ────────────────────────────────────────────────
+  {
+    name: "prospecting_time_blocks: create table",
+    sql: `
+      CREATE TABLE IF NOT EXISTS prospecting_time_blocks (
+        id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+        org_id varchar NOT NULL REFERENCES organizations(id),
+        created_by varchar NOT NULL REFERENCES users(id),
+        title text NOT NULL,
+        block_type text NOT NULL DEFAULT 'prospecting_call',
+        start_at timestamp NOT NULL,
+        end_at timestamp NOT NULL,
+        notes text,
+        color text DEFAULT '#3b82f6',
+        google_calendar_event_id text,
+        synced_to_calendar boolean DEFAULT false,
+        invited_user_ids jsonb DEFAULT '[]',
+        created_at timestamp NOT NULL DEFAULT NOW(),
+        updated_at timestamp NOT NULL DEFAULT NOW()
+      )
+    `,
+  },
+  { name: "prospecting_time_blocks: org_start_idx", sql: `CREATE INDEX IF NOT EXISTS ptb_org_start_idx ON prospecting_time_blocks (org_id, start_at)` },
+  { name: "prospecting_time_blocks: org_creator_idx", sql: `CREATE INDEX IF NOT EXISTS ptb_org_creator_idx ON prospecting_time_blocks (org_id, created_by)` },
 ];
 
 /**

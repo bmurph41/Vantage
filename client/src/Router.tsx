@@ -284,6 +284,7 @@ const ProspectingOverview = lazy(() => import("@/pages/prospecting/Overview"));
 const ProspectingWorkroom = lazy(() => import("@/pages/prospecting/Workroom"));
 const MarketTargets = lazy(() => import("@/pages/prospecting/Markets"));
 const ProspectingCampaigns = lazy(() => import("@/pages/prospecting/Campaigns"));
+const ProspectingSchedule = lazy(() => import("@/pages/prospecting/Schedule"));
 const ProspectingAnalytics = lazy(() => import("@/pages/prospecting/Analytics"));
 const DealAnalyticsPage = lazy(() => import("@/pages/crm/DealAnalyticsPage"));
 const PipelineInsights = lazy(() => import("@/pages/crm/PipelineInsights"));
@@ -2138,6 +2139,13 @@ function Router() {
         {() => (
           <GatedLayout pack="prospecting">
             <ProspectingCampaigns />
+          </GatedLayout>
+        )}
+      </Route>
+      <Route path="/prospecting/schedule">
+        {() => (
+          <GatedLayout pack="prospecting">
+            <ProspectingSchedule />
           </GatedLayout>
         )}
       </Route>
