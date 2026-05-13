@@ -52,17 +52,36 @@ export function configureSecurityMiddleware(app: Express) {
   
   const allowedOrigins = getAllowedOrigins();
   
+  // Trusted Replit-managed host suffixes. Each entry MUST start with a leading
+  // dot — that anchors `hostname.endsWith(suffix)` so attacker hostnames like
+  // `attacker.replit.dev.evil.com` can't masquerade as legitimate.
+  const TRUSTED_REPLIT_SUFFIXES = ['.replit.dev', '.replit.app', '.repl.co'];
+
   app.use(
     cors({
       origin: (origin, callback) => {
         if (!origin || allowedOrigins.includes(origin)) {
           callback(null, true);
-        } else if (origin?.includes('.replit.dev') || origin?.includes('.replit.app') || origin?.includes('.repl.co')) {
-          callback(null, true);
-        } else {
-          logger.warn({ origin, allowedOrigins }, 'CORS rejection');
-          callback(new Error('Not allowed by CORS'));
+          return;
         }
+
+        // Validate Replit-managed origins via proper URL parsing + host-suffix
+        // match. The prior substring `origin.includes('.replit.dev')` check
+        // was vulnerable to `https://attacker.replit.dev.evil.com` style
+        // spoofs — combined with `credentials: true` below, that could carry
+        // authenticated session cookies in cross-origin requests.
+        try {
+          const hostname = new URL(origin).hostname.toLowerCase();
+          if (TRUSTED_REPLIT_SUFFIXES.some((s) => hostname.endsWith(s))) {
+            callback(null, true);
+            return;
+          }
+        } catch {
+          // Malformed Origin → fall through to rejection
+        }
+
+        logger.warn({ origin, allowedOrigins }, 'CORS rejection');
+        callback(new Error('Not allowed by CORS'));
       },
       credentials: true,
       methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
