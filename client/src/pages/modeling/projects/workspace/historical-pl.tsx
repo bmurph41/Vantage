@@ -633,6 +633,99 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
 
   const lastSync = syncHistory?.[0];
 
+  const exportHistoricalPL = () => {
+    const csvRows: string[] = [];
+
+    const isAnnual = viewMode === 'all' || viewMode === 'compare' || displayMode === 'annual';
+
+    if (isAnnual && yearRange.length > 0) {
+      // Annual comparison export: years as columns
+      const fmtVal = (value: number, rev: number) => {
+        if (!showPctRev) return value.toString();
+        return rev > 0 ? `${((value / rev) * 100).toFixed(2)}%` : '—';
+      };
+
+      const headerCells = ['Category', 'Line Item', ...yearRange.map(String)];
+      csvRows.push(headerCells.join(','));
+
+      for (const cat of ['Revenue', 'COGS', 'Expenses']) {
+        const subcats = annualSubcategories[cat as 'Revenue' | 'COGS' | 'Expenses'] || [];
+        for (const sub of subcats) {
+          const row = [cat, sub];
+          for (const year of yearRange) {
+            const rev = getAnnualCategoryTotal('Revenue', year);
+            const val = getAnnualSubcategoryAmount(cat, sub, year);
+            row.push(fmtVal(val, rev));
+          }
+          csvRows.push(row.map(c => `"${c}"`).join(','));
+        }
+        // Category total row
+        const totalRow = [cat, `Total ${cat}`];
+        for (const year of yearRange) {
+          const rev = getAnnualCategoryTotal('Revenue', year);
+          const total = getAnnualCategoryTotal(cat, year);
+          totalRow.push(fmtVal(total, rev));
+        }
+        csvRows.push(totalRow.map(c => `"${c}"`).join(','));
+      }
+    } else {
+      // Single year monthly export
+      const fmtVal = (value: number, rev: number) => {
+        if (!showPctRev) return value.toString();
+        return rev > 0 ? `${((value / rev) * 100).toFixed(2)}%` : '—';
+      };
+
+      const headerCells = ['Category', 'Line Item', ...months, 'Annual Total'];
+      csvRows.push(headerCells.join(','));
+
+      for (const cat of ['Revenue', 'COGS', 'Expenses']) {
+        const items = getCategoryItems(cat);
+        for (const item of items) {
+          const row = [cat, item.subcategory || item.description || 'Other'];
+          let annualTotal = 0;
+          for (let i = 0; i < months.length; i++) {
+            const monthKey = months[i];
+            const rev = getCategoryTotal('Revenue', monthKey);
+            const val = getAdjustedMonthlyValue(item, monthKey, i);
+            annualTotal += val;
+            row.push(fmtVal(val, rev));
+          }
+          const annualRev = getCategoryAnnualTotal('Revenue');
+          row.push(fmtVal(annualTotal, annualRev));
+          csvRows.push(row.map(c => `"${c}"`).join(','));
+        }
+        // Category total
+        const totalRow = [cat, `Total ${cat}`];
+        let catAnnualTotal = 0;
+        for (let i = 0; i < months.length; i++) {
+          const monthKey = months[i];
+          const rev = getCategoryTotal('Revenue', monthKey);
+          const val = getAdjustedCategoryTotal(cat, monthKey, i);
+          catAnnualTotal += val;
+          totalRow.push(fmtVal(val, rev));
+        }
+        const annualRev = getCategoryAnnualTotal('Revenue');
+        totalRow.push(fmtVal(catAnnualTotal, annualRev));
+        csvRows.push(totalRow.map(c => `"${c}"`).join(','));
+      }
+    }
+
+    const csvContent = csvRows.join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    const suffix = showPctRev ? '-pct-rev' : '';
+    link.download = `historical-pl${suffix}-${projectId}-${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+    window.URL.revokeObjectURL(url);
+
+    toast({
+      title: 'Export Complete',
+      description: `Historical P&L exported to CSV${showPctRev ? ' (% of Revenue)' : ''}`,
+    });
+  };
+
   if (isLoading) {
     return (
       <div className="space-y-4">
@@ -910,11 +1003,11 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
             )}
           </Button>
 
-          <Button variant="outline" size="sm" data-testid="button-export-pl">
+          <Button variant="outline" size="sm" data-testid="button-export-pl" onClick={exportHistoricalPL}>
             <Download className="h-4 w-4 mr-2" />
             Export
           </Button>
-          <ExportPdfButton contentRef={pdfRef} filename="historical-pl" title="Historical P&L" />
+          <ExportPdfButton contentRef={pdfRef} filename={showPctRev ? "historical-pl-pct-rev" : "historical-pl"} title={showPctRev ? "Historical P&L (% Rev)" : "Historical P&L"} />
         </div>
       </div>
 

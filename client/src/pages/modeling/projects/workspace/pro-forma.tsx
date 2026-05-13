@@ -927,6 +927,28 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
   const exportProForma = () => {
     const csvRows: string[] = [];
 
+    // Pre-compute revenue totals per period when in % Rev mode
+    const periodRevenues: Record<string, number> = {};
+    const yearRevenues: number[] = [];
+    if (showPctRev) {
+      if (showHistorical) {
+        priorPeriods.forEach(p => {
+          periodRevenues[p.id] = getCategoryTotal('Revenue', p.id);
+        });
+      }
+      if (baselinePeriod) {
+        periodRevenues[baselinePeriod.id] = getCategoryTotal('Revenue', baselinePeriod.id);
+      }
+      years.forEach((_, i) => {
+        yearRevenues.push(getCategoryProjectedTotal('Revenue', i));
+      });
+    }
+
+    const fmtExportValue = (value: number, rev: number) => {
+      if (!showPctRev) return value.toString();
+      return rev > 0 ? `${((value / rev) * 100).toFixed(2)}%` : '—';
+    };
+
     // Build header row
     const headerCells = ['Category', 'Line Item'];
     if (showHistorical) {
@@ -944,12 +966,12 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
       Object.entries(items).forEach(([itemName, values]) => {
         const row = [category, itemName];
         if (showHistorical) {
-          priorPeriods.forEach(p => row.push((values.historical[p.id] || 0).toString()));
+          priorPeriods.forEach(p => row.push(fmtExportValue(values.historical[p.id] || 0, periodRevenues[p.id] || 0)));
         }
         if (baselinePeriod) {
-          row.push((values.historical[baselinePeriod.id] || 0).toString());
+          row.push(fmtExportValue(values.historical[baselinePeriod.id] || 0, periodRevenues[baselinePeriod.id] || 0));
         }
-        values.projected.forEach(v => row.push(v.toString()));
+        values.projected.forEach((v, i) => row.push(fmtExportValue(v, yearRevenues[i] || 0)));
         row.push(''); // CAGR placeholder
         csvRows.push(row.join(','));
       });
@@ -960,13 +982,14 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
     const url = window.URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `pro-forma-${projectId}-${new Date().toISOString().split('T')[0]}.csv`;
+    const suffix = showPctRev ? '-pct-rev' : '';
+    link.download = `pro-forma${suffix}-${projectId}-${new Date().toISOString().split('T')[0]}.csv`;
     link.click();
     window.URL.revokeObjectURL(url);
 
     toast({
       title: "Export Complete",
-      description: "Pro forma data exported to CSV",
+      description: `Pro forma data exported to CSV${showPctRev ? ' (% of Revenue)' : ''}`,
     });
   };
 
@@ -1074,7 +1097,7 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
               Extract Document
             </a>
           </Button>
-          <ExportPdfButton contentRef={pdfRef} filename="pro-forma-projections" title="Pro Forma Projections" />
+          <ExportPdfButton contentRef={pdfRef} filename={showPctRev ? "pro-forma-projections-pct-rev" : "pro-forma-projections"} title={showPctRev ? "Pro Forma Projections (% Rev)" : "Pro Forma Projections"} />
         </div>
       </div>
       <div className="fm-body">
