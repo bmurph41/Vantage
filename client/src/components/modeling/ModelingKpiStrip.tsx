@@ -11,7 +11,8 @@ import type { ProFormaData } from '@/types/modeling';
 import {
   DndContext,
   DragOverlay,
-  PointerSensor,
+  MouseSensor,
+  TouchSensor,
   KeyboardSensor,
   useSensor,
   useSensors,
@@ -23,7 +24,7 @@ import {
   SortableContext,
   sortableKeyboardCoordinates,
   useSortable,
-  horizontalListSortingStrategy,
+  rectSortingStrategy,
   arrayMove,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -502,7 +503,8 @@ export function ModelingKpiStrip({ proFormaData, assetClass, className, projectI
   }, [localOrderedKeys, projectId, saveMutation]);
 
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(MouseSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 8 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
@@ -621,7 +623,7 @@ export function ModelingKpiStrip({ proFormaData, assetClass, className, projectI
         >
           <SortableContext
             items={displayedCards.map((c) => c.kpi.key)}
-            strategy={horizontalListSortingStrategy}
+            strategy={rectSortingStrategy}
           >
             <div className={cn(
               'flex flex-wrap gap-0 divide-x divide-border border rounded-lg bg-card overflow-hidden',
