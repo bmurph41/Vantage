@@ -7,6 +7,83 @@
 import { Router, Request, Response } from 'express';
 import { lpPortalAuth, lpStatements, k1Generator, sideLetters } from '../services/lp-portal-service';
 import { investorLetters } from '../services/document-enhancements';
+import { generateStatementPDF } from '../services/lp-statement-pdf';
+import { generateK1PDF } from '../services/k1-statement-pdf';
+import type { LPStatement, LPStatementData, K1Data } from '../services/lp-portal-service';
+
+/**
+ * Bridge the storage-shape (LPStatementData, stringly-typed for JSONB stability)
+ * into the PDF builder's StatementData shape (nested objects, numeric).
+ * pdf-lib needs numbers; stored data is currency strings via Decimal.toFixed(2).
+ */
+function statementForPDF(statement: LPStatement, fundDisplayName?: string) {
+  const d = (s: string | number | null | undefined): number => {
+    if (s == null) return 0;
+    const n = typeof s === 'string' ? parseFloat(s) : s;
+    return Number.isFinite(n) ? n : 0;
+  };
+  const data = statement.data as LPStatementData;
+  return {
+    fund: {
+      name: fundDisplayName ?? data.fundName,
+      vintage: null,
+      status: 'active',
+      targetSize: 0,
+      committedCapital: 0,
+    },
+    investor: {
+      name: data.investorName,
+      type: '',
+      commitmentAmount: d(data.commitment),
+      commitmentPct: 0,
+      calledCapital: d(data.calledCapital),
+      unfundedCommitment: d(data.unfundedCommitment),
+    },
+    capitalAccount: (() => {
+      // Read directly from the stored rollforward when present; otherwise
+      // derive from flat fields.
+      const rf = data.capitalAccountRollforward ?? [];
+      const findAmount = (label: string): number => {
+        const hit = rf.find((r) => r.description?.toLowerCase().includes(label.toLowerCase()));
+        return hit ? d(hit.amount) : 0;
+      };
+      return {
+        openingBalance: findAmount('beginning'),
+        contributions: findAmount('contributions') || d(data.calledCapital),
+        distributions: -Math.abs(findAmount('distributions')) || -d(data.distributions),
+        preferredReturnAccrued: findAmount('preferred') || d(data.preferredReturn),
+        unrealizedGainLoss: findAmount('unrealized'),
+        endingBalance: findAmount('ending') || d(data.capitalAccountBalance),
+      };
+    })(),
+    distributions: (data.periodActivity ?? [])
+      .filter((a) => a.type === 'distribution' || a.type === 'return_of_capital')
+      .map((a) => ({
+        date: a.date,
+        type: a.type,
+        returnOfCapital: 0,
+        preferredReturn: 0,
+        carriedInterest: 0,
+        profitShare: 0,
+        total: d(a.amount),
+      })),
+    preferredReturn: {
+      rate: 0,
+      totalAccrued: d(data.preferredReturn),
+      totalPaid: 0,
+      unpaidBalance: d(data.preferredReturn),
+    },
+    performance: {
+      grossIrr: null,
+      netIrr: d(data.irr),
+      tvpi: d(data.tvpi),
+      dpi: d(data.dpi),
+      rvpi: d(data.rvpi),
+      nav: d(data.capitalAccountBalance),
+    },
+    dealExposure: [],
+  };
+}
 
 export const lpPortalRouter = Router();
 
@@ -165,6 +242,32 @@ lpPortalRouter.get('/statements/:id/html', async (req: Request, res: Response) =
   } catch (e: any) { res.status(404).json({ error: e.message }); }
 });
 
+lpPortalRouter.get('/statements/:id/pdf', async (req: Request, res: Response) => {
+  try {
+    const scope = await resolveScope(req);
+    if (!scope) return res.status(401).json({ error: 'Authentication required' });
+    const statement = await lpStatements.getStatement(scope.orgId, req.params.id);
+    if (!statement) return res.status(404).json({ error: 'Statement not found' });
+    if (scope.kind === 'lp' && (statement as any).investorId !== scope.investorId) {
+      return res.status(404).json({ error: 'Statement not found' });
+    }
+
+    const pdfData = statementForPDF(statement);
+    const pdfBytes = await generateStatementPDF(pdfData, statement.periodEnd);
+    const filename = `LP_Statement_${statement.periodLabel || statement.id}.pdf`;
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `inline; filename="${filename}"`,
+      'Content-Length': String(pdfBytes.byteLength),
+      'Cache-Control': 'private, no-store',
+    });
+    res.end(Buffer.from(pdfBytes));
+  } catch (e: any) {
+    console.error('[LP Portal] Statement PDF render error:', e);
+    res.status(500).json({ error: 'Failed to render statement PDF' });
+  }
+});
+
 // ─── K-1 Tax Documents ──────────────────────────────────────────────────────
 
 lpPortalRouter.post('/k1/generate', async (req: Request, res: Response) => {
@@ -190,6 +293,34 @@ lpPortalRouter.get('/k1/:fundId/:investorId/:taxYear', async (req: Request, res:
     if (!k1) return res.status(404).json({ error: 'K-1 not found' });
     res.json(k1);
   } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+lpPortalRouter.get('/k1/:fundId/:investorId/:taxYear/pdf', async (req: Request, res: Response) => {
+  try {
+    const scope = await resolveScope(req);
+    if (!scope) return res.status(401).json({ error: 'Authentication required' });
+    if (denyInvestorMismatch(scope, req.params.investorId, res)) return;
+    const taxYear = parseInt(req.params.taxYear, 10);
+    if (!Number.isFinite(taxYear)) {
+      return res.status(400).json({ error: 'Invalid tax year' });
+    }
+    const k1 = await k1Generator.getK1(scope.orgId, req.params.fundId, req.params.investorId, taxYear);
+    if (!k1) return res.status(404).json({ error: 'K-1 not found' });
+
+    const pdfBytes = await generateK1PDF(k1 as K1Data);
+    const safeInvestor = (k1 as K1Data).investorName?.replace(/[^A-Za-z0-9_-]+/g, '_') ?? 'Investor';
+    const filename = `K1_${safeInvestor}_${taxYear}.pdf`;
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `inline; filename="${filename}"`,
+      'Content-Length': String(pdfBytes.byteLength),
+      'Cache-Control': 'private, no-store',
+    });
+    res.end(Buffer.from(pdfBytes));
+  } catch (e: any) {
+    console.error('[LP Portal] K-1 PDF render error:', e);
+    res.status(500).json({ error: 'Failed to render K-1 PDF' });
+  }
 });
 
 // ─── Side Letters ───────────────────────────────────────────────────────────
