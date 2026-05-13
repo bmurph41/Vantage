@@ -2402,6 +2402,52 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     }
   });
 
+  // ─── KPI Strip Configuration ────────────────────
+  app.get('/api/modeling/projects/:projectId/kpi-strip-config', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId } = req.params;
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) return res.status(404).json({ error: 'Project not found' });
+      const cm = (project.customMetrics as any) || {};
+      res.json({ enabledKeys: cm.kpiStripEnabledKeys ?? null });
+    } catch (error: any) {
+      console.error('Failed to get KPI strip config:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.patch('/api/modeling/projects/:projectId/kpi-strip-config', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { projectId } = req.params;
+      const { enabledKeys } = req.body;
+
+      if (!Array.isArray(enabledKeys)) {
+        return res.status(400).json({ error: 'enabledKeys must be an array' });
+      }
+      if (!enabledKeys.every((k: unknown) => typeof k === 'string')) {
+        return res.status(400).json({ error: 'enabledKeys must be an array of strings' });
+      }
+      // Import registry to validate and dedupe keys against known KPIs
+      const { MODELING_KPI_REGISTRY } = await import('@shared/modeling-kpi-registry');
+      const validKeys = [...new Set((enabledKeys as string[]).filter((k) => k in MODELING_KPI_REGISTRY))];
+
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) return res.status(404).json({ error: 'Project not found' });
+
+      const existingMetrics = (project.customMetrics as any) || {};
+      const updatedMetrics = { ...existingMetrics, kpiStripEnabledKeys: validKeys };
+      await storage.updateModelingProject(projectId, { customMetrics: updatedMetrics, updatedBy: userId }, orgId);
+
+      res.json({ success: true, enabledKeys: validKeys });
+    } catch (error: any) {
+      console.error('Failed to update KPI strip config:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // ─── Model Validation Warnings (data-driven) ────
   app.get('/api/modeling/projects/:projectId/validation-warnings', authenticateUser, async (req: any, res) => {
     try {

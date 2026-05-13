@@ -1085,6 +1085,7 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
       <ModelingKpiStrip
         proFormaData={proFormaData}
         assetClass={project?.assetClass ?? project?.asset_class}
+        projectId={projectId}
       />
 
       {/* Document Status Banner */}
