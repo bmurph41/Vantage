@@ -1,1 +1,312 @@
-{"enabled":true,"entitled":true,"tornado":{"target":"irr","drivers":[{"driver":"Purchase Price","low":25.90643806837739,"base":22.97943398567319,"high":20.592606123106247,"delta":"±5%","spread":5.3138319452711436,"unit":"percent"},{"driver":"Revenue Growth","low":20.625890287232465,"base":22.97943398567319,"high":25.151606983776254,"delta":"±100 bps","spread":4.525716696543789,"unit":"percent"},{"driver":"Exit Cap Rate","low":23.892822838456198,"base":22.97943398567319,"high":22.13043463784444,"delta":"±50 bps","spread":1.7623882006117562,"unit":"percent"},{"driver":"Hold Period","low":23.680653700907488,"base":22.97943398567319,"high":22.41131685716384,"delta":"±1 year","spread":1.2693368437436483,"unit":"percent"},{"driver":"Selling Costs","low":23.040473927364744,"base":22.97943398567319,"high":22.918073950832447,"delta":"±50 bps","spread":0.1223999765322965,"unit":"percent"}]},"memo":{"tone":"concise","headline":"Harborview Marina – Beta Test Fixture — Base Case 23.0% IRR, 4.98x EM","executiveSummary":"The base case projects a levered IRR of 23.0% and an equity multiple of 4.98x over a 10-year hold on $12.5M total capitalization. Weighted expected IRR of 22.8% exceeds the 12.0% hurdle.","sections":[{"title":"Key Metrics","bullets":["Base IRR: 23.0% | Upside: 25.6% | Downside: 19.7%","Equity Multiple: 4.98x","NPV at 10.0%: $5.5M","Net Sale Proceeds: $22.4M"]},{"title":"Top Drivers (Sensitivity)","bullets":["Purchase Price: 25.9% → 20.6% IRR (±5%)","Revenue Growth: 20.6% → 25.2% IRR (±100 bps)","Exit Cap Rate: 23.9% → 22.1% IRR (±50 bps)"]}],"appendix":{"assumptions":{"purchasePrice":12500000,"equityInvested":4375000,"totalDebt":8125000,"holdPeriodYears":10,"hurdleIRR":"12%","discountRate":"10%"},"keyStats":{"baseIRR":22.97943398567319,"upsideIRR":25.58121246025683,"downsideIRR":19.72577454925846,"expectedIRR":22.816463745215415,"baseEM":4.983970534857143,"baseNPV":5525049.416192563}}},"scenarios":{"base":{"name":"Base","irr":22.97943398567319,"leveredIrr":22.97943398567319,"equityMultiple":4.983970534857143,"npv":5525049.416192563,"terminalValue":23078721.63,"netSaleProceeds":22386359.98,"cashFlows":[{"date":"2026-05-13","amount":-4375000},{"date":"2027-05-13","amount":543786.2},{"date":"2028-05-13","amount":586033.0900000001},{"date":"2029-05-13","amount":629876.8799999999},{"date":"2030-05-13","amount":675376.3999999999},{"date":"2031-05-13","amount":722592.6399999999},{"date":"2032-05-13","amount":771588.8},{"date":"2033-05-13","amount":822430.3400000001},{"date":"2034-05-13","amount":875185.1200000001},{"date":"2035-05-13","amount":929923.45},{"date":"2036-05-13","amount":15248078.17}],"overridesApplied":{"name":"Base","revenueGrowthRateDelta":0,"exitCapRateDelta":0,"saleCostRateDelta":0,"weight":0.5}},"upside":{"name":"Upside","irr":25.58121246025683,"leveredIrr":25.58121246025683,"equityMultiple":6.039859828571428,"npv":7403622.012168871,"terminalValue":26954272,"netSaleProceeds":26145643.84,"cashFlows":[{"date":"2026-05-13","amount":-4375000},{"date":"2027-05-13","amount":543786.2},{"date":"2028-05-13","amount":601482.2},{"date":"2029-05-13","amount":662011.04},{"date":"2030-05-13","amount":725506.0800000001},{"date":"2031-05-13","amount":792106.8700000001},{"date":"2032-05-13","amount":861959.3700000001},{"date":"2033-05-13","amount":935216.29},{"date":"2034-05-13","amount":1012037.3500000001},{"date":"2035-05-13","amount":1092589.63},{"date":"2036-05-13","amount":19197691.72}],"overridesApplied":{"name":"Upside","revenueGrowthRateDelta":1,"exitCapRateDelta":-0.25,"saleCostRateDelta":0,"weight":0.25}},"downside":{"name":"Downside","irr":19.72577454925846,"leveredIrr":19.72577454925846,"equityMultiple":3.8948747840000006,"npv":3593666.362133682,"terminalValue":19007522.34,"netSaleProceeds":18437296.67,"cashFlows":[{"date":"2026-05-13","amount":-4375000},{"date":"2027-05-13","amount":543786.2},{"date":"2028-05-13","amount":570583.98},{"date":"2029-05-13","amount":598051.72},{"date":"2030-05-13","amount":626206.1399999999},{"date":"2031-05-13","amount":655064.4099999999},{"date":"2032-05-13","amount":684644.1499999999},{"date":"2033-05-13","amount":714963.3799999999},{"date":"2034-05-13","amount":746040.5800000001},{"date":"2035-05-13","amount":777894.73},{"date":"2036-05-13","amount":11122841.890000002}],"overridesApplied":{"name":"Downside","revenueGrowthRateDelta":-1,"exitCapRateDelta":0.5,"saleCostRateDelta":0,"weight":0.25}},"expectedCase":{"expectedIRR":22.816463745215415,"expectedEM":4.9756689205714295,"expectedNPV":5511846.80167192,"expectedTerminalValue":23029809.4,"expectedNetSaleProceeds":22338915.1175,"probIRRBelowHurdle":0,"probLosingMoney":0,"weights":{"base":0.5,"upside":0.25,"downside":0.25}}},"meta":{"generatedAt":"2026-05-13T11:24:09.365Z","mode":"fast","assumptions":{"holdPeriod":10,"revenueGrowthRate":3.5,"expenseGrowthRate":2.5,"exitCapRate":6.75,"purchasePrice":12500000,"totalDebt":8125000,"hurdleIRR":12,"discountRate":10}}}
+{
+  "enabled": true,
+  "entitled": true,
+  "tornado": {
+    "target": "irr",
+    "drivers": [
+      {
+        "driver": "Purchase Price",
+        "low": 25.90643806837739,
+        "base": 22.97943398567319,
+        "high": 20.592606123106247,
+        "delta": "±5%",
+        "spread": 5.3138319452711436,
+        "unit": "percent"
+      },
+      {
+        "driver": "Revenue Growth",
+        "low": 20.625890287232465,
+        "base": 22.97943398567319,
+        "high": 25.151606983776254,
+        "delta": "±100 bps",
+        "spread": 4.525716696543789,
+        "unit": "percent"
+      },
+      {
+        "driver": "Exit Cap Rate",
+        "low": 23.892822838456198,
+        "base": 22.97943398567319,
+        "high": 22.13043463784444,
+        "delta": "±50 bps",
+        "spread": 1.7623882006117562,
+        "unit": "percent"
+      },
+      {
+        "driver": "Hold Period",
+        "low": 23.680653700907488,
+        "base": 22.97943398567319,
+        "high": 22.41131685716384,
+        "delta": "±1 year",
+        "spread": 1.2693368437436483,
+        "unit": "percent"
+      },
+      {
+        "driver": "Selling Costs",
+        "low": 23.040473927364744,
+        "base": 22.97943398567319,
+        "high": 22.918073950832447,
+        "delta": "±50 bps",
+        "spread": 0.1223999765322965,
+        "unit": "percent"
+      }
+    ]
+  },
+  "memo": {
+    "tone": "concise",
+    "headline": "Harborview Marina – Beta Test Fixture — Base Case 23.0% IRR, 4.98x EM",
+    "executiveSummary": "The base case projects a levered IRR of 23.0% and an equity multiple of 4.98x over a 10-year hold on $12.5M total capitalization. Weighted expected IRR of 22.8% exceeds the 12.0% hurdle.",
+    "sections": [
+      {
+        "title": "Key Metrics",
+        "bullets": [
+          "Base IRR: 23.0% | Upside: 25.6% | Downside: 19.7%",
+          "Equity Multiple: 4.98x",
+          "NPV at 10.0%: $5.5M",
+          "Net Sale Proceeds: $22.4M"
+        ]
+      },
+      {
+        "title": "Top Drivers (Sensitivity)",
+        "bullets": [
+          "Purchase Price: 25.9% → 20.6% IRR (±5%)",
+          "Revenue Growth: 20.6% → 25.2% IRR (±100 bps)",
+          "Exit Cap Rate: 23.9% → 22.1% IRR (±50 bps)"
+        ]
+      }
+    ],
+    "appendix": {
+      "assumptions": {
+        "purchasePrice": 12500000,
+        "equityInvested": 4375000,
+        "totalDebt": 8125000,
+        "holdPeriodYears": 10,
+        "hurdleIRR": "12%",
+        "discountRate": "10%"
+      },
+      "keyStats": {
+        "baseIRR": 22.97943398567319,
+        "upsideIRR": 25.58121246025683,
+        "downsideIRR": 19.72577454925846,
+        "expectedIRR": 22.816463745215415,
+        "baseEM": 4.983970534857143,
+        "baseNPV": 5525049.416192563
+      }
+    }
+  },
+  "scenarios": {
+    "base": {
+      "name": "Base",
+      "irr": 22.97943398567319,
+      "leveredIrr": 22.97943398567319,
+      "equityMultiple": 4.983970534857143,
+      "npv": 5525049.416192563,
+      "terminalValue": 23078721.63,
+      "netSaleProceeds": 22386359.98,
+      "cashFlows": [
+        {
+          "date": "2026-05-13",
+          "amount": -4375000
+        },
+        {
+          "date": "2027-05-13",
+          "amount": 543786.2
+        },
+        {
+          "date": "2028-05-13",
+          "amount": 586033.0900000001
+        },
+        {
+          "date": "2029-05-13",
+          "amount": 629876.8799999999
+        },
+        {
+          "date": "2030-05-13",
+          "amount": 675376.3999999999
+        },
+        {
+          "date": "2031-05-13",
+          "amount": 722592.6399999999
+        },
+        {
+          "date": "2032-05-13",
+          "amount": 771588.8
+        },
+        {
+          "date": "2033-05-13",
+          "amount": 822430.3400000001
+        },
+        {
+          "date": "2034-05-13",
+          "amount": 875185.1200000001
+        },
+        {
+          "date": "2035-05-13",
+          "amount": 929923.45
+        },
+        {
+          "date": "2036-05-13",
+          "amount": 15248078.17
+        }
+      ],
+      "overridesApplied": {
+        "name": "Base",
+        "revenueGrowthRateDelta": 0,
+        "exitCapRateDelta": 0,
+        "saleCostRateDelta": 0,
+        "weight": 0.5
+      }
+    },
+    "upside": {
+      "name": "Upside",
+      "irr": 25.58121246025683,
+      "leveredIrr": 25.58121246025683,
+      "equityMultiple": 6.039859828571428,
+      "npv": 7403622.012168871,
+      "terminalValue": 26954272,
+      "netSaleProceeds": 26145643.84,
+      "cashFlows": [
+        {
+          "date": "2026-05-13",
+          "amount": -4375000
+        },
+        {
+          "date": "2027-05-13",
+          "amount": 543786.2
+        },
+        {
+          "date": "2028-05-13",
+          "amount": 601482.2
+        },
+        {
+          "date": "2029-05-13",
+          "amount": 662011.04
+        },
+        {
+          "date": "2030-05-13",
+          "amount": 725506.0800000001
+        },
+        {
+          "date": "2031-05-13",
+          "amount": 792106.8700000001
+        },
+        {
+          "date": "2032-05-13",
+          "amount": 861959.3700000001
+        },
+        {
+          "date": "2033-05-13",
+          "amount": 935216.29
+        },
+        {
+          "date": "2034-05-13",
+          "amount": 1012037.3500000001
+        },
+        {
+          "date": "2035-05-13",
+          "amount": 1092589.63
+        },
+        {
+          "date": "2036-05-13",
+          "amount": 19197691.72
+        }
+      ],
+      "overridesApplied": {
+        "name": "Upside",
+        "revenueGrowthRateDelta": 1,
+        "exitCapRateDelta": -0.25,
+        "saleCostRateDelta": 0,
+        "weight": 0.25
+      }
+    },
+    "downside": {
+      "name": "Downside",
+      "irr": 19.72577454925846,
+      "leveredIrr": 19.72577454925846,
+      "equityMultiple": 3.8948747840000006,
+      "npv": 3593666.362133682,
+      "terminalValue": 19007522.34,
+      "netSaleProceeds": 18437296.67,
+      "cashFlows": [
+        {
+          "date": "2026-05-13",
+          "amount": -4375000
+        },
+        {
+          "date": "2027-05-13",
+          "amount": 543786.2
+        },
+        {
+          "date": "2028-05-13",
+          "amount": 570583.98
+        },
+        {
+          "date": "2029-05-13",
+          "amount": 598051.72
+        },
+        {
+          "date": "2030-05-13",
+          "amount": 626206.1399999999
+        },
+        {
+          "date": "2031-05-13",
+          "amount": 655064.4099999999
+        },
+        {
+          "date": "2032-05-13",
+          "amount": 684644.1499999999
+        },
+        {
+          "date": "2033-05-13",
+          "amount": 714963.3799999999
+        },
+        {
+          "date": "2034-05-13",
+          "amount": 746040.5800000001
+        },
+        {
+          "date": "2035-05-13",
+          "amount": 777894.73
+        },
+        {
+          "date": "2036-05-13",
+          "amount": 11122841.890000002
+        }
+      ],
+      "overridesApplied": {
+        "name": "Downside",
+        "revenueGrowthRateDelta": -1,
+        "exitCapRateDelta": 0.5,
+        "saleCostRateDelta": 0,
+        "weight": 0.25
+      }
+    },
+    "expectedCase": {
+      "expectedIRR": 22.816463745215415,
+      "expectedEM": 4.9756689205714295,
+      "expectedNPV": 5511846.80167192,
+      "expectedTerminalValue": 23029809.4,
+      "expectedNetSaleProceeds": 22338915.1175,
+      "probIRRBelowHurdle": 0,
+      "probLosingMoney": 0,
+      "weights": {
+        "base": 0.5,
+        "upside": 0.25,
+        "downside": 0.25
+      }
+    }
+  },
+  "meta": {
+    "generatedAt": "2026-05-13T11:35:55.119Z",
+    "mode": "fast",
+    "assumptions": {
+      "holdPeriod": 10,
+      "revenueGrowthRate": 3.5,
+      "expenseGrowthRate": 2.5,
+      "exitCapRate": 6.75,
+      "purchasePrice": 12500000,
+      "totalDebt": 8125000,
+      "hurdleIRR": 12,
+      "discountRate": 10
+    }
+  }
+}

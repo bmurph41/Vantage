@@ -1,1 +1,259 @@
-{"projectId":"455e6ec8-35ff-4c30-b0f8-1e24258ff1eb","irr":24.52344616128568,"leveredIrr":24.52344616128568,"unleveredIrr":14.89339983689432,"npv":6616945.260396122,"equityMultiple":5.602643142857143,"goingInCapRate":8.82752,"exitCapRate":6.5,"cashOnCashReturn":12.429398857142857,"purchasePrice":12500000,"equityInvested":4375000,"holdPeriodYears":10,"totalDebt":8125000,"blendedDebtRate":6.5,"years":[{"year":1,"label":"Year 1","noi":1103440,"capex":31528.8,"ncf":1071911.2,"debtService":528125,"leveredCF":543786.2,"cashOnCash":12.429398857142857},{"year":2,"label":"Year 2","noi":1154672.6,"capex":32789.95,"ncf":1121882.65,"debtService":528125,"leveredCF":593757.6499999999,"cashOnCash":13.571603428571427},{"year":3,"label":"Year 3","noi":1208131.89,"capex":34101.55,"ncf":1174030.34,"debtService":528125,"leveredCF":645905.3400000001,"cashOnCash":14.763550628571432},{"year":4,"label":"Year 4","noi":1263911.34,"capex":35465.61,"ncf":1228445.73,"debtService":528125,"leveredCF":700320.73,"cashOnCash":16.007330971428573},{"year":5,"label":"Year 5","noi":1322108.34,"capex":36884.24,"ncf":1285224.1,"debtService":528125,"leveredCF":757099.1000000001,"cashOnCash":17.30512228571429},{"year":6,"label":"Year 6","noi":1382824.23,"capex":38359.61,"ncf":1344464.62,"debtService":528125,"leveredCF":816339.6200000001,"cashOnCash":18.659191314285717},{"year":7,"label":"Year 7","noi":1446164.54,"capex":39893.99,"ncf":1406270.55,"debtService":528125,"leveredCF":878145.55,"cashOnCash":20.071898285714287},{"year":8,"label":"Year 8","noi":1512239.14,"capex":41489.75,"ncf":1470749.39,"debtService":528125,"leveredCF":942624.3899999999,"cashOnCash":21.545700342857142},{"year":9,"label":"Year 9","noi":1581162.42,"capex":43149.34,"ncf":1538013.08,"debtService":528125,"leveredCF":1009888.0800000001,"cashOnCash":23.083156114285718},{"year":10,"label":"Year 10","noi":1653053.46,"capex":44875.31,"ncf":1608178.15,"debtService":528125,"leveredCF":1080053.15,"cashOnCash":24.686929142857142}],"exit":{"exitNOI":1653053.46,"exitCapRate":6.5,"exitValue":25431591.69,"sellingCosts":762947.75,"netSaleProceeds":24668643.94,"debtPayoff":8125000,"netToEquity":16543643.940000001},"cashFlows":[{"date":"2026-05-13","amount":-4375000},{"date":"2027-05-13","amount":543786.2},{"date":"2028-05-13","amount":593757.6499999999},{"date":"2029-05-13","amount":645905.3400000001},{"date":"2030-05-13","amount":700320.73},{"date":"2031-05-13","amount":757099.1000000001},{"date":"2032-05-13","amount":816339.6200000001},{"date":"2033-05-13","amount":878145.55},{"date":"2034-05-13","amount":942624.3899999999},{"date":"2035-05-13","amount":1009888.0800000001},{"date":"2036-05-13","amount":17623697.09}],"sensitivity":{"target":"irr","rows":[{"exitCapRate":5.5,"values":[21.9898240034822,24.314613594912213,26.468509256578766,28.4884303317109,30.400550807572202]},{"exitCapRate":6,"values":[20.88092594894032,23.260048461390422,25.454034296744922,27.504314422935693,29.43984551068578]},{"exitCapRate":6.5,"values":[19.852029137720585,22.28793327394724,24.52344616128568,26.605005443138708,28.564593229255042]},{"exitCapRate":7,"values":[18.889782184416255,21.38495824142525,23.663389027915162,25.777070336546327,27.76127262167457]},{"exitCapRate":7.5,"values":[17.983635198634676,20.54065259136816,22.863373116465482,25.00996626638151,27.019275819767408]}],"columns":[2,3,4,5,6]},"leaseIncome":{"hasLeases":false,"leaseCount":0,"totalBaseRentAnnual":0,"totalRecoveryAnnual":0,"totalEGIAnnual":0,"inPlaceEGIAnnual":0,"stabilizedEGIAnnual":0,"weightedAvgEscalationRate":0,"leaseBreakdown":[]},"yearlyLeaseIncome":[],"meta":{"source":"proForma","generatedAt":"2026-05-13T11:23:49.852Z","discountRate":10,"hasDebt":true,"overridesApplied":true,"leaseIncomeInjected":false,"useLeaseIncomeForDcf":null,"revenueGrowthRateUsed":4,"leaseEscalationRateUsed":null,"acquisitionDate":"2026-05-13"}}
+{
+  "projectId": "9012e2c9-ed1e-4fc2-b1a8-a59ca49259fc",
+  "irr": 14.89339983689432,
+  "leveredIrr": 14.89339983689432,
+  "unleveredIrr": 14.89339983689432,
+  "npv": 4869076.669021293,
+  "equityMultiple": 3.0334251,
+  "goingInCapRate": 8.82752,
+  "exitCapRate": 6.5,
+  "cashOnCashReturn": 8.5752896,
+  "purchasePrice": 12500000,
+  "equityInvested": 12500000,
+  "holdPeriodYears": 10,
+  "totalDebt": 0,
+  "blendedDebtRate": 0,
+  "years": [
+    {
+      "year": 1,
+      "label": "Year 1",
+      "noi": 1103440,
+      "capex": 31528.8,
+      "ncf": 1071911.2,
+      "debtService": 0,
+      "leveredCF": 1071911.2,
+      "cashOnCash": 8.5752896
+    },
+    {
+      "year": 2,
+      "label": "Year 2",
+      "noi": 1154672.6,
+      "capex": 32789.95,
+      "ncf": 1121882.65,
+      "debtService": 0,
+      "leveredCF": 1121882.65,
+      "cashOnCash": 8.975061199999999
+    },
+    {
+      "year": 3,
+      "label": "Year 3",
+      "noi": 1208131.89,
+      "capex": 34101.55,
+      "ncf": 1174030.34,
+      "debtService": 0,
+      "leveredCF": 1174030.34,
+      "cashOnCash": 9.39224272
+    },
+    {
+      "year": 4,
+      "label": "Year 4",
+      "noi": 1263911.34,
+      "capex": 35465.61,
+      "ncf": 1228445.73,
+      "debtService": 0,
+      "leveredCF": 1228445.73,
+      "cashOnCash": 9.82756584
+    },
+    {
+      "year": 5,
+      "label": "Year 5",
+      "noi": 1322108.34,
+      "capex": 36884.24,
+      "ncf": 1285224.1,
+      "debtService": 0,
+      "leveredCF": 1285224.1,
+      "cashOnCash": 10.2817928
+    },
+    {
+      "year": 6,
+      "label": "Year 6",
+      "noi": 1382824.23,
+      "capex": 38359.61,
+      "ncf": 1344464.62,
+      "debtService": 0,
+      "leveredCF": 1344464.62,
+      "cashOnCash": 10.75571696
+    },
+    {
+      "year": 7,
+      "label": "Year 7",
+      "noi": 1446164.54,
+      "capex": 39893.99,
+      "ncf": 1406270.55,
+      "debtService": 0,
+      "leveredCF": 1406270.55,
+      "cashOnCash": 11.2501644
+    },
+    {
+      "year": 8,
+      "label": "Year 8",
+      "noi": 1512239.14,
+      "capex": 41489.75,
+      "ncf": 1470749.39,
+      "debtService": 0,
+      "leveredCF": 1470749.39,
+      "cashOnCash": 11.76599512
+    },
+    {
+      "year": 9,
+      "label": "Year 9",
+      "noi": 1581162.42,
+      "capex": 43149.34,
+      "ncf": 1538013.08,
+      "debtService": 0,
+      "leveredCF": 1538013.08,
+      "cashOnCash": 12.30410464
+    },
+    {
+      "year": 10,
+      "label": "Year 10",
+      "noi": 1653053.46,
+      "capex": 44875.31,
+      "ncf": 1608178.15,
+      "debtService": 0,
+      "leveredCF": 1608178.15,
+      "cashOnCash": 12.865425199999999
+    }
+  ],
+  "exit": {
+    "exitNOI": 1653053.46,
+    "exitCapRate": 6.5,
+    "exitValue": 25431591.69,
+    "sellingCosts": 762947.75,
+    "netSaleProceeds": 24668643.94,
+    "debtPayoff": 0,
+    "netToEquity": 24668643.94
+  },
+  "cashFlows": [
+    {
+      "date": "2026-05-13",
+      "amount": -12500000
+    },
+    {
+      "date": "2027-05-13",
+      "amount": 1071911.2
+    },
+    {
+      "date": "2028-05-13",
+      "amount": 1121882.65
+    },
+    {
+      "date": "2029-05-13",
+      "amount": 1174030.34
+    },
+    {
+      "date": "2030-05-13",
+      "amount": 1228445.73
+    },
+    {
+      "date": "2031-05-13",
+      "amount": 1285224.1
+    },
+    {
+      "date": "2032-05-13",
+      "amount": 1344464.62
+    },
+    {
+      "date": "2033-05-13",
+      "amount": 1406270.55
+    },
+    {
+      "date": "2034-05-13",
+      "amount": 1470749.39
+    },
+    {
+      "date": "2035-05-13",
+      "amount": 1538013.08
+    },
+    {
+      "date": "2036-05-13",
+      "amount": 26276822.09
+    }
+  ],
+  "sensitivity": {
+    "target": "irr",
+    "rows": [
+      {
+        "exitCapRate": 5.5,
+        "values": [
+          13.496698206805178,
+          14.876603913666484,
+          16.21634159466292,
+          17.521417175737096,
+          18.796332302972637
+        ]
+      },
+      {
+        "exitCapRate": 6,
+        "values": [
+          12.81792227967213,
+          14.188262346177286,
+          15.518873674178943,
+          16.81518713749397,
+          18.08164496710169
+        ]
+      },
+      {
+        "exitCapRate": 6.5,
+        "values": [
+          12.209277992488923,
+          13.571002975402383,
+          14.89339983689432,
+          16.181830682624764,
+          17.44068334430222
+        ]
+      },
+      {
+        "exitCapRate": 7,
+        "values": [
+          11.65937365431251,
+          13.013282445408656,
+          14.32823085824508,
+          15.60951760253432,
+          16.861480400541364
+        ]
+      },
+      {
+        "exitCapRate": 7.5,
+        "values": [
+          11.159294959521567,
+          12.506067472688978,
+          13.814219058893654,
+          15.088989701111858,
+          16.334670688463152
+        ]
+      }
+    ],
+    "columns": [
+      2,
+      3,
+      4,
+      5,
+      6
+    ]
+  },
+  "leaseIncome": {
+    "hasLeases": false,
+    "leaseCount": 0,
+    "totalBaseRentAnnual": 0,
+    "totalRecoveryAnnual": 0,
+    "totalEGIAnnual": 0,
+    "inPlaceEGIAnnual": 0,
+    "stabilizedEGIAnnual": 0,
+    "weightedAvgEscalationRate": 0,
+    "leaseBreakdown": []
+  },
+  "yearlyLeaseIncome": [],
+  "meta": {
+    "source": "proForma",
+    "generatedAt": "2026-05-13T11:35:37.275Z",
+    "discountRate": 10,
+    "hasDebt": false,
+    "overridesApplied": true,
+    "leaseIncomeInjected": false,
+    "useLeaseIncomeForDcf": null,
+    "revenueGrowthRateUsed": 4,
+    "leaseEscalationRateUsed": null,
+    "acquisitionDate": "2026-05-13"
+  }
+}

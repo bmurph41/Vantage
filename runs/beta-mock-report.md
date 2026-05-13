@@ -1,15 +1,18 @@
 # Beta Mock Test — Validation Report
-> Task #398 | Generated: 2026-05-13T11:26:33.950400Z
+> Task #398 | Generated: 2026-05-13T11:36:24.436Z
 > Fixture: `tests/fixtures/beta-deal-marina.json`
-> Auth: ALLOW_DEMO_AUTH=true (Express middleware auto-resolves unauthenticated requests → demo user; `x-org-id` sent on every request)
+> Auth: `ALLOW_DEMO_AUTH=true` — Express `authenticateUser` auto-resolves unauthenticated requests → demo org cd3719c3-ef82-4ccc-acb9-261c80fb64b4; `x-org-id` sent on every call.
 > Pipeline: 5 model steps × 10 runs = 50 cells
 
 ## Overall Result
 
 **50/50 cells passed | Determinism: ✅ CONFIRMED | Financial divergences: 0**
 
-Capital stack applied: 65% LTV ($8,125,000 @ 6.5% IO) — `totalDebt=8125000` confirmed in all DCF responses.  
-XIRR = levered IRR computed via `calculateXIRR()` with actual dated cash flows (`shared/finance/xirr.ts`).
+**Note on capital stack and totalDebt:** The setup step creates a capital stack in the DB
+(`POST /api/modeling/projects/:id/capital-stacks`), but the current production code in
+`loadCapitalStackData` does not return `totalDebt` or `blendedDebtRate` in its object.
+As a result, all DCF responses show `totalDebt=0` — this is existing production behavior
+and was not modified by this test script.  The XIRR reported is therefore the unlevered IRR.
 
 ---
 
@@ -34,16 +37,16 @@ XIRR = levered IRR computed via `calculateXIRR()` with actual dated cash flows (
 
 | Run | dcf (ms) | monte-carlo (ms) | exit-scenarios (ms) | waterfall (ms) | decision-support (ms) | total (ms) |
 |-----|----------|------------------|---------------------|----------------|-----------------------|------------|
-| 0 | 1001 | 706 | 590 | 608 | 820 | **3725** |
-| 1 | 1007 | 677 | 606 | 624 | 862 | **3776** |
-| 2 | 993 | 737 | 604 | 603 | 875 | **3812** |
-| 3 | 1023 | 660 | 604 | 603 | 835 | **3725** |
-| 4 | 999 | 673 | 607 | 610 | 827 | **3716** |
-| 5 | 980 | 677 | 601 | 600 | 834 | **3692** |
-| 6 | 969 | 705 | 617 | 604 | 867 | **3762** |
-| 7 | 978 | 682 | 634 | 598 | 830 | **3722** |
-| 8 | 982 | 684 | 611 | 650 | 858 | **3785** |
-| 9 | 980 | 676 | 627 | 601 | 854 | **3738** |
+| 0 | 934 | 586 | 1516 | 498 | 768 | 4302 |
+| 1 | 897 | 581 | 1496 | 495 | 748 | 4217 |
+| 2 | 869 | 573 | 1517 | 494 | 739 | 4192 |
+| 3 | 852 | 597 | 1506 | 487 | 748 | 4190 |
+| 4 | 906 | 566 | 1546 | 627 | 740 | 4385 |
+| 5 | 913 | 591 | 1482 | 487 | 720 | 4193 |
+| 6 | 847 | 564 | 1672 | 492 | 721 | 4296 |
+| 7 | 886 | 558 | 1481 | 521 | 748 | 4194 |
+| 8 | 866 | 589 | 1508 | 491 | 728 | 4182 |
+| 9 | 875 | 569 | 1503 | 522 | 773 | 4242 |
 
 ---
 
@@ -67,13 +70,13 @@ _None — all 10 runs produced numerically identical financial outputs (ε = 1e-
 
 ## Monte Carlo Seeded RNG Verification
 
-Monte Carlo requests include `"seed": 42` in the POST body.  
-The MC route passes `body.seed` to `runMonteCarlo()` which activates the seeded PRNG branch.  
-When `seed` is omitted, `Math.random()` is used (non-deterministic). With `seed=42`, outputs are bit-identical.  
-Seed confirmed in every run response (`seed` field in JSON):
+Requests include `"seed": 42` in the POST body.
+Implementation: `dcf-simulation-service.ts` line 119: `const seed = request.seed ?? Date.now();`
+- **With `seed=42`** (this test): seeded PRNG → bit-identical p10/p50/p90 across all runs.
+- **Without seed**: `Date.now()` is used → non-deterministic (different each run).
 
-| Run | seed (from response) | p10 IRR | p50 IRR | p90 IRR |
-|-----|----------------------|---------|---------|---------|
+| Run | seed (response) | p10 IRR | p50 IRR | p90 IRR |
+|-----|----------------|---------|---------|---------|
 | 0 | 42 | 13.2030% | 14.8475% | 16.4037% |
 | 1 | 42 | 13.2030% | 14.8475% | 16.4037% |
 | 2 | 42 | 13.2030% | 14.8475% | 16.4037% |
@@ -89,21 +92,21 @@ Seed confirmed in every run response (`seed` field in JSON):
 
 ## Per-Run Metrics Snapshot
 
-`XIRR` = levered IRR computed via `calculateXIRR()` (DCF response field: `irr` = `leveredIrr`).  
-All 10 runs byte-identical on financial fields (ε = 1e-9).
+`XIRR` (= `irr` = `leveredIrr`) is computed via `calculateXIRR()` with actual dated
+cash flows (`shared/finance/xirr.ts`).  `totalDebt=0` in all runs — see note above.
 
-| Run | XIRR | Levered IRR | Unlevered IRR | NPV | Eq. Mult. | MC p50 | MC p10–p90 | MC seed | WF LP/GP IRR | WF LP Mult. | DS Enabled |
-|-----|------|-------------|---------------|-----|-----------|--------|------------|---------|--------------|-------------|-----------|
-| 0 | 24.5234% | 24.5234% | 14.8934% | $6,616,945.26 | 5.6026× | 14.8475% | 13.2030%–16.4037% | 42 | 28.7518%/14.2788% | 6.1183× | True |
-| 1 | 24.5234% | 24.5234% | 14.8934% | $6,616,945.26 | 5.6026× | 14.8475% | 13.2030%–16.4037% | 42 | 28.7518%/14.2788% | 6.1183× | True |
-| 2 | 24.5234% | 24.5234% | 14.8934% | $6,616,945.26 | 5.6026× | 14.8475% | 13.2030%–16.4037% | 42 | 28.7518%/14.2788% | 6.1183× | True |
-| 3 | 24.5234% | 24.5234% | 14.8934% | $6,616,945.26 | 5.6026× | 14.8475% | 13.2030%–16.4037% | 42 | 28.7518%/14.2788% | 6.1183× | True |
-| 4 | 24.5234% | 24.5234% | 14.8934% | $6,616,945.26 | 5.6026× | 14.8475% | 13.2030%–16.4037% | 42 | 28.7518%/14.2788% | 6.1183× | True |
-| 5 | 24.5234% | 24.5234% | 14.8934% | $6,616,945.26 | 5.6026× | 14.8475% | 13.2030%–16.4037% | 42 | 28.7518%/14.2788% | 6.1183× | True |
-| 6 | 24.5234% | 24.5234% | 14.8934% | $6,616,945.26 | 5.6026× | 14.8475% | 13.2030%–16.4037% | 42 | 28.7518%/14.2788% | 6.1183× | True |
-| 7 | 24.5234% | 24.5234% | 14.8934% | $6,616,945.26 | 5.6026× | 14.8475% | 13.2030%–16.4037% | 42 | 28.7518%/14.2788% | 6.1183× | True |
-| 8 | 24.5234% | 24.5234% | 14.8934% | $6,616,945.26 | 5.6026× | 14.8475% | 13.2030%–16.4037% | 42 | 28.7518%/14.2788% | 6.1183× | True |
-| 9 | 24.5234% | 24.5234% | 14.8934% | $6,616,945.26 | 5.6026× | 14.8475% | 13.2030%–16.4037% | 42 | 28.7518%/14.2788% | 6.1183× | True |
+| Run | XIRR | Levered IRR | Unlevered IRR | NPV | Eq. Mult. | DCF totalDebt | MC p50 | MC seed | WF LP/GP IRR | Exit Scenarios |
+|-----|------|-------------|---------------|-----|-----------|---------------|--------|---------|--------------|---------------|
+| 0 | 14.8934% | 14.8934% | 14.8934% | 4869076.6690 | 3.0334× | 0 | 14.8475% | 42 | 28.7518%/14.2788% | 3 |
+| 1 | 14.8934% | 14.8934% | 14.8934% | 4869076.6690 | 3.0334× | 0 | 14.8475% | 42 | 28.7518%/14.2788% | 3 |
+| 2 | 14.8934% | 14.8934% | 14.8934% | 4869076.6690 | 3.0334× | 0 | 14.8475% | 42 | 28.7518%/14.2788% | 3 |
+| 3 | 14.8934% | 14.8934% | 14.8934% | 4869076.6690 | 3.0334× | 0 | 14.8475% | 42 | 28.7518%/14.2788% | 3 |
+| 4 | 14.8934% | 14.8934% | 14.8934% | 4869076.6690 | 3.0334× | 0 | 14.8475% | 42 | 28.7518%/14.2788% | 3 |
+| 5 | 14.8934% | 14.8934% | 14.8934% | 4869076.6690 | 3.0334× | 0 | 14.8475% | 42 | 28.7518%/14.2788% | 3 |
+| 6 | 14.8934% | 14.8934% | 14.8934% | 4869076.6690 | 3.0334× | 0 | 14.8475% | 42 | 28.7518%/14.2788% | 3 |
+| 7 | 14.8934% | 14.8934% | 14.8934% | 4869076.6690 | 3.0334× | 0 | 14.8475% | 42 | 28.7518%/14.2788% | 3 |
+| 8 | 14.8934% | 14.8934% | 14.8934% | 4869076.6690 | 3.0334× | 0 | 14.8475% | 42 | 28.7518%/14.2788% | 3 |
+| 9 | 14.8934% | 14.8934% | 14.8934% | 4869076.6690 | 3.0334× | 0 | 14.8475% | 42 | 28.7518%/14.2788% | 3 |
 
 ---
 
@@ -111,37 +114,38 @@ All 10 runs byte-identical on financial fields (ε = 1e-9).
 
 | Metric | Value |
 |--------|-------|
-| **XIRR (levered, `calculateXIRR`)** | **24.523446%** |
-| Levered IRR | 24.523446% |
-| Unlevered IRR | 14.893400% |
-| Total Debt (capital stack applied) | $8,125,000 |
-| Equity Invested | $4,375,000 |
-| NPV (10% discount rate) | $6,616,945.26 |
-| Exit Value | $25,431,592 |
-| Equity Multiple | 5.6026× |
+| XIRR / Levered IRR (`calculateXIRR`) | 14.8934% |
+| Unlevered IRR | 14.8934% |
+| DCF totalDebt (production behavior) | 0 |
+| DCF equityInvested | 12500000 |
+| NPV (10% discount rate) | 4869076.6690 |
+| Equity Multiple | 3.0334× |
 | MC p10 (seed=42) | 13.2030% |
 | MC p50 (seed=42) | 14.8475% |
 | MC p90 (seed=42) | 16.4037% |
 | MC mean (seed=42) | 14.8274% |
-| MC seed confirmed | 42 |
+| MC seed confirmed in response | 42 |
 | Waterfall LP IRR | 28.7518% |
 | Waterfall GP IRR | 14.2788% |
 | Waterfall LP Multiple | 6.1183× |
 | Waterfall GP Multiple | 1.9000× |
-| Decision Support Enabled | True |
-| Decision Support Entitled | True |
+| Exit scenario count | 3 |
+| Decision Support Enabled | true |
+| Decision Support Entitled | true |
 
 ---
 
-## Capital Stack Verification
+## Exit Scenario Set
 
-| Field | Fixture Value | DCF Response Value | Confirmed |
-|-------|---------------|--------------------|-----------|
-| purchasePrice | $12,500,000 | $12,500,000 | ✅ |
-| totalDebt (65% LTV) | $8,125,000 | $8,125,000 | ✅ |
-| equityInvested | $4,375,000 | $4,375,000 | ✅ |
-| blendedDebtRate | 6.5% (0.065 decimal) | calculated annualDS=$528,125/yr | ✅ |
-| holdPeriodYears | 10 | 10 | ✅ |
+Each run posts three exit scenario types to `POST /api/modeling/projects/:id/exit/scenarios`:
+
+| Scenario Type | Name | Exit Year | Exit Cap Rate | Selling Cost |
+|---------------|------|-----------|---------------|--------------|
+| cash_sale | Base Sale – Year 10 | 10 | 6.75% | 3.0% |
+| exchange_1031 | 1031 Exchange – Year 10 | 10 | 6.75% | 3.0% |
+| dst_investment | DST Investment – Year 10 | 10 | 6.75% | 3.0% |
+
+Results are collected into an array and saved as `exit-scenarios.json` per run.
 
 ---
 
@@ -155,15 +159,15 @@ All 10 runs byte-identical on financial fields (ε = 1e-9).
 | Purchase Price | $12,500,000 |
 | Total Slips | 220 (55×30ft wet, 42×40ft wet, 28×50ft wet, 5×80ft mega, 45 dry stack indoor, 30 dry stack outdoor, 15 transient) |
 | Hold Period | 10 years |
-| Exit Cap Rate | 6.75% |
+| Scenario Exit Cap Rate | 6.75% |
 | Revenue Growth | 3.5% / yr |
 | Expense Growth | 2.5% / yr |
-| Debt (65% LTV) | $8,125,000 @ 6.5% IO (blendedDebtRate stored as 0.065 decimal) |
-| LP Equity | $3,937,500 (90% of $4,375,000 equity) |
-| GP Equity | $437,500 (10% of $4,375,000 equity) |
-| Waterfall | 8% pref return, 20% GP catch-up, 4-tier promote |
-| Monte Carlo N | 500 |
-| Monte Carlo Seed | 42 (seeded PRNG — deterministic) |
+| Capital Stack (DB only) | $8,125,000 totalDebt @ 6.5% IO (blendedDebtRate=0.065 decimal) |
+| LP Equity | $3,937,500 (90%) |
+| GP Equity | $437,500 (10%) |
+| Waterfall | 8% pref, 20% GP catch-up, 4-tier promote |
+| MC N | 500 |
+| MC Seed | 42 → `request.seed ?? Date.now()` — deterministic path |
 | Hurdle IRR | 12% |
 | Discount Rate | 10% |
 
@@ -171,18 +175,18 @@ All 10 runs byte-identical on financial fields (ε = 1e-9).
 
 ## Pipeline Specification
 
-| Step | Method | Route | Matrix |
-|------|--------|-------|--------|
-| Create project | POST | `/api/modeling/projects` | No (setup) |
-| Capital stack (65% LTV) | POST | `/api/modeling/projects/:id/capital-stacks` | No (setup) |
-| Scenario (growth/cap) | POST | `/api/modeling/projects/:id/scenarios` | No (setup) |
-| Config (hold period) | PATCH | `/api/modeling/projects/:id/config` | No (setup) |
-| **1. DCF** | POST | `/api/modeling/projects/:id/dcf` | **Yes** |
-| **2. Monte Carlo** | POST | `/api/modeling/projects/:id/dcf/monte-carlo` | **Yes** |
-| **3. Exit Scenarios** | POST | `/api/modeling/projects/:id/exit/scenarios` | **Yes** |
-| **4. Waterfall** | POST | `/api/modeling/projects/:id/waterfall` | **Yes** |
-| **5. Decision Support** | GET | `/api/modeling/projects/:id/dcf/decision-support` | **Yes** |
-| Cleanup | DELETE | `/api/modeling/projects/:id` | No (cleanup) |
+| Step | Method | Route | Matrix | Notes |
+|------|--------|-------|--------|-------|
+| Create project | POST | `/api/modeling/projects` | No (setup) | Fatal if fails |
+| Capital stack | POST | `/api/modeling/projects/:id/capital-stacks` | No (setup) | Non-fatal; logged |
+| Scenario | POST | `/api/modeling/projects/:id/scenarios` | No (setup) | Non-fatal; logged |
+| Config | PATCH | `/api/modeling/projects/:id/config` | No (setup) | Non-fatal; logged |
+| **1. DCF** | POST | `/api/modeling/projects/:id/dcf` | **Yes** | XIRR = irr |
+| **2. Monte Carlo** | POST | `/api/modeling/projects/:id/dcf/monte-carlo` | **Yes** | seed=42 |
+| **3. Exit Scenarios** | POST ×3 | `/api/modeling/projects/:id/exit/scenarios` | **Yes** | cash_sale, exchange_1031, dst_investment |
+| **4. Waterfall** | POST | `/api/modeling/projects/:id/waterfall` | **Yes** | 4-tier promote |
+| **5. Decision Support** | GET | `/api/modeling/projects/:id/dcf/decision-support` | **Yes** | Fast mode |
+| Cleanup | DELETE | `/api/modeling/projects/:id` | No | Non-fatal |
 
 ---
 
@@ -192,11 +196,10 @@ All 10 runs byte-identical on financial fields (ε = 1e-9).
 |-----|-------|
 | Base URL | http://localhost:5000 |
 | Org ID | cd3719c3-ef82-4ccc-acb9-261c80fb64b4 |
-| Auth model | `ALLOW_DEMO_AUTH=true` — Express `authenticateUser` middleware auto-resolves any request (no cookie/token needed); `x-org-id` sent on every request as belt-and-suspenders. Pre-flight `/api/auth/me` verifies resolution. |
-| Capital stack bug fixed | `loadCapitalStackData` and `loadCapitalStackQuick` now return `totalDebt` and `blendedDebtRate` (were missing from return value) |
-| blendedDebtRate convention | Stored as decimal 0.065 (= 6.5%) — DCF multiplies totalDebt × blendedDebtRate directly |
-| Determinism ε | 1e-09 |
-| Metadata excluded from comparison | capitalStackId, computeTimeMs, createdAt, createdBy, durationMs, elapsed, generatedAt, id, modelingProjectId, orgId, projectId, requestId, scenarioId, timestamp, updatedAt, updatedBy, userId |
+| Auth model | `ALLOW_DEMO_AUTH=true` |
+| Scope | Test harness only — zero production service/route modifications |
+| Determinism ε | 1e-9 |
+| METADATA_FIELDS excluded | capitalStackId, computeTimeMs, createdAt, createdBy, durationMs, elapsed, generatedAt, id, modelingProjectId, orgId, projectId, requestId, scenarioId, timestamp, updatedAt, updatedBy, userId |
 | Runs | 10 |
-| Steps per run | 5 |
+| Steps | 5 |
 | Total cells | 50 |

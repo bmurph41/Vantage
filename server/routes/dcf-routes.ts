@@ -364,10 +364,8 @@ async function loadCapitalStackQuick(pool: any, mpId: string) {
   if (!r.rows[0]) return null;
   const row = r.rows[0];
   return {
-    purchasePrice:    Number(row.purchase_price)    || 0,
-    totalDebt:        Number(row.total_debt)        || 0,
-    blendedDebtRate:  Number(row.blended_debt_rate) || 0,
-    holdPeriodYears:  Number(row.hold_period_years) || 5,
+    purchasePrice: Number(row.purchase_price) || 0,
     debtTranches: [],
+    holdPeriodYears: Number(row.hold_period_years) || 5,
   };
 }

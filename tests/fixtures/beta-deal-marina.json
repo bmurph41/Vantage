@@ -66,13 +66,38 @@
     "hurdleIRR": 12,
     "discountRate": 10
   },
-  "exitScenario": {
-    "name": "Base Sale – Year 10",
-    "exitYear": 10,
-    "exitCapRate": 6.75,
-    "sellingCostPct": 3.0,
-    "notes": "Beta test base exit — canonical fixture"
-  },
+  "exitScenarios": [
+    {
+      "scenarioType": "cash_sale",
+      "name": "Base Sale – Year 10",
+      "isBaseCase": true,
+      "holdingPeriodYears": 10,
+      "exitCapRate": "0.0675",
+      "projectedSalePrice": "13562500",
+      "brokerCommissionRate": "0.03",
+      "notes": "Beta test base exit — cash sale"
+    },
+    {
+      "scenarioType": "exchange_1031",
+      "name": "1031 Exchange – Year 10",
+      "isBaseCase": false,
+      "holdingPeriodYears": 10,
+      "exitCapRate": "0.0675",
+      "projectedSalePrice": "13562500",
+      "brokerCommissionRate": "0.03",
+      "notes": "Like-kind exchange deferral scenario"
+    },
+    {
+      "scenarioType": "dst_investment",
+      "name": "DST Investment – Year 10",
+      "isBaseCase": false,
+      "holdingPeriodYears": 10,
+      "exitCapRate": "0.0675",
+      "projectedSalePrice": "13562500",
+      "brokerCommissionRate": "0.03",
+      "notes": "Delaware Statutory Trust exit scenario"
+    }
+  ],
   "waterfall": {
     "scenarioVersionId": "00000000-0000-0000-0000-000000004200",
     "totalInvestment": 12500000,

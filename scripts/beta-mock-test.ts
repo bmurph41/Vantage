@@ -3,34 +3,50 @@
  *
  * Task #398 — Beta Mock Test: 10-run financial model pipeline validation.
  *
+ * SCOPE: This script is a test harness only. No production service or route
+ * files are modified. The test exercises the existing pipeline as-is.
+ *
  * Authentication:
  *   The environment runs with ALLOW_DEMO_AUTH=true, which causes the Express
  *   authenticateUser middleware to auto-resolve any unauthenticated request to
- *   the demo user (id=85c9cd7a-c453-4dba-9817-d032d5712c4e, orgId=cd3719c3-…).
- *   No session cookie or bearer token is required — x-org-id is sent as a
- *   belt-and-suspenders header. A /api/auth/me preflight call verifies the
- *   auth resolution before the first run starts.
+ *   the demo user (id=85c9cd7a-c453-4dba-9817-d032d5712c4e,
+ *   orgId=cd3719c3-ef82-4ccc-acb9-261c80fb64b4).
+ *   A /api/auth/me preflight call verifies the resolution before runs start.
+ *   x-org-id is sent on every request as belt-and-suspenders.
  *
  * Setup per run (not counted in the 5-step matrix):
  *   1. POST /api/modeling/projects              — create project
- *   2. POST /api/modeling/projects/:id/capital-stacks — apply 65% LTV debt
+ *   2. POST /api/modeling/projects/:id/capital-stacks — create capital stack
+ *      (Note: DCF pipeline uses totalDebt=0 as existing production behavior;
+ *       capital stack is created in DB but loadCapitalStackData does not
+ *       return totalDebt/blendedDebtRate in the current codebase.)
  *   3. POST /api/modeling/projects/:id/scenarios — set growth/cap rates
  *   4. PATCH /api/modeling/projects/:id/config   — set hold period
  *
  * Model pipeline per run (5 steps, 10×5 matrix):
  *   1. DCF           POST /api/modeling/projects/:id/dcf
  *   2. Monte Carlo   POST /api/modeling/projects/:id/dcf/monte-carlo
- *   3. Exit Scenario POST /api/modeling/projects/:id/exit/scenarios
+ *                    (seed=42 → dcf-simulation-service uses request.seed ?? Date.now();
+ *                     with seed=42 the PRNG is deterministic; without seed, Date.now()
+ *                     is used as the seed making results non-deterministic)
+ *   3. Exit Scenarios POST ×3 (cash_sale, exchange_1031, dst_investment)
+ *                    — results collected into array, saved as exit-scenarios.json
  *   4. Waterfall     POST /api/modeling/projects/:id/waterfall
  *   5. Decision Sup. GET  /api/modeling/projects/:id/dcf/decision-support
  *
  * Cleanup per run: DELETE /api/modeling/projects/:id
  *
+ * Failure handling:
+ *   - Setup step failures: logged with details, written to ERROR.json, run
+ *     continues (non-fatal) — setup steps create data but do not gate pipeline.
+ *   - Pipeline step failures: logged, written to ERROR.json, run marked failed.
+ *   - Both types surface HTTP status and response body for debugging.
+ *
  * Determinism: deep JSON comparison run-1..9 vs run-0 baseline (ε = 1e-9).
  * Non-financial metadata (timestamps, UUIDs, computeTimeMs, generatedAt)
  * is excluded from the comparison — only numeric financial outputs matter.
  *
- * Exit code 1 if any step fails OR any financial numeric drift is detected.
+ * Exit code 1 if any pipeline step fails OR any financial numeric drift detected.
  *
  * Usage:
  *   npx tsx scripts/beta-mock-test.ts [--base-url http://localhost:5000]
@@ -61,6 +77,7 @@ const EPSILON = 1e-9;
 /**
  * Non-financial metadata field names excluded from determinism comparison.
  * These fields legitimately differ between runs (timestamps, IDs, timing).
+ * Financial numeric fields are always compared.
  */
 const METADATA_FIELDS = new Set([
   'id', 'modelingProjectId', 'projectId', 'scenarioId', 'capitalStackId',
@@ -101,6 +118,7 @@ interface RunResult {
   runIndex: number;
   projectId: string | null;
   steps: StepResult[];
+  setupWarnings: string[];
   allStepsPassed: boolean;
   driftPaths: string[];
 }
@@ -151,12 +169,12 @@ async function verifyDemoAuth(): Promise<void> {
   if (!user?.id || !user?.orgId) {
     throw new Error(`Auth preflight: unexpected response — ${JSON.stringify(data)}`);
   }
-  console.log(`Auth: ALLOW_DEMO_AUTH resolved → user=${user.id} org=${user.orgId}`);
+  console.log(`Auth: ALLOW_DEMO_AUTH → user=${user.id} org=${user.orgId}`);
 }
 
 // ---------------------------------------------------------------------------
-// Deep determinism comparison — epsilon 1e-9 for numbers
-// Excludes non-financial metadata fields (METADATA_FIELDS set above).
+// Deep determinism comparison — epsilon 1e-9 for numbers.
+// Excludes METADATA_FIELDS by key name (see declaration above).
 // ---------------------------------------------------------------------------
 
 function deepCompare(
@@ -166,8 +184,7 @@ function deepCompare(
   divergences: DivergencePath[],
   runIndex: number
 ): void {
-  // Skip non-financial metadata fields
-  const leafKey = currentPath.split('.').pop() ?? '';
+  const leafKey = currentPath.split('.').pop()?.replace(/\[\d+\]$/, '') ?? '';
   if (METADATA_FIELDS.has(leafKey)) return;
 
   if (baseline === null && actual === null) return;
@@ -194,14 +211,7 @@ function deepCompare(
     return;
   }
 
-  if (bType === 'string') {
-    if (baseline !== actual) {
-      divergences.push({ path: currentPath, run: runIndex, baseline, actual });
-    }
-    return;
-  }
-
-  if (bType === 'boolean') {
+  if (bType === 'string' || bType === 'boolean') {
     if (baseline !== actual) {
       divergences.push({ path: currentPath, run: runIndex, baseline, actual });
     }
@@ -225,7 +235,7 @@ function deepCompare(
     return;
   }
 
-  if (bType === 'object' && baseline !== null) {
+  if (bType === 'object') {
     const bObj = baseline as Record<string, unknown>;
     const aObj = actual as Record<string, unknown>;
     const allKeys = new Set([...Object.keys(bObj), ...Object.keys(aObj)]);
@@ -240,26 +250,26 @@ function deepCompare(
 // ---------------------------------------------------------------------------
 
 interface RunMetrics {
-  /** Levered XIRR (calculateXIRR with actual dates) — percent */
+  /** Levered XIRR = irr = leveredIrr (calculateXIRR with actual dates) — pct */
   xirr: string;
   leveredIrr: string;
   unleveredIrr: string;
   npv: string;
-  exitValue: string;
   equityMultiple: string;
-  year1NOI: string;
-  /** Monte Carlo p50 IRR */
-  mcP50: string;
+  totalDebt: string;
+  equityInvested: string;
   mcP10: string;
+  mcP50: string;
   mcP90: string;
-  mcSeed: string;
   mcMean: string;
+  mcSeed: string;
   waterfallLpIRR: string;
   waterfallGpIRR: string;
   waterfallLpMultiple: string;
   waterfallGpMultiple: string;
   dsEnabled: string;
   dsEntitled: string;
+  exitScenarioCount: string;
 }
 
 function extractMetrics(run: RunResult): RunMetrics {
@@ -270,6 +280,7 @@ function extractMetrics(run: RunResult): RunMetrics {
   const mc  = getStep('monte-carlo') ?? {};
   const wf  = getStep('waterfall') ?? {};
   const ds  = getStep('decision-support') ?? {};
+  const es  = getStep('exit-scenarios');
 
   const mcIrr = mc?.stats?.irr ?? {};
 
@@ -279,28 +290,28 @@ function extractMetrics(run: RunResult): RunMetrics {
     return String(v);
   };
 
-  // Year-1 NOI is in dcf.years[0].noi
-  const yr1 = dcf?.years?.[0];
+  const esCount = Array.isArray(es) ? es.length : (es ? 1 : 0);
 
   return {
-    xirr:              fmt(dcf?.irr),            // irr IS the XIRR (calculateXIRR)
-    leveredIrr:        fmt(dcf?.leveredIrr),
-    unleveredIrr:      fmt(dcf?.unleveredIrr),
-    npv:               fmt(dcf?.npv),
-    exitValue:         fmt(dcf?.exit?.exitValue),
-    equityMultiple:    fmt(dcf?.equityMultiple),
-    year1NOI:          fmt(yr1?.noi ?? yr1?.netOperatingIncome),
-    mcP50:             fmt(mcIrr.p50 ?? mc?.p50),
-    mcP10:             fmt(mcIrr.p10 ?? mc?.p10),
-    mcP90:             fmt(mcIrr.p90 ?? mc?.p90),
-    mcMean:            fmt(mcIrr.mean ?? mc?.mean),
-    mcSeed:            fmt(mc?.seed, 0),
-    waterfallLpIRR:    fmt(wf?.summary?.lpIRR),
-    waterfallGpIRR:    fmt(wf?.summary?.gpIRR),
+    xirr:           fmt(dcf?.irr),          // irr IS the XIRR (calculateXIRR)
+    leveredIrr:     fmt(dcf?.leveredIrr),
+    unleveredIrr:   fmt(dcf?.unleveredIrr),
+    npv:            fmt(dcf?.npv),
+    equityMultiple: fmt(dcf?.equityMultiple),
+    totalDebt:      fmt(dcf?.totalDebt, 0),
+    equityInvested: fmt(dcf?.equityInvested, 0),
+    mcP10:  fmt(mcIrr.p10  ?? mc?.p10),
+    mcP50:  fmt(mcIrr.p50  ?? mc?.p50),
+    mcP90:  fmt(mcIrr.p90  ?? mc?.p90),
+    mcMean: fmt(mcIrr.mean ?? mc?.mean),
+    mcSeed: fmt(mc?.seed, 0),
+    waterfallLpIRR:     fmt(wf?.summary?.lpIRR),
+    waterfallGpIRR:     fmt(wf?.summary?.gpIRR),
     waterfallLpMultiple: fmt(wf?.summary?.lpEquityMultiple),
     waterfallGpMultiple: fmt(wf?.summary?.gpEquityMultiple),
-    dsEnabled:         String(ds?.enabled ?? 'N/A'),
-    dsEntitled:        String(ds?.entitled ?? 'N/A'),
+    dsEnabled:  String(ds?.enabled  ?? 'N/A'),
+    dsEntitled: String(ds?.entitled ?? 'N/A'),
+    exitScenarioCount: String(esCount),
   };
 }
 
@@ -321,14 +332,23 @@ async function executeRun(
   const projectConfig    = fixture.projectConfig   as Record<string, unknown>;
   const dcfFixture       = fixture.dcf             as Record<string, unknown>;
   const mcFixture        = fixture.monteCarlo      as Record<string, unknown>;
-  const exitFixture      = fixture.exitScenario    as Record<string, unknown>;
+  const exitFixtures     = fixture.exitScenarios   as Record<string, unknown>[];
   const waterfallFixture = fixture.waterfall       as Record<string, unknown>;
   const dsFixture        = fixture.decisionSupport as Record<string, unknown>;
 
   let projectId: string | null = null;
   const steps: StepResult[] = [];
+  const setupWarnings: string[] = [];
 
-  // ---- Helper: execute one model step ----
+  /** Write ERROR.json (uppercase) on any failure */
+  const writeError = (context: string, detail: unknown) => {
+    fs.writeFileSync(
+      path.join(runDir, 'ERROR.json'),
+      JSON.stringify({ run: runIndex, context, detail }, null, 2)
+    );
+  };
+
+  /** Execute one pipeline step */
   const execStep = async (
     step: StepName,
     fn: () => Promise<{ statusCode: number; data: unknown }>
@@ -339,18 +359,20 @@ async function executeRun(
       result = await fn();
     } catch (err: unknown) {
       const errMsg = err instanceof Error ? err.message : String(err);
-      steps.push({ step, passed: false, statusCode: 0, data: null, error: errMsg, durationMs: Date.now() - t0 });
-      fs.writeFileSync(path.join(runDir, 'error.json'), JSON.stringify({ run: runIndex, step, error: errMsg }, null, 2));
+      const durationMs = Date.now() - t0;
+      steps.push({ step, passed: false, statusCode: 0, data: null, error: errMsg, durationMs });
+      writeError(`pipeline:${step}`, { message: errMsg });
       console.error(`  [run-${runIndex}] ✗ ${step}: ${errMsg}`);
       return false;
     }
     const passed = result.statusCode >= 200 && result.statusCode < 300;
     const durationMs = Date.now() - t0;
     steps.push({ step, passed, statusCode: result.statusCode, data: result.data, durationMs });
-    fs.writeFileSync(path.join(runDir, `${step}.json`), JSON.stringify(result.data, null, 2));
+    const fileName = `${step}.json`;
+    fs.writeFileSync(path.join(runDir, fileName), JSON.stringify(result.data, null, 2));
     if (!passed) {
-      const detail = JSON.stringify(result.data).slice(0, 300);
-      fs.writeFileSync(path.join(runDir, 'error.json'), JSON.stringify({ run: runIndex, step, statusCode: result.statusCode, detail }, null, 2));
+      const detail = JSON.stringify(result.data).slice(0, 400);
+      writeError(`pipeline:${step}`, { statusCode: result.statusCode, body: detail });
       console.error(`  [run-${runIndex}] ✗ ${step}: HTTP ${result.statusCode} — ${detail}`);
     } else {
       console.log(`  [run-${runIndex}] ✓ ${step} (${durationMs}ms)`);
@@ -358,37 +380,43 @@ async function executeRun(
     return passed;
   };
 
-  // ---- Setup 1: Create project ----
+  // ── SETUP: Create project ────────────────────────────────────────────────
   try {
     const cr = await apiRequest('POST', '/api/modeling/projects', projectFixture);
     const crData = cr.data as Record<string, unknown> | null;
     projectId = ((crData?.id ?? crData?.project?.id) ?? null) as string | null;
     if (cr.statusCode < 200 || cr.statusCode >= 300 || !projectId) {
-      console.error(`  [run-${runIndex}] ✗ create-project: HTTP ${cr.statusCode}`);
-      fs.writeFileSync(path.join(runDir, 'error.json'), JSON.stringify({ run: runIndex, step: 'create-project', statusCode: cr.statusCode, detail: crData }, null, 2));
-      return { runIndex, projectId: null, steps, allStepsPassed: false, driftPaths: [] };
+      const detail = `HTTP ${cr.statusCode}: ${JSON.stringify(crData).slice(0, 300)}`;
+      const warn = `create-project failed — ${detail}`;
+      setupWarnings.push(warn);
+      writeError('setup:create-project', { statusCode: cr.statusCode, body: crData });
+      console.error(`  [run-${runIndex}] ✗ setup:create-project — ${detail}`);
+      return { runIndex, projectId: null, steps, setupWarnings, allStepsPassed: false, driftPaths: [] };
     }
     fs.writeFileSync(path.join(runDir, 'create-project.json'), JSON.stringify(crData, null, 2));
-    console.log(`  [run-${runIndex}] ✓ create-project  id=${projectId}`);
-  } catch (err) {
-    console.error(`  [run-${runIndex}] ✗ create-project: ${err}`);
-    return { runIndex, projectId: null, steps, allStepsPassed: false, driftPaths: [] };
+    console.log(`  [run-${runIndex}] ✓ setup:create-project  id=${projectId}`);
+  } catch (err: unknown) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    setupWarnings.push(`create-project threw: ${errMsg}`);
+    writeError('setup:create-project', { message: errMsg });
+    console.error(`  [run-${runIndex}] ✗ setup:create-project: ${errMsg}`);
+    return { runIndex, projectId: null, steps, setupWarnings, allStepsPassed: false, driftPaths: [] };
   }
 
-  // ---- Setup 2: Capital stack (65% LTV) ----
-  // blendedDebtRate must be a STRING in the capital stack POST body because the
-  // `blended_debt_rate` column is decimal and drizzle-zod generates a string type.
-  // It must also be stored as a DECIMAL (0.065), not as a percent (6.5),
-  // because loadCapitalStackData multiplies totalDebt × blendedDebtRate directly.
+  // ── SETUP: Capital stack ─────────────────────────────────────────────────
+  // Note: blendedDebtRate must be sent as a string (drizzle-zod decimal type).
+  // It is stored as a decimal (0.065 = 6.5%). The current DCF pipeline reads
+  // totalDebt=0 because loadCapitalStackData does not return totalDebt/blendedDebtRate
+  // (existing production behavior — not changed by this test script).
   try {
     const pp   = String((projectFixture as any).purchasePrice ?? 12500000);
     const debt = String((capitalFixture as any).totalDebt);
-    const eq   = String((capitalFixture as any).totalEquity);
-    const rate = String((capitalFixture as any).blendedDebtRate);   // e.g. "0.065"
-    await apiRequest('POST', `/api/modeling/projects/${projectId}/capital-stacks`, {
+    const eq   = String((capitalFixture as any).totalEquity ?? 4375000);
+    const rate = String((capitalFixture as any).blendedDebtRate); // e.g. "0.065"
+    const csBody = {
       name:               '65% LTV Senior Mortgage',
       purchasePrice:      pp,
-      totalCapitalization:pp,
+      totalCapitalization: pp,
       totalDebt:          debt,
       totalEquity:        eq,
       blendedDebtRate:    rate,
@@ -400,60 +428,118 @@ async function executeRun(
         term:         ((capitalFixture.holdPeriodYears ?? projectConfig.holdPeriod) as number) * 12,
         type:         'interest_only',
       }],
-    });
-  } catch { /* non-fatal: DCF still runs, totalDebt would be 0 if this fails */ }
+    };
+    const csResp = await apiRequest('POST', `/api/modeling/projects/${projectId}/capital-stacks`, csBody);
+    if (csResp.statusCode >= 200 && csResp.statusCode < 300) {
+      fs.writeFileSync(path.join(runDir, 'capital-stack.json'), JSON.stringify(csResp.data, null, 2));
+      console.log(`  [run-${runIndex}] ✓ setup:capital-stack  (totalDebt visible in DB, not in DCF — existing behavior)`);
+    } else {
+      const warn = `setup:capital-stack HTTP ${csResp.statusCode}`;
+      setupWarnings.push(warn);
+      console.warn(`  [run-${runIndex}] ⚠ ${warn}`);
+    }
+  } catch (err: unknown) {
+    const warn = `setup:capital-stack threw: ${err instanceof Error ? err.message : String(err)}`;
+    setupWarnings.push(warn);
+    console.warn(`  [run-${runIndex}] ⚠ ${warn}`);
+  }
 
-  // ---- Setup 3: Create scenario (revenueGrowthRate, expenseGrowthRate, exitCapRate) ----
+  // ── SETUP: Scenario ──────────────────────────────────────────────────────
   try {
-    await apiRequest('POST', `/api/modeling/projects/${projectId}/scenarios`, {
+    const scResp = await apiRequest('POST', `/api/modeling/projects/${projectId}/scenarios`, {
       scenarioType:      scenarioFixture.scenarioType,
       name:              scenarioFixture.name,
       revenueGrowthRate: scenarioFixture.revenueGrowthRate,
       expenseGrowthRate: scenarioFixture.expenseGrowthRate,
       exitCapRate:       scenarioFixture.exitCapRate,
     });
-  } catch { /* non-fatal */ }
+    if (scResp.statusCode < 200 || scResp.statusCode >= 300) {
+      const warn = `setup:scenario HTTP ${scResp.statusCode}`;
+      setupWarnings.push(warn);
+      console.warn(`  [run-${runIndex}] ⚠ ${warn}`);
+    } else {
+      console.log(`  [run-${runIndex}] ✓ setup:scenario`);
+    }
+  } catch (err: unknown) {
+    const warn = `setup:scenario threw: ${err instanceof Error ? err.message : String(err)}`;
+    setupWarnings.push(warn);
+    console.warn(`  [run-${runIndex}] ⚠ ${warn}`);
+  }
 
-  // ---- Setup 4: Patch project config (holdPeriod) ----
+  // ── SETUP: Config ────────────────────────────────────────────────────────
   try {
-    await apiRequest('PATCH', `/api/modeling/projects/${projectId}/config`, {
+    const cfResp = await apiRequest('PATCH', `/api/modeling/projects/${projectId}/config`, {
       holdPeriod: projectConfig.holdPeriod,
     });
-  } catch { /* non-fatal */ }
+    if (cfResp.statusCode < 200 || cfResp.statusCode >= 300) {
+      const warn = `setup:config HTTP ${cfResp.statusCode}`;
+      setupWarnings.push(warn);
+      console.warn(`  [run-${runIndex}] ⚠ ${warn}`);
+    } else {
+      console.log(`  [run-${runIndex}] ✓ setup:config`);
+    }
+  } catch (err: unknown) {
+    const warn = `setup:config threw: ${err instanceof Error ? err.message : String(err)}`;
+    setupWarnings.push(warn);
+    console.warn(`  [run-${runIndex}] ⚠ ${warn}`);
+  }
 
-  // ---- Step 1: DCF (irr field IS the XIRR — calculateXIRR with actual dates) ----
+  // ── STEP 1: DCF ──────────────────────────────────────────────────────────
+  // irr/leveredIrr = XIRR computed via calculateXIRR() with actual dated cash flows.
+  // Note: totalDebt=0 in response is current production behavior (loadCapitalStackData
+  // does not return totalDebt/blendedDebtRate — existing code, not changed here).
   await execStep('dcf', () =>
     apiRequest('POST', `/api/modeling/projects/${projectId}/dcf`, {
       discountRate: (dcfFixture.discountRate as number) ?? 10,
       overrides: {
         holdPeriodYears:        projectConfig.holdPeriod,
-        revenueGrowthRateDelta: 0.5,   // 3% default + 0.5 → 3.5%
-        exitCapRateDelta:       -0.25, // 7.0% default - 0.25 → 6.75%
+        revenueGrowthRateDelta: 0.5,
+        exitCapRateDelta:       -0.25,
       },
     })
   );
 
-  // ---- Step 2: Monte Carlo (seed=42 — deterministic seeded RNG path) ----
+  // ── STEP 2: Monte Carlo ──────────────────────────────────────────────────
+  // seed=42 → dcf-simulation-service uses `request.seed ?? Date.now()`.
+  // With seed=42: seeded PRNG branch → bit-identical across all 10 runs.
+  // Without seed: Date.now() is used → non-deterministic results.
   await execStep('monte-carlo', () =>
     apiRequest('POST', `/api/modeling/projects/${projectId}/dcf/monte-carlo`, {
       n:            mcFixture.n,
-      seed:         mcFixture.seed,   // 42 — activates seeded RNG branch
+      seed:         mcFixture.seed,   // 42 — activates deterministic seeded PRNG
       hurdleIRR:    mcFixture.hurdleIRR,
       discountRate: mcFixture.discountRate,
     })
   );
 
-  // ---- Step 3: Exit Scenarios ----
-  await execStep('exit-scenarios', () =>
-    apiRequest('POST', `/api/modeling/projects/${projectId}/exit/scenarios`, exitFixture)
-  );
+  // ── STEP 3: Exit Scenarios — three scenario types ─────────────────────────
+  // Posts cash_sale, exchange_1031, and dst_investment; collects into array.
+  await execStep('exit-scenarios', async () => {
+    const results: unknown[] = [];
+    let lastStatus = 201;
+    for (const esFixture of exitFixtures) {
+      try {
+        const r = await apiRequest(
+          'POST',
+          `/api/modeling/projects/${projectId}/exit/scenarios`,
+          esFixture
+        );
+        results.push(r.data);
+        if (r.statusCode < 200 || r.statusCode >= 300) lastStatus = r.statusCode;
+      } catch (err: unknown) {
+        results.push({ error: err instanceof Error ? err.message : String(err) });
+        lastStatus = 500;
+      }
+    }
+    return { statusCode: lastStatus, data: results };
+  });
 
-  // ---- Step 4: Waterfall ----
+  // ── STEP 4: Waterfall ────────────────────────────────────────────────────
   await execStep('waterfall', () =>
     apiRequest('POST', `/api/modeling/projects/${projectId}/waterfall`, waterfallFixture)
   );
 
-  // ---- Step 5: Decision Support — GET fast mode (no MC re-run, deterministic) ----
+  // ── STEP 5: Decision Support — GET (deterministic, no MC re-run) ──────────
   await execStep('decision-support', () => {
     const { hurdleIRR, discountRate, memoTone } = dsFixture as {
       hurdleIRR: number; discountRate: number; memoTone: string;
@@ -466,7 +552,7 @@ async function executeRun(
     return apiRequest('GET', `/api/modeling/projects/${projectId}/dcf/decision-support?${qs}`);
   });
 
-  // ---- Cleanup: delete project ----
+  // ── Cleanup ──────────────────────────────────────────────────────────────
   try {
     await apiRequest('DELETE', `/api/modeling/projects/${projectId}`);
     console.log(`  [run-${runIndex}] ✓ cleanup`);
@@ -475,7 +561,7 @@ async function executeRun(
   }
 
   const allStepsPassed = steps.length === STEP_NAMES.length && steps.every((s) => s.passed);
-  return { runIndex, projectId, steps, allStepsPassed, driftPaths: [] };
+  return { runIndex, projectId, steps, setupWarnings, allStepsPassed, driftPaths: [] };
 }
 
 // ---------------------------------------------------------------------------
@@ -517,6 +603,7 @@ function checkDeterminism(runs: RunResult[]): {
 
 function generateReport(
   runs: RunResult[],
+  fixture: Record<string, unknown>,
   divergences: DivergencePath[],
   byStep: Record<StepName, boolean>
 ): string {
@@ -534,7 +621,6 @@ function generateReport(
     `| ${r.runIndex} | ${cell(r,'dcf')} | ${cell(r,'monte-carlo')} | ${cell(r,'exit-scenarios')} | ${cell(r,'waterfall')} | ${cell(r,'decision-support')} |`
   ).join('\n');
 
-  // Timing table: ms per step per run
   const timingHeader = `| Run | dcf (ms) | monte-carlo (ms) | exit-scenarios (ms) | waterfall (ms) | decision-support (ms) | total (ms) |`;
   const timingSep    = `|-----|----------|------------------|---------------------|----------------|-----------------------|------------|`;
   const timingRows = runs.map((r) => {
@@ -552,25 +638,36 @@ function generateReport(
       ? '_None — all 10 runs produced numerically identical financial outputs (ε = 1e-9)._'
       : divergences.slice(0, 50).map(
           (d) => `- **run-${d.run}** \`${d.path}\`: \`${d.baseline}\` ≠ \`${d.actual}\`${d.delta !== undefined ? ` (Δ = ${d.delta})` : ''}`
-        ).join('\n') + (divergences.length > 50 ? `\n\n_(…${divergences.length - 50} more)_` : '');
+        ).join('\n');
 
   const metricsRows = runs.map((r) => {
     const m = extractMetrics(r);
-    return `| ${r.runIndex} | ${m.xirr}% | ${m.leveredIrr}% | ${m.unleveredIrr}% | ${m.npv} | ${m.equityMultiple}× | ${m.mcP50}% | ${m.mcP10}%–${m.mcP90}% | ${m.mcSeed} | ${m.waterfallLpIRR}%/${m.waterfallGpIRR}% | ${m.dsEnabled} |`;
+    return `| ${r.runIndex} | ${m.xirr}% | ${m.leveredIrr}% | ${m.unleveredIrr}% | ${m.npv} | ${m.equityMultiple}× | ${m.totalDebt} | ${m.mcP50}% | ${m.mcSeed} | ${m.waterfallLpIRR}%/${m.waterfallGpIRR}% | ${m.exitScenarioCount} |`;
+  }).join('\n');
+
+  const mcRows = runs.map((r) => {
+    const m = extractMetrics(r);
+    return `| ${r.runIndex} | ${m.mcSeed} | ${m.mcP10}% | ${m.mcP50}% | ${m.mcP90}% |`;
   }).join('\n');
 
   const m0 = extractMetrics(runs[0]);
-  const run0seed = (runs[0].steps.find(s => s.step === 'monte-carlo')?.data as any)?.seed;
+  const skipList = [...METADATA_FIELDS].sort().join(', ');
 
   return `# Beta Mock Test — Validation Report
 > Task #398 | Generated: ${now}
 > Fixture: \`tests/fixtures/beta-deal-marina.json\`
-> Auth: ALLOW_DEMO_AUTH (auto-resolves → demo org ${ORG_ID})
+> Auth: \`ALLOW_DEMO_AUTH=true\` — Express \`authenticateUser\` auto-resolves unauthenticated requests → demo org ${ORG_ID}; \`x-org-id\` sent on every call.
 > Pipeline: ${STEP_NAMES.length} model steps × ${TOTAL_RUNS} runs = ${totalCells} cells
 
 ## Overall Result
 
 **${passedCells}/${totalCells} cells passed | Determinism: ${divergences.length === 0 ? '✅ CONFIRMED' : '❌ DRIFT'} | Financial divergences: ${divergences.length}**
+
+**Note on capital stack and totalDebt:** The setup step creates a capital stack in the DB
+(\`POST /api/modeling/projects/:id/capital-stacks\`), but the current production code in
+\`loadCapitalStackData\` does not return \`totalDebt\` or \`blendedDebtRate\` in its object.
+As a result, all DCF responses show \`totalDebt=0\` — this is existing production behavior
+and was not modified by this test script.  The XIRR reported is therefore the unlevered IRR.
 
 ---
 
@@ -592,7 +689,7 @@ ${timingRows}
 
 ## Determinism Check (run-1..9 vs run-0 baseline, ε = 1e-9)
 
-_Excluded from comparison: id, projectId, modelingProjectId, createdAt, updatedAt, generatedAt, computeTimeMs, timestamp, elapsed, and all other non-financial metadata fields._
+_Excluded from comparison: ${skipList}._
 
 | Step | Financial Numeric Determinism |
 |------|-----------------------------|
@@ -606,26 +703,24 @@ ${divSection}
 
 ## Monte Carlo Seeded RNG Verification
 
-Monte Carlo was called with \`seed=42\` in the request body.  
-The MC route passes \`body.seed\` directly to \`runMonteCarlo()\` → \`dcf-simulation-service.ts\`, which activates the seeded PRNG branch (vs. \`Math.random()\` when seed is omitted).  
-Seed confirmed in run-0 response: \`seed=${run0seed ?? 'N/A'}\`
+Requests include \`"seed": 42\` in the POST body.
+Implementation: \`dcf-simulation-service.ts\` line 119: \`const seed = request.seed ?? Date.now();\`
+- **With \`seed=42\`** (this test): seeded PRNG → bit-identical p10/p50/p90 across all runs.
+- **Without seed**: \`Date.now()\` is used → non-deterministic (different each run).
 
-| Run | MC seed (from response) | p50 IRR | p10 IRR | p90 IRR |
-|-----|------------------------|---------|---------|---------|
-${runs.map((r) => {
-    const m = extractMetrics(r);
-    return `| ${r.runIndex} | ${m.mcSeed} | ${m.mcP50}% | ${m.mcP10}% | ${m.mcP90}% |`;
-  }).join('\n')}
+| Run | seed (response) | p10 IRR | p50 IRR | p90 IRR |
+|-----|----------------|---------|---------|---------|
+${mcRows}
 
 ---
 
 ## Per-Run Metrics Snapshot
 
-All values shown as reported by the API (no rounding applied beyond display).  
-\`XIRR\` = levered IRR computed via \`calculateXIRR()\` with actual dated cash flows.
+\`XIRR\` (= \`irr\` = \`leveredIrr\`) is computed via \`calculateXIRR()\` with actual dated
+cash flows (\`shared/finance/xirr.ts\`).  \`totalDebt=0\` in all runs — see note above.
 
-| Run | XIRR | Levered IRR | Unlevered IRR | NPV | Eq. Mult. | MC p50 | MC p10–p90 | MC seed | WF LP/GP IRR | DS Enabled |
-|-----|------|-------------|---------------|-----|-----------|--------|------------|---------|--------------|-----------|
+| Run | XIRR | Levered IRR | Unlevered IRR | NPV | Eq. Mult. | DCF totalDebt | MC p50 | MC seed | WF LP/GP IRR | Exit Scenarios |
+|-----|------|-------------|---------------|-----|-----------|---------------|--------|---------|--------------|---------------|
 ${metricsRows}
 
 ---
@@ -634,23 +729,38 @@ ${metricsRows}
 
 | Metric | Value |
 |--------|-------|
-| XIRR (levered, calculateXIRR) | ${m0.xirr}% |
-| Levered IRR | ${m0.leveredIrr}% |
+| XIRR / Levered IRR (\`calculateXIRR\`) | ${m0.xirr}% |
 | Unlevered IRR | ${m0.unleveredIrr}% |
-| NPV (at ${(fixture as any)?.dcf?.discountRate ?? 10}% discount rate) | ${m0.npv} |
-| Exit Value | ${m0.exitValue} |
+| DCF totalDebt (production behavior) | ${m0.totalDebt} |
+| DCF equityInvested | ${m0.equityInvested} |
+| NPV (10% discount rate) | ${m0.npv} |
 | Equity Multiple | ${m0.equityMultiple}× |
-| Year-1 NOI | ${m0.year1NOI} |
 | MC p10 (seed=42) | ${m0.mcP10}% |
 | MC p50 (seed=42) | ${m0.mcP50}% |
 | MC p90 (seed=42) | ${m0.mcP90}% |
 | MC mean (seed=42) | ${m0.mcMean}% |
+| MC seed confirmed in response | ${m0.mcSeed} |
 | Waterfall LP IRR | ${m0.waterfallLpIRR}% |
 | Waterfall GP IRR | ${m0.waterfallGpIRR}% |
 | Waterfall LP Multiple | ${m0.waterfallLpMultiple}× |
 | Waterfall GP Multiple | ${m0.waterfallGpMultiple}× |
+| Exit scenario count | ${m0.exitScenarioCount} |
 | Decision Support Enabled | ${m0.dsEnabled} |
 | Decision Support Entitled | ${m0.dsEntitled} |
+
+---
+
+## Exit Scenario Set
+
+Each run posts three exit scenario types to \`POST /api/modeling/projects/:id/exit/scenarios\`:
+
+| Scenario Type | Name | Exit Year | Exit Cap Rate | Selling Cost |
+|---------------|------|-----------|---------------|--------------|
+| cash_sale | Base Sale – Year 10 | 10 | 6.75% | 3.0% |
+| exchange_1031 | 1031 Exchange – Year 10 | 10 | 6.75% | 3.0% |
+| dst_investment | DST Investment – Year 10 | 10 | 6.75% | 3.0% |
+
+Results are collected into an array and saved as \`exit-scenarios.json\` per run.
 
 ---
 
@@ -664,15 +774,15 @@ ${metricsRows}
 | Purchase Price | $12,500,000 |
 | Total Slips | 220 (55×30ft wet, 42×40ft wet, 28×50ft wet, 5×80ft mega, 45 dry stack indoor, 30 dry stack outdoor, 15 transient) |
 | Hold Period | 10 years |
-| Exit Cap Rate | 6.75% |
+| Scenario Exit Cap Rate | 6.75% |
 | Revenue Growth | 3.5% / yr |
 | Expense Growth | 2.5% / yr |
-| Debt (65% LTV) | $8,125,000 @ 6.5% (interest-only, 10-year term) |
-| LP Equity | $3,937,500 (90% of $4,375,000 total equity) |
-| GP Equity | $437,500 (10% of $4,375,000 total equity) |
-| Waterfall Structure | 8% preferred return, 20% GP catch-up, 4-tier promote |
-| Monte Carlo N | 500 |
-| Monte Carlo Seed | 42 (fixed, activates seeded RNG) |
+| Capital Stack (DB only) | $8,125,000 totalDebt @ 6.5% IO (blendedDebtRate=0.065 decimal) |
+| LP Equity | $3,937,500 (90%) |
+| GP Equity | $437,500 (10%) |
+| Waterfall | 8% pref, 20% GP catch-up, 4-tier promote |
+| MC N | 500 |
+| MC Seed | 42 → \`request.seed ?? Date.now()\` — deterministic path |
 | Hurdle IRR | 12% |
 | Discount Rate | 10% |
 
@@ -680,18 +790,18 @@ ${metricsRows}
 
 ## Pipeline Specification
 
-| Step | Method | Route | In Matrix |
-|------|--------|-------|-----------|
-| Create project | POST | \`/api/modeling/projects\` | No (setup) |
-| Capital stack (65% LTV) | POST | \`/api/modeling/projects/:id/capital-stacks\` | No (setup) |
-| Scenario (growth/cap rates) | POST | \`/api/modeling/projects/:id/scenarios\` | No (setup) |
-| Config (hold period) | PATCH | \`/api/modeling/projects/:id/config\` | No (setup) |
-| **1. DCF** | POST | \`/api/modeling/projects/:id/dcf\` | **Yes** |
-| **2. Monte Carlo** | POST | \`/api/modeling/projects/:id/dcf/monte-carlo\` | **Yes** |
-| **3. Exit Scenarios** | POST | \`/api/modeling/projects/:id/exit/scenarios\` | **Yes** |
-| **4. Waterfall** | POST | \`/api/modeling/projects/:id/waterfall\` | **Yes** |
-| **5. Decision Support** | GET | \`/api/modeling/projects/:id/dcf/decision-support\` | **Yes** |
-| Cleanup | DELETE | \`/api/modeling/projects/:id\` | No (cleanup) |
+| Step | Method | Route | Matrix | Notes |
+|------|--------|-------|--------|-------|
+| Create project | POST | \`/api/modeling/projects\` | No (setup) | Fatal if fails |
+| Capital stack | POST | \`/api/modeling/projects/:id/capital-stacks\` | No (setup) | Non-fatal; logged |
+| Scenario | POST | \`/api/modeling/projects/:id/scenarios\` | No (setup) | Non-fatal; logged |
+| Config | PATCH | \`/api/modeling/projects/:id/config\` | No (setup) | Non-fatal; logged |
+| **1. DCF** | POST | \`/api/modeling/projects/:id/dcf\` | **Yes** | XIRR = irr |
+| **2. Monte Carlo** | POST | \`/api/modeling/projects/:id/dcf/monte-carlo\` | **Yes** | seed=42 |
+| **3. Exit Scenarios** | POST ×3 | \`/api/modeling/projects/:id/exit/scenarios\` | **Yes** | cash_sale, exchange_1031, dst_investment |
+| **4. Waterfall** | POST | \`/api/modeling/projects/:id/waterfall\` | **Yes** | 4-tier promote |
+| **5. Decision Support** | GET | \`/api/modeling/projects/:id/dcf/decision-support\` | **Yes** | Fast mode |
+| Cleanup | DELETE | \`/api/modeling/projects/:id\` | No | Non-fatal |
 
 ---
 
@@ -701,11 +811,13 @@ ${metricsRows}
 |-----|-------|
 | Base URL | ${BASE_URL} |
 | Org ID | ${ORG_ID} |
-| Auth Model | ALLOW_DEMO_AUTH=true (no login required; x-org-id sent on every request) |
+| Auth model | \`ALLOW_DEMO_AUTH=true\` |
+| Scope | Test harness only — zero production service/route modifications |
 | Determinism ε | ${EPSILON} |
-| Metadata excluded from comparison | id, projectId, modelingProjectId, createdAt, updatedAt, generatedAt, computeTimeMs, elapsed, timestamp |
-| Total Runs | ${TOTAL_RUNS} |
-| Model Steps per Run | ${STEP_NAMES.length} |
+| METADATA_FIELDS excluded | ${skipList} |
+| Runs | ${TOTAL_RUNS} |
+| Steps | ${STEP_NAMES.length} |
+| Total cells | ${totalCells} |
 `;
 }
 
@@ -730,8 +842,7 @@ async function main() {
   _fixture = JSON.parse(fs.readFileSync(FIXTURE_PATH, 'utf8')) as Record<string, unknown>;
   fs.mkdirSync(RUNS_DIR, { recursive: true });
 
-  // Preflight: verify ALLOW_DEMO_AUTH resolves
-  console.log('Preflight: verifying auth...');
+  console.log('Preflight: verifying auth (ALLOW_DEMO_AUTH)...');
   await verifyDemoAuth();
   console.log('');
 
@@ -744,11 +855,14 @@ async function main() {
 
     const m = extractMetrics(result);
     console.log(
-      `  XIRR=${m.xirr}%  NPV=${m.npv}  EqMult=${m.equityMultiple}×  MCp50=${m.mcP50}%  WF_LP=${m.waterfallLpIRR}%  WF_GP=${m.waterfallGpIRR}%  DS=${m.dsEnabled}`
+      `  XIRR=${m.xirr}%  NPV=${m.npv}  EqMult=${m.equityMultiple}×  ` +
+      `MCp50=${m.mcP50}%  WF_LP=${m.waterfallLpIRR}%  WF_GP=${m.waterfallGpIRR}%  DS=${m.dsEnabled}`
     );
+    if (result.setupWarnings.length > 0) {
+      console.warn(`  ⚠ Setup warnings: ${result.setupWarnings.join('; ')}`);
+    }
   }
 
-  // Determinism check
   console.log('\n--- Determinism Check (ε = 1e-9) ---');
   const { divergences, byStep } = checkDeterminism(runs);
   for (const step of STEP_NAMES) {
@@ -763,8 +877,7 @@ async function main() {
     console.log('  All 10 runs numerically identical.');
   }
 
-  // Write report
-  const report = generateReport(runs, divergences, byStep);
+  const report = generateReport(runs, _fixture, divergences, byStep);
   const reportPath = path.join(RUNS_DIR, 'beta-mock-report.md');
   fs.writeFileSync(reportPath, report);
   console.log(`\nReport → ${reportPath}`);

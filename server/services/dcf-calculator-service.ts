@@ -1338,13 +1338,11 @@ async function loadCapitalStackData(pool: any, modelingProjectId: string) {
   const row = cs.rows[0];
 
   return {
-    holdPeriodYears:  Number(row.hold_period_years)  || 5,
-    noiGrowthRate:    Number(row.noi_growth_rate)    || 0,
-    exitCapRate:      Number(row.exit_cap_rate)      || 0,
-    totalEquity:      Number(row.total_equity)       || 0,
-    purchasePrice:    Number(row.purchase_price)     || 0,
-    totalDebt:        Number(row.total_debt)         || 0,
-    blendedDebtRate:  Number(row.blended_debt_rate)  || 0,
+    holdPeriodYears: Number(row.hold_period_years) || 5,
+    noiGrowthRate: Number(row.noi_growth_rate) || 0,
+    exitCapRate: Number(row.exit_cap_rate) || 0,
+    totalEquity: Number(row.total_equity) || 0,
+    purchasePrice: Number(row.purchase_price) || 0,
     debtTranches: [],
   };
 }
