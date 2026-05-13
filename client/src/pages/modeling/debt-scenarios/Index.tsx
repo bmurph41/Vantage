@@ -197,6 +197,7 @@ export default function DebtScenariosIndex() {
   // Query: Load modeling projects for linking
   const { data: modelingProjectsList = [] } = useQuery<{ id: string; marinaName: string; dealOutcome: string }[]>({
     queryKey: ['/api/modeling/projects'],
+    select: (res: any) => Array.isArray(res) ? res : (res?.data ?? []),
   });
 
   // State for linking scenarios to projects
@@ -279,18 +280,20 @@ export default function DebtScenariosIndex() {
 
       if (currentScenarioId) {
         // Update existing
-        return await apiRequest('PUT', `/api/modeling/debt-scenarios/${currentScenarioId}`, scenarioData);
+        const res = await apiRequest('PUT', `/api/modeling/debt-scenarios/${currentScenarioId}`, scenarioData);
+        return res.json();
       } else {
         // Create new
-        return await apiRequest('POST', '/api/modeling/debt-scenarios', scenarioData);
+        const res = await apiRequest('POST', '/api/modeling/debt-scenarios', scenarioData);
+        return res.json();
       }
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['/api/modeling/debt-scenarios'] });
-      setCurrentScenarioId(data.id);
+      if (data?.id) setCurrentScenarioId(data.id);
       toast({
         title: "Scenario Saved",
-        description: `"${data.name}" has been saved successfully.`,
+        description: `"${data?.name ?? inputs.name}" has been saved successfully.`,
       });
     },
     onError: () => {
@@ -1144,7 +1147,7 @@ export default function DebtScenariosIndex() {
                           </div>
                         </div>
                         <div className="mt-2 text-xs text-muted-foreground">
-                          Last updated: {format(new Date(scenario.updatedAt), "MMM d, yyyy 'at' h:mm a")}
+                          Last updated: {scenario.updatedAt ? format(new Date(scenario.updatedAt), "MMM d, yyyy 'at' h:mm a") : 'Unknown'}
                         </div>
                       </div>
                       <div className="flex gap-2 ml-4">
