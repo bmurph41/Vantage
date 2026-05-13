@@ -1,7 +1,9 @@
+import { useState } from "react";
 import { format, isSameDay, differenceInMinutes, parseISO } from "date-fns";
 import {
   DndContext,
   DragEndEvent,
+  DragOverEvent,
   DragOverlay,
   DragStartEvent,
   PointerSensor,
@@ -314,6 +316,8 @@ export function TimeBlockGrid({
   setSelectedDay,
   setViewMode,
 }: TimeBlockGridProps) {
+  const [overId, setOverId] = useState<string | null>(null);
+
   const blocksForDay = (day: Date) =>
     blocks.filter((b) => isSameDay(parseISO(b.start_at), day));
 
@@ -324,8 +328,17 @@ export function TimeBlockGrid({
 
   const activeDragBlock = activeDragId ? blocks.find((b) => b.id === activeDragId) : null;
 
+  function handleDragOver(event: DragOverEvent) {
+    setOverId(event.over ? String(event.over.id) : null);
+  }
+
+  function handleDragEnd(event: DragEndEvent) {
+    setOverId(null);
+    onDragEnd(event);
+  }
+
   return (
-    <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd}>
+    <DndContext sensors={sensors} onDragStart={onDragStart} onDragOver={handleDragOver} onDragEnd={handleDragEnd}>
       <div className="flex-1 overflow-auto border rounded-lg bg-background">
         {/* Day header row */}
         <div
@@ -424,6 +437,41 @@ export function TimeBlockGrid({
                     onClick={onCrmActivityClick}
                   />
                 ))}
+
+                {/* Drop preview chip */}
+                {activeDragBlock && (() => {
+                  if (!overId) return null;
+                  const [overDay, overHourStr] = overId.split(/-(?=\d+$)/);
+                  if (overDay !== dayIso) return null;
+                  const overHour = parseInt(overHourStr, 10);
+                  if (isNaN(overHour)) return null;
+                  const color = typeColor(activeDragBlock.block_type, activeDragBlock.color);
+                  const previewTop = (overHour - DAY_START_HOUR) * HOUR_HEIGHT;
+                  const dragHeight = Math.max(blockHeight(activeDragBlock.start_at, activeDragBlock.end_at), 22);
+                  return (
+                    <div
+                      className="absolute left-1 right-1 rounded px-1.5 py-1 overflow-hidden border-l-4 pointer-events-none"
+                      style={{
+                        top: previewTop,
+                        height: dragHeight,
+                        backgroundColor: color + "33",
+                        borderLeftColor: color,
+                        opacity: 0.7,
+                        zIndex: 15,
+                        boxShadow: `0 0 0 1px ${color}44`,
+                      }}
+                    >
+                      <p className="text-xs font-medium leading-tight truncate" style={{ color }}>
+                        {activeDragBlock.title}
+                      </p>
+                      {dragHeight > 32 && (
+                        <p className="text-xs mt-0.5 truncate" style={{ color: color + "aa" }}>
+                          {typeLabel(activeDragBlock.block_type)}
+                        </p>
+                      )}
+                    </div>
+                  );
+                })()}
 
                 {isSameDay(day, new Date()) && (() => {
                   const now = new Date();
