@@ -2406,7 +2406,77 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
   // Preferences are stored per-user per-project so each collaborator has their
   // own layout without affecting teammates.  Page key convention:
   //   "modeling:kpi-strip:{projectId}"
-  // Fall-back chain: user pref (valid array) → project-level legacy value → null (defaults)
+  //   "modeling:kpi-strip:__global__"  (user's global default, seeds new projects)
+  // Fall-back chain: user pref (per-project) → legacy project-level value → user global default → null (registry defaults)
+  // NOTE: legacy project value is checked before the global default so that
+  // existing projects with a saved strip order are never silently overridden.
+
+  // Global default KPI order for the current user
+  app.get('/api/modeling/kpi-strip-config/global-default', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const globalPageKey = 'modeling:kpi-strip:__global__';
+
+      const [globalPref] = await db
+        .select()
+        .from(userKpiPreferences)
+        .where(and(
+          eq(userKpiPreferences.userId, userId),
+          eq(userKpiPreferences.orgId, orgId),
+          eq(userKpiPreferences.pageKey, globalPageKey),
+        ))
+        .limit(1);
+
+      const isValidStringArray = (v: unknown): v is string[] =>
+        Array.isArray(v) && (v as unknown[]).every((k) => typeof k === 'string');
+
+      if (globalPref && isValidStringArray(globalPref.kpiConfig)) {
+        return res.json({ enabledKeys: globalPref.kpiConfig as unknown as string[] });
+      }
+
+      res.json({ enabledKeys: null });
+    } catch (error: any) {
+      console.error('Failed to get global KPI strip default:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Save the current user's global default KPI order
+  app.put('/api/modeling/kpi-strip-config/global-default', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { enabledKeys } = req.body;
+
+      if (!Array.isArray(enabledKeys)) {
+        return res.status(400).json({ error: 'enabledKeys must be an array' });
+      }
+      if (!enabledKeys.every((k: unknown) => typeof k === 'string')) {
+        return res.status(400).json({ error: 'enabledKeys must be an array of strings' });
+      }
+
+      const { MODELING_KPI_REGISTRY } = await import('@shared/modeling-kpi-registry');
+      const validKeys = [...new Set((enabledKeys as string[]).filter((k) => k in MODELING_KPI_REGISTRY))];
+
+      const globalPageKey = 'modeling:kpi-strip:__global__';
+      const kpiJson = sql`${JSON.stringify(validKeys)}::jsonb`;
+
+      await db
+        .insert(userKpiPreferences)
+        .values({ userId, orgId, pageKey: globalPageKey, kpiConfig: kpiJson })
+        .onConflictDoUpdate({
+          target: [userKpiPreferences.userId, userKpiPreferences.orgId, userKpiPreferences.pageKey],
+          set: { kpiConfig: kpiJson, lastModified: new Date() },
+        });
+
+      res.json({ success: true, enabledKeys: validKeys });
+    } catch (error: any) {
+      console.error('Failed to save global KPI strip default:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   app.get('/api/modeling/projects/:projectId/kpi-strip-config', authenticateUser, async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
@@ -2414,8 +2484,12 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
       const { projectId } = req.params;
 
       const pageKey = `modeling:kpi-strip:${projectId}`;
+      const globalPageKey = 'modeling:kpi-strip:__global__';
 
-      // 1. Check user-scoped preference first
+      const isValidStringArray = (v: unknown): v is string[] =>
+        Array.isArray(v) && (v as unknown[]).every((k) => typeof k === 'string');
+
+      // 1. Check user-scoped per-project preference first
       const [userPref] = await db
         .select()
         .from(userKpiPreferences)
@@ -2429,16 +2503,38 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
       // Only use the user pref if it contains a valid string array; otherwise
       // fall through to the legacy project-level value so malformed rows don't
       // silently discard a user's configured defaults.
-      if (userPref && Array.isArray(userPref.kpiConfig) &&
-          (userPref.kpiConfig as unknown[]).every((k) => typeof k === 'string')) {
+      if (userPref && isValidStringArray(userPref.kpiConfig)) {
         return res.json({ enabledKeys: userPref.kpiConfig as unknown as string[] });
       }
 
-      // 2. Fall back to legacy project-level value (migration path for existing data)
+      // 2. Fall back to legacy project-level value (migration path for existing data).
+      //    This must come before the global default so that projects which already
+      //    have a saved strip order are not overridden by the user's global default.
       const project = await storage.getModelingProject(projectId, orgId);
       if (!project) return res.status(404).json({ error: 'Project not found' });
       const cm = (project.customMetrics as any) || {};
-      res.json({ enabledKeys: cm.kpiStripEnabledKeys ?? null });
+      if (Array.isArray(cm.kpiStripEnabledKeys) && cm.kpiStripEnabledKeys.length > 0) {
+        return res.json({ enabledKeys: cm.kpiStripEnabledKeys });
+      }
+
+      // 3. Fall back to user's global default (seeds new/unconfigured projects
+      //    that have no per-project pref and no legacy project-level value).
+      const [globalPref] = await db
+        .select()
+        .from(userKpiPreferences)
+        .where(and(
+          eq(userKpiPreferences.userId, userId),
+          eq(userKpiPreferences.orgId, orgId),
+          eq(userKpiPreferences.pageKey, globalPageKey),
+        ))
+        .limit(1);
+
+      if (globalPref && isValidStringArray(globalPref.kpiConfig)) {
+        return res.json({ enabledKeys: globalPref.kpiConfig as unknown as string[], isGlobalDefault: true });
+      }
+
+      // 4. No configuration found — let the client use registry defaults.
+      res.json({ enabledKeys: null });
     } catch (error: any) {
       console.error('Failed to get KPI strip config:', error);
       res.status(500).json({ error: error.message });

@@ -3,7 +3,7 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import { queryClient, apiRequest } from '@/lib/queryClient';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Info, ChevronDown, ChevronUp, Settings2, RotateCcw, ArrowUp, ArrowDown, GripVertical } from 'lucide-react';
+import { Info, ChevronDown, ChevronUp, Settings2, RotateCcw, ArrowUp, ArrowDown, GripVertical, Bookmark as BookmarkIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatCurrency, formatPercent } from '@/lib/utils';
 import { getKpisForAssetClass, MODELING_KPI_REGISTRY, type ModelingKpiDef, type KpiAnnualRow } from '@shared/modeling-kpi-registry';
@@ -235,6 +235,8 @@ interface KpiSettingsPopoverProps {
   onToggle: (key: string) => void;
   onMove: (key: string, direction: 'up' | 'down') => void;
   onReset: () => void;
+  onSetAsDefault?: () => void;
+  setAsDefaultPending?: boolean;
 }
 
 function KpiSettingsPopover({
@@ -247,6 +249,8 @@ function KpiSettingsPopover({
   onToggle,
   onMove,
   onReset,
+  onSetAsDefault,
+  setAsDefaultPending,
 }: KpiSettingsPopoverProps) {
   const unpinnedAsset = assetClassKpis.filter((k) => !effectiveEnabledSet.has(k.key));
   const unpinnedExtra = extraKpis.filter((k) => !effectiveEnabledSet.has(k.key));
@@ -262,16 +266,29 @@ function KpiSettingsPopover({
         </button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-80 p-0" sideOffset={4}>
-        <div className="px-3 py-2.5 border-b flex items-center justify-between">
+        <div className="px-3 py-2.5 border-b flex items-center justify-between gap-2">
           <p className="text-sm font-semibold">Customize KPIs</p>
-          <button
-            onClick={onReset}
-            className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
-            title="Reset to asset-class defaults"
-          >
-            <RotateCcw className="h-3 w-3" />
-            Reset
-          </button>
+          <div className="flex items-center gap-2">
+            {onSetAsDefault && (
+              <button
+                onClick={onSetAsDefault}
+                disabled={setAsDefaultPending}
+                className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+                title="Save this order as your default for all new projects"
+              >
+                <BookmarkIcon className="h-3 w-3" />
+                {setAsDefaultPending ? 'Saving…' : 'Set as my default'}
+              </button>
+            )}
+            <button
+              onClick={onReset}
+              className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+              title="Reset to asset-class defaults"
+            >
+              <RotateCcw className="h-3 w-3" />
+              Reset
+            </button>
+          </div>
         </div>
 
         <div className="max-h-96 overflow-y-auto p-1">
@@ -398,16 +415,39 @@ export function ModelingKpiStrip({ proFormaData, assetClass, className, projectI
     staleTime: 60_000,
   });
 
+  const { data: globalPrefData } = useQuery<{ enabledKeys: string[] | null }>({
+    queryKey: ['/api/modeling/kpi-strip-config/global-default'],
+    queryFn: async () => {
+      const r = await fetch('/api/modeling/kpi-strip-config/global-default', { credentials: 'include' });
+      if (!r.ok) throw new Error(`Global KPI default fetch failed: ${r.status}`);
+      return r.json();
+    },
+    staleTime: 60_000,
+  });
+
   const savedOrderedKeys: string[] | null = useMemo(() => {
     if (!prefData || !Array.isArray(prefData.enabledKeys)) return null;
     return prefData.enabledKeys;
   }, [prefData]);
+
+  const globalDefaultKeys: string[] | null = useMemo(() => {
+    if (!globalPrefData || !Array.isArray(globalPrefData.enabledKeys)) return null;
+    return globalPrefData.enabledKeys;
+  }, [globalPrefData]);
 
   const saveMutation = useMutation({
     mutationFn: (keys: string[]) =>
       apiRequest('PATCH', `/api/modeling/projects/${projectId}/kpi-strip-config`, { enabledKeys: keys }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'kpi-strip-config'] });
+    },
+  });
+
+  const setAsDefaultMutation = useMutation({
+    mutationFn: (keys: string[]) =>
+      apiRequest('PUT', '/api/modeling/kpi-strip-config/global-default', { enabledKeys: keys }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/modeling/kpi-strip-config/global-default'] });
     },
   });
 
@@ -424,8 +464,9 @@ export function ModelingKpiStrip({ proFormaData, assetClass, className, projectI
   const effectiveOrderedKeys: string[] = useMemo(() => {
     if (localOrderedKeys !== null) return localOrderedKeys;
     if (savedOrderedKeys !== null) return savedOrderedKeys;
+    if (globalDefaultKeys !== null) return globalDefaultKeys;
     return defaultOrderedKeys;
-  }, [localOrderedKeys, savedOrderedKeys, defaultOrderedKeys]);
+  }, [localOrderedKeys, savedOrderedKeys, globalDefaultKeys, defaultOrderedKeys]);
 
   const effectiveEnabledSet = useMemo(() => new Set(effectiveOrderedKeys), [effectiveOrderedKeys]);
 
@@ -487,6 +528,10 @@ export function ModelingKpiStrip({ proFormaData, assetClass, className, projectI
     });
   }, [defaultOrderedKeys, projectId, saveMutation]);
 
+  const handleSetAsDefault = useCallback(() => {
+    setAsDefaultMutation.mutate(effectiveOrderedKeys);
+  }, [effectiveOrderedKeys, setAsDefaultMutation]);
+
   // Shared popover props
   const settingsProps: KpiSettingsPopoverProps = {
     open: popoverOpen,
@@ -498,6 +543,8 @@ export function ModelingKpiStrip({ proFormaData, assetClass, className, projectI
     onToggle: handleToggle,
     onMove: handleMove,
     onReset: handleReset,
+    onSetAsDefault: projectId ? handleSetAsDefault : undefined,
+    setAsDefaultPending: setAsDefaultMutation.isPending,
   };
 
   // ── No proFormaData ────────────────────────────────────────────────────────
