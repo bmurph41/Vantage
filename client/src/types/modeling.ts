@@ -203,19 +203,6 @@ export interface HistoricalPLData {
   [key: string]: unknown;
 }
 
-export interface ActualsData {
-  lineItems?: Array<{
-    id: string;
-    name: string;
-    department?: string;
-    bucket?: string;
-    months?: Record<string, number>;
-    total?: number;
-    [key: string]: unknown;
-  }>;
-  totals?: Record<string, number>;
-  [key: string]: unknown;
-}
 
 export interface ScenarioVersionComparison {
   baseVersion?: { id: string; versionNumber: number };

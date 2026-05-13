@@ -655,7 +655,7 @@ export const ASSET_CLASS_KPI_SETS: Record<ModelingAssetClass, string[]> = {
   industrial:   ['irr', 'equityMultiple', 'cashOnCash', 'goingInCapRate', 'noiMargin', 'dscr', 'ltv', 'opexRatio', 'exitCapRate', 'stabilizedNoi', 'exitValue', 'walt', 'pricePerSf', 'clearHeight', 'dockDoorCount'],
   self_storage: ['irr', 'equityMultiple', 'cashOnCash', 'goingInCapRate', 'noiMargin', 'dscr', 'ltv', 'opexRatio', 'exitCapRate', 'stabilizedNoi', 'noiCagr', 'physicalOccupancy', 'ratePerSf', 'climateControlledPct', 'ecriUpside'],
   mixed_use:    ['irr', 'equityMultiple', 'cashOnCash', 'goingInCapRate', 'noiMargin', 'dscr', 'opexRatio', 'exitCapRate', 'stabilizedNoi', 'exitValue', 'noiCagr'],
-  business:     ['irr', 'equityMultiple', 'cashOnCash', 'noiMargin', 'opexRatio', 'totalReturn', 'exitValue', 'stabilizedNoi', 'noiCagr'],
+  business:     ['irr', 'equityMultiple', 'cashOnCash', 'goingInCapRate', 'exitCapRate', 'noiMargin', 'dscr', 'opexRatio', 'totalReturn', 'exitValue', 'stabilizedNoi', 'noiCagr'],
   default:      ['irr', 'equityMultiple', 'cashOnCash', 'goingInCapRate', 'noiMargin', 'dscr', 'opexRatio', 'exitCapRate', 'stabilizedNoi', 'exitValue'],
 };
 

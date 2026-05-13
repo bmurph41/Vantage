@@ -2389,7 +2389,9 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                       color: 'text-teal-600 dark:text-teal-400',
                     }] : []),
                     ...(() => {
-                      const pp = (assumptions?.exitAssumptions as Record<string, number> | undefined)?.['purchasePrice'];
+                      const pp = Number((project as Record<string, unknown>)?.purchasePrice)
+                        || Number((assumptions?.exitAssumptions as Record<string, number> | undefined)?.['purchasePrice'])
+                        || 0;
                       return pp && pp > 0 ? [{
                         label: 'Going-In Cap',
                         getValue: (i: number) => {
