@@ -3,6 +3,10 @@ import { pnlDocuments } from '@shared/schema';
 import { eq } from 'drizzle-orm';
 import fs from 'fs/promises';
 import path from 'path';
+import {
+  isObjectStorageKey,
+  downloadDocIntelToBuffer,
+} from '../../utils/doc-intel-storage';
 
 const RESTORE_DIR = process.env.UPLOAD_DIR ?? './uploads/pnl';
 

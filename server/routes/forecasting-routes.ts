@@ -22,7 +22,8 @@ const router = Router();
  */
 router.get('/summary', async (req: Request, res: Response) => {
   try {
-    const ownerId = (req as any).userId || 'user-1';
+    const ownerId = (req as any).userId || (process.env.NODE_ENV === 'production' ? '' : 'user-1');
+    if (!ownerId) return res.status(401).json({ error: 'Authentication required' });
     const pipelineId = req.query.pipelineId as string | undefined;
     
     const now = new Date();

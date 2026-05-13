@@ -1818,12 +1818,15 @@ export async function createMoveEvent(data: {
 }): Promise<MoveEvent> {
   const dateStr = data.eventDate || data.checkedAt || new Date().toISOString().split('T')[0];
 
+  if (!data.orgId) {
+    throw new Error('createMoveEvent: orgId is required');
+  }
   const [event] = await db.insert(moveEvents).values({
     direction: data.direction,
     eventDate: dateStr,
     leaseId: data.leaseId || "unknown",
     locationId: data.locationId || null,
-    orgId: data.orgId || "org-1",
+    orgId: data.orgId,
     reason: data.reason || (data.customerName ? `Move ${data.direction.toLowerCase()} - ${data.customerName}` : undefined),
     notes: data.notes || (data.sourceSheet ? `Source: ${data.sourceSheet}` : undefined),
   }).returning();

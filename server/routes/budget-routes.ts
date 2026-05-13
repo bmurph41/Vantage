@@ -258,7 +258,7 @@ function getOrgId(req: Request): string | null {
 function getUserId(req: Request): string {
   const authReq = req as AuthenticatedRequest;
   if (authReq.validatedUserId) return authReq.validatedUserId;
-  return (req as any).session?.userId || (req as any).user?.id || 'user-1';
+  return (req as any).session?.userId || (req as any).user?.id || (process.env.NODE_ENV === 'production' ? '' : 'user-1');
 }
 
 router.get("/", async (req: Request, res: Response, next: NextFunction) => {

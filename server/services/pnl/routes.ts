@@ -44,15 +44,22 @@ const upload = multer({
   limits: { fileSize: (Number(process.env.MAX_UPLOAD_MB ?? 100) || 100) * 1024 * 1024 },
 });
 
-function getAuthContext(req: any) {
-  const orgId = req.user?.organizationId ?? req.headers['x-org-id'] ?? 'org-1';
-  const userId = req.user?.id ?? req.headers['x-user-id'] ?? 'user-1';
+const isProd = process.env.NODE_ENV === 'production';
+function getAuthContext(req: any, res: any): { orgId: string; userId: string } | null {
+  const rawOrg = req.user?.organizationId ?? req.user?.orgId ?? req.headers['x-org-id'];
+  const rawUser = req.user?.id ?? req.headers['x-user-id'];
+  const orgId = rawOrg ?? (isProd ? null : 'org-1');
+  const userId = rawUser ?? (isProd ? null : 'user-1');
+  if (!orgId || !userId) {
+    res.status(401).json({ error: 'Authentication required', code: 'MISSING_IDENTITY' });
+    return null;
+  }
   return { orgId: String(orgId), userId: String(userId) };
 }
 
 router.post('/upload', upload.single('file'), async (req: any, res) => {
   try {
-    const { orgId, userId } = getAuthContext(req);
+    const __auth = getAuthContext(req, res); if (!__auth) return; const { orgId, userId } = __auth;
 
     const schema = z.object({
       assetId: z.string().optional(),
@@ -132,7 +139,7 @@ router.post('/upload', upload.single('file'), async (req: any, res) => {
 
 router.get('/jobs/:jobId', async (req: any, res) => {
   try {
-    const { orgId } = getAuthContext(req);
+    const __auth = getAuthContext(req, res); if (!__auth) return; const { orgId } = __auth;
     const jobId = String(req.params.jobId);
 
     const job = await db.query.pnlJobs.findFirst({
@@ -171,7 +178,7 @@ router.get('/jobs/:jobId', async (req: any, res) => {
 
 router.get('/jobs/:jobId/parsed', async (req: any, res) => {
   try {
-    const { orgId } = getAuthContext(req);
+    const __auth = getAuthContext(req, res); if (!__auth) return; const { orgId } = __auth;
     const jobId = String(req.params.jobId);
 
     const parsed = await db.query.pnlParsedStatements.findFirst({
@@ -191,7 +198,7 @@ router.get('/jobs/:jobId/parsed', async (req: any, res) => {
 
 router.get('/jobs/:jobId/review', async (req: any, res) => {
   try {
-    const { orgId } = getAuthContext(req);
+    const __auth = getAuthContext(req, res); if (!__auth) return; const { orgId } = __auth;
     const jobId = String(req.params.jobId);
 
     const items = await db.query.pnlReviewItems.findMany({
@@ -228,7 +235,7 @@ router.get('/jobs/:jobId/review', async (req: any, res) => {
 // ─── Debug endpoint (v2) ──────────────────────────────────────────────────────
 router.get('/jobs/:jobId/debug', async (req: any, res) => {
   try {
-    const { orgId } = getAuthContext(req);
+    const __auth = getAuthContext(req, res); if (!__auth) return; const { orgId } = __auth;
     const jobId = String(req.params.jobId);
 
     const job = await db.query.pnlJobs.findFirst({
@@ -276,7 +283,7 @@ router.get('/jobs/:jobId/debug', async (req: any, res) => {
 
 router.post('/jobs/:jobId/remap', async (req: any, res) => {
   try {
-    const { orgId, userId } = getAuthContext(req);
+    const __auth = getAuthContext(req, res); if (!__auth) return; const { orgId, userId } = __auth;
     const jobId = String(req.params.jobId);
 
     const schema = z.object({
@@ -374,7 +381,7 @@ router.post('/jobs/:jobId/remap', async (req: any, res) => {
 
 router.get('/facts', async (req: any, res) => {
   try {
-    const { orgId } = getAuthContext(req);
+    const __auth = getAuthContext(req, res); if (!__auth) return; const { orgId } = __auth;
 
     const schema = z.object({
       assetId: z.string().optional(),
@@ -411,7 +418,7 @@ router.get('/facts', async (req: any, res) => {
 
 router.get('/documents', async (req: any, res) => {
   try {
-    const { orgId, userId } = getAuthContext(req);
+    const __auth = getAuthContext(req, res); if (!__auth) return; const { orgId, userId } = __auth;
     const projectId = req.query.modelingProjectId as string | undefined;
     const myDocsOnly = req.query.mine === 'true';
 
@@ -441,7 +448,7 @@ router.get('/documents', async (req: any, res) => {
 
 router.get('/canonical-items', async (req: any, res) => {
   try {
-    const { orgId } = getAuthContext(req);
+    const __auth = getAuthContext(req, res); if (!__auth) return; const { orgId } = __auth;
 
     const items = await db.query.pnlCanonicalLineItems.findMany({
       where: and(eq(pnlCanonicalLineItems.orgId, orgId), eq(pnlCanonicalLineItems.isActive, true)),
@@ -456,7 +463,7 @@ router.get('/canonical-items', async (req: any, res) => {
 
 router.post('/canonical-items/seed', async (req: any, res) => {
   try {
-    const { orgId } = getAuthContext(req);
+    const __auth = getAuthContext(req, res); if (!__auth) return; const { orgId } = __auth;
 
     const DEFAULT_CANONICAL_ITEMS = [
       { section: 'revenue', department: 'Marina', canonicalKey: 'revenue.wet_slip', displayName: 'Wet Slip Revenue', sortOrder: 1 },
@@ -507,7 +514,7 @@ router.post('/canonical-items/seed', async (req: any, res) => {
 
 router.get('/keyword-bank', async (req: any, res) => {
   try {
-    const { orgId } = getAuthContext(req);
+    const __auth = getAuthContext(req, res); if (!__auth) return; const { orgId } = __auth;
 
     const schema = z.object({
       department: z.string().optional(),
@@ -576,7 +583,7 @@ router.get('/keyword-bank', async (req: any, res) => {
 
 router.post('/keyword-bank', async (req: any, res) => {
   try {
-    const { orgId } = getAuthContext(req);
+    const __auth = getAuthContext(req, res); if (!__auth) return; const { orgId } = __auth;
 
     const schema = z.object({
       keyword: z.string().min(1),
@@ -630,7 +637,7 @@ router.post('/keyword-bank', async (req: any, res) => {
 
 router.patch('/keyword-bank/:ruleId', async (req: any, res) => {
   try {
-    const { orgId } = getAuthContext(req);
+    const __auth = getAuthContext(req, res); if (!__auth) return; const { orgId } = __auth;
     const ruleId = String(req.params.ruleId);
 
     const schema = z.object({
@@ -670,7 +677,7 @@ router.patch('/keyword-bank/:ruleId', async (req: any, res) => {
 
 router.delete('/keyword-bank/:ruleId', async (req: any, res) => {
   try {
-    const { orgId } = getAuthContext(req);
+    const __auth = getAuthContext(req, res); if (!__auth) return; const { orgId } = __auth;
     const ruleId = String(req.params.ruleId);
 
     const existingRule = await db.query.pnlKeywordRules.findFirst({
@@ -692,7 +699,7 @@ router.delete('/keyword-bank/:ruleId', async (req: any, res) => {
 
 router.post('/keyword-bank/import', upload.single('file'), async (req: any, res) => {
   try {
-    const { orgId } = getAuthContext(req);
+    const __auth = getAuthContext(req, res); if (!__auth) return; const { orgId } = __auth;
     const isGlobal = req.body.isGlobal === 'true';
 
     const f = req.file;
@@ -718,7 +725,7 @@ router.post('/keyword-bank/import', upload.single('file'), async (req: any, res)
 
 router.post('/keyword-bank/seed-default', async (req: any, res) => {
   try {
-    const { orgId } = getAuthContext(req);
+    const __auth = getAuthContext(req, res); if (!__auth) return; const { orgId } = __auth;
     const isGlobal = req.body.isGlobal === true;
 
     const defaultKeywordBankPath = 'attached_assets/Vantage_PnL_Keyword_Bank_SS3_2023_2024_1766584332411.xlsx';
@@ -743,7 +750,7 @@ router.post('/keyword-bank/seed-default', async (req: any, res) => {
 
 router.get('/marina/:marinaId', async (req: any, res) => {
   try {
-    const { orgId } = getAuthContext(req);
+    const __auth = getAuthContext(req, res); if (!__auth) return; const { orgId } = __auth;
     const marinaId = String(req.params.marinaId);
 
     const schema = z.object({
@@ -778,7 +785,7 @@ router.get('/marina/:marinaId', async (req: any, res) => {
 
 router.get('/marina/:marinaId/time-series', async (req: any, res) => {
   try {
-    const { orgId } = getAuthContext(req);
+    const __auth = getAuthContext(req, res); if (!__auth) return; const { orgId } = __auth;
     const marinaId = String(req.params.marinaId);
 
     const schema = z.object({
@@ -811,7 +818,7 @@ router.get('/marina/:marinaId/time-series', async (req: any, res) => {
 
 router.get('/marina/:marinaId/comparison', async (req: any, res) => {
   try {
-    const { orgId } = getAuthContext(req);
+    const __auth = getAuthContext(req, res); if (!__auth) return; const { orgId } = __auth;
     const marinaId = String(req.params.marinaId);
 
     const schema = z.object({
@@ -844,7 +851,7 @@ router.get('/marina/:marinaId/comparison', async (req: any, res) => {
 
 router.get('/documents/:documentId', async (req: any, res) => {
   try {
-    const { orgId } = getAuthContext(req);
+    const __auth = getAuthContext(req, res); if (!__auth) return; const { orgId } = __auth;
     const documentId = String(req.params.documentId);
 
     const doc = await db.query.pnlDocuments.findFirst({
@@ -905,7 +912,7 @@ router.get('/documents/:documentId', async (req: any, res) => {
 
 router.post('/canonical-items/seed-marina', async (req: any, res) => {
   try {
-    const { orgId } = getAuthContext(req);
+    const __auth = getAuthContext(req, res); if (!__auth) return; const { orgId } = __auth;
 
     const { seedMarinaCoa, getCoaStats } = await import('../../scripts/seedMarinaCoa');
 
@@ -925,7 +932,7 @@ router.post('/canonical-items/seed-marina', async (req: any, res) => {
 
 router.post('/statements/:statementId/approve', async (req: any, res) => {
   try {
-    const { orgId, userId } = getAuthContext(req);
+    const __auth = getAuthContext(req, res); if (!__auth) return; const { orgId, userId } = __auth;
     const statementId = String(req.params.statementId);
 
     const statement = await db.query.pnlParsedStatements.findFirst({
@@ -969,7 +976,7 @@ router.post('/statements/:statementId/approve', async (req: any, res) => {
 
 router.get('/statements/:statementId/lines', async (req: any, res) => {
   try {
-    const { orgId } = getAuthContext(req);
+    const __auth = getAuthContext(req, res); if (!__auth) return; const { orgId } = __auth;
     const statementId = String(req.params.statementId);
 
     const schema = z.object({
@@ -1032,7 +1039,7 @@ router.get('/statements/:statementId/lines', async (req: any, res) => {
 
 router.get('/department-verifications', async (req: any, res) => {
   try {
-    const { orgId } = getAuthContext(req);
+    const __auth = getAuthContext(req, res); if (!__auth) return; const { orgId } = __auth;
     const jobId = req.query.jobId ? String(req.query.jobId) : undefined;
     
     const verifications = await getPendingVerifications(orgId, jobId);
@@ -1045,7 +1052,7 @@ router.get('/department-verifications', async (req: any, res) => {
 
 router.get('/department-verifications/:jobId', async (req: any, res) => {
   try {
-    const { orgId } = getAuthContext(req);
+    const __auth = getAuthContext(req, res); if (!__auth) return; const { orgId } = __auth;
     const jobId = String(req.params.jobId);
     
     const verifications = await getPendingVerifications(orgId, jobId);
@@ -1058,7 +1065,7 @@ router.get('/department-verifications/:jobId', async (req: any, res) => {
 
 router.post('/department-verifications/:id/resolve', async (req: any, res) => {
   try {
-    const { orgId, userId } = getAuthContext(req);
+    const __auth = getAuthContext(req, res); if (!__auth) return; const { orgId, userId } = __auth;
     const verificationId = String(req.params.id);
     
     const schema = z.object({
@@ -1093,7 +1100,7 @@ router.post('/department-verifications/:id/resolve', async (req: any, res) => {
 
 router.post('/department-verifications/:id/skip', async (req: any, res) => {
   try {
-    const { orgId, userId } = getAuthContext(req);
+    const __auth = getAuthContext(req, res); if (!__auth) return; const { orgId, userId } = __auth;
     const verificationId = String(req.params.id);
     
     const verification = await skipDepartmentVerification(verificationId, orgId, userId);
@@ -1107,7 +1114,7 @@ router.post('/department-verifications/:id/skip', async (req: any, res) => {
 
 router.get('/keyword-bank/stats', async (req: any, res) => {
   try {
-    const { orgId } = getAuthContext(req);
+    const __auth = getAuthContext(req, res); if (!__auth) return; const { orgId } = __auth;
     
     const allRules = await getKeywordBankRules(orgId);
     const userVerified = allRules.filter(r => r.source === 'user_verified');
@@ -1139,7 +1146,7 @@ router.get('/keyword-bank/stats', async (req: any, res) => {
 
 router.post('/promote-to-actuals', async (req: any, res) => {
   try {
-    const { orgId } = getAuthContext(req);
+    const __auth = getAuthContext(req, res); if (!__auth) return; const { orgId } = __auth;
     const { modelingProjectId, documentId } = req.body;
 
     if (!modelingProjectId) {
@@ -1160,7 +1167,7 @@ router.post('/promote-to-actuals', async (req: any, res) => {
 // ─── Download original file ───────────────────────────────────
 router.get('/documents/:documentId/download', async (req: any, res) => {
   try {
-    const { orgId } = getAuthContext(req);
+    const __auth = getAuthContext(req, res); if (!__auth) return; const { orgId } = __auth;
     const documentId = String(req.params.documentId);
     const doc = await db.query.pnlDocuments.findFirst({
       where: and(eq(pnlDocuments.id, documentId), eq(pnlDocuments.orgId, orgId)),
@@ -1180,7 +1187,7 @@ router.get('/documents/:documentId/download', async (req: any, res) => {
 // ─── Re-promote: rebuild actuals from existing pnlFacts ───────
 router.post('/re-promote', async (req: any, res) => {
   try {
-    const { orgId } = getAuthContext(req);
+    const __auth = getAuthContext(req, res); if (!__auth) return; const { orgId } = __auth;
     const { modelingProjectId } = req.body;
     if (!modelingProjectId) return res.status(400).json({ error: 'modelingProjectId is required' });
 
@@ -1209,7 +1216,7 @@ router.post('/re-promote', async (req: any, res) => {
 // ─── Re-parse: re-run pipeline from stored file ───────────────
 router.post('/documents/:documentId/reparse', async (req: any, res) => {
   try {
-    const { orgId } = getAuthContext(req);
+    const __auth = getAuthContext(req, res); if (!__auth) return; const { orgId } = __auth;
     const documentId = String(req.params.documentId);
     const doc = await db.query.pnlDocuments.findFirst({
       where: and(eq(pnlDocuments.id, documentId), eq(pnlDocuments.orgId, orgId)),
@@ -1245,7 +1252,7 @@ router.post('/documents/:documentId/reparse', async (req: any, res) => {
 
 router.delete('/documents/:documentId', async (req: any, res) => {
   try {
-    const { orgId } = getAuthContext(req);
+    const __auth = getAuthContext(req, res); if (!__auth) return; const { orgId } = __auth;
     const documentId = String(req.params.documentId);
     const doc = await db.query.pnlDocuments.findFirst({
       where: and(eq(pnlDocuments.id, documentId), eq(pnlDocuments.orgId, orgId)),
@@ -1261,7 +1268,7 @@ router.delete('/documents/:documentId', async (req: any, res) => {
 
 router.delete('/projects/:projectId/purge', async (req: any, res) => {
   try {
-    const { orgId } = getAuthContext(req);
+    const __auth = getAuthContext(req, res); if (!__auth) return; const { orgId } = __auth;
     const projectId = String(req.params.projectId);
     const result = await purgeAllPnlDataForProject(projectId, orgId);
     res.json({ success: true, message: 'All P&L pipeline data purged for this project', ...result });
@@ -1276,7 +1283,7 @@ router.delete('/projects/:projectId/purge', async (req: any, res) => {
 // ─── Seed canonical line items for org ───────────────────────────────────────
 router.post('/seed-canonical', async (req: any, res) => {
   try {
-    const { orgId } = getAuthContext(req);
+    const __auth = getAuthContext(req, res); if (!__auth) return; const { orgId } = __auth;
     const { seedPnlCanonicalItems } = await import('./canonical-seed');
     const result = await seedPnlCanonicalItems(orgId);
     res.json({ success: true, ...result });
@@ -1289,7 +1296,7 @@ router.post('/seed-canonical', async (req: any, res) => {
 // ─── Promote pnlFacts → modelingActuals for a project ────────────────────────
 router.post('/projects/:modelingProjectId/promote', async (req: any, res) => {
   try {
-    const { orgId } = getAuthContext(req);
+    const __auth = getAuthContext(req, res); if (!__auth) return; const { orgId } = __auth;
     const { modelingProjectId } = req.params;
     const { documentId } = req.body;
 
@@ -1305,7 +1312,7 @@ router.post('/projects/:modelingProjectId/promote', async (req: any, res) => {
 // ─── Get pnlFacts summary for a project ──────────────────────────────────────
 router.get('/projects/:modelingProjectId/summary', async (req: any, res) => {
   try {
-    const { orgId } = getAuthContext(req);
+    const __auth = getAuthContext(req, res); if (!__auth) return; const { orgId } = __auth;
     const { modelingProjectId } = req.params;
 
     const { getPnlFactsSummaryForProject } = await import('./project-bridge');
@@ -1320,7 +1327,7 @@ router.get('/projects/:modelingProjectId/summary', async (req: any, res) => {
 // ─── Excel export: Professional P&L Workbook ─────────────────────────────────
 router.get('/jobs/:jobId/export-excel', async (req: any, res) => {
   try {
-    const { orgId } = getAuthContext(req);
+    const __auth = getAuthContext(req, res); if (!__auth) return; const { orgId } = __auth;
     const { jobId } = req.params;
 
     const job = await db.query.pnlJobs.findFirst({

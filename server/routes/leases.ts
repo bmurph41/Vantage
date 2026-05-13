@@ -266,7 +266,7 @@ function getOrgId(req: Request): string {
 }
 
 function getUserId(req: Request): string {
-  return (req as any).user?.id || (req as any).validatedUserId || 'user-1';
+  return (req as any).user?.id || (req as any).validatedUserId || (process.env.NODE_ENV === 'production' ? '' : 'user-1');
 }
 
 function mapRowToLease(row: any) {

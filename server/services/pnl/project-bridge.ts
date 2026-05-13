@@ -23,6 +23,33 @@ import { runPnlPipeline } from './parseOrchestrator';
 import { promotePnlFactsToActuals, type PromoteResult } from './promote-to-actuals';
 import { ensurePnlCanonicalItemsSeeded } from './canonical-seed';
 import { pool } from '../../db';
+import { downloadDocIntelToTempFile, isObjectStorageKey } from '../../utils/doc-intel-storage';
+
+/**
+ * Resolve a doc-intel storage_path to a readable local file. Post-S3 migration
+ * (2026-05-08), storage_path holds an S3 key like "doc-intel/<orgId>/<file>"
+ * rather than a local disk path. This helper hides that detail from callers:
+ *
+ *   - If the path is an S3 key, downloads to /tmp and returns { localPath, cleanup }
+ *   - If the path is a legacy local file, returns the path as-is with a no-op cleanup
+ *
+ * Always call `cleanup()` when done so tmp files don't accumulate.
+ */
+async function materializeStoragePath(
+  storagePath: string,
+  ext: string,
+): Promise<{ localPath: string; cleanup: () => void }> {
+  if (isObjectStorageKey(storagePath)) {
+    const tmpPath = await downloadDocIntelToTempFile(storagePath, ext);
+    return {
+      localPath: tmpPath,
+      cleanup: () => {
+        try { fs.unlinkSync(tmpPath); } catch { /* best-effort */ }
+      },
+    };
+  }
+  return { localPath: storagePath, cleanup: () => {} };
+}
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -101,20 +128,37 @@ export async function importDocIntelToPnlPipeline(
 
   const { storagePath, originalFilename, mimeType, fileSize } = uploadDetails;
 
-  // Verify file exists on disk
-  if (!storagePath || !fs.existsSync(storagePath)) {
-    throw new Error(`File not found on disk: ${storagePath}`);
+  if (!storagePath) {
+    throw new Error(`DocIntel upload ${docIntelUploadId} has no storage_path`);
   }
 
-  // Step 3: Get or create pnlDocument (deduped by SHA256)
-  const sha = await sha256File(storagePath);
+  // Materialize: download from S3 to /tmp if storage_path is an S3 key, else
+  // use the path as-is. cleanup() must be called whether the pipeline succeeds
+  // or throws — done via try/finally below.
+  const ext = path.extname(originalFilename || storagePath) || '';
+  const { localPath, cleanup } = await materializeStoragePath(storagePath, ext);
+  let sha: string;
+  let doc: typeof pnlDocuments.$inferSelect | undefined;
+  try {
+    if (!fs.existsSync(localPath)) {
+      throw new Error(`File not accessible after materialization: ${localPath} (original ${storagePath})`);
+    }
 
-  let doc = await db.query.pnlDocuments.findFirst({
-    where: and(
-      eq(pnlDocuments.orgId, orgId),
-      eq(pnlDocuments.sha256, sha)
-    ),
-  });
+    // Step 3: Get or create pnlDocument (deduped by SHA256)
+    sha = await sha256File(localPath);
+
+    doc = await db.query.pnlDocuments.findFirst({
+      where: and(
+        eq(pnlDocuments.orgId, orgId),
+        eq(pnlDocuments.sha256, sha)
+      ),
+    });
+  } finally {
+    // sha256 + lookup complete; the orchestrator below will re-materialize from
+    // the canonical storage_path (stored as the ORIGINAL S3 key or local path,
+    // not the tmp) so the tmp file is safe to remove now.
+    cleanup();
+  }
 
   if (!doc) {
     const [created] = await db
@@ -126,7 +170,11 @@ export async function importDocIntelToPnlPipeline(
         mimeType,
         byteSize: fileSize,
         sha256: sha,
-        storagePath: path.resolve(storagePath),
+        // Persist the original storage_path (S3 key or local) so downstream
+        // consumers go back through materializeStoragePath() rather than a
+        // stale tmp path. path.resolve() is a no-op for S3 keys (the leading
+        // segment is preserved) but normalizes legacy local paths.
+        storagePath: isObjectStorageKey(storagePath) ? storagePath : path.resolve(storagePath),
         statementType: 'pnl',
         meta: { sourceUploadId: docIntelUploadId },
       })

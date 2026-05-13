@@ -19,35 +19,34 @@ export interface AuthenticatedRequest extends Request {
   };
 }
 
+const isProduction = process.env.NODE_ENV === 'production';
+
 export function extractOrgId(req: AuthenticatedRequest): string | null {
-  const orgId = req.tenantId 
-    || req.orgId 
-    || req.user?.orgId 
-    || req.session?.user?.orgId 
+  const orgId = req.tenantId
+    || req.orgId
+    || req.user?.orgId
+    || req.session?.user?.orgId
     || req.session?.orgId;
-  
-  if (!orgId || orgId === 'org-1' || orgId === 'default-org') {
-    const actualOrg = req.tenantId || req.orgId || req.user?.orgId || req.session?.orgId;
-    if (!actualOrg) {
-      return null;
-    }
-    return actualOrg;
+
+  if (!orgId) return null;
+
+  // Reject mock dev identifiers in production. Matches auth-resolver.ts:36-38.
+  if (orgId === 'org-1' || orgId === 'default-org') {
+    return isProduction ? null : orgId;
   }
-  
+
   return orgId;
 }
 
 export function extractUserId(req: AuthenticatedRequest): string | null {
   const userId = req.user?.id || req.session?.userId || req.session?.user?.id;
-  
-  if (!userId || userId === 'user-1' || userId === 'system') {
-    const actualUser = req.user?.id || req.session?.userId;
-    if (!actualUser) {
-      return null;
-    }
-    return actualUser;
+
+  if (!userId) return null;
+
+  if (userId === 'user-1' || userId === 'system') {
+    return isProduction ? null : userId;
   }
-  
+
   return userId;
 }
 

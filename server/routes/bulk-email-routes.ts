@@ -5,8 +5,21 @@ import { getSendGridClient } from '../services/email-service';
 
 const router = Router();
 
+const isProd = process.env.NODE_ENV === 'production';
+function resolveIdentity(req: Request, res: Response): { orgId: string; userId: string } | null {
+  const orgId = (req as any).user?.orgId ?? (isProd ? null : 'org-1');
+  const userId = (req as any).user?.id ?? (isProd ? null : 'user-1');
+  if (!orgId || !userId) {
+    res.status(401).json({ error: 'Authentication required', code: 'MISSING_IDENTITY' });
+    return null;
+  }
+  return { orgId, userId };
+}
+
 router.post('/bulk-email/send', async (req: Request, res: Response) => {
   try {
+    const identity = resolveIdentity(req, res);
+    if (!identity) return;
     const { contactIds, templateId, subject, htmlBody, fromName } = req.body as {
       contactIds: string[];
       templateId?: string;
@@ -64,7 +77,7 @@ router.post('/bulk-email/send', async (req: Request, res: Response) => {
     try {
       await db.execute(
         sql`INSERT INTO crm_bulk_email_logs (id, org_id, sent_by_id, subject, body, recipient_count, sent_count, failed_count, status, error_details, created_at)
-            VALUES (gen_random_uuid(), 'org-1', NULL, ${subject}, ${htmlBody}, ${contactIds.length}, ${sent}, ${failed}, 'completed', ${JSON.stringify(errors)}::jsonb, NOW())`
+            VALUES (gen_random_uuid(), ${identity.orgId}, ${identity.userId}, ${subject}, ${htmlBody}, ${contactIds.length}, ${sent}, ${failed}, 'completed', ${JSON.stringify(errors)}::jsonb, NOW())`
       );
     } catch (_logErr) {
       // Log table may not exist yet; non-critical
@@ -120,6 +133,8 @@ router.get('/email-templates', async (_req: Request, res: Response) => {
 
 router.post('/email-templates', async (req: Request, res: Response) => {
   try {
+    const identity = resolveIdentity(req, res);
+    if (!identity) return;
     const { name, subject, body } = req.body as { name: string; subject: string; body: string };
 
     if (!name || !subject || !body) {
@@ -128,7 +143,7 @@ router.post('/email-templates', async (req: Request, res: Response) => {
 
     const result = await db.execute(
       sql`INSERT INTO crm_email_templates (name, subject, content, created_by_id, org_id)
-          VALUES (${name}, ${subject}, ${body}, 'user-1', 'org-1')
+          VALUES (${name}, ${subject}, ${body}, ${identity.userId}, ${identity.orgId})
           RETURNING id, name, subject, content AS body, created_at AS "createdAt"`
     );
 

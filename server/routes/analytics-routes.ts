@@ -2109,7 +2109,8 @@ router.post('/report-schedules', async (req: Request, res: Response) => {
   try {
     const orgId = (req as any).user?.orgId || (req as any).tenantId || (req as any).orgId;
     if (!orgId) return res.status(401).json({ error: 'Unauthorized' });
-    const userId = (req as any).userId || 'user-1';
+    const userId = (req as any).userId || (process.env.NODE_ENV === 'production' ? '' : 'user-1');
+    if (!userId) return res.status(401).json({ error: 'Authentication required' });
     
     const data = reportScheduleSchema.parse(req.body);
     const nextRunAt = calculateNextRunAt(data.frequency, data.dayOfWeek, data.dayOfMonth, data.timeOfDay);

@@ -27,6 +27,19 @@ import { resolveDealContext } from '../services/deal-context-resolver';
 
 const router = Router();
 
+// Dev-only identity fallbacks. Returns 401 in production when the caller has
+// no authenticated identity, matching auth-resolver.ts:36-38 semantics.
+const isProd = process.env.NODE_ENV === 'production';
+function resolveIdentity(req: Request, res: Response): { orgId: string; userId: string } | null {
+  const orgId = (req as any).user?.orgId ?? (isProd ? null : 'org-1');
+  const userId = (req as any).user?.id ?? (isProd ? null : 'user-1');
+  if (!orgId || !userId) {
+    res.status(401).json({ error: 'Authentication required', code: 'MISSING_IDENTITY' });
+    return null;
+  }
+  return { orgId, userId };
+}
+
 // ─── Bootstrap schema on first import ────────────────────────────────────────
 ensureKnowledgeBaseSchema().catch(err =>
   console.error('[AI Routes] Schema bootstrap error:', err)
@@ -44,8 +57,9 @@ router.get('/context-summary', async (req: Request, res: Response) => {
       return res.json({ summary: null });
     }
 
-    const orgId = (req as any).user?.orgId ?? 'org-1';
-    const result = await resolveDealContext(orgId, { dealId, modelingProjectId, workspaceId });
+    const identity = resolveIdentity(req, res);
+    if (!identity) return;
+    const result = await resolveDealContext(identity.orgId, { dealId, modelingProjectId, workspaceId });
 
     return res.json({ summary: result?.summary ?? null });
   } catch (error: any) {
@@ -77,8 +91,9 @@ router.post('/chat', async (req: Request, res: Response) => {
     if (!message?.trim()) return res.status(400).json({ error: 'Message is required' });
     if (!context?.currentPage) return res.status(400).json({ error: 'Context.currentPage is required' });
 
-    const userId = (req as any).user?.id ?? 'user-1';
-    const orgId = (req as any).user?.orgId ?? 'org-1';
+    const identity = resolveIdentity(req, res);
+    if (!identity) return;
+    const { orgId, userId } = identity;
 
     const enrichedContext: AssistantContext = {
       ...context,
@@ -141,8 +156,9 @@ router.post('/chat/stream', async (req: Request, res: Response) => {
     if (!message?.trim()) return res.status(400).json({ error: 'Message is required' });
     if (!context?.currentPage) return res.status(400).json({ error: 'Context.currentPage is required' });
 
-    const userId = (req as any).user?.id ?? 'user-1';
-    const orgId = (req as any).user?.orgId ?? 'org-1';
+    const identity = resolveIdentity(req, res);
+    if (!identity) return;
+    const { orgId, userId } = identity;
 
     const enrichedContext: AssistantContext = {
       ...context,
@@ -215,8 +231,9 @@ router.post('/compare', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Maximum 4 entities can be compared at once' });
     }
 
-    const userId = (req as any).user?.id ?? 'user-1';
-    const orgId = (req as any).user?.orgId ?? 'org-1';
+    const identity = resolveIdentity(req, res);
+    if (!identity) return;
+    const { orgId, userId } = identity;
 
     const comparisonContext: AssistantContext = {
       currentPage: '/crm/deals',
@@ -255,8 +272,9 @@ router.post('/evaluate-criteria', async (req: Request, res: Response) => {
 
     if (!entityId) return res.status(400).json({ error: 'entityId is required' });
 
-    const userId = (req as any).user?.id ?? 'user-1';
-    const orgId = (req as any).user?.orgId ?? 'org-1';
+    const identity = resolveIdentity(req, res);
+    if (!identity) return;
+    const { orgId, userId } = identity;
 
     const evalContext: AssistantContext = {
       currentPage: '/crm/deals',
@@ -310,8 +328,9 @@ router.post('/feedback', async (req: Request, res: Response) => {
     if (!messageId || !rating) return res.status(400).json({ error: 'messageId and rating are required' });
     if (!['positive', 'negative'].includes(rating)) return res.status(400).json({ error: 'rating must be positive or negative' });
 
-    const userId = (req as any).user?.id ?? 'user-1';
-    const orgId = (req as any).user?.orgId ?? 'org-1';
+    const identity = resolveIdentity(req, res);
+    if (!identity) return;
+    const { orgId, userId } = identity;
 
     const feedback = await recordFeedback({
       userId, orgId, messageId, rating,
@@ -340,8 +359,9 @@ router.post('/feedback', async (req: Request, res: Response) => {
 
 router.get('/feedback/stats', async (req: Request, res: Response) => {
   try {
-    const orgId = (req as any).user?.orgId ?? 'org-1';
-    const stats = await getFeedbackStats(orgId);
+    const identity = resolveIdentity(req, res);
+    if (!identity) return;
+    const stats = await getFeedbackStats(identity.orgId);
     return res.json(stats);
   } catch (error: any) {
     return res.status(500).json({ error: 'Failed to get feedback stats' });

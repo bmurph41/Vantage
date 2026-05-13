@@ -76,7 +76,8 @@ router.post('/playbooks', async (req: Request, res: Response) => {
   try {
     const orgId = (req as any).user?.orgId || (req as any).tenantId || (req as any).orgId;
     if (!orgId) return res.status(401).json({ error: 'Unauthorized' });
-    const userId = (req as any).userId || 'user-1';
+    const userId = (req as any).userId || (process.env.NODE_ENV === 'production' ? '' : 'user-1');
+    if (!userId) return res.status(401).json({ error: 'Authentication required' });
 
     const parsed = insertCrmPlaybookSchema.safeParse({
       ...req.body,
@@ -310,7 +311,8 @@ router.post('/deals/:dealId/apply-playbook/:playbookId', async (req: Request, re
 router.patch('/deals/:dealId/playbook-progress/:progressId', async (req: Request, res: Response) => {
   try {
     const { progressId } = req.params;
-    const userId = (req as any).userId || 'user-1';
+    const userId = (req as any).userId || (process.env.NODE_ENV === 'production' ? '' : 'user-1');
+    if (!userId) return res.status(401).json({ error: 'Authentication required' });
     const { status, notes, skippedReason } = req.body;
 
     const updateData: any = {
@@ -414,7 +416,8 @@ router.post('/playbooks/from-template/:templateId', async (req: Request, res: Re
     const { templateId } = req.params;
     const orgId = (req as any).user?.orgId || (req as any).tenantId || (req as any).orgId;
     if (!orgId) return res.status(401).json({ error: 'Unauthorized' });
-    const userId = (req as any).userId || 'user-1';
+    const userId = (req as any).userId || (process.env.NODE_ENV === 'production' ? '' : 'user-1');
+    if (!userId) return res.status(401).json({ error: 'Authentication required' });
     const { pipelineId, stageId, name, description } = req.body;
 
     const templatesResponse = await fetch(`http://localhost:${process.env.PORT || 5000}/api/crm/playbook-templates`);
