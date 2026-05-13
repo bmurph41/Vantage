@@ -18,18 +18,29 @@
  */
 
 import { useMemo, useState } from 'react';
-import { AlertCircle, AlertTriangle, Check, Loader2, RefreshCw, Sparkles, Calendar } from 'lucide-react';
+import { AlertCircle, AlertTriangle, Check, Layers, Loader2, RefreshCw, Sparkles, Calendar } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from '@/components/ui/sheet';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Switch } from '@/components/ui/switch';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { formatCurrency } from '@/lib/utils';
 import { useConsolidatedPnL, useApplyAdjustments } from '@/hooks/useConsolidatedPnL';
+import { useModelingAddbacks, type Addback } from '@/hooks/useModelingAddbacks';
 import type {
   AdjustmentMasterState,
+  AddbackToggle,
   ConsolidatedLineItem,
   ConsolidatedPnLOptions,
   ConsolidatedPnLResponse,
@@ -161,15 +172,50 @@ function VarianceCell({ base, current }: { base: number | null; current: number 
 export function ConsolidatedPnLView({ projectId, onNavigateToInputs }: Props) {
   const [yearRange, setYearRange] = useState<YearRangeMode>('calendar');
   const [pendingMaster, setPendingMaster] = useState<AdjustmentMasterState | null>(null);
+  const [pendingTogglesByAddbackId, setPendingTogglesByAddbackId] = useState<Map<string, boolean>>(new Map());
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   const options: ConsolidatedPnLOptions = useMemo(() => ({ yearRange }), [yearRange]);
   const { data, isLoading, isError, refetch, isFetching } = useConsolidatedPnL(projectId, options);
   const apply = useApplyAdjustments(projectId);
+  const { addbacks, isLoading: addbacksLoading } = useModelingAddbacks(projectId);
 
   const effectiveMaster: AdjustmentMasterState =
     pendingMaster ?? data?.masterState ?? 'all_on';
 
-  const dirty = pendingMaster !== null && pendingMaster !== data?.masterState;
+  // Resolve the desired isActive for an addback, taking into account
+  // (1) any explicit per-addback override the user toggled in the drawer,
+  // (2) the pending master state if user changed it,
+  // (3) the server-persisted isActive as fallback.
+  const resolveAddbackState = (a: Addback): boolean => {
+    if (pendingTogglesByAddbackId.has(a.id)) {
+      return pendingTogglesByAddbackId.get(a.id)!;
+    }
+    if (pendingMaster === 'all_on') return true;
+    if (pendingMaster === 'all_off') return false;
+    return a.isActive;
+  };
+
+  // Only-divergent payload: send addbacks whose resolved state differs
+  // from server-persisted isActive. "Leave alone" semantics verified against
+  // adjustment-apply-service.ts (Phase 0).
+  const pendingTogglesArray = useMemo<AddbackToggle[]>(() => {
+    const out: AddbackToggle[] = [];
+    for (const a of addbacks) {
+      const target = pendingTogglesByAddbackId.has(a.id)
+        ? pendingTogglesByAddbackId.get(a.id)!
+        : pendingMaster === 'all_on'
+          ? true
+          : pendingMaster === 'all_off'
+            ? false
+            : a.isActive;
+      if (target !== a.isActive) out.push({ addbackId: a.id, isActive: target });
+    }
+    return out;
+  }, [addbacks, pendingMaster, pendingTogglesByAddbackId]);
+
+  const masterDirty = pendingMaster !== null && pendingMaster !== data?.masterState;
+  const dirty = masterDirty || pendingTogglesArray.length > 0;
 
   const projectedSet = useMemo<Set<ProjectedKey>>(() => {
     if (!data) return new Set();
@@ -249,6 +295,14 @@ export function ConsolidatedPnLView({ projectId, onNavigateToInputs }: Props) {
     projectedSet,
     projectionByYear,
     isFetching,
+    addbacks,
+    addbacksLoading,
+    pendingTogglesByAddbackId,
+    setPendingTogglesByAddbackId,
+    pendingTogglesArray,
+    drawerOpen,
+    setDrawerOpen,
+    resolveAddbackState,
   });
 }
 
@@ -264,6 +318,14 @@ interface RenderArgs {
   projectedSet: Set<ProjectedKey>;
   projectionByYear: Map<number, YearProjectionInfo>;
   isFetching: boolean;
+  addbacks: Addback[];
+  addbacksLoading: boolean;
+  pendingTogglesByAddbackId: Map<string, boolean>;
+  setPendingTogglesByAddbackId: React.Dispatch<React.SetStateAction<Map<string, boolean>>>;
+  pendingTogglesArray: AddbackToggle[];
+  drawerOpen: boolean;
+  setDrawerOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  resolveAddbackState: (a: Addback) => boolean;
 }
 
 function renderView(args: RenderArgs) {
@@ -271,18 +333,53 @@ function renderView(args: RenderArgs) {
     data, yearRange, setYearRange,
     effectiveMaster, setPendingMaster, dirty, apply, pendingMaster,
     projectedSet, projectionByYear, isFetching,
+    addbacks, addbacksLoading,
+    pendingTogglesByAddbackId, setPendingTogglesByAddbackId,
+    pendingTogglesArray, drawerOpen, setDrawerOpen,
+    resolveAddbackState,
   } = args;
 
   const lines = sortLines(data.lineItems);
   const baselineYear = data.years[0]?.year;
 
+  // Master toggle change. When user picks all_on / all_off, clear per-addback
+  // overrides so the master state "wins" for all addbacks. When user picks
+  // 'custom', preserve existing overrides (drawer falls back to server state
+  // for un-touched addbacks).
+  const handleMasterChange = (next: AdjustmentMasterState) => {
+    setPendingMaster(next);
+    if (next === 'all_on' || next === 'all_off') {
+      setPendingTogglesByAddbackId(new Map());
+    }
+  };
+
+  // Individual toggle from the drawer. Sets per-addback override and flips
+  // master to 'custom' if it wasn't already (so the master dropdown reflects
+  // the divergence from a bulk-set state).
+  const handleIndividualToggle = (addbackId: string, next: boolean) => {
+    setPendingTogglesByAddbackId((prev) => {
+      const m = new Map(prev);
+      m.set(addbackId, next);
+      return m;
+    });
+    if (effectiveMaster !== 'custom') {
+      setPendingMaster('custom');
+    }
+  };
+
   const handleApply = () => {
     apply.mutate(
       {
-        addbackToggles: [],
-        masterStateChange: pendingMaster ?? effectiveMaster,
+        addbackToggles: pendingTogglesArray,
+        masterStateChange: pendingMaster ?? undefined,
       },
-      { onSuccess: () => setPendingMaster(null) },
+      {
+        onSuccess: () => {
+          setPendingMaster(null);
+          setPendingTogglesByAddbackId(new Map());
+          setDrawerOpen(false);
+        },
+      },
     );
   };
 
@@ -316,7 +413,7 @@ function renderView(args: RenderArgs) {
               Adjustments:
               <Select
                 value={effectiveMaster}
-                onValueChange={(v) => setPendingMaster(v as AdjustmentMasterState)}
+                onValueChange={(v) => handleMasterChange(v as AdjustmentMasterState)}
               >
                 <SelectTrigger className="w-32 h-8" data-testid="master-state-select">
                   <SelectValue />
@@ -328,6 +425,105 @@ function renderView(args: RenderArgs) {
                 </SelectContent>
               </Select>
             </div>
+
+            <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
+              <SheetTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 gap-1.5"
+                  disabled={addbacks.length === 0 && !addbacksLoading}
+                  data-testid="open-addback-drawer"
+                >
+                  <Layers className="h-3.5 w-3.5" />
+                  Manage individual
+                  {pendingTogglesArray.length > 0 && (
+                    <Badge variant="secondary" className="h-4 px-1 text-[10px] ml-0.5" data-testid="pending-toggle-count">
+                      {pendingTogglesArray.length}
+                    </Badge>
+                  )}
+                </Button>
+              </SheetTrigger>
+              <SheetContent
+                side="right"
+                className="w-full sm:w-[480px] sm:max-w-[480px] overflow-y-auto"
+                data-testid="addback-drawer"
+              >
+                <SheetHeader>
+                  <SheetTitle>Manage individual addbacks</SheetTitle>
+                  <SheetDescription className="text-xs">
+                    Toggle individual addbacks below. Changes here flip the master state to{' '}
+                    <span className="font-semibold">Custom</span> and are sent on the next{' '}
+                    <span className="font-semibold">Apply to Pro Forma</span>.
+                  </SheetDescription>
+                </SheetHeader>
+
+                {addbacksLoading ? (
+                  <div className="space-y-2 mt-4" data-testid="addback-drawer-loading">
+                    <Skeleton className="h-12 w-full" />
+                    <Skeleton className="h-12 w-full" />
+                    <Skeleton className="h-12 w-full" />
+                  </div>
+                ) : addbacks.length === 0 ? (
+                  <div
+                    className="text-center py-8 text-muted-foreground mt-4"
+                    data-testid="addback-drawer-empty"
+                  >
+                    <p className="text-sm">No addbacks defined for this project yet.</p>
+                    <p className="text-xs mt-2">
+                      Open the <span className="font-semibold">Single Year</span> or{' '}
+                      <span className="font-semibold">All Years</span> view of Historical P&amp;L
+                      and click the addback icon next to any line item to create one.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-1 mt-4">
+                    {addbacks.map((addback) => {
+                      const resolved = resolveAddbackState(addback);
+                      const diverges = resolved !== addback.isActive;
+                      const scopeLabel =
+                        addback.scope === 'line_item' ? 'Line'
+                        : addback.scope === 'category' ? 'Category'
+                        : 'Month';
+                      return (
+                        <div
+                          key={addback.id}
+                          className="flex items-start gap-3 p-2 rounded-md hover:bg-muted/40 border border-transparent hover:border-border"
+                          data-testid={`addback-row-${addback.id}`}
+                        >
+                          <Switch
+                            checked={resolved}
+                            onCheckedChange={(v) => handleIndividualToggle(addback.id, v)}
+                            className="mt-0.5 shrink-0"
+                            data-testid={`addback-toggle-${addback.id}`}
+                          />
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-medium truncate">{addback.lineItemLabel}</div>
+                            <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                              {addback.category && (
+                                <span className="text-[10px] text-muted-foreground">{addback.category}</span>
+                              )}
+                              <Badge variant="outline" className="h-4 px-1 text-[10px]">
+                                {scopeLabel}
+                              </Badge>
+                              {diverges && (
+                                <Badge
+                                  variant="outline"
+                                  className="h-4 px-1 text-[10px] border-amber-500 text-amber-700"
+                                  data-testid={`addback-pending-${addback.id}`}
+                                >
+                                  Pending
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </SheetContent>
+            </Sheet>
 
             <Button
               size="sm"
