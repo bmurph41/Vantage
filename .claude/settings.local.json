@@ -320,7 +320,8 @@
       "Bash(echo \"shared tsc exit=$?\")",
       "Bash(NODE_OPTIONS=\"--max-old-space-size=4096\" npx tsc --noEmit --skipLibCheck --target ES2022 --module ESNext --moduleResolution bundler --strict --esModuleInterop --resolveJsonModule --jsx preserve --baseUrl . --paths '{\"@shared/*\":[\"shared/*\"]}' server/services/adjustment-apply-service.ts)",
       "Bash(NODE_OPTIONS=\"--max-old-space-size=4096\" npx tsc -p /tmp/tsconfig-svc.json)",
-      "Bash(NODE_OPTIONS=\"--max-old-space-size=4096\" npx tsc --noEmit --skipLibCheck --target ES2022 --module ESNext --moduleResolution bundler --strict --esModuleInterop --resolveJsonModule --jsx preserve --baseUrl . --paths '{\"@shared/*\":[\"shared/*\"]}' server/services/canonical-actuals-loader.ts)"
+      "Bash(NODE_OPTIONS=\"--max-old-space-size=4096\" npx tsc --noEmit --skipLibCheck --target ES2022 --module ESNext --moduleResolution bundler --strict --esModuleInterop --resolveJsonModule --jsx preserve --baseUrl . --paths '{\"@shared/*\":[\"shared/*\"]}' server/services/canonical-actuals-loader.ts)",
+      "Bash(xargs -I '{}' sed -n '{}p; {},$p' /home/runner/workspace/shared/schema.ts)"
     ]
   }
 }

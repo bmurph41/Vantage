@@ -298,12 +298,21 @@ function BlockDrawer({
         pushToCalendar: form.push_to_calendar,
       };
       if (isEdit) {
-        return apiRequest("PATCH", `/api/prospecting/time-blocks/${drawerState.block!.id}`, payload);
+        const res = await apiRequest("PATCH", `/api/prospecting/time-blocks/${drawerState.block!.id}`, payload);
+        return res.json();
       }
-      return apiRequest("POST", "/api/prospecting/time-blocks", payload);
+      const res = await apiRequest("POST", "/api/prospecting/time-blocks", payload);
+      return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (data: { calendarError?: string }) => {
       toast({ title: isEdit ? "Block updated" : "Block created" });
+      if (data?.calendarError) {
+        toast({
+          title: "Calendar sync failed",
+          description: data.calendarError,
+          variant: "destructive",
+        });
+      }
       onSaved();
       onClose();
     },

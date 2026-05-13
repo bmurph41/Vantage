@@ -247,9 +247,9 @@ router.patch('/:id', async (req: AuthenticatedRequest, res: Response) => {
     }
 
     // Push to Google Calendar if requested and not already synced
+    let calendarError: string | null = null;
     if (pushToCalendar && !updated.synced_to_calendar) {
       try {
-        const { rows: [inviterUser] } = await pool.query(`SELECT email, name FROM users WHERE id = $1`, [userId]);
         const attendeeEmails: string[] = [];
         if (updated.invited_user_ids?.length) {
           const { rows: attendees } = await pool.query(
@@ -260,11 +260,10 @@ router.patch('/:id', async (req: AuthenticatedRequest, res: Response) => {
         }
         const calEvent = await createCalendarEvent({
           title: updated.title,
-          startAt: updated.start_at,
-          endAt: updated.end_at,
-          notes: updated.notes,
-          attendeeEmails,
-          organizerEmail: inviterUser?.email,
+          startDate: updated.start_at,
+          endDate: updated.end_at,
+          description: updated.notes ?? undefined,
+          attendees: attendeeEmails,
         });
         await pool.query(
           `UPDATE prospecting_time_blocks SET synced_to_calendar = true, google_calendar_event_id = $1 WHERE id = $2`,
@@ -272,12 +271,12 @@ router.patch('/:id', async (req: AuthenticatedRequest, res: Response) => {
         );
         updated.synced_to_calendar = true;
         updated.google_calendar_event_id = calEvent?.id ?? null;
-      } catch (_calErr) {
-        // Non-fatal — block was saved; calendar push failed silently
+      } catch (calErr) {
+        calendarError = calErr instanceof Error ? calErr.message : 'Calendar push failed';
       }
     }
 
-    res.json(updated);
+    res.json({ ...updated, calendarError });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Internal server error';
     res.status(msg === 'Unauthorized' ? 401 : 500).json({ error: msg });
