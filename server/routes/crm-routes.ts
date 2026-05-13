@@ -13968,7 +13968,11 @@ export function registerCRMRoutes(
           .from(organizations)
           .where(eq(organizations.id, orgId));
         const orgAssetClasses: string[] = orgRow?.assetClasses ?? [];
-        if (!orgAssetClasses.includes(canonicalAssetClass)) {
+        // Grandfather: an empty assetClasses array means the org has not yet
+        // completed the onboarding-wizard asset-class step (or pre-dates the
+        // entitlement column). Fall through and allow — the operations
+        // resolver applies the same pattern (operations-module-resolver.ts:110).
+        if (orgAssetClasses.length > 0 && !orgAssetClasses.includes(canonicalAssetClass)) {
           return res.status(403).json({
             error: 'Asset class not in your plan',
             message: `Your current plan does not include "${canonicalAssetClass.replace(/_/g, ' ')}" projects. Please upgrade your plan to add this asset class.`,
@@ -14042,6 +14046,22 @@ export function registerCRMRoutes(
               assetClass: normalizedAssetClass,
             })
             .where(eq(crmDeals.id, dealIdToUse));
+        }
+
+        // Self-seed organizations.asset_classes when a non-null canonical class
+        // is used. This is additive (array_cat with NULLIF DISTINCT) so orgs
+        // that skipped the onboarding wizard accumulate their entitlements as
+        // projects are created, instead of staying empty forever and depending
+        // on the grandfather branch in the gate above.
+        if (canonicalAssetClass) {
+          await tx.execute(sql`
+            UPDATE organizations
+               SET asset_classes = (
+                 SELECT ARRAY(SELECT DISTINCT unnest(COALESCE(asset_classes, '{}'::text[]) || ARRAY[${canonicalAssetClass}]::text[]))
+               )
+             WHERE id = ${orgId}
+               AND NOT (COALESCE(asset_classes, '{}'::text[]) @> ARRAY[${canonicalAssetClass}]::text[])
+          `);
         }
 
         return project;
