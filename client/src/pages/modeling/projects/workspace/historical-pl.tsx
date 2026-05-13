@@ -1567,11 +1567,11 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                                   key={month} 
                                   className={`text-right whitespace-nowrap px-2 py-1.5 text-xs ${!isSeasonalMonth(idx) ? 'bg-muted/70' : 'bg-muted'}`}
                                 >
-                                  {formatCurrency(revenue - cogs, { dash: true })}
+                                  {fmtCell(revenue - cogs, revenue)}
                                 </TableCell>
                               );
                             })}
-                            <TableCell className="text-right whitespace-nowrap px-2 py-1.5 text-xs bg-muted">{formatCurrency(getAdjustedCategoryAnnualTotal('Revenue') - getAdjustedCategoryAnnualTotal('COGS'), { dash: true })}</TableCell>
+                            <TableCell className="text-right whitespace-nowrap px-2 py-1.5 text-xs bg-muted">{fmtCell(getAdjustedCategoryAnnualTotal('Revenue') - getAdjustedCategoryAnnualTotal('COGS'), getAdjustedCategoryAnnualTotal('Revenue'))}</TableCell>
                           </TableRow>
                           <TableRow className="bg-muted/30">
                             <TableCell className="whitespace-nowrap sticky left-0 z-10 bg-background border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] text-xs text-muted-foreground w-[15%] min-w-[140px] max-w-[200px] px-3 py-1">Gross Profit Margin</TableCell>

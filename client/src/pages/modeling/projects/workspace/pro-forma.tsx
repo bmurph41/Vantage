@@ -1675,7 +1675,10 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
 
                           <TableCell className="text-right text-muted-foreground">
                             {viewMode === 'monthly' ? (
-                              formatCurrency(months.reduce((sum, _, monthIndex) => sum + calculateMonthSummary(selectedYearInt, monthIndex).grossProfit, 0), { dash: true })
+                              fmtCell(
+                                months.reduce((sum, _, mi) => sum + calculateMonthSummary(selectedYearInt, mi).grossProfit, 0),
+                                months.reduce((sum, _, mi) => sum + calculateMonthSummary(selectedYearInt, mi).revenue, 0)
+                              )
                             ) : (
                               formatPercent(calculateCAGR(
                                 calculateYearSummary(0).grossProfit,
@@ -1741,12 +1744,10 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                         {/* CAGR or Annual Total */}
                         <TableCell className="text-right text-muted-foreground">
                           {viewMode === 'monthly' ? (
-                            // Show annual total for the selected year
-                            formatCurrency(
-                              months.reduce((sum, _, monthIndex) => {
-                                return sum + getMonthlyTotal(category, selectedYearInt, monthIndex);
-                              }, 0)
-                            , { dash: true })
+                            fmtCell(
+                              months.reduce((sum, _, mi) => sum + getMonthlyTotal(category, selectedYearInt, mi), 0),
+                              months.reduce((sum, _, mi) => sum + getMonthlyTotal('Revenue', selectedYearInt, mi), 0)
+                            )
                           ) : (
                             formatPercent(calculateCAGR(
                               getCategoryProjectedTotal(category, 0),
@@ -1990,10 +1991,10 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
 
                                   <TableCell className="text-right text-xs text-muted-foreground">
                                     {viewMode === 'monthly' ? (
-                                      formatCurrency(
-                                        months.reduce((sum, _, monthIndex) => 
-                                          sum + getLineItemMonthlyValue(category, itemName, selectedYearInt, monthIndex), 0)
-                                      , { dash: true })
+                                      fmtCell(
+                                        months.reduce((sum, _, mi) => sum + getLineItemMonthlyValue(category, itemName, selectedYearInt, mi), 0),
+                                        months.reduce((sum, _, mi) => sum + getMonthlyTotal('Revenue', selectedYearInt, mi), 0)
+                                      )
                                     ) : (
                                       formatPercent(calculateCAGR(
                                         values.projected[0],
@@ -2110,16 +2111,17 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                         {viewMode === 'monthly' ? (
                           months.map((_, monthIndex) => {
                             const summary = calculateMonthSummary(selectedYearInt, monthIndex);
+                            const mRev = getMonthlyTotal('Revenue', selectedYearInt, monthIndex);
                             return (
                               <TableCell key={monthIndex} className={`text-right text-red-500 text-[11px] ${isSeasonalMonth(monthIndex) ? 'bg-green-50 dark:bg-green-950/30' : ''}`}>
-                                ({formatCurrency(summary.managementFee, { dash: true })})
+                                {showPctRev ? fmtCell(summary.managementFee, mRev) : `(${formatCurrency(summary.managementFee, { dash: true })})`}
                               </TableCell>
                             );
                           })
                         ) : (
                           years.map((_, i) => {
                             const summary = calculateYearSummary(i);
-                            return <TableCell key={i} className="text-right text-red-500 text-[11px]">({formatCurrency(summary.managementFee, { dash: true })})</TableCell>;
+                            return <TableCell key={i} className="text-right text-red-500 text-[11px]">{showPctRev ? fmtCell(summary.managementFee, getCategoryProjectedTotal('Revenue', i)) : `(${formatCurrency(summary.managementFee, { dash: true })})`}</TableCell>;
                           })
                         )}
                         <TableCell className="text-right text-muted-foreground">-</TableCell>
@@ -2135,16 +2137,17 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                         {viewMode === 'monthly' ? (
                           months.map((_, monthIndex) => {
                             const summary = calculateMonthSummary(selectedYearInt, monthIndex);
+                            const mRev = getMonthlyTotal('Revenue', selectedYearInt, monthIndex);
                             return (
                               <TableCell key={monthIndex} className={`text-right text-red-500 text-[11px] ${isSeasonalMonth(monthIndex) ? 'bg-green-50 dark:bg-green-950/30' : ''}`}>
-                                ({formatCurrency(summary.capex, { dash: true })})
+                                {showPctRev ? fmtCell(summary.capex, mRev) : `(${formatCurrency(summary.capex, { dash: true })})`}
                               </TableCell>
                             );
                           })
                         ) : (
                           years.map((_, i) => {
                             const summary = calculateYearSummary(i);
-                            return <TableCell key={i} className="text-right text-red-500 text-[11px]">({formatCurrency(summary.capex, { dash: true })})</TableCell>;
+                            return <TableCell key={i} className="text-right text-red-500 text-[11px]">{showPctRev ? fmtCell(summary.capex, getCategoryProjectedTotal('Revenue', i)) : `(${formatCurrency(summary.capex, { dash: true })})`}</TableCell>;
                           })
                         )}
                         <TableCell className="text-right text-muted-foreground">-</TableCell>
@@ -2160,16 +2163,17 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                         {viewMode === 'monthly' ? (
                           months.map((_, monthIndex) => {
                             const summary = calculateMonthSummary(selectedYearInt, monthIndex);
+                            const mRev = getMonthlyTotal('Revenue', selectedYearInt, monthIndex);
                             return (
                               <TableCell key={monthIndex} className={`text-right text-red-500 text-[11px] ${isSeasonalMonth(monthIndex) ? 'bg-green-50 dark:bg-green-950/30' : ''}`}>
-                                ({formatCurrency(summary.reserves, { dash: true })})
+                                {showPctRev ? fmtCell(summary.reserves, mRev) : `(${formatCurrency(summary.reserves, { dash: true })})`}
                               </TableCell>
                             );
                           })
                         ) : (
                           years.map((_, i) => {
                             const summary = calculateYearSummary(i);
-                            return <TableCell key={i} className="text-right text-red-500 text-[11px]">({formatCurrency(summary.reserves, { dash: true })})</TableCell>;
+                            return <TableCell key={i} className="text-right text-red-500 text-[11px]">{showPctRev ? fmtCell(summary.reserves, getCategoryProjectedTotal('Revenue', i)) : `(${formatCurrency(summary.reserves, { dash: true })})`}</TableCell>;
                           })
                         )}
                         <TableCell className="text-right text-muted-foreground">-</TableCell>
@@ -2226,7 +2230,10 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
 
                   <TableCell className="text-right text-green-600">
                     {viewMode === 'monthly' ? (
-                      formatCurrency(months.reduce((sum, _, monthIndex) => sum + calculateMonthSummary(selectedYearInt, monthIndex).noi, 0), { dash: true })
+                      fmtCell(
+                        months.reduce((sum, _, mi) => sum + calculateMonthSummary(selectedYearInt, mi).noi, 0),
+                        months.reduce((sum, _, mi) => sum + calculateMonthSummary(selectedYearInt, mi).revenue, 0)
+                      )
                     ) : (
                       formatPercent(calculateCAGR(
                         calculateYearSummary(0).noi,
@@ -2538,7 +2545,10 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                     )}
                     <TableCell className="text-right text-amber-700 dark:text-amber-400">
                       {viewMode === 'monthly' ? (
-                        formatCurrency(months.reduce((sum, _, monthIndex) => sum + calculateMonthSummary(selectedYearInt, monthIndex).cashFlowBeforeDebtService, 0), { dash: true })
+                        fmtCell(
+                          months.reduce((sum, _, mi) => sum + calculateMonthSummary(selectedYearInt, mi).cashFlowBeforeDebtService, 0),
+                          months.reduce((sum, _, mi) => sum + calculateMonthSummary(selectedYearInt, mi).revenue, 0)
+                        )
                       ) : (
                         formatPercent(calculateCAGR(
                           calculateYearSummary(0).cashFlowBeforeDebtService,
@@ -2600,7 +2610,10 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                     )}
                     <TableCell className="text-right text-emerald-600">
                       {viewMode === 'monthly' ? (
-                        formatCurrency(months.reduce((sum, _, monthIndex) => sum + calculateMonthSummary(selectedYearInt, monthIndex).leveredCashFlow, 0), { dash: true })
+                        fmtCell(
+                          months.reduce((sum, _, mi) => sum + calculateMonthSummary(selectedYearInt, mi).leveredCashFlow, 0),
+                          months.reduce((sum, _, mi) => sum + calculateMonthSummary(selectedYearInt, mi).revenue, 0)
+                        )
                       ) : (
                         formatPercent(calculateCAGR(
                           calculateYearSummary(0).leveredCashFlow,
