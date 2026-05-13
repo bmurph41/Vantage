@@ -45,3 +45,4 @@ tmp/
 
 # Claude Code config (contains API keys / session tokens)
 /.claude-user
+/.claude/settings.local.json
