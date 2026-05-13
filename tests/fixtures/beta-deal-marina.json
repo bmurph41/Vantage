@@ -50,7 +50,8 @@
   },
   "capitalStack": {
     "totalDebt": 8125000,
-    "blendedDebtRate": 6.5,
+    "blendedDebtRate": 0.065,
+    "_blendedDebtRateNote": "Stored as decimal (0.065 = 6.5%). The DCF calculator multiplies totalDebt × blendedDebtRate directly for annual debt service.",
     "holdPeriodYears": 10,
     "lpEquityPct": 90,
     "gpEquityPct": 10,
