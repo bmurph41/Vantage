@@ -7,6 +7,7 @@ import { useHoldPeriod } from '@/hooks/use-hold-period';
 import { getProFormaConfig } from '@shared/pro-forma-config';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { RevenueSourceToggle } from '@/components/modeling/RevenueSourceToggle';
+import { ModelingKpiStrip } from '@/components/modeling/ModelingKpiStrip';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -310,8 +311,14 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
   const [showHistorical, setShowHistorical] = useState(true);
   const [selectedKPI, setSelectedKPI] = useState<KPIDrilldownType>(null);
   const [editMode, setEditMode] = useState(false);
+  const [showPctRev, setShowPctRev] = useState(false);
   const [editingDepartment, setEditingDepartment] = useState<{ department: string; category: 'Revenue' | 'COGS' | 'Expenses' } | null>(null);
   const { toast } = useToast();
+  const { data: project } = useQuery<any>({
+    queryKey: [`/api/modeling/projects/${projectId}`],
+  });
+  const fmtCell = (value: number, rev: number) =>
+    showPctRev ? (rev > 0 ? formatPercent((value / rev) * 100, { dash: true }) : '—') : formatCurrency(value, { dash: true });
 
   // ─── Ad-hoc line item state ─────────────────────────────────────────
   const [addingLineItem, setAddingLineItem] = useState<{ category: string; department: string } | null>(null);
@@ -1070,6 +1077,11 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
 
       {/* Revenue Source Toggle */}
       <RevenueSourceToggle projectId={projectId} />
+      {/* Asset-Class KPI Strip */}
+      <ModelingKpiStrip
+        proFormaData={proFormaData}
+        assetClass={(project as any)?.assetClass ?? (project as any)?.asset_class}
+      />
 
       {/* Document Status Banner */}
       {!hasHistoricalData && (
@@ -1506,9 +1518,19 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                 }
               </CardDescription>
             </div>
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Calendar className="h-4 w-4" />
-              <span>Hold Period: {holdPeriod} years</span>
+            <div className="flex items-center gap-2">
+              <Button
+                variant={showPctRev ? "default" : "outline"}
+                size="sm"
+                onClick={() => setShowPctRev(!showPctRev)}
+                className="h-8 text-xs font-mono"
+              >
+                % Rev
+              </Button>
+              <span className="text-sm text-muted-foreground flex items-center gap-1.5">
+                <Calendar className="h-4 w-4" />
+                Hold Period: {holdPeriod} years
+              </span>
             </div>
           </div>
         </CardHeader>
@@ -1616,13 +1638,13 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                             const summary = calculatePeriodSummary(period.id);
                             return (
                               <TableCell key={period.id} className="text-right bg-blue-100/60 dark:bg-blue-950/30 text-blue-900 dark:text-blue-100">
-                                {formatCurrency(summary.grossProfit, { dash: true })}
+                                {fmtCell(summary.grossProfit, getCategoryTotal('Revenue', period.id))}
                               </TableCell>
                             );
                           })}
 
                           <TableCell className="text-right bg-blue-100 dark:bg-blue-900/30 border-x border-blue-200 dark:border-blue-800">
-                            {formatCurrency(baselineSummary?.grossProfit, { dash: true })}
+                            {fmtCell(baselineSummary?.grossProfit ?? 0, baselineSummary?.revenue || 0)}
                           </TableCell>
 
                           {viewMode === 'monthly' ? (
@@ -1633,7 +1655,7 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                                   key={monthIndex} 
                                   className={`text-right ${isSeasonalMonth(monthIndex) ? 'bg-green-50 dark:bg-green-950/30' : ''}`}
                                 >
-                                  {formatCurrency(summary.grossProfit, { dash: true })}
+                                  {fmtCell(summary.grossProfit, getMonthlyTotal('Revenue', selectedYearInt, monthIndex))}
                                 </TableCell>
                               );
                             })
@@ -1641,7 +1663,7 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                             years.map((_, i) => {
                               const summary = calculateYearSummary(i);
                               return (
-                                <TableCell key={i} className="text-right">{formatCurrency(summary.grossProfit, { dash: true })}</TableCell>
+                                <TableCell key={i} className="text-right">{fmtCell(summary.grossProfit, getCategoryProjectedTotal('Revenue', i))}</TableCell>
                               );
                             })
                           )}
@@ -1679,13 +1701,13 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                         {/* Historical totals - blue tint for actuals */}
                         {showHistorical && priorPeriods.map(period => (
                           <TableCell key={period.id} className="text-right font-bold bg-blue-50/60 dark:bg-blue-950/20 text-blue-900 dark:text-blue-100">
-                            {formatCurrency(getCategoryTotal(category, period.id), { dash: true })}
+                            {fmtCell(getCategoryTotal(category, period.id), getCategoryTotal('Revenue', period.id))}
                           </TableCell>
                         ))}
 
                         {/* Baseline total */}
                         <TableCell className="text-right font-bold bg-blue-50 dark:bg-blue-950/30 border-x border-blue-200 dark:border-blue-800">
-                          {formatCurrency(baselineTotal, { dash: true })}
+                          {fmtCell(baselineTotal, baselineSummary?.revenue || 0)}
                         </TableCell>
 
                         {/* Projected totals - Monthly or Annual */}
@@ -1698,7 +1720,7 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                                 key={monthIndex} 
                                 className={`text-right font-bold ${isSeasonalMonth(monthIndex) ? 'bg-green-50 dark:bg-green-950/30' : ''}`}
                               >
-                                {formatCurrency(value, { dash: true })}
+                                {fmtCell(value, getMonthlyTotal('Revenue', selectedYearInt, monthIndex))}
                               </TableCell>
                             );
                           })
@@ -1706,7 +1728,7 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                           // Annual totals
                           years.map((_, i) => (
                             <TableCell key={i} className="text-right font-bold">
-                              {formatCurrency(getCategoryProjectedTotal(category, i), { dash: true })}
+                              {fmtCell(getCategoryProjectedTotal(category, i), getCategoryProjectedTotal('Revenue', i))}
                             </TableCell>
                           ))
                         )}
@@ -1822,13 +1844,13 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                                 const deptHistTotal = Object.values(deptItems).reduce((sum, v) => sum + (v.historical[period.id] || 0), 0);
                                 return (
                                   <TableCell key={period.id} className="text-right text-xs font-medium text-muted-foreground bg-blue-50/60 dark:bg-blue-950/20">
-                                    {formatCurrency(deptHistTotal, { dash: true })}
+                                    {fmtCell(deptHistTotal, getCategoryTotal('Revenue', period.id))}
                                   </TableCell>
                                 );
                               })}
 
                               <TableCell className="text-right text-xs font-medium text-muted-foreground bg-blue-50 dark:bg-blue-950/30 border-x border-blue-200 dark:border-blue-800">
-                                {formatCurrency(baselinePeriod ? Object.values(deptItems).reduce((sum, v) => sum + (v.historical[baselinePeriod.id] || 0), 0) : 0, { dash: true })}
+                                {fmtCell(baselinePeriod ? Object.values(deptItems).reduce((sum, v) => sum + (v.historical[baselinePeriod.id] || 0), 0) : 0, baselineSummary?.revenue || 0)}
                               </TableCell>
 
                               {viewMode === 'monthly' ? (
@@ -1837,7 +1859,7 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                                     sum + getLineItemMonthlyValue(category, itemName, selectedYearInt, monthIndex), 0);
                                   return (
                                     <TableCell key={monthIndex} className={`text-right text-xs font-medium text-muted-foreground ${isSeasonalMonth(monthIndex) ? 'bg-green-50/60 dark:bg-green-950/20' : ''}`}>
-                                      {formatCurrency(deptMonthTotal, { dash: true })}
+                                      {fmtCell(deptMonthTotal, getMonthlyTotal('Revenue', selectedYearInt, monthIndex))}
                                     </TableCell>
                                   );
                                 })
@@ -1846,7 +1868,7 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                                   const deptYearTotal = Object.values(deptItems).reduce((sum, v) => sum + (v.projected[i] || 0), 0);
                                   return (
                                     <TableCell key={i} className="text-right text-xs font-medium text-muted-foreground">
-                                      {formatCurrency(deptYearTotal, { dash: true })}
+                                      {fmtCell(deptYearTotal, getCategoryProjectedTotal('Revenue', i))}
                                     </TableCell>
                                   );
                                 })
@@ -1933,12 +1955,12 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
 
                                   {showHistorical && priorPeriods.map(period => (
                                     <TableCell key={period.id} className="text-right bg-blue-50/60 dark:bg-blue-950/20 text-blue-900 dark:text-blue-100">
-                                      {formatCurrency(values.historical[period.id], { dash: true })}
+                                      {fmtCell(values.historical[period.id] || 0, getCategoryTotal('Revenue', period.id))}
                                     </TableCell>
                                   ))}
 
                                   <TableCell className="text-right bg-blue-50 dark:bg-blue-950/30 border-x border-blue-200 dark:border-blue-800">
-                                    {formatCurrency(baselineValue, { dash: true })}
+                                    {fmtCell(baselineValue, baselineSummary?.revenue || 0)}
                                   </TableCell>
 
                                   {viewMode === 'monthly' ? (
@@ -1949,14 +1971,14 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                                           key={monthIndex} 
                                           className={`text-right ${isSeasonalMonth(monthIndex) ? 'bg-green-50 dark:bg-green-950/30' : ''}`}
                                         >
-                                          {formatCurrency(monthValue, { dash: true })}
+                                          {fmtCell(monthValue, getMonthlyTotal('Revenue', selectedYearInt, monthIndex))}
                                         </TableCell>
                                       );
                                     })
                                   ) : (
                                     values.projected.map((value: number, i: number) => (
                                       <TableCell key={i} className="text-right">
-                                        {formatCurrency(value, { dash: true })}
+                                        {fmtCell(value, getCategoryProjectedTotal('Revenue', i))}
                                       </TableCell>
                                     ))
                                   )}
@@ -2162,13 +2184,13 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                         key={period.id} 
                         className={`text-right bg-blue-100/60 dark:bg-blue-950/30 ${summary.noi >= 0 ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'}`}
                       >
-                        {formatCurrency(summary.noi, { dash: true })}
+                        {fmtCell(summary.noi, getCategoryTotal('Revenue', period.id))}
                       </TableCell>
                     );
                   })}
 
                   <TableCell className={`text-right bg-blue-100 dark:bg-blue-900/30 border-x border-blue-200 dark:border-blue-800 ${(baselineSummary?.noi || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    {formatCurrency(baselineSummary?.noi, { dash: true })}
+                    {fmtCell(baselineSummary?.noi ?? 0, baselineSummary?.revenue || 0)}
                   </TableCell>
 
                   {viewMode === 'monthly' ? (
@@ -2179,7 +2201,7 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                           key={monthIndex} 
                           className={`text-right ${isSeasonalMonth(monthIndex) ? 'bg-green-50 dark:bg-green-950/30' : ''} ${summary.noi >= 0 ? 'text-green-600' : 'text-red-600'}`}
                         >
-                          {formatCurrency(summary.noi, { dash: true })}
+                          {fmtCell(summary.noi, getMonthlyTotal('Revenue', selectedYearInt, monthIndex))}
                         </TableCell>
                       );
                     })
@@ -2191,7 +2213,7 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                           key={i} 
                           className={`text-right ${summary.noi >= 0 ? 'text-green-600' : 'text-red-600'}`}
                         >
-                          {formatCurrency(summary.noi, { dash: true })}
+                          {fmtCell(summary.noi, getCategoryProjectedTotal('Revenue', i))}
                         </TableCell>
                       );
                     })
@@ -2252,6 +2274,41 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
 
                   <TableCell className="text-right text-muted-foreground">-</TableCell>
                 </TableRow>
+
+                {viewMode === 'annual' && (() => {
+                  const m = (proFormaData as any)?.metrics;
+                  if (!m) return null;
+                  const kmRows = [
+                    { label: 'Going-In Cap Rate', value: m.goingInCapRate != null ? formatPercent(m.goingInCapRate, { dash: true }) : null },
+                    { label: 'Exit Cap Rate',      value: m.exitCapRate     != null ? formatPercent(m.exitCapRate,     { dash: true }) : null },
+                    { label: 'IRR',                value: m.irr             != null ? formatPercent(m.irr,             { dash: true }) : null },
+                    { label: 'Equity Multiple',    value: m.equityMultiple  != null ? `${Number(m.equityMultiple).toFixed(2)}x`        : null },
+                    { label: 'Exit Value',         value: m.exitValue       != null ? formatCurrency(m.exitValue,      { dash: true }) : null },
+                  ].filter(r => r.value != null);
+                  if (kmRows.length === 0) return null;
+                  return (
+                    <>
+                      <TableRow className="border-t-2 bg-amber-50/40 dark:bg-amber-950/20">
+                        <TableCell colSpan={100} className="sticky left-0 z-10 ws-section-label ws-section-label--compact py-1 text-amber-700 dark:text-amber-400">
+                          Key Metrics
+                        </TableCell>
+                      </TableRow>
+                      {kmRows.map(row => (
+                        <TableRow key={row.label} className="bg-amber-50/20 dark:bg-amber-950/10">
+                          <TableCell className="sticky left-0 bg-background text-muted-foreground z-10">{row.label}</TableCell>
+                          {showHistorical && priorPeriods.map(p => (
+                            <TableCell key={p.id} className="text-right bg-blue-50/60 dark:bg-blue-950/20 text-muted-foreground">—</TableCell>
+                          ))}
+                          <TableCell className="text-right bg-blue-50 dark:bg-blue-950/30 border-x border-blue-200 dark:border-blue-800 text-muted-foreground">—</TableCell>
+                          {years.map((_, i) => (
+                            <TableCell key={i} className="text-right text-muted-foreground">—</TableCell>
+                          ))}
+                          <TableCell className="text-right font-semibold text-amber-700 dark:text-amber-400">{row.value}</TableCell>
+                        </TableRow>
+                      ))}
+                    </>
+                  );
+                })()}
 
                 <>
                   {(linePositions.managementFee === 'below' || linePositions.capex === 'below' || linePositions.reserves === 'below') && (

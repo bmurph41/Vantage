@@ -163,6 +163,9 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
   const [showCategoryGrowth, setShowCategoryGrowth] = useState(true);
   const [showDepartmentGrowth, setShowDepartmentGrowth] = useState(false);
   const [showLineItemGrowth, setShowLineItemGrowth] = useState(false);
+  const [showPctRev, setShowPctRev] = useState(false);
+  const fmtCell = (value: number, rev: number) =>
+    showPctRev ? (rev > 0 ? formatPercent((value / rev) * 100, { dash: true }) : '—') : formatCurrency(value, { dash: true });
   const { revenueCogsOrder, expensesOrder, updateRevenueCogsOrder, updateExpensesOrder, resetRevenueCogsOrder, resetExpensesOrder, sortDepartments } = useDepartmentOrder();
 
   const { 
@@ -974,6 +977,14 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
               <CardDescription className="text-xs">Click category rows to expand/collapse line items</CardDescription>
             </div>
             <div className="flex items-center gap-3 flex-wrap">
+              <Button
+                variant={showPctRev ? "default" : "outline"}
+                size="sm"
+                onClick={() => setShowPctRev(!showPctRev)}
+                className="h-8 text-xs font-mono"
+              >
+                % Rev
+              </Button>
               {viewMode === 'single' && displayMode === 'annual' && (
                 <>
                   <TooltipProvider>
@@ -1637,7 +1648,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                               className={`text-right font-semibold whitespace-nowrap px-2 py-1.5 text-xs ${!isSeasonalMonth(idx) ? 'bg-muted/30' : 'bg-background'}`}
                             >
                               <div className="flex flex-col items-end">
-                                <span className="text-xs">{formatCurrency(value, { dash: true })}</span>
+                                <span className="text-xs">{fmtCell(value, getAdjustedCategoryTotal('Revenue', month, idx))}</span>
                                 {showMoM && momChange !== null && idx > 0 && (
                                   <span className={`text-xs ${momChange >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                                     {momChange >= 0 ? '+' : ''}{momChange.toFixed(0)}%
@@ -1648,7 +1659,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                           );
                         })}
                         <TableCell className="text-right font-bold bg-background whitespace-nowrap px-2 py-1.5 text-xs">
-                          {formatCurrency(getAdjustedCategoryAnnualTotal(category), { dash: true })}
+                          {fmtCell(getAdjustedCategoryAnnualTotal(category), getAdjustedCategoryAnnualTotal('Revenue'))}
                         </TableCell>
                       </TableRow>
 
@@ -1700,14 +1711,14 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                                 const deptTotal = deptItems.reduce((sum: number, item: PLLineItem) => sum + getAdjustedMonthlyValue(item, month, idx), 0);
                                 return (
                                   <TableCell key={month} className={`text-right whitespace-nowrap px-2 py-1 text-xs font-medium text-muted-foreground/80 ${!isSeasonalMonth(idx) ? 'bg-slate-50 dark:bg-slate-900' : 'bg-slate-100 dark:bg-slate-800'}`}>
-                                    {formatCurrency(deptTotal, { dash: true })}
+                                    {fmtCell(deptTotal, getAdjustedCategoryTotal('Revenue', month, idx))}
                                   </TableCell>
                                 );
                               })}
                               <TableCell className="text-right whitespace-nowrap px-2 py-1 text-xs font-medium text-muted-foreground/80 bg-slate-100 dark:bg-slate-800">
-                                {formatCurrency(deptItems.reduce((sum: number, item: PLLineItem) => {
+                                {fmtCell(deptItems.reduce((sum: number, item: PLLineItem) => {
                                   return months.reduce((itemSum, month, idx) => itemSum + getAdjustedMonthlyValue(item, month, idx), 0);
-                                }, 0), { dash: true })}
+                                }, 0), getAdjustedCategoryAnnualTotal('Revenue'))}
                               </TableCell>
                             </TableRow>
 
@@ -1915,7 +1926,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                                       >
                                         <div className="flex items-center justify-end gap-0.5">
                                           <span className={`text-xs ${isAnyAddback && displayValue !== rawValue ? 'text-amber-700 dark:text-amber-400 font-medium' : ''}`}>
-                                            {formatCurrency(displayValue, { dash: true })}
+                                            {fmtCell(displayValue, getAdjustedCategoryTotal('Revenue', month, idx))}
                                           </span>
                                           {isLineAddedBack && !isCellAddedBack && lineAddback && (
                                             <Tooltip>
@@ -1989,7 +2000,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                                     );
                                   })}
                                   <TableCell className="text-right font-medium whitespace-nowrap px-2 py-1 text-xs">
-                                    {formatCurrency(months.reduce((sum, month, idx) => sum + getAdjustedMonthlyValue(item, month, idx), 0), { dash: true })}
+                                    {fmtCell(months.reduce((sum, month, idx) => sum + getAdjustedMonthlyValue(item, month, idx), 0), getAdjustedCategoryAnnualTotal('Revenue'))}
                                   </TableCell>
                                 </TableRow>
                               );
@@ -2013,7 +2024,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                           key={month} 
                           className={`text-right whitespace-nowrap px-2 py-1.5 text-xs bg-primary/10 ${noi >= 0 ? 'text-green-600' : 'text-red-600'} ${!isSeasonalMonth(idx) ? 'opacity-60' : ''}`}
                         >
-                          {formatCurrency(noi, { dash: true })}
+                          {fmtCell(noi, revenue)}
                         </TableCell>
                       );
                     })}
@@ -2021,7 +2032,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                       const displayNOI = getAdjustedCategoryAnnualTotal('Revenue') - getAdjustedCategoryAnnualTotal('COGS') - getAdjustedCategoryAnnualTotal('Expenses');
                       return (
                         <TableCell className={`text-right whitespace-nowrap px-2 py-1.5 text-xs bg-primary/10 ${displayNOI >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                          {formatCurrency(displayNOI, { dash: true })}
+                          {fmtCell(displayNOI, getAdjustedCategoryAnnualTotal('Revenue'))}
                         </TableCell>
                       );
                     })()}
