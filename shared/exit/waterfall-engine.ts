@@ -173,28 +173,37 @@ export function calculateWaterfall(input: WaterfallInput): WaterfallResult {
   let carriedInterestPaid = 0;
   if (remainingProceeds > 0) {
     if (input.customTiers && input.customTiers.length > 0) {
-      for (const tier of input.customTiers) {
-        if (remainingProceeds <= 0) break;
-        
-        // Round LP share, then derive GP as remainder to prevent floating-point drift
-        const lpShare = Math.round(remainingProceeds * tier.lpSplit * 100) / 100;
-        const gpShare = Math.round((remainingProceeds - lpShare) * 100) / 100;
-        
-        cumulativeLp += lpShare;
-        cumulativeGp += gpShare;
-        carriedInterestPaid += gpShare;
-        
-        distributions.push({
-          tier: tier.name,
-          lpAmount: lpShare,
-          gpAmount: gpShare,
-          totalAmount: remainingProceeds,
-          cumulativeLpAmount: cumulativeLp,
-          cumulativeGpAmount: cumulativeGp,
-        });
-        
-        remainingProceeds = 0;
+      // SEMANTIC GAP — customTiers carry a hurdleRate field intended to gate
+      // each tier on a cumulative-LP-IRR breakpoint (e.g., tier-1 splits apply
+      // until LP IRR = 10%, then tier-2 until 15%, etc.). The IRR-bracket
+      // allocator is NOT implemented today. Until it is, we use the LAST tier
+      // (highest hurdle) when multiple are provided, since real waterfalls
+      // typically increase GP share at each higher hurdle and the LAST tier
+      // is the strictest. A console.warn surfaces this so it isn't silent.
+      if (input.customTiers.length > 1) {
+        // eslint-disable-next-line no-console
+        console.warn(
+          `[waterfall-engine] customTiers length=${input.customTiers.length} but IRR-bracket gating is not implemented; using last tier "${input.customTiers[input.customTiers.length - 1].name}" splits for the full remainder. Spec gap: project_waterfall_irr_hurdle_brackets.md`,
+        );
       }
+      const tier = input.customTiers[input.customTiers.length - 1];
+      const lpShare = Math.round(remainingProceeds * tier.lpSplit * 100) / 100;
+      const gpShare = Math.round((remainingProceeds - lpShare) * 100) / 100;
+
+      cumulativeLp += lpShare;
+      cumulativeGp += gpShare;
+      carriedInterestPaid += gpShare;
+
+      distributions.push({
+        tier: tier.name,
+        lpAmount: lpShare,
+        gpAmount: gpShare,
+        totalAmount: remainingProceeds,
+        cumulativeLpAmount: cumulativeLp,
+        cumulativeGpAmount: cumulativeGp,
+      });
+
+      remainingProceeds = 0;
     } else {
       const lpShare = remainingProceeds * input.lpSplit;
       const gpShare = remainingProceeds * input.gpSplit;
