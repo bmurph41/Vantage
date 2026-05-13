@@ -95,8 +95,27 @@ router.post('/', async (req: AuthenticatedRequest, res: Response) => {
       notes?: string; color?: string; invitedUserIds?: string[]; pushToCalendar?: boolean;
     };
 
+    const VALID_BLOCK_TYPES = [
+      'prospecting_call', 'site_tour', 'loi_review', 'team_meeting', 'admin', 'other',
+    ];
     if (!title || !startAt || !endAt) {
       return res.status(400).json({ error: 'title, startAt, endAt are required' });
+    }
+    const resolvedBlockType = VALID_BLOCK_TYPES.includes(blockType) ? blockType : 'other';
+    const startMs = new Date(startAt).getTime();
+    const endMs = new Date(endAt).getTime();
+    if (isNaN(startMs) || isNaN(endMs) || endMs <= startMs) {
+      return res.status(400).json({ error: 'endAt must be after startAt' });
+    }
+
+    // Validate invitees belong to the same org
+    if (invitedUserIds.length > 0) {
+      const { rows: validUsers } = await pool.query(
+        `SELECT id FROM users WHERE id = ANY($1::uuid[]) AND org_id = $2`,
+        [invitedUserIds, orgId]
+      );
+      const validIds = validUsers.map((u: { id: string }) => u.id);
+      invitedUserIds = invitedUserIds.filter((id) => validIds.includes(id));
     }
 
     const { rows: [block] } = await pool.query(
@@ -104,7 +123,7 @@ router.post('/', async (req: AuthenticatedRequest, res: Response) => {
          (org_id, created_by, title, block_type, start_at, end_at, notes, color, invited_user_ids)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
        RETURNING *`,
-      [orgId, userId, title, blockType, startAt, endAt, notes ?? null, color, JSON.stringify(invitedUserIds)]
+      [orgId, userId, title, resolvedBlockType, startAt, endAt, notes ?? null, color, JSON.stringify(invitedUserIds)]
     );
 
     // Notify invited team members
@@ -169,13 +188,35 @@ router.patch('/:id', async (req: AuthenticatedRequest, res: Response) => {
       params.push(val);
     };
 
+    const VALID_BLOCK_TYPES = [
+      'prospecting_call', 'site_tour', 'loi_review', 'team_meeting', 'admin', 'other',
+    ];
+    if (startAt !== undefined && endAt !== undefined) {
+      const sMs = new Date(startAt).getTime();
+      const eMs = new Date(endAt).getTime();
+      if (isNaN(sMs) || isNaN(eMs) || eMs <= sMs) {
+        return res.status(400).json({ error: 'endAt must be after startAt' });
+      }
+    }
+
+    // Validate invitees belong to the same org
+    let safeInvitees = invitedUserIds;
+    if (safeInvitees && safeInvitees.length > 0) {
+      const { rows: validUsers } = await pool.query(
+        `SELECT id FROM users WHERE id = ANY($1::uuid[]) AND org_id = $2`,
+        [safeInvitees, orgId]
+      );
+      const validIds = validUsers.map((u: { id: string }) => u.id);
+      safeInvitees = safeInvitees.filter((id) => validIds.includes(id));
+    }
+
     if (title !== undefined) addField('title', title);
-    if (blockType !== undefined) addField('block_type', blockType);
+    if (blockType !== undefined) addField('block_type', VALID_BLOCK_TYPES.includes(blockType) ? blockType : 'other');
     if (startAt !== undefined) addField('start_at', startAt);
     if (endAt !== undefined) addField('end_at', endAt);
     if (notes !== undefined) addField('notes', notes);
     if (color !== undefined) addField('color', color);
-    if (invitedUserIds !== undefined) addField('invited_user_ids', JSON.stringify(invitedUserIds));
+    if (safeInvitees !== undefined) addField('invited_user_ids', JSON.stringify(safeInvitees));
     updates.push(`updated_at = NOW()`);
 
     if (updates.length === 1) return res.status(400).json({ error: 'No fields to update' });
@@ -187,9 +228,9 @@ router.patch('/:id', async (req: AuthenticatedRequest, res: Response) => {
     );
 
     // Notify newly added invitees
-    if (invitedUserIds && invitedUserIds.length > 0) {
+    if (safeInvitees && safeInvitees.length > 0) {
       const prevIds: string[] = Array.isArray(existing.invited_user_ids) ? existing.invited_user_ids : [];
-      const newInvitees = invitedUserIds.filter((uid: string) => !prevIds.includes(uid));
+      const newInvitees = safeInvitees.filter((uid: string) => !prevIds.includes(uid));
       if (newInvitees.length > 0) {
         await notifyInvitees(newInvitees, orgId, userId, id, updated.title ?? existing.title);
       }

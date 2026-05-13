@@ -1,3 +1,4 @@
+import { ProspectingNav } from "./ProspectingNav";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -194,6 +195,7 @@ export default function ProspectingOverview() {
   return (
     <div className="flex-1 overflow-auto p-6 bg-gray-50">
       <div className="max-w-7xl mx-auto">
+        <ProspectingNav />
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-2xl font-bold text-gray-900" data-testid="page-title">Prospecting Overview</h1>

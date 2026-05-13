@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   format, startOfWeek, addDays, addWeeks, subWeeks,
@@ -36,7 +36,7 @@ import {
   ExternalLink,
   Clock,
 } from "lucide-react";
-import { Link } from "wouter";
+import { ProspectingNav } from "./ProspectingNav";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -104,48 +104,22 @@ function buildIso(dateStr: string, timeStr: string): string {
   return new Date(`${dateStr}T${timeStr}:00`).toISOString();
 }
 
-// ── Prospecting Nav ───────────────────────────────────────────────────────────
-
-const PROSPECTING_TABS = [
-  { label: "Overview",  href: "/prospecting" },
-  { label: "Workroom",  href: "/prospecting/workroom" },
-  { label: "Markets",   href: "/prospecting/markets" },
-  { label: "Campaigns", href: "/prospecting/campaigns" },
-  { label: "Schedule",  href: "/prospecting/schedule" },
-];
-
-function ProspectingNav({ active }: { active: string }) {
-  return (
-    <div className="flex gap-1 border-b mb-6">
-      {PROSPECTING_TABS.map((t) => (
-        <Link key={t.href} href={t.href}>
-          <button
-            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-              active === t.href
-                ? "border-blue-600 text-blue-700"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            {t.label}
-          </button>
-        </Link>
-      ))}
-    </div>
-  );
-}
-
 // ── Draggable block chip ──────────────────────────────────────────────────────
 
 function DraggableBlockChip({
   block,
   onClick,
   onCalendarPush,
+  onResizeStart,
   isDragging,
+  heightOverride,
 }: {
   block: TimeBlock;
   onClick: (b: TimeBlock) => void;
   onCalendarPush: (id: string) => void;
+  onResizeStart: (blockId: string, startY: number, origEndAtMs: number) => void;
   isDragging?: boolean;
+  heightOverride?: number;
 }) {
   const { attributes, listeners, setNodeRef, transform } = useDraggable({
     id: block.id,
@@ -153,7 +127,7 @@ function DraggableBlockChip({
   });
 
   const top = blockTop(block.start_at);
-  const height = blockHeight(block.start_at, block.end_at);
+  const height = heightOverride ?? blockHeight(block.start_at, block.end_at);
   const color = typeColor(block.block_type, block.color);
 
   const style = transform
@@ -173,12 +147,12 @@ function DraggableBlockChip({
       }}
       className="absolute left-1 right-1 rounded px-1.5 py-1 overflow-hidden shadow-sm border-l-4 select-none group"
     >
-      {/* Drag handle — covers most of the chip */}
+      {/* Drag handle — covers most of the chip (not bottom resize zone) */}
       <div
         {...listeners}
         {...attributes}
-        className="absolute inset-0 cursor-grab active:cursor-grabbing"
-        style={{ zIndex: 1 }}
+        className="absolute inset-x-0 top-0 cursor-grab active:cursor-grabbing"
+        style={{ zIndex: 1, bottom: 10 }}
       />
 
       {/* Content — on top of drag handle */}
@@ -216,6 +190,18 @@ function DraggableBlockChip({
           style={{ color }}
         />
       )}
+
+      {/* Resize handle — bottom edge */}
+      <div
+        className="absolute inset-x-0 bottom-0 h-2.5 z-30 cursor-ns-resize opacity-0 group-hover:opacity-100 flex items-center justify-center"
+        onMouseDown={(e) => {
+          e.stopPropagation();
+          e.preventDefault();
+          onResizeStart(block.id, e.clientY, new Date(block.end_at).getTime());
+        }}
+      >
+        <div className="w-6 h-0.5 rounded-full bg-current opacity-40" style={{ color }} />
+      </div>
     </div>
   );
 }
@@ -514,6 +500,8 @@ export default function Schedule() {
   const [selectedDay, setSelectedDay] = useState<Date>(new Date());
   const [drawer, setDrawer] = useState<DrawerState>({ open: false, mode: "create" });
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
+  const [resizeHeights, setResizeHeights] = useState<Record<string, number>>({});
+  const resizeRef = useRef<{ blockId: string; startY: number; origEndAtMs: number; origHeight: number } | null>(null);
 
   const weekEnd = addDays(weekStart, 7);
 
@@ -594,6 +582,66 @@ export default function Schedule() {
     },
     onError: () => toast({ title: "Delete failed", variant: "destructive" }),
   });
+
+  const resizeMutation = useMutation({
+    mutationFn: async ({ id, endAt }: { id: string; endAt: string }) => {
+      return apiRequest("PATCH", `/api/prospecting/time-blocks/${id}`, { endAt });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/prospecting/time-blocks"] });
+    },
+    onError: () => {
+      toast({ title: "Resize failed", variant: "destructive" });
+      queryClient.invalidateQueries({ queryKey: ["/api/prospecting/time-blocks"] });
+    },
+  });
+
+  const handleResizeStart = useCallback((blockId: string, startY: number, origEndAtMs: number) => {
+    const block = blocks.find((b) => b.id === blockId);
+    if (!block) return;
+    resizeRef.current = {
+      blockId,
+      startY,
+      origEndAtMs,
+      origHeight: blockHeight(block.start_at, block.end_at),
+    };
+  }, [blocks]);
+
+  useEffect(() => {
+    const onMouseMove = (e: MouseEvent) => {
+      if (!resizeRef.current) return;
+      const { blockId, startY, origHeight } = resizeRef.current;
+      const deltaY = e.clientY - startY;
+      const newHeight = Math.max(22, origHeight + deltaY);
+      setResizeHeights((prev) => ({ ...prev, [blockId]: newHeight }));
+    };
+
+    const onMouseUp = (e: MouseEvent) => {
+      if (!resizeRef.current) return;
+      const { blockId, startY, origEndAtMs } = resizeRef.current;
+      resizeRef.current = null;
+
+      const deltaY = e.clientY - startY;
+      const deltaMs = Math.round((deltaY / HOUR_HEIGHT) * 60) * 60_000;
+      const newEndAtMs = origEndAtMs + deltaMs;
+      const block = blocks.find((b) => b.id === blockId);
+      if (!block) { setResizeHeights((prev) => { const n = { ...prev }; delete n[blockId]; return n; }); return; }
+      const startMs = new Date(block.start_at).getTime();
+      if (newEndAtMs <= startMs + 60_000 * 15) {
+        setResizeHeights((prev) => { const n = { ...prev }; delete n[blockId]; return n; });
+        return;
+      }
+      setResizeHeights((prev) => { const n = { ...prev }; delete n[blockId]; return n; });
+      resizeMutation.mutate({ id: blockId, endAt: new Date(newEndAtMs).toISOString() });
+    };
+
+    document.addEventListener("mousemove", onMouseMove);
+    document.addEventListener("mouseup", onMouseUp);
+    return () => {
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", onMouseUp);
+    };
+  }, [blocks, resizeMutation]);
 
   const handleSaved = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ["/api/prospecting/time-blocks"] });
@@ -687,7 +735,7 @@ export default function Schedule() {
 
   return (
     <div className="flex flex-col h-full min-h-0">
-      <ProspectingNav active="/prospecting/schedule" />
+      <ProspectingNav />
 
       {/* Toolbar */}
       <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
@@ -838,7 +886,9 @@ export default function Schedule() {
                           block={b}
                           onClick={openEdit}
                           onCalendarPush={(id) => calPushMutation.mutate(id)}
+                          onResizeStart={handleResizeStart}
                           isDragging={activeDragId === b.id}
+                          heightOverride={resizeHeights[b.id]}
                         />
                       ))}
 

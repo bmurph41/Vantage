@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { ProspectingNav } from "./ProspectingNav";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, Target, Calendar, TrendingUp, BarChart3, ChevronLeft, ChevronRight, Clock, Phone, Mail, Users, ArrowUpRight, ArrowDownRight, Minus, RefreshCcw, ExternalLink } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -337,6 +338,9 @@ export default function ProspectingWorkroom() {
 
   return (
     <div className="flex flex-col min-h-full bg-gray-50">
+      <div className="px-6 pt-4 bg-white">
+        <ProspectingNav />
+      </div>
       <div className="flex-shrink-0 bg-white border-b shadow-sm">
         <div className="p-6">
           <div className="flex items-center justify-between">
