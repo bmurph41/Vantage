@@ -1,0 +1,16 @@
+{
+  "extends": "./tsconfig.json",
+  "include": [
+    "server/services/document-builder/token-resolver-service.ts",
+    "server/services/document-builder/data-binding-service.ts",
+    "server/services/document-builder/ai-content-service.ts",
+    "server/routes/document-builder-routes.ts",
+    "shared/document-builder/templates/token-map.ts"
+  ],
+  "exclude": ["node_modules", "build", "dist", "dist-types"],
+  "references": [],
+  "compilerOptions": {
+    "incremental": false,
+    "composite": false
+  }
+}

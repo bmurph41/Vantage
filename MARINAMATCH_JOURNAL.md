@@ -1,5 +1,64 @@
 # MarinaMatch Platform Journal
 
+## ✅ Doc Studio asset-class drift cleanup — Phase 1 + 2 shipped (2026-05-13)
+
+Completed next-session option (a) from the 2026-05-08 session. Two commits removed the marina-specific copy that was leaking into non-marina documents through the Document Studio token resolver, bindings catalog, and AI prompt pipeline. The runtime now resolves a deal's asset class (project → property → deal → marina default), populates asset-class-agnostic tokens, filters the bindings catalog, and parameterizes AI systemPrompts + userPromptTemplates so generated content reads correctly for multifamily / hotel / office / etc.
+
+### What changed
+
+**Commit `1e403ebf` — Phase 1: tokens + bindings catalog (8 files)**
+- `shared/document-builder/templates/token-map.ts` — Added 5 agnostic tokens: `ASSET_CLASS`, `ASSET_CLASS_LABEL`, `PROPERTY_UNIT_LABEL`, `PROPERTY_UNIT_LABEL_PLURAL`, `PROPERTY_UNIT_COUNT`. Marked `TOTAL_SLIPS` / `LINEAR_FEET` / `AVG_LOA` / `MAX_BOAT_LENGTH` descriptions as marina-only.
+- `server/services/document-builder/token-resolver-service.ts` — `resolvePropertyTokens` now resolves assetClass with precedence project → property → deal → `'marina'` default. Always populates the 4 agnostic tokens; conditionally populates marina-specific tokens. New `pickPrimaryUnitCount` helper picks the right unit-count column per asset class.
+- `server/services/document-builder/data-binding-service.ts` — `getBindingsCatalog(assetClass?)` filters marina-specific fields (wetSlips, drySlips, waterFrontage, bodyOfWater, channelDepth, groundLease*) out for non-marina; back-compat preserved when arg omitted. `'Total Slips' / 'Total Units' / 'Total Keys'` label sourced from `cfg.terms.totalUnitsLabel`.
+- `server/routes/document-builder-routes.ts:709` — `GET /bindings/catalog` accepts `?assetClass=…` query param.
+- `client/src/lib/document-builder-api.ts` — `useBindingsCatalog(assetClass?)` bakes assetClass into queryKey + URL.
+- `client/src/components/document-builder/DataBindingPanel.tsx:509` + `client/src/pages/document-studio/DocumentEditor.tsx:513` — pass `document?.assetClass` to the hook (cache-key consistency; values themselves were already declare-but-don't-use).
+- `client/src/components/document-builder/DocumentBuilder.tsx` — Added second useEffect that refetches the bindings catalog once `document.assetClass` is known. The mount-time `loadLibraries()` still fetches the back-compat shape first.
+
+**Commit `a8d54816` — Phase 2: AI prompts (3 files)**
+- `server/services/document-builder/ai-content-service.ts` — Added `getAssetNarrativeTerms()` helper pulling `assetLabel`, `unit`/`unitPlural`, `totalUnitsLabel`, `analystSpecialty` from `getModelConfig()`. Composes `${label} properties` when the config's `propertyPlural` is the generic "properties" (avoids "specializing in properties" reading). Refactored 5 generators (`generateExecutiveSummary`, `generateInvestmentHighlights`, `generateMarketOverview`, `generateRiskAssessment`, `generatePropertyDescription`) to accept optional `assetClass`. `generateSectionContent` now injects narrative terms into the context dict AND interpolates `template.systemPrompt` (previously only the userPromptTemplate was interpolated).
+- `shared/document-builder/section-library.ts` — Updated 3 AI prompt templates in `marinaSpecific: false` sections (executive_summary at line ~209, investment_highlights at ~283, market_overview at ~671). Replaced hardcoded "marina"/"slips"/"boating" with `{{assetLabel}}`, `{{assetLabelPlural}}`, `{{totalUnitsLabel}}`, `{{totalUnits}}`, `{{unitPlural}}`, `{{analystSpecialty}}` placeholders.
+- `client/src/lib/document-builder-api.ts` — Added optional `assetClass?: string` to the 4 AI-gen hook input types.
+
+### Decisions made
+
+- **Back-compat default `'marina'`** in the token resolver. Any deal without an explicit assetClass on its project/property/deal record falls through to marina (preserves today's behavior for legacy data). Once all org-active deals have explicit assetClass, the default can flip to `'unknown'` and fall through cleanly. Same logic in the bindings catalog: `showMarinaFields = isMarina || !assetClass` — the no-arg case keeps the full marina catalog for back-compat callers.
+- **Two-fetch catalog pattern in DocumentBuilder.tsx** — `loadLibraries()` at mount fetches the back-compat shape; a second useEffect refetches with `?assetClass=…` once `document?.assetClass` resolves. Avoided gating the entire libraries load on document hydration to keep first paint fast.
+- **`totalSlips` kept as alias on AI generator signatures** — each generator's context type accepts both `totalUnits` (canonical) and `totalSlips` (marina-era alias) and prefers `totalUnits ?? totalSlips`. Callers that predate asset-class support don't break.
+- **6 `marinaSpecific: true` sections left untouched** (Comp Set, Demographics, Floating Dock variants, Risks & Mitigants, Slip Status Allocation chart, etc.) — they're appropriately marina-only by flag and the section picker should already filter them out for non-marina deals.
+- **Filed as new memory: `project_doc_studio_asset_class_drift_phase_1_2_shipped.md`** — see `Next session` below for the trailing items.
+
+### Verification
+
+- `tsc -p shared --noEmit` (4GB heap): 0 errors before and after both commits.
+- Single-file project-context `tsc -p tsconfig.ds-check.json --noEmit --skipLibCheck` covering token-resolver, data-binding, ai-content, document-builder-routes, token-map, section-library: zero new errors in any of the edited line ranges. Pre-existing baseline noise (schema circular-reference TS7022, drizzle insert type drift, pre-existing column-not-found errors at unrelated lines) unchanged.
+- Live store-writer path verified via grep: `DocumentBuilder.tsx loadLibraries()` is the only caller of `store.setBindingsCatalog`. The two `useBindingsCatalog()` hook callers in DataBindingPanel and DocumentEditor declare-but-don't-use the result — updated for cache-key correctness.
+- AI generators not smoke-tested against a live OPENAI/ANTHROPIC key — no API call made this session. The interpolation logic was verified by reading the templates and confirming all `{{key}}` placeholders match the keys injected by `getAssetNarrativeTerms()` + caller context.
+
+### Working tree at session end
+
+- Both commits landed locally on `main`: `1e403ebf` and `a8d54816`. Awaiting push.
+- Untracked: `tsconfig.ds-check.json` (single-file typecheck helper from prior session, carried forward — workflow tool, leave untracked); `attached_assets/image_1778687928132.png` (paste).
+
+### Next session
+
+**Asset-class drift cleanup follow-ups (low priority):**
+- `slipStatusAllocation` schema field in `rent_roll_analysis` section (`shared/document-builder/section-library.ts:737,746`) — marina-flavored field name in a generic section. Schema field, not user-facing copy. Defer to a schema rename pass.
+- Flip token resolver default from `'marina'` to `'unknown'` once all org-active deals have explicit `assetClass` set.
+- Flip bindings catalog `showMarinaFields` to drop the `!assetClass` back-compat branch once all callers pass assetClass.
+- OM Builder bindings catalog at `/api/om-builder/bindings/catalog` (`server/om/routes.ts:2244`) — separate endpoint with separate field shapes, NOT touched this session. Apply the same asset-class filtering pattern if/when OM Builder needs it.
+- DB-seeded prompt template copies (if any old documents have copies of the previous prompt strings stored in their `documents.aiPromptTemplates` column) won't pick up the new placeholders. Defer until a doc-regeneration pass is needed.
+
+**Other next-session candidates (from 2026-05-08 list, still open):**
+- (b) Token resolver gap closure — waterfall tier table, Monte Carlo bands, DSCR/LTV timelines (~3-5h)
+- (c) Lift LP statement / K-1 PDF pattern → capital calls + distributions + quarterly letters (~3-5h)
+- (e)-(h) FM Gaps G4-G7 (G4 Phase 2 already shipped 2026-05-08)
+- (i) V2 nav decision (`project_doc_intel_v2_nav_dead_entry.md`)
+- (j) Per-area tsconfig setup for server/ + client/
+- (k) UploadWithStats type unification
+- (l) Bite 2: server/services TypeScript baseline cleanup
+- (m) Multi-partner GP/LP discovery (Q1-Q6)
+
 ## ✅ IC tab on deal record — Track 1(d) shipped (2026-05-13)
 
 Surfaced the existing 14-endpoint Investment Committee backend (`server/routes/ic-routes.ts`, mounted at `/api/ic`) as a new "IC" tab on the deal record page. Frontend wiring only — no backend changes. Per the Deal Workspace audit memory (2026-05-07): `ic-routes.ts` and `icMemos` schema with voting workflow have existed for some time; the deal-detail.tsx 13-tab CrmRecordPage shell had no IC entry.
