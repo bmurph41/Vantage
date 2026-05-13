@@ -2406,7 +2406,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
   // Preferences are stored per-user per-project so each collaborator has their
   // own layout without affecting teammates.  Page key convention:
   //   "modeling:kpi-strip:{projectId}"
-  // Fall-back chain: user pref → project-level legacy value → null (defaults)
+  // Fall-back chain: user pref (valid array) → project-level legacy value → null (defaults)
   app.get('/api/modeling/projects/:projectId/kpi-strip-config', authenticateUser, async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
@@ -2426,10 +2426,12 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
         ))
         .limit(1);
 
-      if (userPref) {
-        // kpiConfig stores the string[] directly for this use-case
-        const enabledKeys = Array.isArray(userPref.kpiConfig) ? userPref.kpiConfig as unknown as string[] : null;
-        return res.json({ enabledKeys });
+      // Only use the user pref if it contains a valid string array; otherwise
+      // fall through to the legacy project-level value so malformed rows don't
+      // silently discard a user's configured defaults.
+      if (userPref && Array.isArray(userPref.kpiConfig) &&
+          (userPref.kpiConfig as unknown[]).every((k) => typeof k === 'string')) {
+        return res.json({ enabledKeys: userPref.kpiConfig as unknown as string[] });
       }
 
       // 2. Fall back to legacy project-level value (migration path for existing data)
@@ -2456,13 +2458,23 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
       if (!enabledKeys.every((k: unknown) => typeof k === 'string')) {
         return res.status(400).json({ error: 'enabledKeys must be an array of strings' });
       }
+
+      // Verify the project exists and belongs to this org before writing prefs
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) return res.status(404).json({ error: 'Project not found' });
+
       // Validate and dedupe keys against the known KPI registry
       const { MODELING_KPI_REGISTRY } = await import('@shared/modeling-kpi-registry');
       const validKeys = [...new Set((enabledKeys as string[]).filter((k) => k in MODELING_KPI_REGISTRY))];
 
       const pageKey = `modeling:kpi-strip:${projectId}`;
 
-      // Upsert into user-scoped preferences table
+      // Upsert into user-scoped preferences table.
+      // kpiConfig is an unrestricted jsonb column; we store a plain string[]
+      // here (modeling KPI keys) rather than the CRM-oriented KpiConfigItem[]
+      // shape used by the /api/user-preferences/kpis/:pageKey endpoint.
+      // We use a sql template to write the raw JSON array without touching
+      // the Drizzle-typed insert path that expects KpiConfigItem objects.
       const [existing] = await db
         .select()
         .from(userKpiPreferences)
@@ -2476,12 +2488,20 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
       if (existing) {
         await db
           .update(userKpiPreferences)
-          .set({ kpiConfig: validKeys as any, lastModified: new Date() })
+          .set({
+            kpiConfig: sql`${JSON.stringify(validKeys)}::jsonb`,
+            lastModified: new Date(),
+          })
           .where(eq(userKpiPreferences.id, existing.id));
       } else {
         await db
           .insert(userKpiPreferences)
-          .values({ userId, orgId, pageKey, kpiConfig: validKeys as any });
+          .values({
+            userId,
+            orgId,
+            pageKey,
+            kpiConfig: sql`${JSON.stringify(validKeys)}::jsonb`,
+          });
       }
 
       res.json({ success: true, enabledKeys: validKeys });
