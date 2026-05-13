@@ -17,7 +17,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Plus, Search, Pencil, Trash2, TrendingUp, BarChart3, FileSpreadsheet, Settings, PieChart, Info, Clock, CheckCircle, XCircle, AlertCircle, Sparkles, Brain, Map as MapIcon } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2, TrendingUp, BarChart3, FileSpreadsheet, Settings, PieChart, Info, Clock, CheckCircle, XCircle, AlertCircle, Sparkles, Brain, Map as MapIcon, TriangleAlert } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { uwStageLabels } from '@shared/schema';
@@ -77,6 +78,7 @@ export default function ModelingProjectsPage() {
   const [formMode, setFormMode] = useState<'create' | 'edit'>('create');
   const [isTemplateOpen, setIsTemplateOpen] = useState(false);
   const [isNewProjectWizardOpen, setIsNewProjectWizardOpen] = useState(false);
+  const [deleteConfirmProject, setDeleteConfirmProject] = useState<ModelingProject | null>(null);
 
   const { data: projectsResponse, isLoading } = useQuery<{ data: ModelingProject[] } | ModelingProject[]>({
     queryKey: ['/api/modeling/projects'],
@@ -132,9 +134,14 @@ export default function ModelingProjectsPage() {
     setIsFormOpen(true);
   };
 
-  const handleDelete = async (project: ModelingProject) => {
-    if (confirm(`Are you sure you want to delete "${project.marinaName}"?`)) {
-      deleteMutation.mutate(project.id);
+  const handleDelete = (project: ModelingProject) => {
+    setDeleteConfirmProject(project);
+  };
+
+  const confirmDelete = () => {
+    if (deleteConfirmProject) {
+      deleteMutation.mutate(deleteConfirmProject.id);
+      setDeleteConfirmProject(null);
     }
   };
 
@@ -562,6 +569,37 @@ export default function ModelingProjectsPage() {
         steps={valuatorTourSteps}
         videoTitle="Financial Model Walkthrough"
       />
+
+      <Dialog open={!!deleteConfirmProject} onOpenChange={(open) => { if (!open) setDeleteConfirmProject(null); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <div className="flex items-center gap-3 mb-1">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-destructive/10">
+                <TriangleAlert className="h-5 w-5 text-destructive" />
+              </div>
+              <DialogTitle className="text-base">Delete Modeling Project</DialogTitle>
+            </div>
+            <DialogDescription className="text-sm text-muted-foreground pl-[52px]">
+              You're about to permanently delete{' '}
+              <span className="font-semibold text-foreground">"{deleteConfirmProject?.marinaName}"</span>.
+              All scenarios, assumptions, uploaded documents, and financial projections will be removed.
+              This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="mt-2 gap-2 sm:gap-2">
+            <Button variant="outline" onClick={() => setDeleteConfirmProject(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmDelete}
+              disabled={deleteMutation.isPending}
+            >
+              {deleteMutation.isPending ? 'Deleting…' : 'Delete Project'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
