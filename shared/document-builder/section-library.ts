@@ -206,11 +206,11 @@ export const SECTION_LIBRARY: Record<string, SectionDefinition> = {
       {
         key: 'generate_overview',
         name: 'Generate Executive Summary',
-        systemPrompt: 'You are an expert commercial real estate analyst specializing in marina investments. Write institutional-quality content for offering memorandums.',
-        userPromptTemplate: `Write a compelling executive summary paragraph (150-200 words) for {{propertyName}}, a {{totalSlips}}-slip marina in {{location}}.
+        systemPrompt: 'You are an expert commercial real estate analyst specializing in {{analystSpecialty}}. Write institutional-quality content for offering memorandums.',
+        userPromptTemplate: `Write a compelling executive summary paragraph (150-200 words) for {{propertyName}}, a {{assetLabel}} in {{location}}.
 
 Key property details:
-- Total Slips: {{totalSlips}}
+- {{totalUnitsLabel}}: {{totalUnits}}
 - Ground Lease Term: {{groundLeaseTerm}}
 - Purchase Price: {{purchasePrice}}
 - Cap Rate: {{capRate}}
@@ -218,8 +218,8 @@ Key property details:
 The summary should:
 1. Open with the investment opportunity positioning
 2. Highlight the property's strategic location and market position
-3. Emphasize the storage-dominant operation
-4. Note key amenities and revenue streams
+3. Describe the operational profile and revenue mix
+4. Note key amenities and value drivers
 5. Close with the investment thesis
 
 Write in third person, professional tone. Do not use bullet points.`,
@@ -280,12 +280,13 @@ Write in third person, professional tone. Do not use bullet points.`,
       {
         key: 'generate_highlights',
         name: 'Generate Investment Highlights',
-        systemPrompt: 'You are an expert marina investment analyst. Generate compelling, data-driven investment highlights.',
-        userPromptTemplate: `Generate 6-8 compelling investment highlights for {{propertyName}} marina.
+        systemPrompt: 'You are an expert {{assetLabel}} investment analyst. Generate compelling, data-driven investment highlights.',
+        userPromptTemplate: `Generate 6-8 compelling investment highlights for {{propertyName}}.
 
 Property context:
+- Asset Class: {{assetLabel}}
 - Location: {{location}}
-- Total Slips: {{totalSlips}}
+- {{totalUnitsLabel}}: {{totalUnits}}
 - Occupancy: {{occupancy}}
 - Cap Rate: {{capRate}}
 
@@ -668,18 +669,17 @@ Write in flowing paragraphs with professional tone.`,
       {
         key: 'generate_market',
         name: 'Generate Market Overview',
-        systemPrompt: 'You are a marina market analyst with expertise in recreational boating trends.',
-        userPromptTemplate: `Write a market overview (150-200 words) for the {{location}} marina market.
+        systemPrompt: 'You are a commercial real estate market analyst specializing in {{assetLabelPlural}}.',
+        userPromptTemplate: `Write a market overview (150-200 words) for the {{location}} {{assetLabel}} market.
 
 Market data:
 - Population: {{population}}
 - Median Household Income: {{medianIncome}}
-- Boat Registrations: {{boatRegistrations}}
 
 The overview should:
-1. Describe local/regional marina market conditions
-2. Highlight boating and watercraft ownership trends
-3. Discuss supply/demand dynamics for marina slips
+1. Describe local/regional {{assetLabel}} market conditions
+2. Highlight demand drivers relevant to {{assetLabelPlural}}
+3. Discuss supply/demand dynamics for {{unitPlural}}
 4. Position the property favorably within market context
 
 Write in flowing paragraphs with analytical tone.`,

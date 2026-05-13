@@ -544,6 +544,7 @@ export function useGenerateExecutiveSummary() {
     mutationFn: (input: {
       propertyName: string;
       propertyType?: string;
+      assetClass?: string;
       location?: string;
       highlights?: string[];
       metrics?: Record<string, any>;
@@ -564,6 +565,7 @@ export function useGenerateInvestmentHighlights() {
     mutationFn: (input: {
       propertyName: string;
       propertyType?: string;
+      assetClass?: string;
       financials?: Record<string, any>;
       marketData?: Record<string, any>;
       count?: number;
@@ -584,6 +586,7 @@ export function useGenerateMarketOverview() {
     mutationFn: (input: {
       location: string;
       propertyType?: string;
+      assetClass?: string;
       demographics?: Record<string, any>;
       marketStats?: Record<string, any>;
       options?: { provider?: string; temperature?: number };
@@ -603,6 +606,7 @@ export function useGenerateRiskAssessment() {
     mutationFn: (input: {
       propertyName: string;
       propertyType?: string;
+      assetClass?: string;
       financials?: Record<string, any>;
       marketConditions?: Record<string, any>;
       options?: { provider?: string; temperature?: number };

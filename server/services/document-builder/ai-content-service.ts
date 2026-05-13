@@ -7,6 +7,56 @@ import OpenAI from 'openai';
 import Anthropic from '@anthropic-ai/sdk';
 import { getSectionDefinition } from '../../../shared/document-builder/section-library';
 import type { AIPromptTemplate, ResolvedBinding } from '../../../shared/document-builder/types';
+import { getModelConfig } from '../../../shared/asset-class-model-config';
+
+// =============================================================================
+// Asset-Class Narrative Terms
+// =============================================================================
+
+/**
+ * Terms injected into AI systemPrompts + userPrompts so the model writes
+ * about the right thing (marina vs multifamily vs hotel vs office vs …)
+ * without per-asset-class branching in each generator.
+ *
+ * Pulled from shared/asset-class-model-config.ts. Three layers:
+ *   - assetLabel:     human-readable label ("marina", "multifamily", "hotel")
+ *   - unit/unitPlural: the rentable unit term ("slip"/"slips", "unit"/"units")
+ *   - totalUnitsLabel: column label for the count ("Total Slips", "Total Units")
+ *
+ * `analystSpecialty` is a marketing-friendly noun phrase for systemPrompts;
+ * derived from assetLabel but kept as its own field so we can override per
+ * asset class if "marina investments analyst" reads differently from
+ * "multifamily acquisitions analyst" in practice.
+ */
+interface AssetNarrativeTerms {
+  assetLabel: string;
+  assetLabelPlural: string;
+  unit: string;
+  unitPlural: string;
+  totalUnitsLabel: string;
+  analystSpecialty: string;
+}
+
+function getAssetNarrativeTerms(assetClass?: string | null): AssetNarrativeTerms {
+  const cfg = getModelConfig(assetClass ?? 'marina');
+  const label = cfg.label.toLowerCase();
+  // propertyPlural in the config is mostly "properties" — generic and not very
+  // useful by itself ("specializing in properties" reads poorly). When the
+  // config provides a distinct plural noun (e.g. "hotels"), use it directly;
+  // otherwise compose "<label> properties" (e.g. "marina properties",
+  // "multifamily properties") so the systemPrompt is always specific.
+  const cfgPlural = cfg.terms.propertyPlural;
+  const assetLabelPlural =
+    cfgPlural && cfgPlural !== 'properties' ? cfgPlural : `${label} properties`;
+  return {
+    assetLabel: label,
+    assetLabelPlural,
+    unit: cfg.terms.unit,
+    unitPlural: cfg.terms.unitPlural,
+    totalUnitsLabel: cfg.terms.totalUnitsLabel || 'Total Units',
+    analystSpecialty: `${label} investments`,
+  };
+}
 
 // =============================================================================
 // Provider Types
@@ -93,8 +143,18 @@ class AIContentGenerationService {
       }
     }
 
-    // Build the prompt
-    const userPrompt = this.interpolateTemplate(template.userPromptTemplate, context);
+    // Inject asset-class narrative terms so section-library templates can
+    // reference {{assetLabel}}, {{assetLabelPlural}}, {{unit}}, {{unitPlural}},
+    // {{totalUnitsLabel}}, {{analystSpecialty}} without per-asset branching.
+    // Caller passes context.assetClass; if absent, marina defaults apply
+    // (back-compat with templates authored before asset-class support).
+    const terms = getAssetNarrativeTerms(context.assetClass);
+    const ctx = { ...terms, ...context };
+
+    // Build the prompt. Interpolate the systemPrompt too so seed templates
+    // can switch out the analyst-specialty phrasing per asset class.
+    const systemPrompt = this.interpolateTemplate(template.systemPrompt, ctx);
+    const userPrompt = this.interpolateTemplate(template.userPromptTemplate, ctx);
 
     const provider = options?.provider || this.defaultProvider;
     const temperature = options?.temperature ?? template.temperature;
@@ -102,7 +162,7 @@ class AIContentGenerationService {
 
     if (provider === 'anthropic') {
       return this.generateWithAnthropic(
-        template.systemPrompt,
+        systemPrompt,
         userPrompt,
         temperature,
         maxTokens,
@@ -110,7 +170,7 @@ class AIContentGenerationService {
       );
     } else {
       return this.generateWithOpenAI(
-        template.systemPrompt,
+        systemPrompt,
         userPrompt,
         temperature,
         maxTokens,
@@ -247,6 +307,11 @@ class AIContentGenerationService {
     context: {
       propertyName: string;
       location: string;
+      assetClass?: string;
+      // Generic unit count — used for all asset classes. `totalSlips` is kept
+      // as a marina-era alias for back-compat with callers that predate
+      // asset-class support.
+      totalUnits?: number;
       totalSlips?: number;
       groundLeaseTerm?: string;
       purchasePrice?: number;
@@ -257,12 +322,15 @@ class AIContentGenerationService {
     },
     options?: GenerationOptions
   ): Promise<GenerationResult> {
-    const systemPrompt = `You are an expert commercial real estate analyst specializing in marina investments. Write institutional-quality content for investment committee memorandums and offering memorandums. Use professional, analytical tone with specific data points. Write in flowing paragraphs without bullet points unless specifically requested.`;
+    const terms = getAssetNarrativeTerms(context.assetClass);
+    const unitCount = context.totalUnits ?? context.totalSlips;
 
-    const userPrompt = `Write a compelling executive summary paragraph (200-250 words) for ${context.propertyName}, located in ${context.location}.
+    const systemPrompt = `You are an expert commercial real estate analyst specializing in ${terms.analystSpecialty}. Write institutional-quality content for investment committee memorandums and offering memorandums. Use professional, analytical tone with specific data points. Write in flowing paragraphs without bullet points unless specifically requested.`;
+
+    const userPrompt = `Write a compelling executive summary paragraph (200-250 words) for ${context.propertyName}, a ${terms.assetLabel} in ${context.location}.
 
 Property Details:
-- Total Slips: ${context.totalSlips || 'N/A'}
+- ${terms.totalUnitsLabel}: ${unitCount || 'N/A'}
 - Ground Lease: ${context.groundLeaseTerm || 'Fee Simple'}
 - Purchase Price: ${context.purchasePrice ? `$${context.purchasePrice.toLocaleString()}` : 'N/A'}
 - Cap Rate: ${context.capRate ? `${(context.capRate * 100).toFixed(1)}%` : 'N/A'}
@@ -271,8 +339,8 @@ ${context.additionalContext ? `\nAdditional Context:\n${context.additionalContex
 The summary should:
 1. Open with the property's unique positioning and investment opportunity
 2. Highlight the strategic location and market position
-3. Describe the storage-dominant operation if applicable
-4. Note key amenities and revenue diversification
+3. Describe the operational profile and revenue mix
+4. Note key amenities or value drivers
 5. Close with the investment thesis and return potential
 
 Write in third person, professional tone suitable for institutional investors.`;
@@ -287,7 +355,9 @@ Write in third person, professional tone suitable for institutional investors.`;
     context: {
       propertyName: string;
       location: string;
-      totalSlips?: number;
+      assetClass?: string;
+      totalUnits?: number;
+      totalSlips?: number; // marina-era alias
       occupancy?: number;
       capRate?: number;
       marketPosition?: string;
@@ -295,12 +365,15 @@ Write in third person, professional tone suitable for institutional investors.`;
     },
     options?: GenerationOptions
   ): Promise<GenerationResult> {
-    const systemPrompt = `You are a marina investment analyst. Generate concise, compelling investment highlights that emphasize value, stability, and growth potential. Each highlight should be one line and start with a strong action word or key metric.`;
+    const terms = getAssetNarrativeTerms(context.assetClass);
+    const unitCount = context.totalUnits ?? context.totalSlips;
+
+    const systemPrompt = `You are a ${terms.assetLabel} investment analyst. Generate concise, compelling investment highlights that emphasize value, stability, and growth potential. Each highlight should be one line and start with a strong action word or key metric.`;
 
     const userPrompt = `Generate 6-8 investment highlights for ${context.propertyName} in ${context.location}.
 
 Property Context:
-- Total Slips: ${context.totalSlips || 'N/A'}
+- ${terms.totalUnitsLabel}: ${unitCount || 'N/A'}
 - Occupancy: ${context.occupancy ? `${(context.occupancy * 100).toFixed(0)}%` : 'N/A'}
 - Cap Rate: ${context.capRate ? `${(context.capRate * 100).toFixed(1)}%` : 'N/A'}
 - Market Position: ${context.marketPosition || 'Strong regional presence'}
@@ -317,27 +390,34 @@ Format as bullet points starting with "• ". Each bullet should be concise (und
   async generateMarketOverview(
     context: {
       location: string;
+      assetClass?: string;
       population?: number;
       medianIncome?: number;
+      // marina-specific demographic signal — kept on the context for marina
+      // deals; non-marina deals should leave this undefined.
       boatRegistrations?: number;
       marketTrends?: string[];
     },
     options?: GenerationOptions
   ): Promise<GenerationResult> {
-    const systemPrompt = `You are a marina market analyst with expertise in recreational boating trends and demographic analysis. Write analytical market overviews that provide context for marina investments.`;
+    const terms = getAssetNarrativeTerms(context.assetClass);
+    const isMarina = terms.assetLabel === 'marina';
 
-    const userPrompt = `Write a market overview (150-200 words) for the ${context.location} marina market.
+    const systemPrompt = isMarina
+      ? `You are a marina market analyst with expertise in recreational boating trends and demographic analysis. Write analytical market overviews that provide context for marina investments.`
+      : `You are a commercial real estate market analyst specializing in ${terms.assetLabelPlural}. Write analytical market overviews that provide context for ${terms.analystSpecialty}, grounded in demographics, supply/demand, and local market dynamics.`;
+
+    const userPrompt = `Write a market overview (150-200 words) for the ${context.location} ${terms.assetLabel} market.
 
 Market Data:
 - Population: ${context.population?.toLocaleString() || 'N/A'}
 - Median Household Income: ${context.medianIncome ? `$${context.medianIncome.toLocaleString()}` : 'N/A'}
-- Boat Registrations: ${context.boatRegistrations?.toLocaleString() || 'N/A'}
+${isMarina && context.boatRegistrations ? `- Boat Registrations: ${context.boatRegistrations.toLocaleString()}` : ''}
 ${context.marketTrends?.length ? `- Market Trends: ${context.marketTrends.join(', ')}` : ''}
 
 The overview should:
-1. Describe local/regional marina market conditions
-2. Highlight boating and watercraft ownership trends
-3. Discuss supply/demand dynamics for marina slips
+1. Describe local/regional ${terms.assetLabel} market conditions
+${isMarina ? '2. Highlight boating and watercraft ownership trends\n3. Discuss supply/demand dynamics for marina slips' : `2. Highlight demand drivers relevant to ${terms.assetLabelPlural}\n3. Discuss supply/demand dynamics for ${terms.unitPlural}`}
 4. Note any barriers to new supply
 5. Position the subject property favorably within market context
 
@@ -353,15 +433,18 @@ Write in flowing paragraphs with analytical, professional tone.`;
     context: {
       propertyName: string;
       location: string;
+      assetClass?: string;
       groundLeaseTerm?: string;
       purchasePrice?: number;
       specificRisks?: string[];
     },
     options?: GenerationOptions
   ): Promise<GenerationResult> {
-    const systemPrompt = `You are a due diligence analyst specializing in marina acquisitions. Generate comprehensive risk assessments with specific mitigants for each identified risk.`;
+    const terms = getAssetNarrativeTerms(context.assetClass);
 
-    const userPrompt = `Generate a risk assessment for the ${context.propertyName} marina acquisition in ${context.location}.
+    const systemPrompt = `You are a due diligence analyst specializing in ${terms.assetLabel} acquisitions. Generate comprehensive risk assessments with specific mitigants for each identified risk.`;
+
+    const userPrompt = `Generate a risk assessment for the ${context.propertyName} ${terms.assetLabel} acquisition in ${context.location}.
 
 Property Context:
 - Ground Lease: ${context.groundLeaseTerm || 'Fee Simple'}
@@ -393,35 +476,45 @@ Format as a structured list that can be converted to a table.`;
     context: {
       propertyName: string;
       location: string;
+      assetClass?: string;
+      totalUnits?: number;
+      // Marina-specific physical fields. Non-marina deals leave these
+      // undefined; the prompt omits them in that case so the model isn't
+      // primed with marina-flavored detail it can't use.
       totalSlips?: number;
       wetSlips?: number;
       drySlips?: number;
-      amenities?: string[];
       waterBody?: string;
+      // Generic
+      amenities?: string[];
       yearBuilt?: number;
       recentImprovements?: string[];
     },
     options?: GenerationOptions
   ): Promise<GenerationResult> {
-    const systemPrompt = `You are a commercial real estate writer specializing in marina properties. Write detailed, professional property descriptions that highlight physical attributes, amenities, and operational characteristics.`;
+    const terms = getAssetNarrativeTerms(context.assetClass);
+    const isMarina = terms.assetLabel === 'marina';
+    const unitCount = context.totalUnits ?? context.totalSlips;
+
+    const systemPrompt = `You are a commercial real estate writer specializing in ${terms.assetLabelPlural}. Write detailed, professional property descriptions that highlight physical attributes, amenities, and operational characteristics.`;
 
     const userPrompt = `Write a property description (150-200 words) for ${context.propertyName} in ${context.location}.
 
 Property Details:
-- Total Slips: ${context.totalSlips || 'N/A'}
-- Wet Slips: ${context.wetSlips || 'N/A'}
+- ${terms.totalUnitsLabel}: ${unitCount || 'N/A'}
+${isMarina ? `- Wet Slips: ${context.wetSlips || 'N/A'}
 - Dry Slips: ${context.drySlips || 'N/A'}
-- Water Body: ${context.waterBody || 'N/A'}
+- Water Body: ${context.waterBody || 'N/A'}` : ''}
 - Year Built: ${context.yearBuilt || 'N/A'}
 - Amenities: ${context.amenities?.join(', ') || 'N/A'}
 ${context.recentImprovements?.length ? `- Recent Improvements: ${context.recentImprovements.join(', ')}` : ''}
 
 The description should:
 1. Open with the property's positioning and setting
-2. Describe the storage mix and slip configuration
+${isMarina ? '2. Describe the storage mix and slip configuration' : `2. Describe the ${terms.unit} mix and operational configuration`}
 3. Highlight key amenities and services
 4. Note infrastructure quality and recent improvements
-5. Mention access and navigational characteristics
+${isMarina ? '5. Mention access and navigational characteristics' : '5. Mention access, visibility, and locational characteristics'}
 
 Write in professional, descriptive prose suitable for an offering memorandum.`;
 
