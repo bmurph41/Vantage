@@ -230,20 +230,46 @@ export function ConsolidatedPnLView({ projectId, onNavigateToInputs }: Props) {
     for (const report of data.missingPeriods) {
       m.set(report.year, { report, methods: [] });
     }
+
+    // Upstream emits one ConsolidatedCell per (line item × missing month)
+    // by design (potential per-cell rendering). For the year-header summary
+    // tooltip we want each missing month listed once, attributed to its
+    // "best" projection method. Source rank: prior_year_yoy beats
+    // trailing_3mo beats gap (lower rank = better basis).
+    const sourceRank: Record<ProjectionSource, number> = {
+      'auto:prior_year_yoy': 0,
+      'auto:trailing_3mo': 1,
+      'gap': 2,
+    };
+
+    const bestByYearMonth = new Map<number, Map<number, ProjectionSource>>();
     for (const cell of data.projectedCells) {
-      const info = m.get(cell.year);
-      if (!info) continue;
-      let bucket = info.methods.find((b) => b.source === cell.source);
-      if (!bucket) {
-        bucket = { source: cell.source, months: [] };
-        info.methods.push(bucket);
+      if (!m.has(cell.year)) continue;
+      let byMonth = bestByYearMonth.get(cell.year);
+      if (!byMonth) {
+        byMonth = new Map<number, ProjectionSource>();
+        bestByYearMonth.set(cell.year, byMonth);
       }
-      bucket.months.push(cell.month);
+      const existing = byMonth.get(cell.month);
+      if (existing === undefined || sourceRank[cell.source] < sourceRank[existing]) {
+        byMonth.set(cell.month, cell.source);
+      }
     }
-    m.forEach((info) => {
-      info.methods.forEach((b) => {
-        b.months.sort((x: number, y: number) => x - y);
+
+    bestByYearMonth.forEach((byMonth, year) => {
+      const info = m.get(year);
+      if (!info) return;
+      const bucketBySource = new Map<ProjectionSource, number[]>();
+      byMonth.forEach((source, month) => {
+        const months = bucketBySource.get(source);
+        if (months) months.push(month);
+        else bucketBySource.set(source, [month]);
       });
+      bucketBySource.forEach((months, source) => {
+        months.sort((x: number, y: number) => x - y);
+        info.methods.push({ source, months });
+      });
+      info.methods.sort((a, b) => sourceRank[a.source] - sourceRank[b.source]);
     });
     return m;
   }, [data]);
