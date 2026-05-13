@@ -30130,3 +30130,13 @@ export const insertProspectingTimeBlockSchema = createInsertSchema(prospectingTi
   updatedAt: true,
 });
 export type InsertProspectingTimeBlock = z.infer<typeof insertProspectingTimeBlockSchema>;
+
+// ── Organization Settings ──────────────────────────────────────────────────
+// Matches the table created by the startup migration (simple key-value store per org)
+export const organizationSettings = pgTable("organization_settings", {
+  id: integer("id").primaryKey(),
+  orgId: text("org_id").notNull(),
+  settingKey: text("setting_key").notNull(),
+  settingValue: text("setting_value"),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
