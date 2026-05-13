@@ -73,7 +73,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { ExportPdfButton } from '@/components/ui/export-pdf-button';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartTooltip, ResponsiveContainer, Legend, ReferenceLine, Area, AreaChart, ComposedChart } from 'recharts';
-import type { ProjectAssumptions, ProFormaData } from '@/types/modeling';
+import type { ProjectAssumptions, ProFormaData, ActualsData, ModelingProject } from '@/types/modeling';
 import { WorkflowNavigation } from '@/components/modeling/workflow-navigation';
 import { useDepartmentOrder } from '@/hooks/useDepartmentOrder';
 import { useModelingPnlOverrides, VALID_DEPARTMENTS } from '@/hooks/useModelingPnlOverrides';
@@ -314,7 +314,7 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
   const [showPctRev, setShowPctRev] = useState(false);
   const [editingDepartment, setEditingDepartment] = useState<{ department: string; category: 'Revenue' | 'COGS' | 'Expenses' } | null>(null);
   const { toast } = useToast();
-  const { data: project } = useQuery<any>({
+  const { data: project } = useQuery<ModelingProject>({
     queryKey: [`/api/modeling/projects/${projectId}`],
   });
   const fmtCell = (value: number, rev: number) =>
@@ -356,7 +356,7 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
   });
 
   // Fetch actuals by year from document uploads
-  const { data: actualsData } = useQuery<Record<string, unknown>>({
+  const { data: actualsData } = useQuery<ActualsData>({
     queryKey: ['/api/modeling/projects', projectId, 'actuals'],
   });
 
@@ -613,7 +613,7 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
   // Derive the baseline period from the pro forma engine's latest historical year,
   // falling back to document-based periods
   const latestHistoricalYear = proFormaData?.latestHistoricalYear;
-  const linePositions = (proFormaData as any)?.metrics?.linePositions || { managementFee: 'below', capex: 'below', reserves: 'below' };
+  const linePositions = proFormaData?.linePositions ?? { managementFee: 'below' as const, capex: 'below' as const, reserves: 'below' as const };
 
   const baselinePeriod = useMemo((): DocumentPeriod | null => {
     // First check if we have a period from documents matching the engine's baseline year
@@ -713,7 +713,7 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
 
     // Supplement with actuals data if pro forma didn't have certain line items
     if (actualsData?.grouped) {
-      (actualsData as any).grouped.forEach((item: any) => {
+      actualsData.grouped.forEach((item) => {
         const category = item.category as keyof typeof data;
         if (data[category]) {
           const lineItemName = item.subcategory || item.description || 'Other';
@@ -769,7 +769,7 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
     }
     // Also use actuals data
     if (actualsData?.grouped) {
-      actualsData.grouped.forEach((item: any) => {
+      actualsData.grouped.forEach((item) => {
         if (item.subcategory && item.department) {
           map[item.subcategory] = item.department;
         }
@@ -1080,7 +1080,7 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
       {/* Asset-Class KPI Strip */}
       <ModelingKpiStrip
         proFormaData={proFormaData}
-        assetClass={(project as any)?.assetClass ?? (project as any)?.asset_class}
+        assetClass={project?.assetClass ?? project?.asset_class}
       />
 
       {/* Document Status Banner */}
@@ -2314,6 +2314,27 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                       },
                       color: 'text-teal-600 dark:text-teal-400',
                     }] : []),
+                    ...(() => {
+                      const pp = (assumptions?.exitAssumptions as Record<string, number> | undefined)?.['purchasePrice'];
+                      return pp && pp > 0 ? [{
+                        label: 'Going-In Cap',
+                        getValue: (i: number) => {
+                          const noi = calculateYearSummary(i).noi;
+                          return formatPercent((noi / pp) * 100, { dash: true });
+                        },
+                        color: 'text-sky-600 dark:text-sky-400',
+                      }] : [];
+                    })(),
+                    ...(() => {
+                      const exitRate = (assumptions?.exitAssumptions as Record<string, number> | undefined)?.['exitCapRate'];
+                      return exitRate && exitRate > 0 ? [{
+                        label: 'Exit Cap Rate',
+                        getValue: (i: number) => {
+                          return i === years.length - 1 ? formatPercent(exitRate, { dash: true }) : '—';
+                        },
+                        color: 'text-indigo-600 dark:text-indigo-400',
+                      }] : [];
+                    })(),
                   ];
                   return (
                     <>

@@ -70,6 +70,12 @@ export interface MonthlyProjection {
   [key: string]: unknown;
 }
 
+export interface LinePositions {
+  managementFee?: 'above' | 'below' | string;
+  capex?: 'above' | 'below' | string;
+  reserves?: 'above' | 'below' | string;
+}
+
 export interface ProFormaData {
   revenue?: ProFormaSection;
   expenses?: ProFormaSection;
@@ -78,6 +84,30 @@ export interface ProFormaData {
   monthlyProjections?: MonthlyProjection[];
   latestHistoricalYear?: number;
   metrics?: Record<string, number>;
+  linePositions?: LinePositions;
+  [key: string]: unknown;
+}
+
+export interface ActualsGroupedItem {
+  category?: string;
+  subcategory?: string;
+  description?: string;
+  department?: string;
+  annualTotal?: number;
+  name?: string;
+  [key: string]: unknown;
+}
+
+export interface ActualsData {
+  grouped?: ActualsGroupedItem[];
+  [key: string]: unknown;
+}
+
+export interface ModelingProject {
+  id?: string;
+  name?: string;
+  assetClass?: string;
+  asset_class?: string;
   [key: string]: unknown;
 }
 
