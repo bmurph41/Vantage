@@ -102,6 +102,9 @@ app.post(
   '/api/stripe/webhook',
   express.raw({ type: 'application/json' }),
   async (req: any, res) => {
+    // Hoisted outside the try so the outer catch's failure-mark (3b/3c) can
+    // read event.id when the handler throws after dedupe persisted a row.
+    let event: any;
     try {
       const stripeKey = process.env.STRIPE_SECRET_KEY;
       if (!stripeKey) {
@@ -128,7 +131,6 @@ app.post(
 
       const isProduction = process.env.NODE_ENV === 'production';
 
-      let event: any;
       if (webhookSecret) {
         if (!sig) {
           console.error('[Stripe Webhook] Missing Stripe-Signature header');
@@ -415,13 +417,18 @@ app.post(
       // Delegate to billing-service for SKU-specific flows (marketplace_plus,
       // broker_plan, core-platform tier subscriptions). The index.ts switch
       // above only handles packType-metadata checkouts; billingService covers
-      // everything else. Failures here are logged but don't fail the webhook —
-      // Stripe will retry if needed via the 500 path above.
+      // everything else. Errors here MUST propagate to the outer catch (Day 3
+      // sub-fix 3c) — that path stamps stripe_events.processing_status='failed'
+      // via 3b's failure-mark and returns 500, letting Stripe retry on its own
+      // redelivery schedule. The inner catch only exists to attach a targeted
+      // log prefix; it rethrows so the dedupe ledger and HTTP response stay
+      // consistent with the actual outcome.
       try {
         const { default: billingService } = await import('./services/billing-service');
         await billingService.handleWebhook(event);
       } catch (delegateErr: any) {
         console.error('[Stripe Webhook] billingService.handleWebhook error:', delegateErr.message);
+        throw delegateErr;
       }
 
       // Success-mark before responding — the row landed via dedupe upsert above.
