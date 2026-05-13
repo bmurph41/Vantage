@@ -1,5 +1,5 @@
 {
-  "projectId": "b4330553-9dcb-4b77-8d56-730d8da66352",
+  "projectId": "61dd0810-3a06-47a7-9540-f00d618100f6",
   "irr": 21.0027405521536,
   "leveredIrr": 21.0027405521536,
   "unleveredIrr": 21.0027405521536,
@@ -246,7 +246,7 @@
   "yearlyLeaseIncome": [],
   "meta": {
     "source": "proForma",
-    "generatedAt": "2026-05-13T11:55:41.751Z",
+    "generatedAt": "2026-05-13T12:01:47.481Z",
     "discountRate": 10,
     "hasDebt": false,
     "overridesApplied": false,

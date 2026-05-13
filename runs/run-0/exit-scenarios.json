@@ -1,7 +1,7 @@
 [
   {
-    "id": "7bf9c450-f7a8-4bb3-8035-c3bdb20875d6",
-    "modelingProjectId": "0ffc42a3-b3ee-4223-96cc-d9871b9288d3",
+    "id": "c19c8efd-0a29-44a4-b364-715c5b2f295f",
+    "modelingProjectId": "6192fc99-b650-4b80-8792-63a6608455d1",
     "orgId": "cd3719c3-ef82-4ccc-acb9-261c80fb64b4",
     "name": "Net Proceeds – Year 10",
     "description": null,
@@ -39,12 +39,12 @@
     "assetClass": null,
     "dealType": "asset_sale",
     "engineVersion": null,
-    "createdAt": "2026-05-13T11:54:33.667Z",
-    "updatedAt": "2026-05-13T11:54:33.667Z"
+    "createdAt": "2026-05-13T12:00:38.296Z",
+    "updatedAt": "2026-05-13T12:00:38.296Z"
   },
   {
-    "id": "1a6744a7-afed-4677-90f6-2275b1553810",
-    "modelingProjectId": "0ffc42a3-b3ee-4223-96cc-d9871b9288d3",
+    "id": "4ae96460-05d0-4ac7-8c26-28214daf380c",
+    "modelingProjectId": "6192fc99-b650-4b80-8792-63a6608455d1",
     "orgId": "cd3719c3-ef82-4ccc-acb9-261c80fb64b4",
     "name": "1031 Exchange – Year 10",
     "description": null,
@@ -82,12 +82,12 @@
     "assetClass": null,
     "dealType": "asset_sale",
     "engineVersion": null,
-    "createdAt": "2026-05-13T11:54:34.167Z",
-    "updatedAt": "2026-05-13T11:54:34.167Z"
+    "createdAt": "2026-05-13T12:00:38.835Z",
+    "updatedAt": "2026-05-13T12:00:38.835Z"
   },
   {
-    "id": "173a2eb6-1ec4-4687-b8d6-ca4aafeeb242",
-    "modelingProjectId": "0ffc42a3-b3ee-4223-96cc-d9871b9288d3",
+    "id": "b2efdb1c-9b5b-484a-a37f-a6954f46dc1c",
+    "modelingProjectId": "6192fc99-b650-4b80-8792-63a6608455d1",
     "orgId": "cd3719c3-ef82-4ccc-acb9-261c80fb64b4",
     "name": "DST Investment – Year 10",
     "description": null,
@@ -125,12 +125,12 @@
     "assetClass": null,
     "dealType": "asset_sale",
     "engineVersion": null,
-    "createdAt": "2026-05-13T11:54:34.683Z",
-    "updatedAt": "2026-05-13T11:54:34.683Z"
+    "createdAt": "2026-05-13T12:00:39.355Z",
+    "updatedAt": "2026-05-13T12:00:39.355Z"
   },
   {
-    "id": "961449f1-dca9-45aa-9f53-3a5ac44eea07",
-    "modelingProjectId": "0ffc42a3-b3ee-4223-96cc-d9871b9288d3",
+    "id": "abca8023-5cfa-4329-ae34-0b1e82b8ddab",
+    "modelingProjectId": "6192fc99-b650-4b80-8792-63a6608455d1",
     "orgId": "cd3719c3-ef82-4ccc-acb9-261c80fb64b4",
     "name": "Waterfall Exit – Year 10",
     "description": null,
@@ -168,7 +168,7 @@
     "assetClass": null,
     "dealType": "asset_sale",
     "engineVersion": null,
-    "createdAt": "2026-05-13T11:54:35.178Z",
-    "updatedAt": "2026-05-13T11:54:35.178Z"
+    "createdAt": "2026-05-13T12:00:40.130Z",
+    "updatedAt": "2026-05-13T12:00:40.130Z"
   }
 ]

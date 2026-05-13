@@ -1,5 +1,5 @@
 {
-  "id": "a0fbd80d-4612-4b75-b9e2-1f183d9524b1",
+  "id": "295957c1-3802-4b08-a2c1-adc4cbc0470f",
   "orgId": "cd3719c3-ef82-4ccc-acb9-261c80fb64b4",
   "marinaName": "Beta Mock Marina",
   "purchasePrice": "12500000.00",
@@ -14,7 +14,7 @@
   "primaryValuationMetric": "cap_rate",
   "brokerId": null,
   "brokerCompanyId": null,
-  "dealId": "88c00527-f16f-48fe-8e93-939d8ed440c0",
+  "dealId": "7e961aad-fa23-4594-9e2e-f2e9778b8acf",
   "ddProjectId": null,
   "salesCompId": null,
   "rateCompId": null,
@@ -85,6 +85,6 @@
   "notes": null,
   "createdBy": "85c9cd7a-c453-4dba-9817-d032d5712c4e",
   "updatedBy": null,
-  "createdAt": "2026-05-13T11:55:08.132Z",
-  "updatedAt": "2026-05-13T11:55:08.132Z"
+  "createdAt": "2026-05-13T12:01:13.734Z",
+  "updatedAt": "2026-05-13T12:01:13.734Z"
 }

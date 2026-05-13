@@ -1,5 +1,5 @@
 # Beta Mock Test — Validation Report
-> Task #398 | Generated: 2026-05-13T11:55:46.086Z
+> Task #398 | Generated: 2026-05-13T12:01:51.695Z
 > Fixture: `tests/fixtures/beta-deal-marina.json`
 > Auth: `ALLOW_DEMO_AUTH=true` — Express `authenticateUser` auto-resolves all requests → org cd3719c3-ef82-4ccc-acb9-261c80fb64b4; `x-org-id` on every call.
 > Pipeline: 5 model steps × 10 runs = 50 cells
@@ -37,16 +37,16 @@ was **not modified** by this test script. XIRR/NPV reported here are therefore t
 
 | Run | dcf | monte-carlo | exit-scenarios | waterfall | decision-support | total |
 |-----|-----|-------------|----------------|-----------|------------------|-------|
-| 0 | 855 | 593 | 2016 | 530 | 724 | **4718** |
-| 1 | 849 | 569 | 2029 | 497 | 699 | **4643** |
-| 2 | 853 | 570 | 2053 | 503 | 728 | **4707** |
-| 3 | 863 | 573 | 2031 | 498 | 704 | **4669** |
-| 4 | 819 | 565 | 2016 | 497 | 695 | **4592** |
-| 5 | 809 | 612 | 2016 | 491 | 706 | **4634** |
-| 6 | 861 | 561 | 2023 | 503 | 698 | **4646** |
-| 7 | 807 | 569 | 2069 | 504 | 708 | **4657** |
-| 8 | 841 | 572 | 2087 | 489 | 734 | **4723** |
-| 9 | 859 | 569 | 2045 | 493 | 744 | **4710** |
+| 0 | 855 | 570 | 2331 | 562 | 703 | **5021** |
+| 1 | 856 | 563 | 2266 | 539 | 692 | **4916** |
+| 2 | 815 | 589 | 2231 | 559 | 701 | **4895** |
+| 3 | 851 | 568 | 2009 | 512 | 701 | **4641** |
+| 4 | 830 | 564 | 2022 | 500 | 683 | **4599** |
+| 5 | 808 | 570 | 2203 | 496 | 699 | **4776** |
+| 6 | 830 | 568 | 2050 | 517 | 720 | **4685** |
+| 7 | 801 | 576 | 1980 | 524 | 700 | **4581** |
+| 8 | 862 | 560 | 2023 | 629 | 741 | **4815** |
+| 9 | 818 | 576 | 1972 | 495 | 696 | **4557** |
 
 ---
 
@@ -192,7 +192,7 @@ Canonical parameters as specified in Task #398:
 | Config | PATCH | `/api/modeling/projects/:id/config` | No (setup) | Non-fatal; logged |
 | **1. DCF** | POST | `/api/modeling/projects/:id/dcf` | **Yes** | XIRR = `irr` = `leveredIrr` |
 | **2. Monte Carlo** | POST | `/api/modeling/projects/:id/dcf/monte-carlo` | **Yes** | seed=42 |
-| **3. Exit Scenarios** | POST ×3 | `/api/modeling/projects/:id/exit/scenarios` | **Yes** | cash_sale, exchange_1031, dst_investment |
+| **3. Exit Scenarios** | POST ×4 | `/api/modeling/projects/:id/exit/scenarios` | **Yes** | cash_sale, exchange_1031, dst_investment, hybrid |
 | **4. Waterfall** | POST | `/api/modeling/projects/:id/waterfall` | **Yes** | 4-tier promote |
 | **5. Decision Support** | GET | `/api/modeling/projects/:id/dcf/decision-support` | **Yes** | |
 | Cleanup | DELETE | `/api/modeling/projects/:id` | No | Non-fatal |

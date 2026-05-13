@@ -30,7 +30,7 @@
  *                       const seed = request.seed ?? Date.now();
  *                     With seed=42: seeded PRNG — bit-identical outputs.
  *                     Without seed: Date.now() used → non-deterministic.
- *   3. Exit Scenarios POST ×3  cash_sale, exchange_1031, dst_investment
+ *   3. Exit Scenarios POST ×4  cash_sale, exchange_1031, dst_investment, hybrid
  *                     Results collected into an array → exit-scenarios.json
  *   4. Waterfall      POST /api/modeling/projects/:id/waterfall
  *   5. Decision Sup.  GET  /api/modeling/projects/:id/dcf/decision-support
@@ -905,7 +905,7 @@ Canonical parameters as specified in Task #398:
 | Config | PATCH | \`/api/modeling/projects/:id/config\` | No (setup) | Non-fatal; logged |
 | **1. DCF** | POST | \`/api/modeling/projects/:id/dcf\` | **Yes** | XIRR = \`irr\` = \`leveredIrr\` |
 | **2. Monte Carlo** | POST | \`/api/modeling/projects/:id/dcf/monte-carlo\` | **Yes** | seed=42 |
-| **3. Exit Scenarios** | POST ×3 | \`/api/modeling/projects/:id/exit/scenarios\` | **Yes** | cash_sale, exchange_1031, dst_investment |
+| **3. Exit Scenarios** | POST ×4 | \`/api/modeling/projects/:id/exit/scenarios\` | **Yes** | cash_sale, exchange_1031, dst_investment, hybrid |
 | **4. Waterfall** | POST | \`/api/modeling/projects/:id/waterfall\` | **Yes** | 4-tier promote |
 | **5. Decision Support** | GET | \`/api/modeling/projects/:id/dcf/decision-support\` | **Yes** | |
 | Cleanup | DELETE | \`/api/modeling/projects/:id\` | No | Non-fatal |
