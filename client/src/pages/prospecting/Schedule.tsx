@@ -1,29 +1,16 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  format, startOfWeek, startOfDay, addDays, addWeeks, subWeeks,
-  isSameDay, parseISO, differenceInMinutes,
+  format, startOfWeek, startOfDay, addDays, addWeeks, subWeeks, parseISO,
 } from "date-fns";
-import {
-  DndContext,
-  DragEndEvent,
-  DragOverlay,
-  DragStartEvent,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  useDroppable,
-  useDraggable,
-} from "@dnd-kit/core";
+import { PointerSensor, useSensor, useSensors, DragStartEvent, DragEndEvent } from "@dnd-kit/core";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import {
@@ -37,193 +24,27 @@ import {
   Clock,
 } from "lucide-react";
 import { ProspectingNav } from "./ProspectingNav";
+import {
+  TimeBlockGrid,
+  TimeBlock,
+  BLOCK_TYPES,
+  DEFAULT_COLORS,
+  typeColor,
+  blockHeight,
+  HOUR_HEIGHT,
+  DAY_START_HOUR,
+  VISIBLE_HOURS,
+} from "./TimeBlockGrid";
 
-// ── Constants ─────────────────────────────────────────────────────────────────
-
-const HOUR_HEIGHT = 56; // px per hour
-const DAY_START_HOUR = 6;  // 6 AM
-const DAY_END_HOUR = 22;   // 10 PM
-const VISIBLE_HOURS = DAY_END_HOUR - DAY_START_HOUR;
-
-// ── Types ─────────────────────────────────────────────────────────────────────
-
-type TimeBlock = {
-  id: string;
-  title: string;
-  block_type: string;
-  start_at: string;
-  end_at: string;
-  notes?: string;
-  color: string;
-  synced_to_calendar: boolean;
-  google_calendar_event_id?: string;
-  invited_user_ids: string[];
-  creator_name?: string;
-};
+// ── Local helpers (drawer-only) ───────────────────────────────────────────────
 
 type OrgUser = { id: string; name: string; email: string };
-
-const BLOCK_TYPES = [
-  { value: "prospecting_call", label: "Prospecting Call", color: "#3b82f6" },
-  { value: "site_tour",        label: "Site Tour",        color: "#10b981" },
-  { value: "loi_review",       label: "LOI Review",       color: "#f59e0b" },
-  { value: "team_meeting",     label: "Team Meeting",     color: "#8b5cf6" },
-  { value: "admin",            label: "Admin",            color: "#6b7280" },
-  { value: "other",            label: "Other",            color: "#ec4899" },
-] as const;
-
-const DEFAULT_COLORS: Record<string, string> = Object.fromEntries(
-  BLOCK_TYPES.map(({ value, color }) => [value, color])
-);
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-function blockTop(startAt: string): number {
-  const start = parseISO(startAt);
-  const minsFromGridStart = (start.getHours() - DAY_START_HOUR) * 60 + start.getMinutes();
-  return Math.max(0, (minsFromGridStart / 60) * HOUR_HEIGHT);
-}
-
-function blockHeight(startAt: string, endAt: string): number {
-  const mins = differenceInMinutes(parseISO(endAt), parseISO(startAt));
-  return Math.max(22, (mins / 60) * HOUR_HEIGHT);
-}
-
-function typeLabel(blockType: string) {
-  return BLOCK_TYPES.find((t) => t.value === blockType)?.label ?? blockType;
-}
-
-function typeColor(blockType: string, overrideColor?: string) {
-  return overrideColor || DEFAULT_COLORS[blockType] || "#3b82f6";
-}
 
 function toLocalDateStr(d: Date) { return format(d, "yyyy-MM-dd"); }
 function toLocalTimeStr(d: Date) { return format(d, "HH:mm"); }
 
 function buildIso(dateStr: string, timeStr: string): string {
   return new Date(`${dateStr}T${timeStr}:00`).toISOString();
-}
-
-// ── Draggable block chip ──────────────────────────────────────────────────────
-
-function DraggableBlockChip({
-  block,
-  onClick,
-  onCalendarPush,
-  onResizeStart,
-  isDragging,
-  heightOverride,
-}: {
-  block: TimeBlock;
-  onClick: (b: TimeBlock) => void;
-  onCalendarPush: (id: string) => void;
-  onResizeStart: (blockId: string, startY: number, origEndAtMs: number) => void;
-  isDragging?: boolean;
-  heightOverride?: number;
-}) {
-  const { attributes, listeners, setNodeRef, transform } = useDraggable({
-    id: block.id,
-    data: { block },
-  });
-
-  const top = blockTop(block.start_at);
-  const height = heightOverride ?? blockHeight(block.start_at, block.end_at);
-  const color = typeColor(block.block_type, block.color);
-
-  const style = transform
-    ? { transform: `translate(${transform.x}px, ${transform.y}px)` }
-    : {};
-
-  return (
-    <div
-      ref={setNodeRef}
-      style={{
-        top,
-        height: Math.max(height, 22),
-        backgroundColor: color + "22",
-        borderLeftColor: color,
-        opacity: isDragging ? 0.4 : 1,
-        ...style,
-      }}
-      className="absolute left-1 right-1 rounded px-1.5 py-1 overflow-hidden shadow-sm border-l-4 select-none group"
-    >
-      {/* Drag handle — covers most of the chip (not bottom resize zone) */}
-      <div
-        {...listeners}
-        {...attributes}
-        className="absolute inset-x-0 top-0 cursor-grab active:cursor-grabbing"
-        style={{ zIndex: 1, bottom: 10 }}
-      />
-
-      {/* Content — on top of drag handle */}
-      <div className="relative z-10 pointer-events-none">
-        <p className="text-xs font-medium leading-tight truncate" style={{ color }}>
-          {block.title}
-        </p>
-        {height > 32 && (
-          <p className="text-xs text-muted-foreground mt-0.5 truncate">
-            {typeLabel(block.block_type)}
-          </p>
-        )}
-      </div>
-
-      {/* Click-to-edit overlay (right half) */}
-      <div
-        className="absolute inset-0 z-20 cursor-pointer"
-        style={{ left: "40%" }}
-        onClick={(e) => { e.stopPropagation(); onClick(block); }}
-      />
-
-      {/* Calendar push quick-action — appears on hover */}
-      {!block.synced_to_calendar && (
-        <button
-          className="absolute top-0.5 right-0.5 z-30 opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded hover:bg-white/50"
-          title="Push to Google Calendar"
-          onClick={(e) => { e.stopPropagation(); onCalendarPush(block.id); }}
-        >
-          <CalendarDays className="w-3 h-3" style={{ color }} />
-        </button>
-      )}
-      {block.synced_to_calendar && (
-        <Calendar
-          className="absolute top-0.5 right-0.5 z-30 w-3 h-3 pointer-events-none"
-          style={{ color }}
-        />
-      )}
-
-      {/* Resize handle — bottom edge */}
-      <div
-        className="absolute inset-x-0 bottom-0 h-2.5 z-30 cursor-ns-resize opacity-0 group-hover:opacity-100 flex items-center justify-center"
-        onMouseDown={(e) => {
-          e.stopPropagation();
-          e.preventDefault();
-          onResizeStart(block.id, e.clientY, new Date(block.end_at).getTime());
-        }}
-      >
-        <div className="w-6 h-0.5 rounded-full bg-current opacity-40" style={{ color }} />
-      </div>
-    </div>
-  );
-}
-
-// ── Droppable hour cell ───────────────────────────────────────────────────────
-
-function DroppableHourCell({
-  id,
-  onClick,
-}: {
-  id: string;
-  onClick: () => void;
-}) {
-  const { setNodeRef, isOver } = useDroppable({ id });
-  return (
-    <div
-      ref={setNodeRef}
-      className={`border-b cursor-pointer transition-colors ${isOver ? "bg-blue-50 dark:bg-blue-950/30" : "hover:bg-muted/30"}`}
-      style={{ height: HOUR_HEIGHT }}
-      onClick={onClick}
-    />
-  );
 }
 
 // ── Drawer (create / edit) ────────────────────────────────────────────────────
@@ -711,9 +532,6 @@ export default function Schedule() {
 
   const hours = Array.from({ length: VISIBLE_HOURS }, (_, i) => DAY_START_HOUR + i);
 
-  const blocksForDay = (day: Date) =>
-    blocks.filter((b) => isSameDay(parseISO(b.start_at), day));
-
   const prevPeriod = () => {
     if (viewMode === "week") setWeekStart((d) => subWeeks(d, 1));
     else setSelectedDay((d) => addDays(d, -1));
@@ -734,7 +552,6 @@ export default function Schedule() {
       : format(selectedDay, "EEEE, MMMM d, yyyy");
 
   const unsyncedIds = blocks.filter((b) => !b.synced_to_calendar).map((b) => b.id);
-  const activeDragBlock = activeDragId ? blocks.find((b) => b.id === activeDragId) : null;
 
   return (
     <div className="flex flex-col h-full min-h-0">
@@ -801,143 +618,57 @@ export default function Schedule() {
         ))}
       </div>
 
-      {/* Calendar grid */}
-      <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-        <div className="flex-1 overflow-auto border rounded-lg bg-background">
-          {/* Day header row */}
-          <div
-            className="grid sticky top-0 z-10 bg-background border-b"
-            style={{ gridTemplateColumns: `56px repeat(${days.length}, 1fr)` }}
-          >
-            <div className="border-r" />
-            {days.map((day) => (
-              <div
-                key={day.toISOString()}
-                className={`px-2 py-2 text-center border-r last:border-r-0 cursor-pointer hover:bg-muted/50 transition-colors ${
-                  isSameDay(day, new Date()) ? "bg-blue-50 dark:bg-blue-950/20" : ""
-                }`}
-                onClick={() => {
-                  setSelectedDay(day);
-                  if (viewMode === "week") setViewMode("day");
-                }}
-              >
-                <p className="text-xs text-muted-foreground">{format(day, "EEE")}</p>
-                <p className={`text-sm font-semibold ${isSameDay(day, new Date()) ? "text-blue-600" : ""}`}>
-                  {format(day, "d")}
-                </p>
-                {blocksForDay(day).length > 0 && (
-                  <Badge variant="secondary" className="text-xs mt-0.5 px-1 py-0">
-                    {blocksForDay(day).length}
-                  </Badge>
-                )}
-              </div>
-            ))}
-          </div>
-
-          {/* Hour rows */}
-          <div
-            className="grid"
-            style={{ gridTemplateColumns: `56px repeat(${days.length}, 1fr)` }}
-          >
-            {/* Time gutter */}
-            <div className="border-r">
-              {hours.map((h) => (
-                <div
-                  key={h}
-                  className="border-b text-right pr-2 text-xs text-muted-foreground"
-                  style={{ height: HOUR_HEIGHT }}
-                >
-                  <span className="relative -top-2">{format(new Date(2000, 0, 1, h), "h a")}</span>
-                </div>
-              ))}
-            </div>
-
-            {/* Day columns */}
-            {days.map((day) => {
-              const dayBlocks = blocksForDay(day);
-              const dayIso = format(day, "yyyy-MM-dd");
-
-              return (
-                <div
-                  key={day.toISOString()}
-                  className="relative border-r last:border-r-0"
-                  style={{ height: VISIBLE_HOURS * HOUR_HEIGHT }}
-                >
-                  {/* Droppable hour cells */}
-                  {hours.map((h) => (
-                    <DroppableHourCell
-                      key={h}
-                      id={`${dayIso}-${h}`}
-                      onClick={() => openCreate(day, h)}
-                    />
-                  ))}
-
-                  {/* Draggable block chips */}
-                  {isLoading
-                    ? [0, 1].map((i) => (
-                        <div
-                          key={i}
-                          className="absolute left-1 right-1 rounded"
-                          style={{ top: i * 90 + 10, height: 60 }}
-                        >
-                          <Skeleton className="w-full h-full" />
-                        </div>
-                      ))
-                    : dayBlocks.map((b) => (
-                        <DraggableBlockChip
-                          key={b.id}
-                          block={b}
-                          onClick={openEdit}
-                          onCalendarPush={(id) => calPushMutation.mutate(id)}
-                          onResizeStart={handleResizeStart}
-                          isDragging={activeDragId === b.id}
-                          heightOverride={resizeHeights[b.id]}
-                        />
-                      ))}
-
-                  {/* Today line */}
-                  {isSameDay(day, new Date()) && (() => {
-                    const now = new Date();
-                    const mins = (now.getHours() - DAY_START_HOUR) * 60 + now.getMinutes();
-                    const top = (mins / 60) * HOUR_HEIGHT;
-                    if (top < 0 || top > VISIBLE_HOURS * HOUR_HEIGHT) return null;
-                    return (
-                      <div
-                        className="absolute left-0 right-0 border-t-2 border-red-500 z-20 pointer-events-none"
-                        style={{ top }}
-                      >
-                        <div className="w-2 h-2 bg-red-500 rounded-full absolute -left-1 -top-1" />
+      {/* Mobile list fallback (screens < md) */}
+      <div className="md:hidden flex-1 overflow-auto space-y-2">
+        {isLoading
+          ? [0, 1, 2].map((i) => <div key={i} className="h-14 rounded border"><div className="h-full w-full animate-pulse bg-muted" /></div>)
+          : blocks.length === 0
+            ? <p className="text-sm text-muted-foreground text-center pt-8">No time blocks for this period.</p>
+            : [...blocks]
+                .sort((a, b) => new Date(a.start_at).getTime() - new Date(b.start_at).getTime())
+                .map((b) => {
+                  const color = typeColor(b.block_type, b.color);
+                  return (
+                    <div
+                      key={b.id}
+                      className="flex items-center gap-3 p-3 rounded border border-l-4 cursor-pointer hover:bg-muted/30"
+                      style={{ borderLeftColor: color }}
+                      onClick={() => openEdit(b)}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{b.title}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {format(parseISO(b.start_at), "EEE MMM d · h:mm a")} – {format(parseISO(b.end_at), "h:mm a")}
+                        </p>
                       </div>
-                    );
-                  })()}
-                </div>
-              );
-            })}
-          </div>
-        </div>
+                      {b.synced_to_calendar && <Calendar className="w-4 h-4 shrink-0" style={{ color }} />}
+                    </div>
+                  );
+                })
+        }
+      </div>
 
-        {/* Drag overlay — ghost chip while dragging */}
-        <DragOverlay>
-          {activeDragBlock && (
-            <div
-              className="rounded px-1.5 py-1 shadow-lg border-l-4 opacity-90"
-              style={{
-                backgroundColor: typeColor(activeDragBlock.block_type, activeDragBlock.color) + "33",
-                borderLeftColor: typeColor(activeDragBlock.block_type, activeDragBlock.color),
-                width: 150,
-                height: Math.max(blockHeight(activeDragBlock.start_at, activeDragBlock.end_at), 40),
-              }}
-            >
-              <p
-                className="text-xs font-medium truncate"
-                style={{ color: typeColor(activeDragBlock.block_type, activeDragBlock.color) }}
-              >
-                {activeDragBlock.title}
-              </p>
-            </div>
-          )}
-        </DragOverlay>
-      </DndContext>
+      {/* Desktop calendar grid */}
+      <div className="hidden md:flex md:flex-col md:flex-1 md:min-h-0">
+        <TimeBlockGrid
+          blocks={blocks}
+          days={days}
+          hours={hours}
+          viewMode={viewMode}
+          isLoading={isLoading}
+          activeDragId={activeDragId}
+          resizeHeights={resizeHeights}
+          sensors={sensors}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+          openCreate={openCreate}
+          openEdit={openEdit}
+          onCalendarPush={(id) => calPushMutation.mutate(id)}
+          onResizeStart={handleResizeStart}
+          setSelectedDay={setSelectedDay}
+          setViewMode={setViewMode}
+        />
+      </div>
 
       {/* Summary bar */}
       <div className="mt-3 flex items-center gap-4 text-xs text-muted-foreground">
