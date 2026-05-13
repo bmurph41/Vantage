@@ -1,0 +1,68 @@
+# Task: Run 10 Identical Mock Beta Tests Through the Financial Model
+
+## Objective
+Execute the full financial modeling pipeline 10 times using IDENTICAL input data to verify:
+1. Full pipeline functionality (Pro Forma → DCF Layers 1–4 → Monte Carlo → Decision Support → Exit Strategy)
+2. Deterministic output — same inputs must produce bit-identical results across all 10 runs
+3. No uncaught errors, warnings, or silent failures at any layer
+
+## Test Context
+- Org: Southern Marinas (cd3719c3-ef82-4ccc-acb9-261c80fb64b4, tier=institutional)
+- User: brettmurphy41@gmail.com
+- Asset class: marina
+- API prefix: /api/v1/
+- All HTTP calls must include the x-org-id header (RLS)
+
+## Canonical Test Deal
+Create ONE fixed dummy deal fixture at tests/fixtures/beta-deal-marina.json (create if missing). Use these properties:
+- Deal name: "Beta Mock Run {i}" (i = 0..9)
+- Purchase price: $12,500,000
+- Slips: 220 (80 wet / 100 covered / 40 dry)
+- Avg slip rate: $850/mo
+- Ancillary income (fuel, ship store, service): $1,250,000/yr
+- OpEx ratio: 38%
+- Hold period: 10 yrs
+- Going-in cap: 7.0%, Exit cap: 7.5%
+- Debt: 65% LTV, 6.25% fixed, 25yr amort, 2yr IO
+- Equity: 35% common
+- Monte Carlo seed: 42 (FIXED — required for determinism)
+- Seasonality: auto-derived defaults
+
+## Implementation
+Create scripts/beta-mock-test.ts that does the following:
+
+1. Loads the canonical fixture once into memory (parse once, reuse — do not re-read from disk per iteration).
+2. Loops i = 0..9. For each iteration:
+   a. POST /api/v1/deals → create deal
+   b. POST /api/v1/financial/proforma/generate → Pro Forma
+   c. POST /api/v1/financial/dcf/run → DCF (Layers 1–4, including XIRR)
+   d. POST /api/v1/financial/montecarlo/run with seed=42 → Monte Carlo
+   e. POST /api/v1/financial/decision/run → tornado, attribution, memo
+   f. Run Exit Strategy scenarios: 1031, DST, Waterfall, Net Proceeds
+   g. Save full JSON response for each layer to runs/run-{i}/{layer}.json
+   h. DELETE /api/v1/deals/{id} to clean up
+3. After all 10 runs, run a diff pass:
+   - Deep-compare runs/run-0/{layer}.json against runs/run-1..9/{layer}.json
+   - Floating-point comparison: epsilon 1e-9
+   - Flag any divergence, including ordering of array elements
+4. Write runs/beta-mock-report.md with:
+   - Pass/fail matrix (10 runs × 5 layers)
+   - Diff details for any non-deterministic outputs (which key diverged, by how much)
+   - Wall-clock time per layer per run
+   - Final NPV, IRR, XIRR, equity multiple from each run (must be identical)
+   - Any errors/warnings logged during the run
+
+## Rules
+- DO NOT run `npm run db:push` — use raw pool.query() for any DB setup
+- ESM imports use .js extensions
+- DO NOT modify production financial-model code — read-only on the model
+- If a single run errors, log it and continue; do NOT abort the loop
+- Exit code 0 if all 10 runs produce identical results across all layers; exit code 1 otherwise
+
+## Acceptance Criteria
+- All 10 runs complete without uncaught exceptions
+- Pro Forma, DCF, Decision Support, and Exit Strategy outputs are bit-identical across all 10 runs
+- Monte Carlo outputs are bit-identical with seed=42 — if they diverge, this is a determinism bug; flag it explicitly
+- runs/beta-mock-report.md exists and shows 50/50 cells green
+
+When complete, paste the contents of beta-mock-report.md back to me along with the exit code.
