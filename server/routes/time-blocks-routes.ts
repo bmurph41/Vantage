@@ -108,11 +108,12 @@ router.post('/', async (req: AuthenticatedRequest, res: Response) => {
       return res.status(400).json({ error: 'endAt must be after startAt' });
     }
 
-    // Validate invitees belong to the same org
-    let safeInvitees: string[] = [...invitedUserIds];
+    // Validate invitees belong to the same org (pre-filter to UUID-format strings)
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    let safeInvitees: string[] = [...invitedUserIds].filter((id) => UUID_RE.test(id));
     if (safeInvitees.length > 0) {
       const { rows: validUsers } = await pool.query(
-        `SELECT id FROM users WHERE id = ANY($1::uuid[]) AND org_id = $2`,
+        `SELECT id::text FROM users WHERE id::text = ANY($1::text[]) AND org_id = $2`,
         [safeInvitees, orgId]
       );
       const validIds = validUsers.map((u: { id: string }) => u.id);
@@ -200,11 +201,14 @@ router.patch('/:id', async (req: AuthenticatedRequest, res: Response) => {
       }
     }
 
-    // Validate invitees belong to the same org
-    let safeInvitees = invitedUserIds;
+    // Validate invitees belong to the same org (pre-filter to UUID-format strings)
+    const UUID_RE2 = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    let safeInvitees = invitedUserIds
+      ? [...invitedUserIds].filter((id) => UUID_RE2.test(id))
+      : undefined;
     if (safeInvitees && safeInvitees.length > 0) {
       const { rows: validUsers } = await pool.query(
-        `SELECT id FROM users WHERE id = ANY($1::uuid[]) AND org_id = $2`,
+        `SELECT id::text FROM users WHERE id::text = ANY($1::text[]) AND org_id = $2`,
         [safeInvitees, orgId]
       );
       const validIds = validUsers.map((u: { id: string }) => u.id);

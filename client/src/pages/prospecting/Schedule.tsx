@@ -533,11 +533,20 @@ export default function Schedule() {
     mutationFn: async ({ id, startAt, endAt }: { id: string; startAt: string; endAt: string }) => {
       return apiRequest("PATCH", `/api/prospecting/time-blocks/${id}`, { startAt, endAt });
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/prospecting/time-blocks"] });
+    onMutate: async ({ id, startAt, endAt }) => {
+      await queryClient.cancelQueries({ queryKey: ["/api/prospecting/time-blocks"] });
+      const qk = ["/api/prospecting/time-blocks", rangeStart.toISOString(), rangeEnd.toISOString()];
+      const previous = queryClient.getQueryData<TimeBlock[]>(qk);
+      queryClient.setQueryData<TimeBlock[]>(qk, (old) =>
+        old?.map((b) => b.id === id ? { ...b, start_at: startAt, end_at: endAt } : b)
+      );
+      return { previous, qk };
     },
-    onError: () => {
+    onError: (_, __, context) => {
+      if (context?.previous) queryClient.setQueryData(context.qk, context.previous);
       toast({ title: "Reschedule failed", variant: "destructive" });
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/prospecting/time-blocks"] });
     },
   });
@@ -589,11 +598,20 @@ export default function Schedule() {
     mutationFn: async ({ id, endAt }: { id: string; endAt: string }) => {
       return apiRequest("PATCH", `/api/prospecting/time-blocks/${id}`, { endAt });
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/prospecting/time-blocks"] });
+    onMutate: async ({ id, endAt }) => {
+      await queryClient.cancelQueries({ queryKey: ["/api/prospecting/time-blocks"] });
+      const qk = ["/api/prospecting/time-blocks", rangeStart.toISOString(), rangeEnd.toISOString()];
+      const previous = queryClient.getQueryData<TimeBlock[]>(qk);
+      queryClient.setQueryData<TimeBlock[]>(qk, (old) =>
+        old?.map((b) => b.id === id ? { ...b, end_at: endAt } : b)
+      );
+      return { previous, qk };
     },
-    onError: () => {
+    onError: (_, __, context) => {
+      if (context?.previous) queryClient.setQueryData(context.qk, context.previous);
       toast({ title: "Resize failed", variant: "destructive" });
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/prospecting/time-blocks"] });
     },
   });
