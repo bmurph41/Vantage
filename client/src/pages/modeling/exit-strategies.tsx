@@ -1007,6 +1007,7 @@ export default function ExitStrategiesPage() {
   const { data: projects = [], isLoading: projectsLoading } = useQuery<ModelingProject[]>({
     queryKey: ['/api/modeling/projects'],
     enabled: isLinkModalOpen,
+    select: (res: any) => Array.isArray(res) ? res : (res?.data ?? []),
   });
 
   const filteredProjects = projects.filter((project) => {
