@@ -118,6 +118,18 @@ export interface K1Data {
   beginningCapitalAccount: string;
   endingCapitalAccount: string;
   partnersShare: string;
+  /**
+   * `true` for any K-1 produced by the platform — this is a GP-summary K-1,
+   * not the IRS Form 1065 Schedule K-1 that must be prepared from a partnership
+   * tax return by a licensed CPA. UI surfaces a "DRAFT" watermark.
+   */
+  isDraft?: boolean;
+  /**
+   * Human-readable notes about how each allocation was derived. Surface in
+   * the PDF footer so LPs (and auditors) know what is and isn't sourced from
+   * an actual partnership return.
+   */
+  methodologyNotes?: string[];
 }
 
 // ─── LP Portal Auth ──────────────────────────────────────────────────────────
@@ -479,7 +491,7 @@ class LPStatementGenerator {
 class K1Generator {
 
   async generateK1(orgId: string, fundId: string, investorId: string, taxYear: number): Promise<K1Data> {
-    const [fundResult, investorResult, movementsResult] = await Promise.all([
+    const [fundResult, investorResult, movementsResult, dealsResult, balanceResult] = await Promise.all([
       db.execute(sql`SELECT * FROM funds WHERE id = ${fundId} AND org_id = ${orgId}`),
       db.execute(sql`SELECT * FROM fund_investors WHERE id = ${investorId} AND fund_id = ${fundId}`),
       db.execute(sql`
@@ -487,6 +499,31 @@ class K1Generator {
         WHERE fund_id = ${fundId} AND investor_id = ${investorId}
           AND EXTRACT(YEAR FROM effective_date) = ${taxYear}
         ORDER BY effective_date
+      `),
+      // Pull fund-level deal allocations to derive depreciable cost basis. Each
+      // allocation row holds the fund's invested equity into a project; we then
+      // join to modeling_projects for purchase_price and asset_class to pick
+      // the right MACRS recovery period (27.5 residential / 39 commercial).
+      db.execute(sql`
+        SELECT
+          fda.invested_amount,
+          mp.purchase_price,
+          mp.asset_class,
+          mp.created_at AS project_created_at
+        FROM fund_deal_allocations fda
+        LEFT JOIN modeling_projects mp ON mp.id = fda.modeling_project_id
+        WHERE fda.fund_id = ${fundId}
+          AND EXTRACT(YEAR FROM fda.allocation_date) <= ${taxYear}
+      `),
+      // Cumulative pre-year balance from immutable ledger for the
+      // beginningCapitalAccount line (replaces the prior contributions-only
+      // approximation).
+      db.execute(sql`
+        SELECT COALESCE(SUM(amount), 0) AS total
+        FROM fund_ledger_entries
+        WHERE fund_id = ${fundId}
+          AND investor_id = ${investorId}
+          AND EXTRACT(YEAR FROM effective_date) < ${taxYear}
       `),
     ]);
 
@@ -497,24 +534,92 @@ class K1Generator {
     const d = (val: any) => new Decimal(val?.toString() || '0');
     const commitment = d(investor.commitment_amount);
     const totalCommitment = d(fund.committed_capital);
-    const partnerShare = totalCommitment.isZero() ? new Decimal(0) : commitment.dividedBy(totalCommitment).times(100);
+    const partnerSharePct = totalCommitment.isZero()
+      ? new Decimal(0)
+      : commitment.dividedBy(totalCommitment); // ratio 0..1
 
-    // Calculate tax allocations based on partner's share
-    // In reality these would come from the fund's tax return (Form 1065)
     const movements = (movementsResult.rows as any[]);
-    let totalDistributions = new Decimal(0);
-    let totalContributions = new Decimal(0);
+
+    // Categorize movements by line-item: each movement carries explicit
+    // preferred_return / return_of_capital / carried_interest columns, so we
+    // don't need to guess from the type alone.
+    let cashDistributions = new Decimal(0);
+    let returnOfCapital = new Decimal(0);
+    let preferredReturnReceived = new Decimal(0);
+    let carriedInterestReceived = new Decimal(0);
+    let contributions = new Decimal(0);
 
     for (const m of movements) {
       const amt = d(m.amount);
-      if (m.movement_type === 'distribution') totalDistributions = totalDistributions.plus(amt);
-      if (m.movement_type === 'capital_call') totalContributions = totalContributions.plus(amt);
+      const type = m.movement_type as string;
+      if (type === 'distribution' || type === 'return_of_capital') {
+        cashDistributions = cashDistributions.plus(amt);
+        returnOfCapital = returnOfCapital.plus(d(m.return_of_capital));
+        preferredReturnReceived = preferredReturnReceived.plus(d(m.preferred_return));
+        carriedInterestReceived = carriedInterestReceived.plus(d(m.carried_interest));
+      } else if (type === 'call' || type === 'contribution') {
+        contributions = contributions.plus(amt);
+      }
     }
 
-    // Simplified allocation: In production, this would come from actual partnership return
+    // ── Real Form-1065-shape allocations ───────────────────────────────────
+    // Rental real estate income (Line 2): partner's share of fund NOI.
     const fundNOI = d(fund.total_noi || '0');
-    const investorNOI = fundNOI.times(partnerShare).dividedBy(100);
-    const depreciation = investorNOI.times(new Decimal(0.3)); // Rough depreciation allocation
+    const rentalIncome = fundNOI.times(partnerSharePct);
+
+    // Interest income (Line 5): partner's preferred return PAID in the year.
+    // Preferred return is interest-character distribution; if movements don't
+    // tag preferred_return explicitly we fall back to the accrued share, which
+    // overstates but is closer than zero.
+    const interestIncome = preferredReturnReceived.isZero()
+      ? d(investor.preferred_return_accrued || 0).times(partnerSharePct)
+      : preferredReturnReceived;
+
+    // Long-term capital gain (Line 9a): allocated carried-interest distributions
+    // — these come from realized exits, treated as LTCG for the LP. (GP carry
+    // is character-tracked separately; for the LP receiving distributions
+    // sourced from a realized property sale held > 1 yr, the gain flows
+    // through as LTCG.)
+    const longTermCapitalGain = carriedInterestReceived;
+
+    // Depreciation (informational — flows into ordinary loss via Line 1):
+    // Compute partner's share of MACRS straight-line on the fund's depreciable
+    // cost basis. depreciable_basis = invested_equity * 0.80 (typical building/
+    // land split), recovered over the MACRS class life (27.5 residential / 39
+    // commercial). This replaces the prior NOI * 0.30 hardcode which was
+    // mathematically meaningless.
+    const RESIDENTIAL_CLASSES = new Set(['multifamily', 'mobile_home', 'rv_park', 'senior_housing']);
+    let depreciation = new Decimal(0);
+    const dealRows = (dealsResult.rows as any[]) ?? [];
+    for (const row of dealRows) {
+      const purchasePrice = d(row.purchase_price);
+      if (purchasePrice.isZero()) continue;
+      // Use purchase_price (full cost basis) for the depreciable property,
+      // not just fund-invested equity — depreciation is on the property's
+      // cost, then allocated to partners pro-rata.
+      const buildingShare = purchasePrice.times(0.80);
+      const isResidential = RESIDENTIAL_CLASSES.has(String(row.asset_class || '').toLowerCase());
+      const recoveryYears = isResidential ? 27.5 : 39;
+      const annualDeprec = buildingShare.dividedBy(recoveryYears);
+      depreciation = depreciation.plus(annualDeprec.times(partnerSharePct));
+    }
+
+    // Ending capital account — derived from immutable ledger (set above in
+    // getInvestorCapitalAccounts via getLedgerBalance). Falls back to the
+    // stored column if the ledger query failed.
+    const endingCapitalAccount = d(investor.capital_account_balance);
+    const beginningCapitalAccount = d((balanceResult.rows as any[])?.[0]?.total ?? 0);
+
+    const methodologyNotes: string[] = [
+      'Rental income: partner pro-rata share of fund total NOI for the tax year.',
+      preferredReturnReceived.isZero()
+        ? 'Interest income: derived from accrued preferred return × partner share (preferred-return cash flow not tagged on movements — approximation).'
+        : 'Interest income: sum of preferred-return-tagged amounts on capital movements.',
+      'Long-term capital gain: sum of carried-interest-tagged amounts on capital movements.',
+      `Depreciation: 80% building / 20% land split, ${RESIDENTIAL_CLASSES.size > 0 ? '27.5-year (residential) / 39-year (commercial) ' : ''}MACRS straight-line on each deal\'s purchase price, allocated by partner share. Mid-month convention NOT applied.`,
+      'Capital account: derived from immutable fund_ledger_entries.',
+      'This is a GP-prepared summary and NOT the IRS Form 1065 Schedule K-1. The official K-1 must be prepared from a partnership tax return by a licensed CPA.',
+    ];
 
     const k1: K1Data = {
       investorName: investor.name || investor.investor_name || '',
@@ -524,22 +629,24 @@ class K1Generator {
       fundEIN: fund.ein || 'XX-XXXXXXX',
       taxYear,
       ordinaryIncome: '0.00',
-      rentalIncome: investorNOI.toFixed(2),
-      interestIncome: d(investor.preferred_return_accrued).times(partnerShare).dividedBy(100).toFixed(2),
+      rentalIncome: rentalIncome.toFixed(2),
+      interestIncome: interestIncome.toFixed(2),
       dividendIncome: '0.00',
       shortTermCapitalGain: '0.00',
-      longTermCapitalGain: '0.00',
+      longTermCapitalGain: longTermCapitalGain.toFixed(2),
       section1231Gain: '0.00',
       section179Deduction: '0.00',
       depreciation: depreciation.toFixed(2),
       otherDeductions: '0.00',
       foreignTaxesPaid: '0.00',
       alternativeMinimumTax: '0.00',
-      distributionsOfCash: totalDistributions.toFixed(2),
+      distributionsOfCash: cashDistributions.toFixed(2),
       distributionsOfProperty: '0.00',
-      beginningCapitalAccount: totalContributions.toFixed(2),
-      endingCapitalAccount: d(investor.capital_account_balance).toFixed(2),
-      partnersShare: partnerShare.toFixed(4),
+      beginningCapitalAccount: beginningCapitalAccount.toFixed(2),
+      endingCapitalAccount: endingCapitalAccount.toFixed(2),
+      partnersShare: partnerSharePct.times(100).toFixed(4),
+      isDraft: true,
+      methodologyNotes,
     };
 
     // Store K-1

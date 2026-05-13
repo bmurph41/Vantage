@@ -911,6 +911,63 @@ Sincerely,
     const matches = text.match(/\{\{([A-Z_]+)\}\}/g) || [];
     return [...new Set(matches.map(m => m.replace(/\{\{|\}\}/g, '')))];
   }
+
+  /**
+   * Public render entry used by lp-portal-routes. Wraps renderInvestorLetter
+   * with caller-friendly options (variables/investorId/fundId/format) and
+   * fetches the template's letter kind so format='pdf' can drive the binary
+   * letter-pdf builder. Returns a discriminated union: `format: 'pdf'` gives
+   * `pdfBase64` for transport, anything else gives the resolved text body.
+   */
+  async renderTemplate(orgId: string, opts: {
+    templateId: string;
+    variables: Record<string, string>;
+    investorId?: string;
+    fundId?: string;
+    format?: 'text' | 'html' | 'pdf';
+  }, _userId: string): Promise<
+    | { format: 'text' | 'html'; subject: string; body: string; unresolvedTokens: string[] }
+    | { format: 'pdf'; subject: string; pdfBase64: string; filename: string; unresolvedTokens: string[] }
+  > {
+    const format = opts.format ?? 'html';
+    const rendered = await this.renderInvestorLetter(orgId, opts.templateId, opts.variables);
+
+    if (format === 'pdf') {
+      // Look up the template kind + fund name to drive PDF layout
+      const tmpl = await db.execute(sql`
+        SELECT template_type FROM investor_letter_templates WHERE id = ${opts.templateId} AND org_id = ${orgId}
+      `);
+      const tmplType = (tmpl.rows as any[])?.[0]?.template_type as
+        | 'quarterly_update'
+        | 'capital_call_notice'
+        | 'distribution_notice'
+        | 'annual_letter'
+        | 'custom'
+        | undefined;
+
+      const fundName = opts.variables.FUND_NAME ?? opts.variables.fundName ?? 'Fund';
+      const investorName = opts.variables.INVESTOR_NAME ?? opts.variables.investorName ?? 'Investor';
+      const { generateLetterPDF } = await import('./letter-pdf');
+      const bytes = await generateLetterPDF({
+        subject: rendered.subject,
+        body: rendered.body,
+        fundName,
+        investorName,
+        letterKind: tmplType ?? 'custom',
+        letterDate: new Date(),
+      });
+      const filename = `${(tmplType ?? 'letter').replace(/_/g, '-')}_${investorName.replace(/[^A-Za-z0-9_-]+/g, '_')}.pdf`;
+      return {
+        format: 'pdf',
+        subject: rendered.subject,
+        pdfBase64: Buffer.from(bytes).toString('base64'),
+        filename,
+        unresolvedTokens: rendered.unresolvedTokens,
+      };
+    }
+
+    return { format: format as 'text' | 'html', ...rendered };
+  }
 }
 
 // ─── Rent Roll PDF Generator ─────────────────────────────────────────────────

@@ -45,12 +45,25 @@ class K1PDFBuilder {
     this.addPage();
 
     // Header
-    this.text(`Schedule K-1 Summary — Tax Year ${data.taxYear}`, { size: 18, font: this.fontBold, color: NAVY });
+    this.text(`Schedule K-1 Summary - Tax Year ${data.taxYear}`, { size: 18, font: this.fontBold, color: NAVY });
     this.y -= 2;
     this.text(data.fundName, { size: 12, color: STEEL });
     this.y -= 4;
     this.page.drawRectangle({ x: MARGIN_LEFT, y: this.y, width: CONTENT_WIDTH, height: 2, color: TEAL });
     this.y -= 18;
+
+    // Draft banner — surfaces that this is a GP summary, not a filed K-1
+    if (data.isDraft) {
+      this.page.drawRectangle({
+        x: MARGIN_LEFT, y: this.y - 4, width: CONTENT_WIDTH, height: 22,
+        color: rgb(1, 0.95, 0.78), borderColor: rgb(0.85, 0.7, 0.2), borderWidth: 1,
+      });
+      this.page.drawText(
+        "DRAFT - GP SUMMARY. Not the IRS Form 1065 Schedule K-1. Do not file.",
+        { x: MARGIN_LEFT + 8, y: this.y + 3, size: 9, font: this.fontBold, color: rgb(0.55, 0.4, 0.05) },
+      );
+      this.y -= 28;
+    }
 
     // Partnership info
     this.section("Partnership Information");
@@ -115,6 +128,28 @@ class K1PDFBuilder {
       ["Ending Capital Account", data.endingCapitalAccount],
     ], true);
     this.y -= 16;
+
+    // Methodology notes — surfaces the allocation method for each line so LP
+    // and CPA can reconcile against the underlying ledger.
+    if (data.methodologyNotes && data.methodologyNotes.length > 0) {
+      this.section("Methodology Notes");
+      for (const note of data.methodologyNotes) {
+        this.ensure(20);
+        // Wrap to ~95 chars at 8pt; conservative width since pdf-lib does not
+        // wrap automatically.
+        const maxChars = 100;
+        let remaining = note;
+        while (remaining.length > 0) {
+          const chunk = remaining.length > maxChars
+            ? remaining.slice(0, remaining.lastIndexOf(' ', maxChars) > 40 ? remaining.lastIndexOf(' ', maxChars) : maxChars)
+            : remaining;
+          this.text(`- ${chunk}`, { size: 8, color: STEEL });
+          remaining = remaining.slice(chunk.length).trim();
+        }
+        this.y -= 2;
+      }
+      this.y -= 8;
+    }
 
     // Disclaimer
     this.ensure(50);

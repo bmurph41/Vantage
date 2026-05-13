@@ -429,3 +429,37 @@ lpPortalRouter.post('/investor-letters/render', async (req: Request, res: Respon
     res.json(rendered);
   } catch (e: any) { res.status(400).json({ error: e.message }); }
 });
+
+/**
+ * Binary-PDF version of investor-letters/render. POST body matches the JSON
+ * endpoint, but the response is the raw PDF bytes so the client can stream
+ * a download directly without base64 decoding.
+ */
+lpPortalRouter.post('/investor-letters/render-pdf', async (req: Request, res: Response) => {
+  try {
+    const scope = await resolveScope(req);
+    if (!scope) return res.status(401).json({ error: 'Authentication required' });
+    if (denyInvestorMismatch(scope, req.body.investorId, res)) return;
+    const result = await investorLetters.renderTemplate(scope.orgId, {
+      templateId: req.body.templateId,
+      variables: req.body.variables ?? {},
+      investorId: scope.kind === 'lp' ? scope.investorId : req.body.investorId,
+      fundId: req.body.fundId,
+      format: 'pdf',
+    }, getUserId(req));
+    if (result.format !== 'pdf') {
+      return res.status(500).json({ error: 'PDF render produced non-PDF output' });
+    }
+    const bytes = Buffer.from(result.pdfBase64, 'base64');
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `inline; filename="${result.filename}"`,
+      'Content-Length': String(bytes.byteLength),
+      'Cache-Control': 'private, no-store',
+    });
+    res.end(bytes);
+  } catch (e: any) {
+    console.error('[LP Portal] Letter PDF render error:', e);
+    res.status(500).json({ error: 'Failed to render letter PDF' });
+  }
+});
