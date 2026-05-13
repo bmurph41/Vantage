@@ -76,6 +76,25 @@ export interface LinePositions {
   reserves?: 'above' | 'below' | string;
 }
 
+export interface ProFormaMetrics {
+  goingInCapRate: number;
+  exitCapRate: number;
+  purchasePrice: number;
+  exitValue: number;
+  irr: number;
+  irrAnnualized: number;
+  equityMultiple: number;
+  unleveredIrr: number;
+  unleveredEquityMultiple: number;
+  year1Noi: number;
+  stabilizedNoi: number;
+  netExitProceeds: number;
+  revenueGrowthRate: number;
+  expenseGrowthRate: number;
+  totalReturn: number;
+  [key: string]: unknown;
+}
+
 export interface ProFormaData {
   revenue?: ProFormaSection;
   expenses?: ProFormaSection;
@@ -83,7 +102,7 @@ export interface ProFormaData {
   annualProjections?: AnnualProjection[];
   monthlyProjections?: MonthlyProjection[];
   latestHistoricalYear?: number;
-  metrics?: Record<string, number>;
+  metrics?: ProFormaMetrics;
   linePositions?: LinePositions;
   [key: string]: unknown;
 }

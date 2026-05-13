@@ -615,7 +615,7 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
   const latestHistoricalYear = proFormaData?.latestHistoricalYear;
   const linePositions: LinePositions = (
     proFormaData?.linePositions
-    ?? (proFormaData?.metrics as Record<string, unknown> | undefined)?.['linePositions'] as LinePositions | undefined
+    ?? (proFormaData?.metrics?.linePositions as LinePositions | undefined)
     ?? { managementFee: 'below', capex: 'below', reserves: 'below' }
   );
 
@@ -2437,8 +2437,8 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                       }] : [];
                     })(),
                     ...(() => {
-                      const exitVal = (proFormaData?.metrics as Record<string, number> | undefined)?.exitValue;
-                      return exitVal && exitVal > 0 ? [{
+                      const exitVal = proFormaData?.metrics?.exitValue;
+                      return exitVal != null && exitVal > 0 ? [{
                         label: 'Exit Value',
                         getValue: (i: number) => {
                           return i === years.length - 1 ? formatCurrency(exitVal, { dash: true }) : '—';
@@ -2447,8 +2447,8 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                       }] : [];
                     })(),
                     ...(() => {
-                      const irrVal = (proFormaData?.metrics as Record<string, number> | undefined)?.irr;
-                      return irrVal && irrVal !== 0 ? [{
+                      const irrVal = proFormaData?.metrics?.irr;
+                      return irrVal != null && isFinite(irrVal) && irrVal !== 0 ? [{
                         label: 'IRR',
                         getValue: (i: number) => {
                           return i === years.length - 1 ? formatPercent(irrVal, { dash: true }) : '—';
@@ -2457,8 +2457,8 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                       }] : [];
                     })(),
                     ...(() => {
-                      const emVal = (proFormaData?.metrics as Record<string, number> | undefined)?.equityMultiple;
-                      return emVal && emVal > 0 ? [{
+                      const emVal = proFormaData?.metrics?.equityMultiple;
+                      return emVal != null && emVal > 0 ? [{
                         label: 'Equity Multiple',
                         getValue: (i: number) => {
                           return i === years.length - 1 ? `${emVal.toFixed(2)}x` : '—';
