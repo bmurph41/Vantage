@@ -2,13 +2,55 @@ import { db } from "../db";
 import { docketKeywordBank } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
 
-// REQUIRED_MARINA_TERMS - Fallback keywords if database is empty
-// These are the core keywords that signal marina industry relevance
+// DEFAULT_REQUIRED_TERMS - Fallback keywords if database is empty
+// Covers all CRE / alternative asset classes tracked by Vantage
 const DEFAULT_REQUIRED_TERMS = [
-  "marina", "marina for sale", "marina broker", "property investment", "marina operations",
-  "marinas for sale", "properties", "boat sales", "private equity in marinas", "boat slip",
-  "dry stack", "yacht club", "boatyard", "superyacht marina", "megayacht", "dockage",
-  "storage", "marine industry", "marina operator", "marina owner", "marina management"
+  // Marina / Waterfront
+  "marina", "marina for sale", "marina broker", "marina operations", "marinas for sale",
+  "boat sales", "boat slip", "dry stack", "yacht club", "boatyard", "superyacht marina",
+  "megayacht", "dockage", "marine industry", "marina operator", "marina owner", "marina management",
+  // Multifamily / Residential
+  "apartment", "multifamily", "apartment complex", "apartment community", "rental housing",
+  "affordable housing", "multifamily acquisition", "apartment sale", "housing development",
+  "NMHC", "NAA", "residential investment",
+  // Self-Storage
+  "self storage", "self-storage", "storage facility", "public storage", "extra space storage",
+  "cubesmart", "life storage", "national storage affiliates", "mini storage",
+  // Industrial / Warehouse
+  "industrial property", "warehouse", "distribution center", "logistics facility",
+  "industrial park", "manufacturing facility", "industrial acquisition", "NAIOP",
+  "industrial real estate", "cold storage", "fulfillment center",
+  // Retail / Shopping Center
+  "shopping center", "strip mall", "retail center", "retail property", "retail real estate",
+  "ICSC", "grocery anchored", "net lease", "NNN lease", "power center",
+  // Hotel / Hospitality
+  "hotel", "hospitality property", "resort", "lodging", "hotel acquisition", "hotel sale",
+  "RevPAR", "hotel development", "extended stay", "full-service hotel",
+  // Short-Term Rental
+  "short-term rental", "short term rental", "STR market", "Airbnb regulation",
+  "vacation rental", "VRBO", "OTA regulation",
+  // Senior Housing / Healthcare RE
+  "senior housing", "assisted living", "skilled nursing facility", "memory care",
+  "senior living community", "healthcare real estate", "medical office building",
+  "life sciences real estate", "NIC",
+  // Mobile Home Parks / Manufactured Housing
+  "manufactured housing", "mobile home park", "MHP acquisition", "land lease community",
+  "Sun Communities", "Equity LifeStyle", "UDC", "manufactured home",
+  // Car Wash
+  "car wash", "carwash", "express car wash", "ICA carwash",
+  // RV Parks / Campgrounds
+  "rv park", "rv resort", "campground acquisition", "outdoor hospitality", "glamping",
+  "KOA", "Sun RV",
+  // Office
+  "office building", "office tower", "office park", "office acquisition", "office market",
+  "coworking", "sublease space",
+  // General CRE / Investment
+  "commercial real estate", "real estate acquisition", "property acquisition",
+  "real estate investment", "real estate deal", "real estate sale", "cap rate",
+  "net operating income", "REIT", "real estate fund", "real estate private equity",
+  "real estate portfolio", "CMBS", "bridge loan", "ground lease", "sale-leaseback",
+  // Legacy / broad
+  "properties", "private equity in marinas", "storage", "property investment"
 ];
 
 // Cache for required keywords from database
@@ -64,6 +106,41 @@ const MARINA_TERMS = [
   "moorage", "berth", "yacht", "nautical", "boat sales", "outboard", "inboard",
   "storage", "haul", "launch", "dockmaster", "superyacht", "megayacht", "pontoon",
   "jetty", "wharf", "anchorage", "boatyard", "shipyard", "waterfront", "sailing"
+];
+
+// CRE vertical terms — scored alongside marina terms
+const CRE_VERTICAL_TERMS = [
+  // Multifamily
+  "apartment", "multifamily", "rental housing", "tenant", "lease-up", "occupancy rate",
+  "affordable housing", "workforce housing", "student housing", "senior apartments",
+  // Self-Storage
+  "self storage", "self-storage", "storage facility", "storage unit", "mini storage",
+  // Industrial / Warehouse
+  "warehouse", "distribution center", "fulfillment center", "industrial park",
+  "logistics facility", "cold storage", "flex industrial",
+  // Retail
+  "shopping center", "strip mall", "retail center", "grocery anchored",
+  "net lease", "NNN", "power center", "lifestyle center",
+  // Hotel / Hospitality
+  "hotel", "hospitality", "lodging", "resort", "RevPAR", "ADR", "extended stay",
+  "select-service", "full-service hotel", "hotel flag",
+  // Short-Term Rental
+  "short-term rental", "vacation rental", "STR", "Airbnb", "VRBO",
+  // Senior Housing / Healthcare
+  "senior housing", "assisted living", "skilled nursing", "memory care",
+  "senior living", "healthcare real estate", "medical office",
+  // Mobile Home Parks
+  "manufactured housing", "mobile home park", "land lease community",
+  // Car Wash
+  "car wash", "carwash", "express wash",
+  // RV Parks
+  "rv park", "campground", "glamping", "outdoor hospitality",
+  // Office
+  "office building", "office park", "coworking", "flex office",
+  // General CRE
+  "commercial real estate", "real estate acquisition", "cap rate", "NOI",
+  "REIT", "real estate fund", "CMBS", "ground lease", "sale-leaseback",
+  "real estate private equity", "real estate portfolio"
 ];
 
 const INVESTMENT_TERMS = [
@@ -126,26 +203,30 @@ export function scoreArticle(title: string, content: string, source: string): nu
   const text = `${title} ${content}`.toLowerCase();
   let score = 0;
 
-  // CRITICAL: Check for required marina keyword first
-  // If no required marina keyword is found, return 0 immediately
+  // Require at least one CRE / asset-class keyword to be present
   const hasRequired = hasRequiredMarinaKeyword(title, content);
   if (!hasRequired) {
-    // Only allow if it's from a known marina-industry source AND has some marina context
-    const isFromMarinaSource = /marina|boating|dock|yacht|maritime|superyacht/i.test(source);
-    const hasAnyMarinaContext = MARINA_TERMS.some(term => text.includes(term));
-    if (!isFromMarinaSource || !hasAnyMarinaContext) {
-      return 0; // Reject articles without marina relevance
+    // Allow if the source name clearly belongs to a known CRE vertical
+    const isCRESource = /marina|boating|dock|yacht|maritime|apartment|multifamily|storage|hotel|hospitality|industrial|retail|senior.hous|car.wash|rv.park|campground|manufactured/i.test(source);
+    if (!isCRESource) {
+      return 0;
     }
   }
 
-  // Base score for marina industry sources
+  // Base score for known industry-vertical sources
   if (/marina|boating|dock|yacht|maritime|superyacht/i.test(source)) {
     score += 20;
+  } else if (/apartment|multifamily|storage|hotel|hospitality|industrial|retail|senior.hous|car.wash|rv.park|campground|manufactured/i.test(source)) {
+    score += 15;
   }
 
-  // Score based on marina-specific terms
-  const vantagees = MARINA_TERMS.filter(term => text.includes(term)).length;
-  score += Math.min(vantagees * 8, 40);
+  // Score marina-specific terms
+  const marinaMatches = MARINA_TERMS.filter(term => text.includes(term)).length;
+  score += Math.min(marinaMatches * 8, 40);
+
+  // Score other CRE vertical terms (same weight cap, additive with marina)
+  const creMatches = CRE_VERTICAL_TERMS.filter(term => text.includes(term)).length;
+  score += Math.min(creMatches * 8, 40);
 
   // Investment relevance
   const investmentMatches = INVESTMENT_TERMS.filter(term => text.includes(term)).length;
@@ -172,14 +253,14 @@ export function scoreArticle(title: string, content: string, source: string): nu
     score += 10;
   }
 
-  // Bonus for location mentions (marinas are location-specific)
-  if (/florida|california|mediterranean|caribbean|bahamas|monaco|france|italy|spain|greece/i.test(text)) {
+  // Bonus for US location mentions
+  if (/florida|california|texas|new york|arizona|nevada|colorado|georgia|carolinas|mediterranean|caribbean/i.test(text)) {
     score += 5;
   }
 
-  // Penalty for irrelevant content
-  if (/cruise ship|cargo|container|oil|gas|fishing|commercial vessel/i.test(text) && 
-      !/(marina|yacht|boat)/i.test(text)) {
+  // Penalty for clearly irrelevant content (commercial shipping without RE context)
+  if (/cruise ship|cargo ship|container ship|oil rig|fishing vessel|commercial vessel/i.test(text) &&
+      !/(marina|yacht|boat|real estate|property|acquisition)/i.test(text)) {
     score -= 15;
   }
 
@@ -212,25 +293,29 @@ export async function scoreArticleAsync(title: string, content: string, source: 
   const text = `${title} ${content}`.toLowerCase();
   let score = 0;
 
-  // CRITICAL: Check for required marina keyword first using database keywords
+  // Require at least one CRE / asset-class keyword (DB-driven, falls back to DEFAULT_REQUIRED_TERMS)
   const hasRequired = await hasRequiredMarinaKeywordAsync(title, content);
   if (!hasRequired) {
-    // Only allow if it's from a known marina-industry source AND has some marina context
-    const isFromMarinaSource = /marina|boating|dock|yacht|maritime|superyacht/i.test(source);
-    const hasAnyMarinaContext = MARINA_TERMS.some(term => text.includes(term));
-    if (!isFromMarinaSource || !hasAnyMarinaContext) {
-      return 0; // Reject articles without marina relevance
+    const isCRESource = /marina|boating|dock|yacht|maritime|apartment|multifamily|storage|hotel|hospitality|industrial|retail|senior.hous|car.wash|rv.park|campground|manufactured/i.test(source);
+    if (!isCRESource) {
+      return 0;
     }
   }
 
-  // Base score for marina industry sources
+  // Base score for known industry-vertical sources
   if (/marina|boating|dock|yacht|maritime|superyacht/i.test(source)) {
     score += 20;
+  } else if (/apartment|multifamily|storage|hotel|hospitality|industrial|retail|senior.hous|car.wash|rv.park|campground|manufactured/i.test(source)) {
+    score += 15;
   }
 
-  // Score based on marina-specific terms
-  const vantagees = MARINA_TERMS.filter(term => text.includes(term)).length;
-  score += Math.min(vantagees * 8, 40);
+  // Score marina-specific terms
+  const marinaMatches = MARINA_TERMS.filter(term => text.includes(term)).length;
+  score += Math.min(marinaMatches * 8, 40);
+
+  // Score other CRE vertical terms
+  const creMatches = CRE_VERTICAL_TERMS.filter(term => text.includes(term)).length;
+  score += Math.min(creMatches * 8, 40);
 
   // Investment relevance
   const investmentMatches = INVESTMENT_TERMS.filter(term => text.includes(term)).length;
@@ -252,19 +337,19 @@ export async function scoreArticleAsync(title: string, content: string, source: 
   const marinaCount = (text.match(/\bmarina\b/g) || []).length;
   score += Math.min(marinaCount * 5, 15);
 
-  // Bonus for financial figures (indicates investment relevance)
+  // Bonus for financial figures
   if (/\$[\d,]+|€[\d,]+|£[\d,]+|million|billion/i.test(text)) {
     score += 10;
   }
 
-  // Bonus for location mentions (marinas are location-specific)
-  if (/florida|california|mediterranean|caribbean|bahamas|monaco|france|italy|spain|greece/i.test(text)) {
+  // Bonus for US location mentions
+  if (/florida|california|texas|new york|arizona|nevada|colorado|georgia|carolinas|mediterranean|caribbean/i.test(text)) {
     score += 5;
   }
 
-  // Penalty for irrelevant content
-  if (/cruise ship|cargo|container|oil|gas|fishing|commercial vessel/i.test(text) && 
-      !/(marina|yacht|boat)/i.test(text)) {
+  // Penalty for clearly irrelevant content
+  if (/cruise ship|cargo ship|container ship|oil rig|fishing vessel|commercial vessel/i.test(text) &&
+      !/(marina|yacht|boat|real estate|property|acquisition)/i.test(text)) {
     score -= 15;
   }
 

@@ -25,7 +25,11 @@ function normalizeEntityType(type: string): 'company' | 'person' | 'location' | 
 }
 
 const parser = new Parser({
-  timeout: 10000,
+  timeout: 30000,
+  headers: {
+    'User-Agent': 'Mozilla/5.0 (compatible; VantageBot/2.0; +https://vantage.app)',
+    'Accept': 'application/rss+xml, application/xml, text/xml, application/atom+xml, */*',
+  },
   customFields: {
     item: ['contentSnippet', 'content', 'summary']
   }
@@ -631,5 +635,27 @@ export async function initializeDefaultRssSources(): Promise<void> {
       }
     } catch (error) {
     }
+  }
+
+  // Seed all asset class configs and comprehensive source library on startup
+  try {
+    const { seedAllAssetClasses } = await import("../seeds/asset-class-seed");
+    await seedAllAssetClasses();
+  } catch (error) {
+    console.error("[Docket] Asset class seed error:", error);
+  }
+
+  try {
+    const { seedTradePublicationFeeds } = await import("../seeds/trade-publications-feeds");
+    await seedTradePublicationFeeds();
+  } catch (error) {
+    console.error("[Docket] Trade publication seed error:", error);
+  }
+
+  try {
+    const { seedBizJournalsFeeds } = await import("../seeds/bizjournals-feeds");
+    await seedBizJournalsFeeds();
+  } catch (error) {
+    console.error("[Docket] BizJournals seed error:", error);
   }
 }

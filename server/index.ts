@@ -443,6 +443,13 @@ app.use(ddChecklistRouter);
     const docketStorage = new DocketStorage();
     registerDocketRoutes(app, docketStorage);
 
+    // Seed Docket asset classes and RSS sources on startup (non-blocking, idempotent)
+    setImmediate(() => {
+      import('./docket/services/rss-fetcher').then(({ initializeDefaultRssSources }) => {
+        initializeDefaultRssSources().catch(e => console.error('[Docket] Startup seed error:', e));
+      }).catch(e => console.error('[Docket] Failed to load rss-fetcher for seeding:', e));
+    });
+
     // Sentry must run BEFORE the centralized handler so errors are captured
     // even if the central handler transforms them. No-op when SENTRY_DSN unset.
     app.use(sentryErrorHandler);

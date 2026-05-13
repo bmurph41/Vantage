@@ -2,55 +2,61 @@ import { db } from "../db";
 import { rssSources } from "@shared/docket-schema";
 import { eq } from "drizzle-orm";
 
-const MARINA_KEYWORDS = [
-  "marina",
-  "properties",
-  "harbor",
-  "harbour",
-  "dock",
-  "dockage",
-  "waterfront",
-  "boat",
-  "boatyard",
-  "yacht",
-  "yacht club",
-  "safe harbor",
-  "suntex",
-  "westrec",
-  "marinas international",
-  "igd marinas",
-  "bellingham marine",
-  "valvtect",
-  "blackstone",
-  "kkr",
-  "brookfield",
-  "acquisition",
-  "purchase",
-  "sale",
-  "deal",
-  "investment",
-  "private equity",
-  "real estate",
-  "coastal",
-  "port",
-  "slip",
-  "slips",
-  "mooring",
-  "moorage",
-  "storage",
-  "dry storage",
-  "dry stack",
-  "wet slip",
-  "wet slips",
-  "marina operator",
-  "marina management",
-  "boat launch",
-  "boat ramp",
-  "seawall",
-  "bulkhead",
-  "floating dock",
-  "pier",
+// CRE_KEYWORDS: broad keyword set covering all asset classes.
+// BizJournals articles are only ingested when at least one of these terms appears.
+const CRE_KEYWORDS = [
+  // General CRE / investment
+  "commercial real estate", "real estate acquisition", "property acquisition",
+  "real estate investment", "real estate deal", "real estate sale", "real estate fund",
+  "real estate private equity", "real estate portfolio", "REIT",
+  "cap rate", "NOI", "net operating income", "CMBS", "bridge loan",
+  "ground lease", "sale-leaseback", "real estate", "acquisition",
+  "purchase", "sale", "deal", "investment", "private equity", "properties",
+  // Marina / waterfront
+  "marina", "harbor", "harbour", "dock", "dockage", "waterfront", "boat",
+  "boatyard", "yacht", "yacht club", "boat slip", "dry stack", "wet slip",
+  "moorage", "floating dock", "pier", "seawall", "suntex", "westrec",
+  "safe harbor", "oasis marinas", "marina operator", "marina management",
+  "coastal", "port", "slip", "slips", "mooring", "storage", "dry storage",
+  "boat launch", "boat ramp", "bulkhead", "marinas international",
+  "igd marinas", "bellingham marine", "valvtect",
+  // Multifamily
+  "apartment", "multifamily", "apartment complex", "rental housing",
+  "affordable housing", "multifamily acquisition", "NMHC", "NAA",
+  // Self-Storage
+  "self storage", "self-storage", "storage facility", "mini storage",
+  "public storage", "extra space storage", "cubesmart", "life storage",
+  // Industrial / Warehouse
+  "industrial property", "warehouse", "distribution center", "logistics facility",
+  "industrial park", "fulfillment center", "cold storage", "NAIOP",
+  // Retail
+  "shopping center", "strip mall", "retail center", "retail real estate",
+  "ICSC", "grocery anchored", "net lease", "NNN lease", "power center",
+  // Hotel / Hospitality
+  "hotel", "hospitality property", "resort", "lodging", "hotel acquisition",
+  "RevPAR", "extended stay", "full-service hotel",
+  // Short-Term Rental
+  "short-term rental", "vacation rental", "Airbnb", "VRBO", "STR market",
+  // Senior Housing / Healthcare
+  "senior housing", "assisted living", "skilled nursing facility",
+  "memory care", "healthcare real estate", "medical office building",
+  // Mobile Home Parks
+  "manufactured housing", "mobile home park", "land lease community",
+  "Sun Communities", "Equity LifeStyle",
+  // Car Wash
+  "car wash", "carwash", "express car wash",
+  // RV Parks
+  "rv park", "rv resort", "campground acquisition", "glamping",
+  // Office
+  "office building", "office acquisition", "office market", "coworking",
+  // Broad finance / macro (BizJournals articles often touch these)
+  "blackstone", "kkr", "brookfield", "carlyle", "starwood capital",
+  "interest rate", "federal reserve", "inflation", "recession",
+  "development", "property investment",
 ];
+
+// Keep backward-compatible alias
+const MARINA_KEYWORDS = CRE_KEYWORDS;
 
 const BIZJOURNALS_REGIONAL_FEEDS = [
   {
