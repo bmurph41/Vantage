@@ -313,19 +313,6 @@ function BlockDrawer({
     },
   });
 
-  const calMutation = useMutation({
-    mutationFn: () =>
-      apiRequest("POST", `/api/prospecting/time-blocks/${drawerState.block!.id}/push-calendar`, {}),
-    onSuccess: () => {
-      toast({ title: "Synced to Google Calendar" });
-      onSaved();
-    },
-    onError: (e: unknown) => {
-      const msg = e instanceof Error ? e.message : "Calendar push failed";
-      toast({ title: "Calendar Error", description: msg, variant: "destructive" });
-    },
-  });
-
   const toggleInvite = (uid: string) =>
     setField(
       "invited_user_ids",
@@ -422,27 +409,14 @@ function BlockDrawer({
             </div>
           )}
 
-          {!isEdit && (
+          {(!isEdit || (isEdit && !drawerState.block?.synced_to_calendar)) && (
             <div className="flex items-center gap-3">
               <Switch
                 checked={form.push_to_calendar}
                 onCheckedChange={(v) => setField("push_to_calendar", v)}
               />
-              <Label className="cursor-pointer">Push to Google Calendar</Label>
+              <Label className="cursor-pointer">Push to Google Calendar on save</Label>
             </div>
-          )}
-
-          {isEdit && drawerState.block && !drawerState.block.synced_to_calendar && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full"
-              onClick={() => calMutation.mutate()}
-              disabled={calMutation.isPending}
-            >
-              <CalendarDays className="w-4 h-4 mr-2" />
-              {calMutation.isPending ? "Syncing…" : "Push to Google Calendar"}
-            </Button>
           )}
 
           {isEdit && drawerState.block?.synced_to_calendar && (

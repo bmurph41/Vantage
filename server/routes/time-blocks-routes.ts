@@ -170,9 +170,9 @@ router.patch('/:id', async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { orgId, userId } = getOrgUser(req);
     const { id } = req.params;
-    const { title, blockType, startAt, endAt, notes, color, invitedUserIds } = req.body as {
+    const { title, blockType, startAt, endAt, notes, color, invitedUserIds, pushToCalendar } = req.body as {
       title?: string; blockType?: string; startAt?: string; endAt?: string;
-      notes?: string; color?: string; invitedUserIds?: string[];
+      notes?: string; color?: string; invitedUserIds?: string[]; pushToCalendar?: boolean;
     };
 
     const { rows: [existing] } = await pool.query(
@@ -243,6 +243,37 @@ router.patch('/:id', async (req: AuthenticatedRequest, res: Response) => {
       const newInvitees = safeInvitees.filter((uid: string) => !prevIds.includes(uid));
       if (newInvitees.length > 0) {
         await notifyInvitees(newInvitees, orgId, userId, id, updated.title ?? existing.title);
+      }
+    }
+
+    // Push to Google Calendar if requested and not already synced
+    if (pushToCalendar && !updated.synced_to_calendar) {
+      try {
+        const { rows: [inviterUser] } = await pool.query(`SELECT email, name FROM users WHERE id = $1`, [userId]);
+        const attendeeEmails: string[] = [];
+        if (updated.invited_user_ids?.length) {
+          const { rows: attendees } = await pool.query(
+            `SELECT email FROM users WHERE id::text = ANY($1::text[])`,
+            [updated.invited_user_ids]
+          );
+          attendeeEmails.push(...attendees.map((u: { email: string }) => u.email));
+        }
+        const calEvent = await createCalendarEvent({
+          title: updated.title,
+          startAt: updated.start_at,
+          endAt: updated.end_at,
+          notes: updated.notes,
+          attendeeEmails,
+          organizerEmail: inviterUser?.email,
+        });
+        await pool.query(
+          `UPDATE prospecting_time_blocks SET synced_to_calendar = true, google_calendar_event_id = $1 WHERE id = $2`,
+          [calEvent?.id ?? null, id]
+        );
+        updated.synced_to_calendar = true;
+        updated.google_calendar_event_id = calEvent?.id ?? null;
+      } catch (_calErr) {
+        // Non-fatal — block was saved; calendar push failed silently
       }
     }
 
