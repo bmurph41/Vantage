@@ -1992,7 +1992,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
         }
       }
       
-      const checkProjectOnly = req.body.checkProjectOnly === 'true';
+      const checkProjectOnly = req.body.checkProjectOnly !== 'false'; // default true: scope duplicate check to this project only
       
       const displayName = req.body.displayName?.trim() || req.file.originalname;
       
