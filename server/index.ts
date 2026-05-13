@@ -105,7 +105,19 @@ app.post(
     try {
       const stripeKey = process.env.STRIPE_SECRET_KEY;
       if (!stripeKey) {
-        return res.status(200).json({ received: true });
+        const isProductionEnv = process.env.NODE_ENV === 'production';
+        if (isProductionEnv) {
+          console.error('[STRIPE_WEBHOOK] CRITICAL: STRIPE_SECRET_KEY not configured in production. Webhook events are not being processed.');
+          return res.status(503).json({
+            error: 'Stripe not configured',
+            message: 'Server is missing required Stripe configuration. Webhook cannot be processed.',
+          });
+        }
+        console.warn('[STRIPE_WEBHOOK] STRIPE_SECRET_KEY not configured (dev environment). Webhook not processed.');
+        return res.status(503).json({
+          error: 'Stripe not configured',
+          message: 'Set STRIPE_SECRET_KEY to process webhooks in development.',
+        });
       }
 
       const Stripe = (await import('stripe')).default;
