@@ -542,15 +542,27 @@ function CrmActivityDetailPanel({
 }) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const [showCompleteForm, setShowCompleteForm] = useState(false);
+  const [completeNote, setCompleteNote] = useState("");
+
+  useEffect(() => {
+    setShowCompleteForm(false);
+    setCompleteNote("");
+  }, [activity?.id]);
 
   const markCompleteMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const res = await apiRequest("POST", `/api/crm/activities/${id}/complete`);
+    mutationFn: async ({ id, notes }: { id: string; notes: string }) => {
+      const res = await apiRequest("PUT", `/api/crm/activities/${id}`, {
+        status: "completed",
+        ...(notes.trim() ? { notes: notes.trim() } : {}),
+      });
       return res.json();
     },
     onSuccess: (updated) => {
       onActivityUpdated({ ...activity!, status: "completed", ...updated });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/activities"] });
+      setShowCompleteForm(false);
+      setCompleteNote("");
       toast({ title: "Activity marked as complete" });
     },
     onError: () => {
@@ -634,18 +646,50 @@ function CrmActivityDetailPanel({
             </div>
           )}
 
-          {/* Mark as Complete button */}
+          {/* Mark as Complete */}
           {!isCompleted && (
-            <div className="pt-1">
-              <Button
-                className="w-full"
-                variant="default"
-                onClick={() => markCompleteMutation.mutate(activity.id)}
-                disabled={markCompleteMutation.isPending}
-              >
-                <CheckCircle className="w-4 h-4 mr-2" />
-                {markCompleteMutation.isPending ? "Saving…" : "Mark as Complete"}
-              </Button>
+            <div className="pt-1 space-y-2">
+              {!showCompleteForm ? (
+                <Button
+                  className="w-full"
+                  variant="default"
+                  onClick={() => setShowCompleteForm(true)}
+                >
+                  <CheckCircle className="w-4 h-4 mr-2" />
+                  Mark as Complete
+                </Button>
+              ) : (
+                <div className="rounded-md border bg-muted/30 p-3 space-y-2">
+                  <Label className="text-sm font-medium">Completion notes (optional)</Label>
+                  <Textarea
+                    placeholder="What happened? Any next steps or outcomes…"
+                    value={completeNote}
+                    onChange={(e) => setCompleteNote(e.target.value)}
+                    rows={3}
+                    className="resize-none text-sm"
+                  />
+                  <div className="flex gap-2">
+                    <Button
+                      className="flex-1"
+                      variant="default"
+                      size="sm"
+                      onClick={() => markCompleteMutation.mutate({ id: activity.id, notes: completeNote })}
+                      disabled={markCompleteMutation.isPending}
+                    >
+                      <CheckCircle className="w-3.5 h-3.5 mr-1.5" />
+                      {markCompleteMutation.isPending ? "Saving…" : "Confirm Complete"}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => { setShowCompleteForm(false); setCompleteNote(""); }}
+                      disabled={markCompleteMutation.isPending}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
