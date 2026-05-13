@@ -838,7 +838,7 @@ router.post('/after-tax-analysis', async (req: Request, res: Response, next: Nex
 router.get("/portfolio/debt", async (req: Request, res: Response, next: NextFunction) => {
   try {
     const orgId = getOrgId(req);
-    const projects = await storage.listModelingProjects(orgId);
+    const projects = await storage.getModelingProjects(orgId!);
 
     const { loans: loansTable } = await import("@shared/schema");
     const { eq, and } = await import("drizzle-orm");
