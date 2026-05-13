@@ -100,17 +100,31 @@ export default function IRRDecomposition({ projectId, onTabChange }: IRRDecompos
     isError,
     error: decompositionError,
     refetch,
-  } = useQuery<IRRDecompositionData>({
+  } = useQuery<IRRDecompositionData | { requiresInputs: true; missing: string[] }>({
     queryKey: ['irr-decomposition', projectId],
     queryFn: async () => {
-      const res = await apiRequest('POST', '/api/institutional-analysis/irr-decomposition', {
-        projectId,
+      // Direct fetch (not apiRequest) so we can branch on 422 instead of
+      // throwing — the route returns 422 'requires-inputs' with a `missing`
+      // array when the project doesn't yet have the assumptions needed.
+      const res = await fetch('/api/institutional-analysis/irr-decomposition', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ projectId }),
       });
+      if (res.status === 422) {
+        const body = await res.json().catch(() => ({}));
+        return { requiresInputs: true as const, missing: body.missing || [] };
+      }
+      if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`);
       return res.json();
     },
     enabled: !!projectId,
     retry: false,
   });
+
+  const isRequiresInputs =
+    decomposition && (decomposition as any).requiresInputs === true;
 
   const exportMutation = useMutation({
     mutationFn: async () => {
@@ -193,18 +207,30 @@ export default function IRRDecomposition({ projectId, onTabChange }: IRRDecompos
     );
   }
 
-  if (isError) {
+  if (isError || isRequiresInputs) {
+    const missing = isRequiresInputs ? (decomposition as any).missing as string[] : [];
     const errMsg = (decompositionError as any)?.message ?? '';
     return (
       <div className="flex flex-col items-center justify-center py-16 px-8 text-center space-y-4">
         <div className="rounded-full bg-amber-100 dark:bg-amber-950 p-4">
           <AlertCircle className="h-8 w-8 text-amber-500" />
         </div>
-        <div>
+        <div className="max-w-md">
           <h3 className="text-lg font-semibold mb-1">IRR Decomposition Unavailable</h3>
-          <p className="text-sm text-muted-foreground max-w-md">
-            {errMsg || 'Unable to compute IRR decomposition. Ensure the project has complete assumptions and cash flow data.'}
-          </p>
+          {isRequiresInputs ? (
+            <>
+              <p className="text-sm text-muted-foreground mb-2">
+                Add the following on the Inputs tab to enable IRR decomposition:
+              </p>
+              <ul className="text-sm text-muted-foreground list-disc list-inside text-left inline-block">
+                {missing.map((m) => <li key={m}>{m}</li>)}
+              </ul>
+            </>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              {errMsg || 'Unable to compute IRR decomposition. Ensure the project has complete assumptions and cash flow data.'}
+            </p>
+          )}
         </div>
         <div className="flex gap-3">
           <Button variant="outline" size="sm" onClick={() => refetch()}>
@@ -220,7 +246,7 @@ export default function IRRDecomposition({ projectId, onTabChange }: IRRDecompos
     );
   }
 
-  if (!decomposition) return null;
+  if (!decomposition || isRequiresInputs) return null;
 
   const kpis = [
     {

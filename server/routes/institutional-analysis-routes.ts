@@ -33,8 +33,106 @@ const router = Router();
 // 1. IRR DECOMPOSITION
 // ============================================================================
 
+/**
+ * Resolve the 11 IRR-decomposition inputs from a modeling project. Returns
+ * `null` and emits a 422 'requires-inputs' response when prerequisites are
+ * missing so the client can render an empty-state instead of an unfriendly
+ * Zod field list. The pre-fix behavior returned 400 with all 11 fields
+ * required, which made the tab look broken on every new project.
+ */
+async function resolveIrrInputsFromProject(projectId: string): Promise<
+  | { ok: true; inputs: Parameters<typeof institutionalAnalysisService.computeReturnDecomposition>[0] }
+  | { ok: false; missing: string[] }
+> {
+  const proj = await db.execute(sql`
+    SELECT purchase_price, year_1_cap_rate, created_at FROM modeling_projects WHERE id = ${projectId} LIMIT 1
+  `);
+  const projRow = (proj.rows as any[])?.[0];
+  if (!projRow) return { ok: false, missing: ['project'] };
+
+  const cfg = await db.execute(sql`
+    SELECT hold_period FROM modeling_project_config WHERE modeling_project_id = ${projectId} LIMIT 1
+  `);
+  const cfgRow = (cfg.rows as any[])?.[0];
+
+  const scen = await db.execute(sql`
+    SELECT revenue_growth_rate, expense_growth_rate, exit_cap_rate
+    FROM modeling_scenario_versions
+    WHERE modeling_project_id = ${projectId}
+    ORDER BY created_at DESC LIMIT 1
+  `);
+  const scenRow = (scen.rows as any[])?.[0];
+
+  const dbg = await db.execute(sql`
+    SELECT loan_amount, interest_rate, amortization_months
+    FROM debt_inputs WHERE modeling_project_id = ${projectId} LIMIT 1
+  `).catch(() => ({ rows: [] as any[] }));
+  const debtRow = (dbg.rows as any[])?.[0];
+
+  const num = (v: any): number | null => {
+    if (v == null) return null;
+    const n = typeof v === 'string' ? parseFloat(v) : Number(v);
+    return Number.isFinite(n) ? n : null;
+  };
+
+  const purchasePrice = num(projRow.purchase_price);
+  const year1Cap = num(projRow.year_1_cap_rate);
+  const year1NOI = purchasePrice && year1Cap ? purchasePrice * (year1Cap / 100) : null;
+  const holdPeriodYears = num(cfgRow?.hold_period) ?? 5;
+  const noiGrowthRate = num(scenRow?.revenue_growth_rate) ?? 0.03;
+  const exitCapRate = num(scenRow?.exit_cap_rate) ?? (year1Cap ? year1Cap / 100 : null);
+  const loanAmount = num(debtRow?.loan_amount) ?? 0;
+  const interestRate = num(debtRow?.interest_rate) ?? 0;
+  const amortizationMonths = num(debtRow?.amortization_months) ?? 0;
+  const equityInvested = purchasePrice != null ? Math.max(purchasePrice - loanAmount, 1) : null;
+  const sellingCostPct = 0.02;
+  const acquisitionDate = projRow.created_at instanceof Date
+    ? projRow.created_at.toISOString()
+    : new Date(projRow.created_at).toISOString();
+
+  const missing: string[] = [];
+  if (!purchasePrice) missing.push('Purchase Price');
+  if (!year1NOI) missing.push('Year 1 NOI (derived from cap rate)');
+  if (!exitCapRate) missing.push('Exit Cap Rate');
+  if (missing.length > 0) return { ok: false, missing };
+
+  return {
+    ok: true,
+    inputs: {
+      purchasePrice: purchasePrice!,
+      equityInvested: equityInvested!,
+      loanAmount,
+      interestRate,
+      amortizationMonths,
+      holdPeriodYears,
+      year1NOI: year1NOI!,
+      noiGrowthRate,
+      exitCapRate: exitCapRate!,
+      sellingCostPct,
+      acquisitionDate,
+    },
+  };
+}
+
 router.post('/irr-decomposition', async (req: Request, res: Response) => {
   try {
+    // Two body shapes: caller may post the full input set OR just a projectId.
+    // The latter is the common path from the workspace tab. Resolve from
+    // project assumptions when only an id is provided so the tab works on
+    // every project without a side-trip through the UI to fill 11 fields.
+    if (req.body?.projectId && Object.keys(req.body).length === 1) {
+      const resolved = await resolveIrrInputsFromProject(String(req.body.projectId));
+      if (!resolved.ok) {
+        return res.status(422).json({
+          error: 'requires-inputs',
+          message: 'IRR decomposition needs more data on this project.',
+          missing: resolved.missing,
+        });
+      }
+      const result = institutionalAnalysisService.computeReturnDecomposition(resolved.inputs);
+      return res.json(result);
+    }
+
     const body = z.object({
       purchasePrice: z.number().positive(),
       equityInvested: z.number().positive(),
@@ -61,8 +159,80 @@ router.post('/irr-decomposition', async (req: Request, res: Response) => {
 // 2. MARK-TO-MARKET
 // ============================================================================
 
+async function resolveMtmInputsFromProject(projectId: string): Promise<
+  | { ok: true; units: any[]; purchasePrice: number }
+  | { ok: false; missing: string[] }
+> {
+  const proj = await db.execute(sql`
+    SELECT purchase_price FROM modeling_projects WHERE id = ${projectId} LIMIT 1
+  `);
+  const projRow = (proj.rows as any[])?.[0];
+  if (!projRow) return { ok: false, missing: ['project'] };
+
+  const purchasePrice = projRow.purchase_price ? parseFloat(projRow.purchase_price) : null;
+  if (!purchasePrice) return { ok: false, missing: ['Purchase Price'] };
+
+  // Pull commercial-lease rent-roll first (the typical MTM source). Fall back
+  // to rent_roll_entries if there are no commercial leases.
+  const leasesResult = await db.execute(sql`
+    SELECT id, unit_number, tenant_name, lease_type, square_footage,
+           monthly_rent, market_rent, lease_end, status
+    FROM commercial_leases
+    WHERE project_id = ${projectId}
+  `).catch(() => ({ rows: [] as any[] }));
+
+  let units: any[] = (leasesResult.rows as any[]).map((l) => ({
+    unitId: l.id,
+    unitName: l.unit_number || 'Unit',
+    unitType: l.lease_type || 'commercial',
+    size: l.square_footage ? String(l.square_footage) : undefined,
+    currentRent: parseFloat(l.monthly_rent || '0'),
+    marketRent: parseFloat(l.market_rent || l.monthly_rent || '0'),
+    leaseExpiry: l.lease_end || undefined,
+    occupancyStatus: (l.status === 'active' || l.status === 'current')
+      ? 'occupied'
+      : (l.tenant_name ? 'pending' : 'vacant'),
+  }));
+
+  if (units.length === 0) {
+    const rrResult = await db.execute(sql`
+      SELECT rre.id, rre.unit_id, rre.monthly_rate, rre.start_date
+      FROM rent_roll_entries rre
+      INNER JOIN rent_rolls rr ON rre.rent_roll_id = rr.id
+      WHERE rr.modeling_project_id = ${projectId}
+      LIMIT 500
+    `).catch(() => ({ rows: [] as any[] }));
+    units = (rrResult.rows as any[]).map((r) => ({
+      unitId: r.id,
+      unitName: r.unit_id || 'Unit',
+      unitType: 'residential',
+      currentRent: parseFloat(r.monthly_rate || '0'),
+      marketRent: parseFloat(r.monthly_rate || '0'),
+      occupancyStatus: 'occupied',
+    }));
+  }
+
+  if (units.length === 0) return { ok: false, missing: ['Rent Roll'] };
+  return { ok: true, units, purchasePrice };
+}
+
 router.post('/mark-to-market', async (req: Request, res: Response) => {
   try {
+    if (req.body?.projectId && Object.keys(req.body).length === 1) {
+      const resolved = await resolveMtmInputsFromProject(String(req.body.projectId));
+      if (!resolved.ok) {
+        return res.status(422).json({
+          error: 'requires-inputs',
+          message: 'Mark-to-market needs more data on this project.',
+          missing: resolved.missing,
+        });
+      }
+      const result = institutionalAnalysisService.computeMarkToMarket(
+        resolved.units, resolved.purchasePrice,
+      );
+      return res.json(result);
+    }
+
     const body = z.object({
       units: z.array(z.object({
         unitId: z.string(),

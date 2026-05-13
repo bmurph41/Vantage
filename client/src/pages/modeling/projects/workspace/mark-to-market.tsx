@@ -547,17 +547,33 @@ function ByTypeTab({ typeBreakdown }: { typeBreakdown: MtmTypeBreakdown[] }) {
 function MarkToMarket({ projectId, onTabChange }: MarkToMarketProps) {
   const [activeTab, setActiveTab] = useState('summary');
 
-  const { data: analysis, isLoading, error } = useQuery<MtmAnalysis>({
+  const { data: analysisRaw, isLoading, error } = useQuery<MtmAnalysis | { requiresInputs: true; missing: string[] }>({
     queryKey: ['mark-to-market', projectId],
     queryFn: async () => {
-      const res = await apiRequest('POST', '/api/institutional-analysis/mark-to-market', {
-        projectId,
+      const res = await fetch('/api/institutional-analysis/mark-to-market', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ projectId }),
       });
+      if (res.status === 422) {
+        const body = await res.json().catch(() => ({}));
+        return { requiresInputs: true as const, missing: body.missing || [] };
+      }
+      if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`);
       return res.json();
     },
     enabled: !!projectId,
     staleTime: 5 * 60 * 1000,
   });
+
+  const isRequiresInputs = analysisRaw && (analysisRaw as any).requiresInputs === true;
+  // Downstream rendering reads `analysis` as the narrowed MtmAnalysis (or
+  // undefined when still loading or in requires-inputs state). The early
+  // return below already short-circuits the requires-inputs branch.
+  const analysis: MtmAnalysis | undefined = isRequiresInputs
+    ? undefined
+    : (analysisRaw as MtmAnalysis | undefined);
 
   const handleTabChange = (tab: string) => {
     setActiveTab(tab);
@@ -583,21 +599,34 @@ function MarkToMarket({ projectId, onTabChange }: MarkToMarketProps) {
     }
   };
 
-  if (error) {
+  if (error || isRequiresInputs) {
+    const missing = isRequiresInputs ? ((analysisRaw as any).missing as string[]) : [];
     return (
       <Card>
         <CardContent className="py-12">
-          <div className="flex flex-col items-center gap-3 text-center">
-            <AlertTriangle className="h-10 w-10 text-destructive" />
-            <p className="text-lg font-semibold">Unable to Load Mark-to-Market Analysis</p>
-            <p className="text-sm text-muted-foreground max-w-md">
-              {error instanceof Error ? error.message : 'An unexpected error occurred while fetching mark-to-market data.'}
-            </p>
+          <div className="flex flex-col items-center gap-3 text-center max-w-md mx-auto">
+            <AlertTriangle className="h-10 w-10 text-amber-500" />
+            <p className="text-lg font-semibold">Mark-to-Market Unavailable</p>
+            {isRequiresInputs ? (
+              <>
+                <p className="text-sm text-muted-foreground">
+                  Add the following on this project to enable mark-to-market analysis:
+                </p>
+                <ul className="text-sm text-muted-foreground list-disc list-inside text-left inline-block">
+                  {missing.map((m) => <li key={m}>{m}</li>)}
+                </ul>
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                {error instanceof Error ? error.message : 'An unexpected error occurred while fetching mark-to-market data.'}
+              </p>
+            )}
           </div>
         </CardContent>
       </Card>
     );
   }
+
 
   return (
     <div className="space-y-6">
