@@ -154,6 +154,39 @@ app.post(
         }
       }
 
+      // ── Success-aware idempotency (Day 3 sub-fix 3b) ─────────────────────
+      // Fires AFTER signature verification (so we never persist unverified
+      // events) and BEFORE the event-type switch (so duplicates short-circuit
+      // before any business logic). Retryable: a previously-failed row is
+      // reset to 'received' and re-processed so transient failures can
+      // recover on Stripe's automatic redelivery.
+      const { pool } = await import('./db');
+      try {
+        const existing = await pool.query(
+          `SELECT processing_status FROM stripe_events WHERE stripe_event_id = $1`,
+          [event.id],
+        );
+
+        if (existing.rows.length > 0 && existing.rows[0].processing_status === 'succeeded') {
+          console.info(`[STRIPE_WEBHOOK] Duplicate event ${event.id} (${event.type}), already succeeded`);
+          return res.status(200).json({ received: true, duplicate: true });
+        }
+
+        await pool.query(
+          `INSERT INTO stripe_events (stripe_event_id, event_type, raw_event, processing_status)
+           VALUES ($1, $2, $3, 'received')
+           ON CONFLICT (stripe_event_id) DO UPDATE
+             SET processing_status = 'received',
+                 error_message = NULL,
+                 received_at = NOW(),
+                 raw_event = EXCLUDED.raw_event`,
+          [event.id, event.type, JSON.stringify(event)],
+        );
+      } catch (err) {
+        console.error('[STRIPE_WEBHOOK] Dedupe check/insert failed:', err);
+        return res.status(500).json({ error: 'Dedupe failed', message: 'Please retry.' });
+      }
+
       const data = event.data.object;
       const orgId = data.metadata?.orgId || data.subscription_details?.metadata?.orgId;
 
@@ -391,10 +424,42 @@ app.post(
         console.error('[Stripe Webhook] billingService.handleWebhook error:', delegateErr.message);
       }
 
+      // Success-mark before responding — the row landed via dedupe upsert above.
+      try {
+        await pool.query(
+          `UPDATE stripe_events
+              SET processing_status = 'succeeded',
+                  completed_at = NOW(),
+                  error_message = NULL
+            WHERE stripe_event_id = $1`,
+          [event.id],
+        );
+      } catch (markErr: any) {
+        // Don't fail the webhook for a status-write hiccup — Stripe already got the work done.
+        console.error('[STRIPE_WEBHOOK] Failed to mark event succeeded:', markErr?.message);
+      }
+
       res.json({ received: true });
     } catch (error: any) {
       // Return 500 so Stripe retries the webhook delivery; log full error server-side
       console.error('[Stripe Webhook] Processing error:', error.message, error.stack);
+      // Failure-mark — only meaningful when dedupe upsert already landed.
+      // event may be undefined if we threw before sig verification; guard with optional chaining.
+      try {
+        if (event?.id) {
+          const { pool } = await import('./db');
+          await pool.query(
+            `UPDATE stripe_events
+                SET processing_status = 'failed',
+                    error_message = $2,
+                    completed_at = NOW()
+              WHERE stripe_event_id = $1`,
+            [event.id, String(error?.message ?? 'unknown').slice(0, 2000)],
+          );
+        }
+      } catch (markErr: any) {
+        console.error('[STRIPE_WEBHOOK] Failed to mark event failed:', markErr?.message);
+      }
       res.status(500).json({ error: 'Webhook processing failed' });
     }
   }

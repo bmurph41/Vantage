@@ -28666,6 +28666,19 @@ export const billingSubscriptions = pgTable("billing_subscriptions", {
 export type BillingSubscription = typeof billingSubscriptions.$inferSelect;
 export type InsertBillingSubscription = typeof billingSubscriptions.$inferInsert;
 
+export const stripeEvents = pgTable("stripe_events", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  stripeEventId: varchar("stripe_event_id", { length: 255 }).notNull().unique(),
+  eventType: varchar("event_type", { length: 100 }).notNull(),
+  rawEvent: jsonb("raw_event").notNull(),
+  processingStatus: varchar("processing_status", { length: 20 }).notNull().default("received"),
+  errorMessage: text("error_message"),
+  receivedAt: timestamp("received_at", { withTimezone: true }).defaultNow().notNull(),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+});
+export type StripeEvent = typeof stripeEvents.$inferSelect;
+export type InsertStripeEvent = typeof stripeEvents.$inferInsert;
+
 export const billingInvoices = pgTable("billing_invoices", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   orgId: varchar("org_id").notNull().references(() => organizations.id),

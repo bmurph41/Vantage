@@ -19942,6 +19942,27 @@ const MIGRATIONS: Migration[] = [
   { name: "prospecting_time_blocks: end_at_timestamptz", sql: `ALTER TABLE prospecting_time_blocks ALTER COLUMN end_at TYPE timestamptz USING end_at AT TIME ZONE 'UTC'` },
   { name: "prospecting_time_blocks: add parent_block_id", sql: `ALTER TABLE prospecting_time_blocks ADD COLUMN IF NOT EXISTS parent_block_id varchar` },
   { name: "prospecting_time_blocks: add recurrence_rule", sql: `ALTER TABLE prospecting_time_blocks ADD COLUMN IF NOT EXISTS recurrence_rule jsonb` },
+
+  // stripe_events — webhook idempotency ledger (Day 3 sub-fix 3b).
+  // Success-aware dedupe: 'received' → 'succeeded' on completion or
+  // 'failed' on outer-catch. Retries upsert the row back to 'received'.
+  {
+    name: "stripe_events: create table",
+    sql: `
+      CREATE TABLE IF NOT EXISTS stripe_events (
+        id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+        stripe_event_id varchar(255) NOT NULL UNIQUE,
+        event_type varchar(100) NOT NULL,
+        raw_event jsonb NOT NULL,
+        processing_status varchar(20) NOT NULL DEFAULT 'received',
+        error_message text,
+        received_at timestamp with time zone DEFAULT now() NOT NULL,
+        completed_at timestamp with time zone
+      )
+    `,
+  },
+  { name: "stripe_events: idx_status", sql: `CREATE INDEX IF NOT EXISTS idx_stripe_events_status ON stripe_events (processing_status)` },
+  { name: "stripe_events: idx_received_at", sql: `CREATE INDEX IF NOT EXISTS idx_stripe_events_received_at ON stripe_events (received_at DESC)` },
 ];
 
 /**
