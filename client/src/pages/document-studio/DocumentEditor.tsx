@@ -55,7 +55,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
 import { cn } from '@/lib/utils';
-import { queryClient } from '@/lib/queryClient';
+import { apiRequest, queryClient } from '@/lib/queryClient';
 
 import {
   FileText, ArrowLeft, Save, Download, Share2, Settings, Eye, Sparkles,
@@ -421,17 +421,10 @@ function VersionHistoryPanel({ documentId }: { documentId: string }) {
   const saveVersion = async () => {
     setSaving(true);
     try {
-      const res = await fetch(`/api/document-builder/documents/${documentId}/versions`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ changeDescription: description || undefined }),
-      });
-      if (res.ok) {
-        queryClient.invalidateQueries({ queryKey: [`/api/document-builder/documents/${documentId}/versions`] });
-        toast({ title: 'Version saved' });
-        setDescription('');
-      }
+      await apiRequest('POST', `/api/document-builder/documents/${documentId}/versions`, { changeDescription: description || undefined });
+      queryClient.invalidateQueries({ queryKey: [`/api/document-builder/documents/${documentId}/versions`] });
+      toast({ title: 'Version saved' });
+      setDescription('');
     } catch {
       toast({ title: 'Failed to save version', variant: 'destructive' });
     } finally {
@@ -441,14 +434,9 @@ function VersionHistoryPanel({ documentId }: { documentId: string }) {
 
   const restoreVersion = async (versionId: string, versionNumber: number) => {
     try {
-      const res = await fetch(`/api/document-builder/documents/${documentId}/versions/${versionId}/restore`, {
-        method: 'POST',
-        credentials: 'include',
-      });
-      if (res.ok) {
-        queryClient.invalidateQueries({ queryKey: ['document-builder'] });
-        toast({ title: `Restored to version ${versionNumber}` });
-      }
+      await apiRequest('POST', `/api/document-builder/documents/${documentId}/versions/${versionId}/restore`);
+      queryClient.invalidateQueries({ queryKey: ['document-builder'] });
+      toast({ title: `Restored to version ${versionNumber}` });
     } catch {
       toast({ title: 'Failed to restore', variant: 'destructive' });
     }

@@ -285,8 +285,7 @@ export default function DocumentStudioHub() {
 
   const deleteMutation = useMutation({
     mutationFn: async (docId: number) => {
-      const res = await fetch(`/api/document-builder/documents/${docId}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("Delete failed");
+      await apiRequest("DELETE", `/api/document-builder/documents/${docId}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["document-builder", "documents"] });
@@ -299,8 +298,7 @@ export default function DocumentStudioHub() {
 
   const duplicateMutation = useMutation({
     mutationFn: async (docId: number) => {
-      const res = await fetch(`/api/document-builder/documents/${docId}/duplicate`, { method: "POST" });
-      if (!res.ok) throw new Error("Duplicate failed");
+      const res = await apiRequest("POST", `/api/document-builder/documents/${docId}/duplicate`);
       return res.json();
     },
     onSuccess: () => {
@@ -322,12 +320,7 @@ export default function DocumentStudioHub() {
       audience?: string;
       assetClass?: string;
     }) => {
-      const res = await fetch("/api/document-builder/documents", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(input),
-      });
-      if (!res.ok) throw new Error("Create failed");
+      const res = await apiRequest("POST", "/api/document-builder/documents", input);
       const json = await res.json();
       return json.data ?? json;
     },
@@ -748,12 +741,7 @@ export default function DocumentStudioHub() {
                                 </DropdownMenuItem>
                                 <DropdownMenuItem onClick={async () => {
                                   try {
-                                    const res = await fetch(`/api/document-builder/documents/${doc.id}/export`, {
-                                      method: 'POST',
-                                      headers: { 'Content-Type': 'application/json' },
-                                      body: JSON.stringify({ format: 'pdf' }),
-                                    });
-                                    if (!res.ok) throw new Error('Export failed');
+                                    const res = await apiRequest('POST', `/api/document-builder/documents/${doc.id}/export`, { format: 'pdf' });
                                     const json = await res.json();
                                     const job = json.data ?? json;
                                     toast({ title: 'Export started', description: `PDF export is being generated. Job ID: ${job.id}` });
@@ -780,12 +768,7 @@ export default function DocumentStudioHub() {
                                 </DropdownMenuItem>
                                 <DropdownMenuItem onClick={async () => {
                                   try {
-                                    const res = await fetch(`/api/document-builder/documents/${doc.id}/export`, {
-                                      method: 'POST',
-                                      headers: { 'Content-Type': 'application/json' },
-                                      body: JSON.stringify({ format: 'docx' }),
-                                    });
-                                    if (!res.ok) throw new Error('Export failed');
+                                    const res = await apiRequest('POST', `/api/document-builder/documents/${doc.id}/export`, { format: 'docx' });
                                     const json = await res.json();
                                     const job = json.data ?? json;
                                     toast({ title: 'Export started', description: `DOCX export is being generated. Job ID: ${job.id}` });
@@ -812,12 +795,7 @@ export default function DocumentStudioHub() {
                                 </DropdownMenuItem>
                                 <DropdownMenuItem onClick={async () => {
                                   try {
-                                    const res = await fetch(`/api/document-builder/documents/${doc.id}/export`, {
-                                      method: 'POST',
-                                      headers: { 'Content-Type': 'application/json' },
-                                      body: JSON.stringify({ format: 'pptx' }),
-                                    });
-                                    if (!res.ok) throw new Error('Export failed');
+                                    const res = await apiRequest('POST', `/api/document-builder/documents/${doc.id}/export`, { format: 'pptx' });
                                     const json = await res.json();
                                     const job = json.data ?? json;
                                     toast({ title: 'Export started', description: `PPTX export is being generated. Job ID: ${job.id}` });
