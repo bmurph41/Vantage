@@ -250,8 +250,11 @@ function parseCoveredItems(): {
   const coveredIndexes = new Set<string>();
 
   // Match: ALTER TABLE <table> ADD COLUMN IF NOT EXISTS <column>
+  // Column name may be double-quoted when it collides with a PostgreSQL reserved
+  // word (e.g. "group", "user", "order"). The quotes are required in the SQL
+  // but should be stripped when keying coverage.
   const addColRe =
-    /ALTER\s+TABLE\s+(\w+)\s+ADD\s+COLUMN\s+IF\s+NOT\s+EXISTS\s+(\w+)/gi;
+    /ALTER\s+TABLE\s+(\w+)\s+ADD\s+COLUMN\s+IF\s+NOT\s+EXISTS\s+"?(\w+)"?/gi;
   for (const m of migrationsSource.matchAll(addColRe)) {
     coveredColumns.add(`${m[1].toLowerCase()}.${m[2].toLowerCase()}`);
   }
