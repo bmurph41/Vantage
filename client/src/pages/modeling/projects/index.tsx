@@ -376,11 +376,11 @@ export default function ModelingProjectsPage() {
                       <TableHead className="font-bold text-foreground min-w-[180px]">Marina Name</TableHead>
                       <TableHead className="font-bold text-foreground text-center">Asset Class</TableHead>
                       <TableHead className="font-bold text-foreground text-center">UW Stage</TableHead>
-                      <TableHead className="font-bold text-foreground text-right whitespace-nowrap">Purchase Price</TableHead>
-                      <TableHead className="font-bold text-foreground text-right">IRR</TableHead>
-                      <TableHead className="font-bold text-foreground text-right whitespace-nowrap">Yr 1 Cap Rate</TableHead>
-                      <TableHead className="font-bold text-foreground text-right whitespace-nowrap">Hist. {metricLabel}</TableHead>
-                      <TableHead className="font-bold text-foreground text-right whitespace-nowrap">Yr. 1 {metricLabel}</TableHead>
+                      <TableHead className="font-bold text-foreground text-center whitespace-nowrap">Purchase Price</TableHead>
+                      <TableHead className="font-bold text-foreground text-center">IRR</TableHead>
+                      <TableHead className="font-bold text-foreground text-center whitespace-nowrap">Yr 1 Cap Rate</TableHead>
+                      <TableHead className="font-bold text-foreground text-center whitespace-nowrap">Hist. {metricLabel}</TableHead>
+                      <TableHead className="font-bold text-foreground text-center whitespace-nowrap">Yr. 1 {metricLabel}</TableHead>
                       <TableHead className="font-bold text-foreground text-center">Status</TableHead>
                       <TableHead className="font-bold text-foreground text-center whitespace-nowrap">
                         <span className="inline-flex items-center gap-1">
@@ -413,7 +413,7 @@ export default function ModelingProjectsPage() {
                               {uwStageLabels[(project.uwStage || "not_started") as keyof typeof uwStageLabels] || "Not Started"}
                             </Badge>
                           </TableCell>
-                          <TableCell className="text-right whitespace-nowrap font-semibold pb-0" data-testid={`text-price-${project.id}`}>
+                          <TableCell className="text-center whitespace-nowrap font-semibold pb-0" data-testid={`text-price-${project.id}`}>
                             {formatCurrency(project.purchasePrice, { dash: true, context: 'price' })}
                           </TableCell>
                           <TableCell className="text-center whitespace-nowrap pb-0" data-testid={`text-irr-${project.id}`}>
@@ -421,13 +421,13 @@ export default function ModelingProjectsPage() {
                               {(project.irr != null && project.irr !== 0) ? formatPercent(project.irr, { dash: true }) : '-'}
                             </span>
                           </TableCell>
-                          <TableCell className="text-right whitespace-nowrap font-semibold pb-0" data-testid={`text-cap-rate-${project.id}`}>
+                          <TableCell className="text-center whitespace-nowrap font-semibold pb-0" data-testid={`text-cap-rate-${project.id}`}>
                             {(project.year1CapRate != null && project.year1CapRate !== 0) ? formatPercent(project.year1CapRate, { dash: true }) : '-'}
                           </TableCell>
-                          <TableCell className="text-right whitespace-nowrap font-semibold pb-0" data-testid={`text-t12-ebitda-${project.id}`}>
+                          <TableCell className="text-center whitespace-nowrap font-semibold pb-0" data-testid={`text-t12-ebitda-${project.id}`}>
                             {project.t12Ebitda != null ? formatCurrency(project.t12Ebitda, { context: 'ebitda' }) : '-'}
                           </TableCell>
-                          <TableCell className="text-right whitespace-nowrap font-semibold pb-0" data-testid={`text-yr1-ebitda-${project.id}`}>
+                          <TableCell className="text-center whitespace-nowrap font-semibold pb-0" data-testid={`text-yr1-ebitda-${project.id}`}>
                             {project.year1Ebitda != null ? formatCurrency(project.year1Ebitda, { context: 'ebitda' }) : '-'}
                           </TableCell>
                           <TableCell className="text-center whitespace-nowrap pb-0">

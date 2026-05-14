@@ -4262,4 +4262,65 @@ push. Working tree at session-end shows journal modified +
 - (m) Multi-partner GP/LP discovery (Q1-Q6 architectural)
 
 
+---
+
+# Next session pickup — 2026-05-14
+
+## State at session start
+- HEAD: b68fab16 (Phase 2.1c per-year projection handling control)
+- All work pushed to origin/main
+- Phase 2.1 complete (gaps #1, #2, #3 closed)
+- Beta clock: ~11 working days remaining
+
+## First task — read these memories before doing anything else (~10 min)
+1. `project_annual_rollup_design_decision.md` — decision framing
+2. `project_consolidated_annual_partial_year_finding.md` — original investigation
+3. `project_pro_forma_chart_flat_zero_bug.md` — separate finding
+
+## Day plan (estimated 6-8h of focused work)
+
+### Block 1 — Design A vs B decision + implementation (~3h)
+1. Read decision framing memory
+2. Open consolidated view for 948 Florida Ave. (project_id: 6b3a9021-f393-489d-9274-321ac76eae08) in browser
+3. Look at the actual UX with fresh eyes — does Design B's "partial badge + suppressed variance" feel honest enough, or does the comparison gap feel broken?
+4. Decide: A, B, or C-as-Phase-3
+5. Implement chosen design per memory's effort estimate
+   - Design A: ~2-3h backend service changes + frontend visual treatment
+   - Design B: ~1-2h badge strengthening + variance suppression
+6. Ship as own commit. Standard pattern: Phase 0 → implementation → verification → commit → push
+
+### Block 2 — Pro forma chart investigation (~1-2h)
+1. Read-only diagnostic: where does the NOI Projection chart get its data?
+2. Compare to where the pro forma KPI tiles get their data
+3. Surface the mismatch
+4. Report findings before any fix
+
+### Block 3 — Fix pro forma chart (~1-2h, depends on diagnostic)
+Based on Block 2 finding, scope and implement the fix.
+
+### Block 4 — Browser-verify Phase 2.1 remaining scenarios (~30 min)
+1. 2.1a tooltip hover: confirm distinct months show (post-0383dfd9 fix)
+2. 2.1b scenarios 1 + 7: drawer renders, multi-year independence
+3. 2.1c scenarios 1 + 7: banner select renders, multi-year independent
+4. Audit gap #6 round-trip: full toggle → apply → pro forma cycle
+
+### Block 5 — If time remaining: audit gap #4 (~1-2h)
+Disclaimer UX inconsistency — pendingMaster shows in selector but grid still shows persisted state until apply. Either change disclaimer language or add local preview mode.
+
+## Stop conditions for tomorrow
+- Design decision feels unclear after 30 min of consideration → flag, defer to Brett directly
+- Pro forma chart diagnostic surfaces unexpected scope → stop, surface
+- Browser verifications surface new bugs → stop, document, decide priority
+
+## Standing reminders
+- Never `npm run db:push`
+- Raw `pool.query()` for RLS-adjacent tables (modeling_projection_decisions, organization_brand_settings, stripe_events, etc.)
+- ESM imports use `.js` extensions
+- Auto-commit watch — pre-existing Replit Agent absorption pattern continues
+- Working-tree audit before every commit
+- Cross-surface verification > self-match verification
+
+## Replit Agent watch
+Check `git log --oneline -20` at session start. Replit Agent has shipped autonomous commits between sessions twice this week. If you see commits you don't recognize, investigate before any new work (per standing rule #5).
+
 
