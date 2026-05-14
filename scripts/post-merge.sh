@@ -31,7 +31,12 @@ set -e
 npm install --prefer-offline
 
 # Step 2 — apply schema migrations
-timeout 60 bash -c 'yes | npm run db:push' || echo "db:push skipped (timeout or no changes needed)"
+# DISABLED 2026-05-14: db:push would DROP 131 orphan production tables.
+# See project_post_merge_dbpush_disabled.md for full investigation.
+# If you need to apply schema changes, write a raw migration in server/db-startup-migrations.ts.
+# DO NOT re-enable without restoring the missing 131 tables to Drizzle schemas first.
+# timeout 60 bash -c 'yes | npm run db:push' || echo "db:push skipped (timeout or no changes needed)"
+echo "[post-merge] db:push step DISABLED — see project_post_merge_dbpush_disabled.md"
 
 # Step 3 — schema drift check (hard gate: exits non-zero if drift is detected)
 echo ""
