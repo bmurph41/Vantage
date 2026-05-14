@@ -17689,7 +17689,7 @@ export function registerCRMRoutes(
 
         const key = `${item.category}-${subcategory}`;
         if (!acc[key]) {
-          const dept = deptOverrideMap[subcategory] || item.department || inferDepartment(subcategory, item.category);
+          const dept = deptOverrideMap[subcategory] || item.department || inferDepartment(subcategory, item.category, (project as any).assetClass);
           acc[key] = {
             category: item.category,
             subcategory,
@@ -17734,7 +17734,7 @@ export function registerCRMRoutes(
 
       const monthlyAmount = (parseFloat(annualAmount) / 12).toFixed(2);
       const { inferDepartment } = await import('../utils/department-mapping');
-      const dept = department || inferDepartment(subcategory, category);
+      const dept = department || inferDepartment(subcategory, category, (project as any).assetClass);
       const lineDesc = `${dept}: ${subcategory}`;
       const inserted: string[] = [];
 
@@ -17894,7 +17894,7 @@ export function registerCRMRoutes(
           const effectiveCategory = categoryOverrideMap[subcategory] || item.category;
           const key = `${effectiveCategory}-${subcategory}`;
           if (!acc[key]) {
-            const dept = deptOverrideMap[subcategory] || item.department || inferDepartmentFn(subcategory, effectiveCategory);
+            const dept = deptOverrideMap[subcategory] || item.department || inferDepartmentFn(subcategory, effectiveCategory, (project as any).assetClass);
             acc[key] = {
               category: effectiveCategory,
               subcategory,

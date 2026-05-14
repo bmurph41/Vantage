@@ -2525,7 +2525,8 @@ Respond with JSON only:
         deptSource = 'departmentConfirmed';
       } else {
         // No user confirmation — fall back to heuristic inference
-        inferredDept = inferDeptForActual(subcategory, plCategory);
+        // assetClass not in scope — see commit body threading TODO.
+        inferredDept = inferDeptForActual(subcategory, plCategory, undefined);
         deptSource = 'inferred';
       }
 

@@ -143,7 +143,8 @@ export async function promotePnlFactsToActuals(
         const rawDepartment = pipelineDept
           || coaEntry?.department
           || canonical.subcategoryGroup
-          || inferDepartment(fact.sourceLabel || subcategory, category);
+          // assetClass not in scope — see commit body threading TODO.
+          || inferDepartment(fact.sourceLabel || subcategory, category, undefined);
         const department = normalizeDepartment(rawDepartment);
 
         const year = fact.fiscalYear;

@@ -693,7 +693,7 @@ export class ProFormaEngineService {
     };
 
     const revenueLineItems: LineItem[] = Object.entries(revenueBySubcat).map(([name, data], idx) => {
-      const department = data.department || inferDepartment(name, data.category);
+      const department = data.department || inferDepartment(name, data.category, (project as any).assetClass);
       const annualGrowthRate = getRevenueGrowthForDept(department, name);
       const baseMonthly = new Decimal(data.amount).dividedBy(12);
       const projectionsMonthly: Record<string, number> = {};
@@ -748,7 +748,7 @@ export class ProFormaEngineService {
     });
 
     const cogsLineItems: LineItem[] = Object.entries(cogsBySubcat).map(([name, data], idx) => {
-      const department = data.department || inferDepartment(name, data.category);
+      const department = data.department || inferDepartment(name, data.category, (project as any).assetClass);
       const annualGrowthRate = getExpenseGrowthForCategory(name, department);
       const baseMonthly = new Decimal(data.amount).dividedBy(12);
       const projectionsMonthly: Record<string, number> = {};
@@ -764,7 +764,7 @@ export class ProFormaEngineService {
         const projectedMarginPct = new Decimal(marginData.projected).dividedBy(100);
         const revenueKey = department === 'Fuel' ? 'fuel_dock' : departmentToAssumptionKey(department);
         const matchingRevenue = Object.entries(revenueBySubcat).find(([_, rd]) =>
-          departmentToAssumptionKey(rd.department || inferDepartment(rd.subcategory)) === revenueKey
+          departmentToAssumptionKey(rd.department || inferDepartment(rd.subcategory, undefined, (project as any).assetClass)) === revenueKey
         );
 
         if (matchingRevenue) {
@@ -870,7 +870,7 @@ export class ProFormaEngineService {
     };
 
     const expenseLineItems: LineItem[] = Object.entries(expensesBySubcat).map(([name, data], idx) => {
-      const department = data.department || inferDepartment(name, data.category);
+      const department = data.department || inferDepartment(name, data.category, (project as any).assetClass);
       const annualGrowthRate = getExpenseGrowthForCategory(name, department);
       const baseMonthly = new Decimal(data.amount).dividedBy(12);
       const projectionsMonthly: Record<string, number> = {};
@@ -897,7 +897,7 @@ export class ProFormaEngineService {
         const projectedMarginPct = new Decimal(marginData.projected).dividedBy(100);
         const revenueKey = department === 'Fuel' ? 'fuel_dock' : 'ship_store';
         const matchingRevenue = Object.entries(revenueBySubcat).find(([_, rd]) =>
-          departmentToAssumptionKey(rd.department || inferDepartment(rd.subcategory)) === revenueKey
+          departmentToAssumptionKey(rd.department || inferDepartment(rd.subcategory, undefined, (project as any).assetClass)) === revenueKey
         );
 
         if (matchingRevenue) {

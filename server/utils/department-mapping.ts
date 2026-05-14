@@ -10,7 +10,13 @@ for (const item of MARINA_COA_SEED) {
   COA_DEPARTMENT_MAP[item.displayName.toLowerCase()] = item.department;
 }
 
-export function inferDepartment(subcategory: string, category?: string): string {
+/**
+ * @param assetClass Optional. Accepted for forward-compatibility with the
+ *   engine-unification work (see project_engine_unification_architecture_2026_05_14).
+ *   NOT yet consumed — current behavior is the marina-keyword cascade regardless
+ *   of asset class. A later Day 2+ commit will branch on this.
+ */
+export function inferDepartment(subcategory: string, category?: string, assetClass?: string): string {
   const lower = subcategory.toLowerCase();
   const cat = (category || '').toLowerCase();
 

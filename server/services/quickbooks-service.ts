@@ -605,7 +605,8 @@ export class QuickBooksService {
 
         const categoryMapping = this.mapQuickBooksAccountToCategory(row.account, row.type);
         const { inferDepartment } = await import('../utils/department-mapping');
-        const dept = inferDepartment(categoryMapping.subcategory, categoryMapping.category);
+        // assetClass not in scope — see commit body threading TODO.
+        const dept = inferDepartment(categoryMapping.subcategory, categoryMapping.category, undefined);
         
         await db.insert(modelingActuals).values({
           orgId,
