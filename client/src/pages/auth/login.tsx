@@ -247,7 +247,12 @@ export default function LoginPage() {
         setMfaRequired(true);
         setMfaData({ userId: data.userId, mfaToken: data.mfaToken });
       } else {
-        queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+        // Immediately seed the auth cache with the returned user so the
+        // router's auth guard sees an authenticated user before we navigate,
+        // preventing the race condition where user=null bounces us back to /login.
+        if (data.user) {
+          queryClient.setQueryData(["/api/auth/me"], data.user);
+        }
         queryClient.invalidateQueries({ queryKey: ["/api/bootstrap"] });
         queryClient.invalidateQueries({ queryKey: ["/api/organization/packs"] });
         toast({
@@ -275,8 +280,10 @@ export default function LoginPage() {
       });
       return response.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+    onSuccess: (data) => {
+      if (data.user) {
+        queryClient.setQueryData(["/api/auth/me"], data.user);
+      }
       queryClient.invalidateQueries({ queryKey: ["/api/bootstrap"] });
       queryClient.invalidateQueries({ queryKey: ["/api/organization/packs"] });
       toast({
