@@ -36,7 +36,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { formatCurrency } from '@/lib/utils';
-import { useConsolidatedPnL, useApplyAdjustments } from '@/hooks/useConsolidatedPnL';
+import { useConsolidatedPnL, useApplyAdjustments, useUpdateProjectionDecision } from '@/hooks/useConsolidatedPnL';
 import { useModelingAddbacks, type Addback } from '@/hooks/useModelingAddbacks';
 import type {
   AdjustmentMasterState,
@@ -45,6 +45,7 @@ import type {
   ConsolidatedPnLOptions,
   ConsolidatedPnLResponse,
   MissingPeriodReport,
+  ProjectionHandling,
   ProjectionSource,
   YearColumn,
   YearRangeMode,
@@ -178,6 +179,7 @@ export function ConsolidatedPnLView({ projectId, onNavigateToInputs }: Props) {
   const options: ConsolidatedPnLOptions = useMemo(() => ({ yearRange }), [yearRange]);
   const { data, isLoading, isError, refetch, isFetching } = useConsolidatedPnL(projectId, options);
   const apply = useApplyAdjustments(projectId);
+  const updateProjectionDecision = useUpdateProjectionDecision(projectId);
   const { addbacks, isLoading: addbacksLoading } = useModelingAddbacks(projectId);
 
   const effectiveMaster: AdjustmentMasterState =
@@ -329,6 +331,7 @@ export function ConsolidatedPnLView({ projectId, onNavigateToInputs }: Props) {
     drawerOpen,
     setDrawerOpen,
     resolveAddbackState,
+    updateProjectionDecision,
   });
 }
 
@@ -352,6 +355,7 @@ interface RenderArgs {
   drawerOpen: boolean;
   setDrawerOpen: React.Dispatch<React.SetStateAction<boolean>>;
   resolveAddbackState: (a: Addback) => boolean;
+  updateProjectionDecision: ReturnType<typeof useUpdateProjectionDecision>;
 }
 
 function renderView(args: RenderArgs) {
@@ -363,6 +367,7 @@ function renderView(args: RenderArgs) {
     pendingTogglesByAddbackId, setPendingTogglesByAddbackId,
     pendingTogglesArray, drawerOpen, setDrawerOpen,
     resolveAddbackState,
+    updateProjectionDecision,
   } = args;
 
   const lines = sortLines(data.lineItems);
@@ -605,14 +610,51 @@ function renderView(args: RenderArgs) {
         <Alert variant="default" className="border-blue-300 bg-blue-50" data-testid="missing-periods-banner">
           <AlertCircle className="h-4 w-4 text-blue-600" />
           <AlertTitle className="text-blue-900">Projected months in range</AlertTitle>
-          <AlertDescription className="text-blue-800 text-xs">
-            {data.missingPeriods.filter((p) => p.missingMonths.length > 0).map((p) => (
-              <div key={p.year}>
-                {p.year}: {p.missingMonths.length} month{p.missingMonths.length === 1 ? '' : 's'} missing — auto-projected
-                ({p.handling}).
-              </div>
-            ))}
-            Auto-projected cells use prior-year YoY → trailing-3-month → gap fallback.
+          <AlertDescription className="text-blue-800 text-xs space-y-2">
+            {data.missingPeriods.filter((p) => p.missingMonths.length > 0).map((p) => {
+              const isPending =
+                updateProjectionDecision.isPending &&
+                updateProjectionDecision.variables?.year === p.year;
+              return (
+                <div key={p.year} className="flex items-center gap-3" data-testid={`missing-period-row-${p.year}`}>
+                  <span className="flex-1">
+                    {p.year}: {p.missingMonths.length} month
+                    {p.missingMonths.length === 1 ? '' : 's'} missing
+                  </span>
+                  {isPending && <Loader2 className="h-3.5 w-3.5 animate-spin text-blue-700" />}
+                  <Select
+                    value={p.handling}
+                    onValueChange={(v) =>
+                      updateProjectionDecision.mutate({
+                        year: p.year,
+                        handling: v as ProjectionHandling,
+                      })
+                    }
+                    disabled={isPending}
+                  >
+                    <SelectTrigger
+                      className="h-7 w-36 text-xs bg-white"
+                      data-testid={`projection-handling-${p.year}`}
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="auto">Auto-project</SelectItem>
+                      <SelectItem value="gap">Leave as gaps</SelectItem>
+                      <SelectItem value="manual" disabled>
+                        <span className="flex items-center gap-1.5">
+                          Manual entry
+                          <span className="text-[10px] text-muted-foreground">(Phase 3)</span>
+                        </span>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              );
+            })}
+            <div className="text-[11px] text-blue-700/80 pt-1 border-t border-blue-200">
+              Auto-project uses prior-year YoY → trailing-3-month → gap fallback. Choose "Leave as gaps" to render missing months as known holes.
+            </div>
           </AlertDescription>
         </Alert>
       )}

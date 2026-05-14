@@ -6,7 +6,20 @@ import type {
   ConsolidatedPnLResponse,
   ApplyAdjustmentsRequest,
   ApplyAdjustmentsResult,
+  ProjectionHandling,
 } from '@shared/types/consolidated-pnl';
+
+export interface UpdateProjectionDecisionRequest {
+  year: number;
+  handling: ProjectionHandling;
+  needsReview?: boolean;
+}
+
+export interface UpdateProjectionDecisionResult {
+  year: number;
+  handling: ProjectionHandling;
+  needsReview: boolean;
+}
 
 const consolidatedKey = (projectId: string | undefined, options: ConsolidatedPnLOptions) => [
   '/api/modeling/projects',
@@ -88,6 +101,54 @@ export function useApplyAdjustments(projectId: string | undefined) {
       toast({
         title: 'Apply failed',
         description: err.message || 'Could not apply adjustments.',
+        variant: 'destructive',
+      });
+    },
+  });
+}
+
+/**
+ * Phase 2.1c — per-year projection handling control.
+ *
+ * Invalidates ONLY the consolidated-pnl query (not the broader apply-mutation
+ * set). The pro-forma engine doesn't read modeling_projection_decisions —
+ * its growth-rate-based forecast is independent.
+ */
+export function useUpdateProjectionDecision(projectId: string | undefined) {
+  const { toast } = useToast();
+
+  return useMutation<
+    UpdateProjectionDecisionResult,
+    Error,
+    UpdateProjectionDecisionRequest
+  >({
+    mutationFn: async ({ year, handling, needsReview }) => {
+      const body = needsReview !== undefined ? { handling, needsReview } : { handling };
+      const res = await apiRequest(
+        'PUT',
+        `/api/modeling/projects/${projectId}/projection-decisions/${year}`,
+        body,
+      );
+      return res.json();
+    },
+    onSuccess: (row) => {
+      queryClient.invalidateQueries({
+        queryKey: ['/api/modeling/projects', projectId, 'consolidated-pnl'],
+      });
+      const labels: Record<ProjectionHandling, string> = {
+        auto: 'Auto-project',
+        manual: 'Manual entry',
+        gap: 'Leave as gaps',
+      };
+      toast({
+        title: 'Projection handling updated',
+        description: `${row.year}: ${labels[row.handling] ?? row.handling}.`,
+      });
+    },
+    onError: (err) => {
+      toast({
+        title: 'Update failed',
+        description: err.message || 'Could not update projection handling.',
         variant: 'destructive',
       });
     },

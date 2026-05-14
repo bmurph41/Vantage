@@ -9529,6 +9529,49 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     }
   });
 
+  // PUT projection handling for a single (project, year).
+  // Backs the per-year Select in the consolidated view's missing-period banner
+  // (Phase 2.1c). Upserts modeling_projection_decisions; the next consolidated
+  // P&L read picks up the new handling.
+  app.put('/api/modeling/projects/:projectId/projection-decisions/:year', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId as string;
+      const { projectId, year: yearParam } = req.params;
+
+      const year = parseInt(yearParam, 10);
+      if (!Number.isInteger(year) || year < 1900 || year > 2200) {
+        return res.status(400).json({
+          error: { code: 'INVALID_YEAR', message: 'year must be an integer in [1900, 2200]' },
+        });
+      }
+
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+
+      const body = (req.body ?? {}) as Record<string, unknown>;
+      const handling = body.handling as 'auto' | 'manual' | 'gap' | undefined;
+      if (!handling || !['auto', 'manual', 'gap'].includes(handling)) {
+        return res.status(400).json({
+          error: { code: 'INVALID_HANDLING', message: "handling must be one of 'auto', 'manual', 'gap'" },
+        });
+      }
+
+      // User action implies review — default to false. Body may override.
+      const needsReview = typeof body.needsReview === 'boolean' ? body.needsReview : false;
+
+      const { upsertProjectionDecision } = await import('../services/consolidated-pnl-service');
+      const row = await upsertProjectionDecision(orgId, projectId, year, handling, needsReview);
+      res.json(row);
+    } catch (error: any) {
+      console.error('Failed to upsert projection decision:', error);
+      res.status(500).json({
+        error: { code: 'PROJECTION_DECISION_UPSERT_FAILED', message: 'Failed to upsert projection decision' },
+      });
+    }
+  });
+
   // ==================== SCENARIO COLLABORATION ROUTES ====================
 
   // Helpers

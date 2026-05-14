@@ -203,7 +203,7 @@ async function fetchMasterState(
   return r.rows[0]?.adjustments_master_state ?? 'all_on';
 }
 
-interface ProjectionDecisionRow {
+export interface ProjectionDecisionRow {
   year: number;
   handling: ProjectionHandling;
   needsReview: boolean;
@@ -232,6 +232,45 @@ async function fetchProjectionDecisions(
     });
   }
   return map;
+}
+
+/**
+ * Upsert a (project_id, year) row in modeling_projection_decisions. Composite
+ * PK on (project_id, year) is the conflict target. updated_at is explicitly
+ * set on conflict — Postgres DEFAULT now() only fires on INSERT.
+ *
+ * `needs_review` defaults to false at the route layer because user action
+ * implies review; callers may override.
+ */
+export async function upsertProjectionDecision(
+  orgId: string,
+  projectId: string,
+  year: number,
+  handling: ProjectionHandling,
+  needsReview: boolean,
+): Promise<ProjectionDecisionRow> {
+  const r = await pool.query<{
+    year: number;
+    handling: ProjectionHandling;
+    needs_review: boolean;
+  }>(
+    `INSERT INTO modeling_projection_decisions
+       (project_id, org_id, year, handling, needs_review)
+     VALUES ($1, $2, $3, $4, $5)
+     ON CONFLICT (project_id, year)
+     DO UPDATE SET
+       handling = EXCLUDED.handling,
+       needs_review = EXCLUDED.needs_review,
+       updated_at = NOW()
+     RETURNING year, handling, needs_review`,
+    [projectId, orgId, year, handling, needsReview],
+  );
+  const row = r.rows[0];
+  return {
+    year: Number(row.year),
+    handling: row.handling,
+    needsReview: row.needs_review,
+  };
 }
 
 function decisionFor(
