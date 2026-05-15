@@ -54,7 +54,8 @@ import {
   type Year1Mode,
   type T12Context
 } from '../utils/modeling-periods';
-import { loadCanonicalActuals } from './canonical-actuals-loader';
+import { loadCanonicalActuals, normalizeCategory } from './canonical-actuals-loader';
+import { getConsolidatedPnL } from './consolidated-pnl-service';
 import { computeDirectInputFinancials } from './direct-input-engine';
 
 // ============================================
@@ -464,45 +465,91 @@ export class ProFormaEngineService {
     const latestHistoricalYear = actualsYears[0] || baseYear - 1;
     const historicalYears = actualsYears.filter(y => y < baseYear || actualsYears.length === 1 ? true : y <= latestHistoricalYear);
 
-    // FIX: Use shared canonical actuals loader for baseline aggregation.
-    // Guarantees identical category/department as getHistoricalPL().
+    // Day 7 of engine unification: baseline now sources from the Historical
+    // engine (consolidated-pnl-service) instead of loadCanonicalActuals +
+    // flat 12/N annualization. The projection chain
+    // (prior_year_yoy → trailing_3mo → gap) fills missing months; modeling_
+    // projection_decisions is respected automatically (Historical engine
+    // already reads it). See project_engine_unification_architecture_2026_05_14.
     //
-    // Phase 1.6b — applyAddbacks=true so the pro-forma baseline reflects
-    // the user's addback adjustments. getHistoricalPL stays at default
-    // (false) so the historical view continues to show raw actuals.
-    const { items: baselineItems, coverage } = await loadCanonicalActuals(
-      projectId,
-      orgId,
-      latestHistoricalYear,
-      { applyAddbacks: true },
-    );
+    // Sub-decision: projected cells summed at THIS call site (Pro Forma seed
+    // loop), not at source in buildAnnualAdjustments — keeps Consolidated UI
+    // behavior stable. Override re-application here mirrors the
+    // loadCanonicalActuals path because getConsolidatedPnL/getAdjustedActuals
+    // do not yet apply modeling_pnl_overrides; preserves correctness for
+    // projects with overrides set.
+    // Range = 'calendar' (full historical span), NOT just latestHistoricalYear.
+    // The projection chain in projectMissingMonths reads from the monthly
+    // stream returned by getAdjustedActuals; restricting to a single year
+    // strips prior-year data and forces prior_year_yoy → trailing_3mo
+    // fallback (over-projects from peak months). Calendar range gives the
+    // projection chain the full prior-year context it needs. Downstream
+    // filtering by latestHistoricalYear (below) ensures only that year's
+    // cells contribute to the baseline.
+    const consolidated = await getConsolidatedPnL(orgId, projectId, {
+      yearRange: 'calendar',
+    });
 
-    // ── Partial-year annualization ────────────────────────────────
-    // If the user uploaded only N months of data (e.g. 2) and has enabled
-    // annualization, scale every amount by 12/N before seeding the baseline.
-    // The historical P&L view always shows raw actuals; only the pro-forma
-    // baseline uses the annualized figure.
-    const annualizeEnabled = !!(project.customMetrics as any)?.annualizePartialYear;
-    const annualizationFactor =
-      annualizeEnabled && coverage.monthsWithData > 0 && coverage.monthsWithData < 12
-        ? 12 / coverage.monthsWithData
-        : 1;
+    interface SeedBucket { total: number; category: string; department: string; }
+    const buckets = new Map<string, SeedBucket>();
 
-    for (const item of baselineItems) {
+    // Layer A — line-item annual amounts for latestHistoricalYear.
+    // adjustedAmount is line-direction with active addbacks overlaid.
+    for (const li of consolidated.lineItems) {
+      const key = li.subcategory || (li.category as string) || 'Other';
+      if (excludeSet.has(key)) continue;
+      const rawCat = categoryOverrideMap[key] || (li.category as string);
+      const normCat = normalizeCategory(rawCat);
+      const cell = li.annual.find(c => c.year === latestHistoricalYear);
+      if (!cell) continue;
+      let b = buckets.get(key);
+      if (!b) {
+        const dept = deptOverrideMap[key]
+          || li.department
+          || inferDepartment(key, normCat, assetClass);
+        b = { total: 0, category: normCat, department: dept };
+        buckets.set(key, b);
+      }
+      b.total += cell.adjustedAmount;
+    }
+
+    // Layer B — projected cells (missing months under handling='auto').
+    // baseAmount is line-direction pre-addback; mixed with Layer A's
+    // post-addback amounts. Acceptable: addbacks remove anomalies; projections
+    // shouldn't include the anomaly or its addback. Phase 3 could project on
+    // the adjustedAmount stream for full semantic consistency.
+    for (const pc of consolidated.projectedCells) {
+      if (pc.year !== latestHistoricalYear) continue;
+      if (pc.baseAmount == null) continue; // 'gap' source — skip
+      const key = pc.subcategory || (pc.category as string) || 'Other';
+      if (excludeSet.has(key)) continue;
+      const rawCat = categoryOverrideMap[key] || (pc.category as string);
+      const normCat = normalizeCategory(rawCat);
+      let b = buckets.get(key);
+      if (!b) {
+        const dept = deptOverrideMap[key] || inferDepartment(key, normCat, assetClass);
+        b = { total: 0, category: normCat, department: dept };
+        buckets.set(key, b);
+      }
+      b.total += pc.baseAmount;
+    }
+
+    // Layer C — seed Pro Forma dicts. No annualizationFactor: projection
+    // chain already produced missing-month values for partial coverage.
+    for (const [key, b] of Array.from(buckets.entries())) {
       const entry: ActualEntry = {
-        amount: item.total * annualizationFactor,
-        category: item.category,
-        subcategory: item.key,
-        department: item.department,
+        amount: b.total,
+        category: b.category,
+        subcategory: key,
+        department: b.department,
         year: latestHistoricalYear,
       };
-      
-      if (item.category === 'Revenue') {
-        revenueBySubcat[item.key] = entry;
-      } else if (item.category === 'COGS') {
-        cogsBySubcat[item.key] = entry;
+      if (b.category === 'Revenue') {
+        revenueBySubcat[key] = entry;
+      } else if (b.category === 'COGS') {
+        cogsBySubcat[key] = entry;
       } else {
-        expensesBySubcat[item.key] = entry;
+        expensesBySubcat[key] = entry;
       }
     }
 
