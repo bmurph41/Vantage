@@ -46,3 +46,7 @@ tmp/
 # Claude Code config (contains API keys / session tokens)
 /.claude-user
 /.claude/settings.local.json
+
+# Scratch diagnostic tsconfigs from scoped tsc verification
+tsconfig.diag-*.json
+tsconfig.4files-check.json
