@@ -39,6 +39,7 @@ import {
 import { eq, and, desc } from 'drizzle-orm';
 import { debtScheduleService, type DebtSchedule, type DSCRMetrics } from './debt-schedule-service';
 import { generateCanonicalDebtSchedule } from './canonical-debt-adapter';
+import { readCanonicalPayload } from './canonical-assumption-store';
 import {
   buildModelingPeriods,
   buildT12AwarePeriods,
@@ -383,7 +384,22 @@ export class ProFormaEngineService {
     const stabilizedNoiYear = config?.stabilizedNoiYear || 3;
     const irrDisplayPreference = (config?.irrDisplayPreference as IrrDisplayPreference) || 'monthly';
     
-    const assumptions = (scenario?.assumptions as any) || {};
+    // Read assumptions from canonical store (Day 3 of engine unification).
+    // Defensive fallback to JSONB blob if canonical row missing — shouldn't
+    // happen for backfilled scenarios, but graceful during reader migration.
+    let assumptions: Record<string, any>;
+    if (scenario?.id) {
+      const canonical = await readCanonicalPayload(scenario.id);
+      if (canonical) {
+        assumptions = canonical;
+      } else {
+        console.warn(`[pro-forma] No canonical payload for scenario ${scenario.id}, falling back to JSONB blob`);
+        assumptions = (scenario?.assumptions as any) || {};
+      }
+    } else {
+      assumptions = {};
+    }
+
     const granularGrowthRates: Record<string, number> = assumptions.growthRates || {};
     const granularExpenseGrowth: Record<string, number> = assumptions.expenseGrowth || {};
     const granularOccupancy: Record<string, Record<string, number>> = assumptions.occupancy || {};
