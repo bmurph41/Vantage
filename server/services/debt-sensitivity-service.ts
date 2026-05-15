@@ -1,10 +1,11 @@
 import { db } from '../db';
-import { 
+import {
   modelingProjects,
   modelingScenarioVersions,
   modelingAuditLog
 } from '@shared/schema';
 import { eq, and } from 'drizzle-orm';
+import { readCanonicalPayload } from './canonical-assumption-store';
 
 export interface LenderStructure {
   id: string;
@@ -90,9 +91,19 @@ export class DebtSensitivityService {
       throw new Error('Scenario version not found or access denied');
     }
 
-    const assumptions = typeof scenario.assumptions === 'string' 
-      ? JSON.parse(scenario.assumptions) 
-      : (scenario.assumptions || {});
+    // Read assumptions from canonical store (Day 4 of engine unification).
+    // Defensive fallback to JSONB blob if canonical row missing — backfill
+    // ensures coverage for reachable scenarios; warning surfaces gaps.
+    let assumptions: Record<string, any>;
+    const canonical = await readCanonicalPayload(scenario.id);
+    if (canonical) {
+      assumptions = canonical;
+    } else {
+      console.warn(`[debt-sensitivity] No canonical payload for scenario ${scenario.id}, falling back to JSONB blob`);
+      assumptions = typeof scenario.assumptions === 'string'
+        ? JSON.parse(scenario.assumptions)
+        : (scenario.assumptions || {});
+    }
 
     const baselineNOI = assumptions.noi || assumptions.netOperatingIncome || (input.purchasePrice * 0.065);
 

@@ -4463,3 +4463,87 @@ Days 3-4 are reader migration. The engine and downstream services currently read
 - Inputs & Assumptions UI redesign (post-beta)
 - Pro Forma chart flat-zero bug (during Days 15-17 polish)
 - Layout findings 4-5 (during Days 15-17 polish)
+
+---
+
+# Next session pickup — 2026-05-17
+
+## State at session start
+- HEAD: 220da6a3 (Day 3 Commit 2 — proFormaEngineService migration)
+- All work pushed to origin/main
+- Day 3 of engine unification complete
+- Beta clock: ~14 working days remaining
+
+## First task — Agent watch (5 min)
+`git log --oneline -10` — check for autonomous commits since 220da6a3.
+Pattern: 6 incidents in 14 days. Latest was ede8bc82 (design override of header alignment, reverted in 82edf907).
+
+## Second task — read these memories (~10 min)
+1. `project_engine_unification_architecture_2026_05_14.md` — canonical reference
+2. `project_marina_phase0_state_map_2026_05_14.md` — Day 1 foundation
+3. `project_pro_forma_assumptions_audit_2026_05_14.md` — assumption store audit
+4. `project_orphan_scenario_versions_2026_05_16.md` — orphan situation (post-beta cleanup)
+5. `project_tenant_isolation_stub_guard_2026_05_15.md` — auth fix context
+6. `project_ci_red_known.md` — Path C verification standard
+
+## Day 4 plan — Remaining reader migrations
+
+Day 3 Phase 0 identified 4 remaining readers after proFormaEngineService (which shipped in 220da6a3):
+
+### debtSensitivityService (~30 min, Pattern 2, 2 keys)
+debt-sensitivity-service.ts:80-97
+Reads: noi, netOperatingIncome
+Falls through to 6.5% cap-rate proxy on purchase price
+Migration: swap fetch path to readCanonicalPayload, verify identical sensitivity output
+
+### dcfCalculatorService (~1h, Pattern 2, 5 keys)
+dcf-calculator-service.ts:157-167, 254-260, 1041-1043, 1292-1324
+Reads: cpiRate, cpiCap, cpiFloor, rolloverVacancyMonths, rolloverTiLcPerSf
+Uses raw SQL fetch currently — need to migrate AND verify the raw-SQL path interplay
+CPI/rollover keys only present for commercial-lease projects (per Day 3 Phase 0)
+
+### scenarioGovernanceService (~30 min, Pattern 1, opaque blob)
+scenario-governance-service.ts:188-191, 358, 418, 597-599, 813
+Diff/hash/serialize handling — never extracts specific keys
+Already uses scenarioAssumptionPayloads.payload as writer (the broken governance writer we fixed in Day 2)
+Migration: ensure read paths also use canonical, not the JSONB blob
+
+### vdrModelingIntegrationService (~15 min, auto-fixed, verify only)
+vdr-modeling-integration-service.ts:163-208
+Hands scenario version ID to proFormaEngineService — already auto-fixed when proForma migrated
+Smoke verify the comparison-export path still works end-to-end
+
+## Verification approach (same as Day 3 Commit 2)
+
+For each reader migration:
+1. Capture output BEFORE migration via dev server route
+2. Apply migration
+3. Capture output AFTER migration
+4. Diff — must be byte-identical (or only wall-clock timestamps differ)
+5. Normalized hash comparison if any non-deterministic fields exist
+
+If diff isn't clean, STOP and investigate before commit.
+
+## After Day 4
+
+Engine unification Days 1-4 will be complete. The next phase is Days 5-6 (marina projection model generalization — occupancy×rate and margin models made asset-class-aware), then Day 7 (marina historical/pro-forma handoff with 4-view unification).
+
+## Stop conditions
+- Pro forma output (or any reader output) differs before/after → STOP, investigate
+- Warning logs for backfilled scenarios → STOP, canonical store coverage incomplete
+- Replit Agent autonomous commit between sessions → STOP, investigate
+- New scenario writes don't appear in canonical store → STOP, dual-write regression
+
+## Standing reminders
+- Never `npm run db:push` (disabled in post-merge.sh)
+- Path C verification: tsc -b shared + scoped tsc + smoke routes
+- Failure-isolated dual-write preserves primary path
+- Field-specific assertions in smoke tests, not just "doesn't crash"
+
+## Open follow-ups
+- Orphan scenario_version cleanup + FK addition (post-beta)
+- Unprefixed middleware mounts at server/routes.ts:1558, 1559, 1574 (deferred root cause)
+- 131 orphan tables (post-beta)
+- Inputs & Assumptions UI redesign (post-beta)
+- Pro Forma chart flat-zero bug (during Days 15-17 polish)
+- Layout findings 4-5 (during Days 15-17 polish)
