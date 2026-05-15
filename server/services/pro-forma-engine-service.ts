@@ -812,7 +812,10 @@ export class ProFormaEngineService {
       if (granularMargins[departmentToAssumptionKey(department)]) {
         const marginData = granularMargins[departmentToAssumptionKey(department)];
         const projectedMarginPct = new Decimal(marginData.projected).dividedBy(100);
-        const revenueKey = department === 'Fuel' ? 'fuel_dock' : departmentToAssumptionKey(department);
+        // Day 6 of engine unification: previously ternary
+        //   department === 'Fuel' ? 'fuel_dock' : departmentToAssumptionKey(department)
+        // Both branches produced 'fuel_dock' for Fuel — dead code. Simplified.
+        const revenueKey = departmentToAssumptionKey(department);
         const matchingRevenue = Object.entries(revenueBySubcat).find(([_, rd]) =>
           departmentToAssumptionKey(rd.department || inferDepartment(rd.subcategory, undefined, (project as any).assetClass)) === revenueKey
         );
@@ -945,7 +948,13 @@ export class ProFormaEngineService {
       } else if (granularMargins[departmentToAssumptionKey(department)]) {
         const marginData = granularMargins[departmentToAssumptionKey(department)];
         const projectedMarginPct = new Decimal(marginData.projected).dividedBy(100);
-        const revenueKey = department === 'Fuel' ? 'fuel_dock' : 'ship_store';
+        // Day 6 of engine unification: was buggy
+        //   department === 'Fuel' ? 'fuel_dock' : 'ship_store'
+        // Hardcoded 'ship_store' anchored every non-Fuel margin-modeled
+        // expense to Ship's Store revenue regardless of its actual
+        // department (Service expense was projected against Ship's Store
+        // revenue × Service margin, etc). Now uses dept's own assumption key.
+        const revenueKey = departmentToAssumptionKey(department);
         const matchingRevenue = Object.entries(revenueBySubcat).find(([_, rd]) =>
           departmentToAssumptionKey(rd.department || inferDepartment(rd.subcategory, undefined, (project as any).assetClass)) === revenueKey
         );

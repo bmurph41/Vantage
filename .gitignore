@@ -50,3 +50,6 @@ tmp/
 # Scratch diagnostic tsconfigs from scoped tsc verification
 tsconfig.diag-*.json
 tsconfig.4files-check.json
+
+# Scratch verification harnesses (synthetic test fixtures, one-shot scripts)
+.scratch/
