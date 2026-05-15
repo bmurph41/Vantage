@@ -20,7 +20,7 @@ import {
 } from '@shared/schema';
 import { eq, and, desc, asc } from 'drizzle-orm';
 import { triggerValuationSnapshot } from './scenario-snapshot-hook';
-import { hashAssumptionsPayload } from './canonical-assumption-store';
+import { hashAssumptionsPayload, readCanonicalPayload } from './canonical-assumption-store';
 
 // ============================================
 // TYPES
@@ -184,11 +184,18 @@ export class ScenarioGovernanceService {
       return { success: false, error: 'Scenario not found' };
     }
     
-    // Calculate diff
-    const diff = this.calculateAssumptionsDiff(
-      (current.assumptions as Record<string, any>) || {},
-      assumptions
-    );
+    // Calculate diff — read current assumptions from canonical store
+    // (Day 4 Commit 3: engine unification). Fall back to JSONB blob if
+    // canonical row absent (warn surfaces gaps in backfill/dual-write).
+    const currentCanonical = await readCanonicalPayload(scenarioVersionId);
+    let currentAssumptions: Record<string, any>;
+    if (currentCanonical) {
+      currentAssumptions = currentCanonical;
+    } else {
+      console.warn(`[scenario-governance] No canonical payload for scenario ${scenarioVersionId}, falling back to JSONB blob`);
+      currentAssumptions = (current.assumptions as Record<string, any>) || {};
+    }
+    const diff = this.calculateAssumptionsDiff(currentAssumptions, assumptions);
     
     // Generate payload hash for integrity
     const payloadHash = this.hashPayload(assumptions);
@@ -353,9 +360,20 @@ export class ScenarioGovernanceService {
     if (scenario.status !== 'draft') {
       return { success: false, error: `Cannot submit ${scenario.status} scenario for approval` };
     }
-    
-    // Generate hash of current assumptions for integrity check
-    const payloadHash = this.hashPayload(scenario.assumptions);
+
+    // Generate hash of current assumptions for integrity check — read from
+    // canonical store (Day 4 Commit 3: engine unification). Hash is content-
+    // addressed via shared hashAssumptionsPayload (recursive sortKeys), so
+    // blob and canonical produce identical hashes when content matches.
+    const submitCanonical = await readCanonicalPayload(scenarioVersionId);
+    let submitAssumptions: any;
+    if (submitCanonical) {
+      submitAssumptions = submitCanonical;
+    } else {
+      console.warn(`[scenario-governance] No canonical payload for scenario ${scenarioVersionId}, falling back to JSONB blob`);
+      submitAssumptions = scenario.assumptions;
+    }
+    const payloadHash = this.hashPayload(submitAssumptions);
     
     await db.update(modelingScenarioVersions)
       .set({
@@ -414,9 +432,18 @@ export class ScenarioGovernanceService {
         updatedAt: new Date(),
       })
       .where(eq(modelingScenarioVersions.id, scenarioVersionId));
-    
-    const payloadHash = this.hashPayload(scenario.assumptions);
-    
+
+    // Approval hash from canonical store (Day 4 Commit 3: engine unification).
+    const approveCanonical = await readCanonicalPayload(scenarioVersionId);
+    let approveAssumptions: any;
+    if (approveCanonical) {
+      approveAssumptions = approveCanonical;
+    } else {
+      console.warn(`[scenario-governance] No canonical payload for scenario ${scenarioVersionId}, falling back to JSONB blob`);
+      approveAssumptions = scenario.assumptions;
+    }
+    const payloadHash = this.hashPayload(approveAssumptions);
+
     await this.logAuditEvent({
       orgId,
       projectId: scenario.modelingProjectId,
@@ -572,12 +599,32 @@ export class ScenarioGovernanceService {
     ]);
     
     if (!base[0] || !compare[0]) return null;
-    
+
     const baseVersion = this.mapToScenarioVersion(base[0]);
     const compareVersion = this.mapToScenarioVersion(compare[0]);
-    
+
+    // Override mapped .assumptions with canonical store payloads
+    // (Day 4 Commit 3: engine unification). mapToScenarioVersion sources
+    // .assumptions from the JSONB column; for diff + serialization we want
+    // the canonical view. Fall back to mapped (JSONB) value if canonical
+    // row absent.
+    const [baseCanonical, compareCanonical] = await Promise.all([
+      readCanonicalPayload(baseVersionId),
+      readCanonicalPayload(compareVersionId),
+    ]);
+    if (baseCanonical) {
+      baseVersion.assumptions = baseCanonical;
+    } else {
+      console.warn(`[scenario-governance] No canonical payload for scenario ${baseVersionId}, falling back to JSONB blob`);
+    }
+    if (compareCanonical) {
+      compareVersion.assumptions = compareCanonical;
+    } else {
+      console.warn(`[scenario-governance] No canonical payload for scenario ${compareVersionId}, falling back to JSONB blob`);
+    }
+
     const changes: FieldChange[] = [];
-    
+
     // Compare top-level fields
     const fieldsToCompare = ['name', 'description', 'revenueGrowthRate', 'expenseGrowthRate', 'exitCapRate'];
     for (const field of fieldsToCompare) {
@@ -592,8 +639,8 @@ export class ScenarioGovernanceService {
         });
       }
     }
-    
-    // Compare assumptions
+
+    // Compare assumptions (now canonical-sourced)
     const assumptionsDiff = this.calculateAssumptionsDiff(
       baseVersion.assumptions || {},
       compareVersion.assumptions || {}
