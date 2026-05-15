@@ -35,6 +35,8 @@ import {
   CanonicalCashFlowSet,
 } from './finance/cashflow-parity';
 
+import { readCanonicalPayload } from './canonical-assumption-store';
+
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 export interface DCFAnalysisInput {
@@ -1290,9 +1292,10 @@ async function loadProjectData(pool: any, projectId: string) {
 }
 
 async function loadScenarioData(pool: any, modelingProjectId: string) {
-  // Scenario version
+  // Scenario version — include id for canonical-store lookup
+  // (Day 4 Commit 4: engine unification).
   const sv = await pool.query(
-    `SELECT revenue_growth_rate, expense_growth_rate, exit_cap_rate, assumptions
+    `SELECT id, revenue_growth_rate, expense_growth_rate, exit_cap_rate, assumptions
      FROM modeling_scenario_versions
      WHERE modeling_project_id = $1
      ORDER BY created_at DESC LIMIT 1`,
@@ -1309,6 +1312,23 @@ async function loadScenarioData(pool: any, modelingProjectId: string) {
   );
   const config = pc.rows[0] ?? {};
 
+  // Resolve assumptions from canonical store; fall back to JSONB blob if
+  // canonical row is missing. Downstream consumers (CPI rate/cap/floor at
+  // L160-170, rollover vacancy/TI-LC at L259-265) read keys from this
+  // object — semantics unchanged when content matches.
+  let assumptions: Record<string, any> = {};
+  if (scenario.id) {
+    const canonical = await readCanonicalPayload(scenario.id);
+    if (canonical) {
+      assumptions = canonical;
+    } else {
+      console.warn(`[dcf-calculator] No canonical payload for scenario ${scenario.id}, falling back to JSONB blob`);
+      assumptions = typeof scenario.assumptions === 'string'
+        ? JSON.parse(scenario.assumptions)
+        : (scenario.assumptions ?? {});
+    }
+  }
+
   return {
     revenueGrowthRate: Number(scenario.revenue_growth_rate) || 3,
     expenseGrowthRate: Number(scenario.expense_growth_rate) || 2.5,
@@ -1316,9 +1336,7 @@ async function loadScenarioData(pool: any, modelingProjectId: string) {
     holdPeriod: Number(config.hold_period) || 5,
     acquisitionCloseDate: config.acquisition_close_date ?? null,
     seasonMonths: [],
-    assumptions: typeof scenario.assumptions === 'string'
-      ? JSON.parse(scenario.assumptions)
-      : scenario.assumptions ?? {},
+    assumptions,
     // null = unset (legacy auto-detect), true = opt-in, false = opt-out
     useLeaseIncomeForDcf: config.use_lease_income_for_dcf ?? null,
   };
