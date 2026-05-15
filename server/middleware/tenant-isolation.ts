@@ -42,6 +42,12 @@ export function enforceTenant(req: Request, res: Response, next: NextFunction) {
   }
 
   if (!user.orgId) {
+    // No `id` means this is an OAuth session stub (e.g. Replit passport), not a
+    // fully enterprise-authenticated user.  Let the request pass through so the
+    // actual route handler — which may be a public endpoint — can decide.
+    if (!user.id) {
+      return next();
+    }
     logger.error({
       type: 'missing_org_id',
       userId: user.id,
