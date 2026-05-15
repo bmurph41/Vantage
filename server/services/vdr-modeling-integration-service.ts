@@ -1,5 +1,5 @@
 import { db } from '../db';
-import { 
+import {
   modelingProjects,
   modelingScenarioVersions,
   vdrFolders,
@@ -10,6 +10,7 @@ import { eq, and, sql } from 'drizzle-orm';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as crypto from 'crypto';
+import { readCanonicalPayload } from './canonical-assumption-store';
 
 export interface VDRExportOptions {
   includeICMemo?: boolean;
@@ -211,10 +212,24 @@ export class VDRModelingIntegrationService {
         return null;
       }
 
-      const comparisonContent = this.generateScenarioComparisonText(project, scenarios);
+      const canonicalPayloads = new Map<string, Record<string, any>>();
+      for (const scenario of scenarios) {
+        const canonical = await readCanonicalPayload(scenario.id);
+        if (canonical) {
+          canonicalPayloads.set(scenario.id, canonical);
+        } else {
+          console.warn(`[vdr-comparison] No canonical payload for scenario ${scenario.id}, falling back to JSONB blob`);
+          const fallback = typeof scenario.assumptions === 'string'
+            ? JSON.parse(scenario.assumptions as any)
+            : ((scenario.assumptions as any) || {});
+          canonicalPayloads.set(scenario.id, fallback);
+        }
+      }
+
+      const comparisonContent = this.generateScenarioComparisonText(project, scenarios, canonicalPayloads);
       const filename = `Scenario_Comparison_${project.marinaName || project.name}_${new Date().toISOString().split('T')[0]}.txt`;
       const doc = await this.saveDocument(folderId, ddProjectId, orgId, userId, filename, comparisonContent, 'text/plain', 'scenario_comparison');
-      
+
       return doc;
     } catch (error) {
       console.error('Failed to export Scenario Comparison:', error);
@@ -312,34 +327,35 @@ export class VDRModelingIntegrationService {
     return lines.join('\n');
   }
 
-  private generateScenarioComparisonText(project: any, scenarios: any[]): string {
+  private generateScenarioComparisonText(
+    project: any,
+    scenarios: any[],
+    canonicalPayloads: Map<string, Record<string, any>>
+  ): string {
     const lines: string[] = [];
-    
+
     lines.push('SCENARIO COMPARISON REPORT');
     lines.push('='.repeat(50));
     lines.push(`Project: ${project.marinaName || project.name}`);
     lines.push(`Generated: ${new Date().toISOString()}`);
     lines.push('');
-    
+
     for (const scenario of scenarios) {
       lines.push(`\n${'─'.repeat(50)}`);
       lines.push(`Scenario: ${scenario.name} (v${scenario.version})`);
       lines.push(`Status: ${scenario.status}`);
       lines.push(`Type: ${scenario.scenarioType || 'N/A'}`);
       lines.push(`Created: ${scenario.createdAt}`);
-      
-      if (scenario.assumptions) {
+
+      const assumptions = canonicalPayloads.get(scenario.id);
+      if (assumptions && Object.keys(assumptions).length > 0) {
         lines.push('\nKey Assumptions:');
-        const assumptions = typeof scenario.assumptions === 'string' 
-          ? JSON.parse(scenario.assumptions) 
-          : scenario.assumptions;
-        
         for (const [key, value] of Object.entries(assumptions)) {
           lines.push(`  - ${key}: ${value}`);
         }
       }
     }
-    
+
     return lines.join('\n');
   }
 
