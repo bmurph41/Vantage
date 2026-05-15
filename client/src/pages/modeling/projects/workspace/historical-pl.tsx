@@ -1325,10 +1325,10 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                 <TableHeader>
                   <TableRow className="border-b-2">
                     <TableHead className="sticky left-0 z-20 bg-white dark:bg-background border-r px-3 py-2.5 text-xs uppercase tracking-wider text-muted-foreground">Line Item</TableHead>
-                    <TableHead className="text-right px-3 py-2.5 font-bold text-sm">{compareYears[0]}</TableHead>
-                    <TableHead className="text-right px-3 py-2.5 font-bold text-sm">{compareYears[1]}</TableHead>
-                    <TableHead className="text-right px-3 py-2.5 font-bold text-sm">$ Change</TableHead>
-                    <TableHead className="text-right px-3 py-2.5 font-bold text-sm">% Change</TableHead>
+                    <TableHead className="text-center px-3 py-2.5 font-bold text-sm">{compareYears[0]}</TableHead>
+                    <TableHead className="text-center px-3 py-2.5 font-bold text-sm">{compareYears[1]}</TableHead>
+                    <TableHead className="text-center px-3 py-2.5 font-bold text-sm">$ Change</TableHead>
+                    <TableHead className="text-center px-3 py-2.5 font-bold text-sm">% Change</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1647,12 +1647,12 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                     {months.map((month, idx) => (
                       <TableHead 
                         key={month} 
-                        className={`text-right px-1 py-2 text-sm font-bold ${!isSeasonalMonth(idx) ? 'bg-muted/30' : ''}`}
+                        className={`text-center px-1 py-2 text-sm font-bold ${!isSeasonalMonth(idx) ? 'bg-muted/30' : ''}`}
                       >
                         {month}
                       </TableHead>
                     ))}
-                    <TableHead className="text-right px-1 py-2 text-sm font-bold">Annual</TableHead>
+                    <TableHead className="text-center px-1 py-2 text-sm font-bold">Annual</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -2203,12 +2203,12 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                       const hasData = availableYears.includes(String(year));
                       return (
                         <Fragment key={year}>
-                          <TableHead className={`text-right px-3 py-2.5 font-bold text-sm ${!hasData ? 'text-muted-foreground/50' : ''}`}>
+                          <TableHead className={`text-center px-3 py-2.5 font-bold text-sm ${!hasData ? 'text-muted-foreground/50' : ''}`}>
                             {year}
-                            {hasData && <div className="w-1 h-1 rounded-full bg-green-500 ml-auto mt-1" />}
+                            {hasData && <div className="w-1 h-1 rounded-full bg-green-500 mx-auto mt-1" />}
                           </TableHead>
                           {showGrowthCols && yi > 0 && (
-                            <TableHead className="text-right px-1 py-2.5 text-[10px] text-muted-foreground bg-muted/10">YoY %</TableHead>
+                            <TableHead className="text-center px-1 py-2.5 text-[10px] text-muted-foreground bg-muted/10">YoY %</TableHead>
                           )}
                         </Fragment>
                       );
