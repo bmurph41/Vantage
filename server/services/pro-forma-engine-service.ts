@@ -379,6 +379,10 @@ export class ProFormaEngineService {
     const flatExpenseGrowthRate = new Decimal(scenario?.expenseGrowthRate?.toString() || '2.5').dividedBy(100);
     const exitCapRate = new Decimal(scenario?.exitCapRate?.toString() || '7.5').dividedBy(100);
     const purchasePrice = new Decimal(project.purchasePrice?.toString() || '0');
+
+    // Day 5 of engine unification: asset-class dispatch for projection models.
+    // Default 'marina' preserves current behavior for projects without assetClass.
+    const assetClass = (project as any).assetClass || 'marina';
     
     const stabilizedNoiMode = (config?.stabilizedNoiMode as StabilizedNoiMode) || 'fixed_year';
     const stabilizedNoiYear = config?.stabilizedNoiYear || 3;
@@ -672,7 +676,25 @@ export class ProFormaEngineService {
       return flatExpenseGrowthRate;
     };
     
+    // Asset-class-aware occupancy adjustment (Day 5 of engine unification).
+    // Marina: per-storage-type occupancy ratio (current/base year).
+    // STR/multifamily: stub returning 1; Year 1 occupancy applied by direct-input,
+    // pro-forma grows via revenueGrowthRate scalar. Future commits may add
+    // projection-time occupancy curves for these asset classes.
     const getOccupancyAdjustment = (department: string, subcategory: string, year: number): Decimal => {
+      switch (assetClass) {
+        case 'marina':
+          return getMarinaOccupancyAdjustment(department, subcategory, year);
+        case 'str':
+          return getStrOccupancyAdjustment(department, subcategory, year);
+        case 'multifamily':
+          return getMultifamilyOccupancyAdjustment(department, subcategory, year);
+        default:
+          return new Decimal(1);
+      }
+    };
+
+    const getMarinaOccupancyAdjustment = (department: string, subcategory: string, year: number): Decimal => {
       if (department !== 'Storage') return new Decimal(1);
 
       const storageTypeKey = storageSubcategoryToTypeKey(subcategory);
@@ -686,6 +708,18 @@ export class ProFormaEngineService {
 
       if (baseOccPct.lte(0)) return new Decimal(1);
       return currentOccPct.dividedBy(baseOccPct);
+    };
+
+    const getStrOccupancyAdjustment = (_department: string, _subcategory: string, _year: number): Decimal => {
+      // STUB — STR occupancy is scalar-applied at Year 1 by direct-input.
+      // See project_marina_occupancy_key_mismatch_2026_05_18.md for context.
+      return new Decimal(1);
+    };
+
+    const getMultifamilyOccupancyAdjustment = (_department: string, _subcategory: string, _year: number): Decimal => {
+      // STUB — Year 1 vacancy applied by direct-input. Pro-forma grows via revenueGrowthRate.
+      // See project_marina_occupancy_key_mismatch_2026_05_18.md for context.
+      return new Decimal(1);
     };
     
     const actualsMonthlyLookup: Record<string, Record<string, number>> = {};
