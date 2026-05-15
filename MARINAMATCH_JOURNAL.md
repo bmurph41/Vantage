@@ -4385,3 +4385,81 @@ Per architecture doc, Days 2-4 are marina canonical assumption store work.
 - Layout findings 4-5 (during Days 15-17 polish)
 
 
+
+---
+
+# Next session pickup — 2026-05-16
+
+## State at session start
+- HEAD: 6050e2fe (Day 2 — dual-write to canonical assumption store)
+- All work pushed to origin/main
+- Day 2 of engine unification complete
+- Beta clock: ~15 working days remaining
+
+## First task — Agent watch (5 min)
+`git log --oneline -10` — check for any autonomous commits between 6050e2fe and HEAD.
+Pattern: 5 incidents in 13 days. If anything autonomous landed, investigate before any other work.
+
+## Second task — read these memories (~10 min)
+1. `project_engine_unification_architecture_2026_05_14.md` — canonical reference
+2. `project_marina_phase0_state_map_2026_05_14.md` — Day 1 foundation
+3. `project_pro_forma_assumptions_audit_2026_05_14.md` — assumption store audit
+4. `project_post_merge_dbpush_disabled.md` — critical safety context
+5. `project_ci_red_known.md` — Path C verification standard
+
+## Day 3-4 plan — Migrate readers to canonical store
+
+Days 3-4 are reader migration. The engine and downstream services currently read from modeling_scenario_versions.assumptions JSONB blob. We migrate them to read from scenario_assumption_payloads (latest-version-per-scenario via ORDER BY created_at DESC LIMIT 1).
+
+### Day 3 specific (Phase 0 + first reader migration)
+
+1. **Phase 0 — read-only investigation (~60-90 min)**
+   - Reader inventory from Day 2 Phase 0 surfaced 7+ readers:
+     - proFormaEngineService (primary)
+     - dcfCalculatorService
+     - multiYearProjectionEngine
+     - institutionalAnalysisService
+     - debtSensitivityService
+     - vdrModelingIntegrationService
+     - scenarioGovernanceService (audit)
+     - Plus 2 route-level direct reads
+   - For each reader: trace what fields they read, what shape they expect
+   - Specifically check: does dcfCalculatorService.ts read keys (cpiRate, cpiCap, cpiFloor, rolloverVacancyMonths, rolloverTiLcPerSf) that don't appear in sampled JSONB blobs? If yes, surface where those keys come from (different writer? defaults fallback?). This was flagged but not resolved in Day 2.
+
+2. **Design decision — read fallback strategy**
+   - When canonical store has a row for the scenario_version_id, read it
+   - When canonical store is EMPTY for that scenario_version_id (legacy data before dual-write started), fall back to JSONB blob
+   - This means readers need a try-canonical-then-JSONB pattern OR a backfill of existing scenarios into canonical store
+   - Discuss before coding
+
+3. **First Day 3 commit (~2-3h)**
+   - Migrate proFormaEngineService (the primary engine reader) first
+   - Add helper: readCanonicalPayload(scenarioVersionId) → returns latest payload or null
+   - Pro Forma reads canonical when present, falls back to JSONB blob
+   - Verify pro forma produces identical numbers before/after migration for marina test project
+
+## Stop conditions
+- Phase 0 reveals readers depend on JSONB-specific shape that canonical doesn't preserve → STOP, design decision needed
+- Backfill question requires committing to specific migration of existing data → STOP, discuss before coding
+- Replit Agent autonomous commit between sessions → STOP, investigate
+- Pro Forma numbers differ before/after reader migration → STOP, surface the discrepancy
+
+## Standing reminders
+- Never `npm run db:push` (also disabled in post-merge.sh)
+- Raw `pool.query()` for RLS-adjacent tables
+- ESM imports use `.js` extensions
+- Path C: scoped tsc verification (tsc -b shared + scoped server), baseline-diff for noisy areas
+- Working-tree audit before every commit
+- Cross-surface verification > self-match verification
+- Smoke tests with FIELD-SPECIFIC assertions, not just "doesn't crash"
+- Failure-isolation (try/catch) on canonical writes preserves primary path
+
+## Open follow-ups (not Day 3 work)
+- Backfill existing scenarios into scenario_assumption_payloads (decision needed during Day 3 Phase 0)
+- Old broken-hash payload rows in scenario_assumption_payloads (4 rows from Day 2 smoke tests) — keep as reference, clean up when canonical store has real population
+- dcfCalculatorService reads unidentified keys (cpiRate etc) — surface during Day 3 Phase 0
+- tsconfig.diag-server.json untracked in working tree — consider committing or .gitignoring it for future verification work
+- 131 orphan tables (post-beta)
+- Inputs & Assumptions UI redesign (post-beta)
+- Pro Forma chart flat-zero bug (during Days 15-17 polish)
+- Layout findings 4-5 (during Days 15-17 polish)
