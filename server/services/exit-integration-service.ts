@@ -21,6 +21,7 @@ import {
   capitalStacks,
   modelingProjectConfig,
 } from '@shared/schema';
+import { writeCanonicalPayload } from './canonical-assumption-store';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -443,6 +444,18 @@ class ExitIntegrationService {
       await db.update(modelingScenarioVersions)
         .set({ assumptions, updatedAt: new Date() } as any)
         .where(eq(modelingScenarioVersions.id, v.id));
+      // Dual-write to canonical assumption store (Day 2, Phase A — append-only).
+      try {
+        await writeCanonicalPayload({
+          orgId: v.orgId,
+          projectId: v.modelingProjectId,
+          scenarioId: v.scenarioType,
+          scenarioVersionId: v.id,
+          assumptions,
+        });
+      } catch (err) {
+        console.error('[canonical-assumption-store] dual-write failed (exit-integration holdPeriod):', err);
+      }
     }
     if (versions.length > 0) updated.push(`scenarioVersions(${versions.length})`);
 

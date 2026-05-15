@@ -6,6 +6,7 @@ import {
 } from '@shared/schema';
 import { eq, and, desc, sql, ne } from 'drizzle-orm';
 import { triggerValuationSnapshot } from './scenario-snapshot-hook';
+import { writeCanonicalPayload } from './canonical-assumption-store';
 
 export type ScenarioType = 'base' | 'aggressive' | 'conservative' | 'custom';
 export type ScenarioStatus = 'draft' | 'pending_approval' | 'approved' | 'rejected';
@@ -80,6 +81,20 @@ export class ScenarioVersioningService {
       updatedBy: input.userId
     }).returning();
 
+    // Dual-write to canonical assumption store (Day 2, Phase A — append-only).
+    // Failure-isolated: never break the primary JSONB write above.
+    try {
+      await writeCanonicalPayload({
+        orgId: input.orgId,
+        projectId: input.projectId,
+        scenarioId: input.scenarioType,
+        scenarioVersionId: scenario.id,
+        assumptions: input.assumptions || {},
+      });
+    } catch (err) {
+      console.error('[canonical-assumption-store] dual-write failed (createScenario):', err);
+    }
+
     await this.logAuditEvent({
       orgId: input.orgId,
       projectId: input.projectId,
@@ -140,6 +155,19 @@ export class ScenarioVersioningService {
         updatedBy: input.userId
       }).returning();
 
+      // Dual-write to canonical assumption store (Day 2, Phase A — append-only).
+      try {
+        await writeCanonicalPayload({
+          orgId: currentScenario.orgId,
+          projectId: currentScenario.modelingProjectId,
+          scenarioId: currentScenario.scenarioType,
+          scenarioVersionId: newVersion.id,
+          assumptions: input.assumptions || currentScenario.assumptions || {},
+        });
+      } catch (err) {
+        console.error('[canonical-assumption-store] dual-write failed (updateScenario new-version):', err);
+      }
+
       await this.logAuditEvent({
         orgId: currentScenario.orgId,
         projectId: currentScenario.modelingProjectId,
@@ -172,6 +200,22 @@ export class ScenarioVersioningService {
         .set(updateData)
         .where(eq(modelingScenarioVersions.id, input.scenarioId))
         .returning();
+
+      // Dual-write to canonical assumption store (Day 2, Phase A — append-only).
+      // Guarded: in-place updates can be name-only edits with no assumptions change.
+      if (input.assumptions !== undefined) {
+        try {
+          await writeCanonicalPayload({
+            orgId: currentScenario.orgId,
+            projectId: currentScenario.modelingProjectId,
+            scenarioId: currentScenario.scenarioType,
+            scenarioVersionId: updated.id,
+            assumptions: input.assumptions,
+          });
+        } catch (err) {
+          console.error('[canonical-assumption-store] dual-write failed (updateScenario in-place):', err);
+        }
+      }
 
       await this.logAuditEvent({
         orgId: currentScenario.orgId,

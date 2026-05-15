@@ -19,8 +19,8 @@ import {
   modelingProjects
 } from '@shared/schema';
 import { eq, and, desc, asc } from 'drizzle-orm';
-import * as crypto from 'crypto';
 import { triggerValuationSnapshot } from './scenario-snapshot-hook';
+import { hashAssumptionsPayload } from './canonical-assumption-store';
 
 // ============================================
 // TYPES
@@ -738,10 +738,15 @@ export class ScenarioGovernanceService {
 
   /**
    * Generate hash of assumptions payload for integrity verification.
+   *
+   * Delegates to the shared helper in canonical-assumption-store.ts so
+   * both writers produce identical hashes. The previous inline impl
+   * misused JSON.stringify's replacer-array argument (key allowlist, not
+   * sort order), stripping all nested keys — payloads differing only at
+   * nested levels hashed identically.
    */
   private hashPayload(payload: any): string {
-    const json = JSON.stringify(payload || {}, Object.keys(payload || {}).sort());
-    return crypto.createHash('sha256').update(json).digest('hex').substring(0, 16);
+    return hashAssumptionsPayload(payload);
   }
 
   /**

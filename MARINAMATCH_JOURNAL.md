@@ -4323,4 +4323,65 @@ Disclaimer UX inconsistency — pendingMaster shows in selector but grid still s
 ## Replit Agent watch
 Check `git log --oneline -20` at session start. Replit Agent has shipped autonomous commits between sessions twice this week. If you see commits you don't recognize, investigate before any new work (per standing rule #5).
 
+---
+
+# Next session pickup — 2026-05-15
+
+## State at session start
+- HEAD: c25f7ab3 (Day 1 — asset class threading through inferDepartment)
+- All work pushed to origin/main
+- Day 1 of engine unification complete
+- Beta clock: ~16 working days remaining (was 17 at start of Day 1)
+
+## First task — read these memories before doing anything else (~15 min)
+1. `project_engine_unification_architecture_2026_05_14.md` — canonical reference, read first
+2. `project_marina_phase0_state_map_2026_05_14.md` — Day 1 foundation
+3. `project_pro_forma_assumptions_audit_2026_05_14.md` — assumption store audit Q1-Q5
+4. `project_post_merge_dbpush_disabled.md` — critical safety context
+5. `project_ci_red_known.md` — Path C verification standard
+
+## Replit Agent watch at session start
+`git log --oneline -10` — check for any autonomous commits between c25f7ab3 and HEAD.
+Pattern: 5 incidents in 12 days. If anything autonomous landed, investigate before any other work.
+
+## Day 2 plan — Begin canonical assumption store migration
+
+Per architecture doc, Days 2-4 are marina canonical assumption store work.
+
+### Day 2 specific (Phase 0 + first commit)
+
+1. **Phase 0 — read-only investigation (~60-90 min)**
+   - Read scenario_assumption_payloads schema in full: `psql "$DATABASE_URL" -c "\d scenario_assumption_payloads"`
+   - Compare to current JSONB blob structure in modeling_scenario_versions.assumptions (sample 2-3 marina projects)
+   - Identify field-by-field mapping: what's in JSONB → what would land in the canonical store
+   - Surface gaps: anything in JSONB that scenario_assumption_payloads can't represent today?
+   - Read every writer/reader of modeling_scenario_versions.assumptions to inventory the migration surface
+
+2. **First Day 2 commit (~2-3h)**
+   - Add dual-write capability: when assumption JSONB is updated, also write to scenario_assumption_payloads
+   - Phase A of dual-write pattern per architecture doc
+   - No reader migration yet — engine still reads JSONB blob
+   - Verify both stores stay in sync for marina projects
+
+## Stop conditions
+- Phase 0 surfaces scenario_assumption_payloads can't represent the JSONB shape → STOP, design decision needed
+- Dual-write implementation would touch more than 5 files → STOP, scope decision
+- Replit Agent autonomous commit between sessions → STOP, investigate
+
+## Standing reminders
+- Never `npm run db:push` (now also disabled in post-merge.sh)
+- Raw `pool.query()` for RLS-adjacent tables
+- ESM imports use `.js` extensions
+- Path C: scoped tsc verification (tsc -b shared + scoped server), baseline-diff for noisy areas
+- Working-tree audit before every commit
+- Cross-surface verification > self-match verification
+- Document threading TODOs in commit body
+
+## Open follow-ups not blocking Day 2
+- 131 orphan tables (post-beta)
+- Inputs & Assumptions UI redesign (post-beta unless surfaces as beta blocker)
+- Pro Forma chart flat-zero bug (during Days 15-17 polish)
+- Audit gap #4 disclaimer UX (during Days 15-17 polish)
+- Layout findings 4-5 (during Days 15-17 polish)
+
 
