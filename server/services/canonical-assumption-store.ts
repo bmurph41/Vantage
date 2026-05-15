@@ -12,6 +12,7 @@
  */
 
 import * as crypto from 'crypto';
+import { eq, desc } from 'drizzle-orm';
 import { db } from '../db';
 import { scenarioAssumptionPayloads } from '@shared/schema';
 
@@ -79,4 +80,26 @@ export async function writeCanonicalPayload(params: {
     payloadSchemaVersion: 1, // integer — NOT the string '1.0' the dead governance writer passed
     payloadHash,
   });
+}
+
+/**
+ * Read the latest canonical payload for a scenario version.
+ *
+ * Returns null only when no canonical row exists. Callers should NOT fall
+ * back to modeling_scenario_versions.assumptions — the Day 3 backfill
+ * ensures every populated scenario has a canonical row, and the Day 2
+ * dual-write keeps coverage current. A null return for a populated
+ * scenario is a bug worth surfacing, not silently working around.
+ *
+ * Append-only mechanics: latest = ORDER BY created_at DESC LIMIT 1.
+ */
+export async function readCanonicalPayload(
+  scenarioVersionId: string
+): Promise<Record<string, any> | null> {
+  const rows = await db.select({ payload: scenarioAssumptionPayloads.payload })
+    .from(scenarioAssumptionPayloads)
+    .where(eq(scenarioAssumptionPayloads.scenarioVersionId, scenarioVersionId))
+    .orderBy(desc(scenarioAssumptionPayloads.createdAt))
+    .limit(1);
+  return rows.length > 0 ? (rows[0].payload as Record<string, any>) : null;
 }
