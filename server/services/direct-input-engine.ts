@@ -65,36 +65,62 @@ interface COALine {
   defaultPct?: number;          // default percentage if using pct compute
   isSubtraction?: boolean;      // vacancy, concessions, COGS
   formulaFn?: (inputs: Record<string, any>, computed: Record<string, number>) => { amount: number; formula: string };
+  // Day 9: explicit monthly-variant key names (e.g. 'utilitiesMonthly',
+  // 'hoaCondoMonthly') that the annual→monthly auto-derive rule below
+  // wouldn't catch. Each matched value is treated as monthly and × 12.
+  monthlyInputKeys?: string[];
 }
 
 // ===== STR =====
+// Day 9 of engine unification — UI-form key aliases wired through STR_COA so
+// L1 (STR_CONFIG.inputSections) and L2 (STR_FIELDS) field names produce the
+// same output as L3 canonical names. See project_str_coverage_audit_2026_05_19.
+//
+// Deferred to Day 10 (formula territory, not pure aliases):
+//   - Seasonal ADR/occupancy (peakSeasonADR, shoulderSeasonADR, offSeasonADR
+//     × peakOccupancyPercent / shoulderOccupancyPercent / offSeasonOccupancyPercent)
+//   - Per-turn fees (cleaningFeePerTurnover × turnoversPerMonth × 12)
+//   - Per-platform host fees blended via airbnbBookingPercent × airbnbHostFeePct etc.
+//   - Reserves as % of revenue (furnishingReservePercent, capexReservePercent)
+//   - Per-stay/per-night guest fees (petFeePerStay, extraGuestFeePerNight, etc.)
+//   - Splitting 'internet' into separate Internet/Cable and Streaming lines
+//     (current monthly_x12 returns first non-zero — if user supplies both
+//     wifiMonthly and streamingMonthly, only one fires).
 const STR_COA: COALine[] = [
   // Revenue
   { key: 'grossRentalIncome', label: 'Gross Rental Income', category: 'revenue', inputKeys: [], computeType: 'formula',
     formulaFn: (i, c) => {
       const rate = num(i.avgNightlyRate ?? i.nightlyRate ?? i.averageDailyRate);
-      const occ = pct(i.occupancy ?? i.occupancyRate);
+      // Day 9: avgOccupancyPercent is the L1 UI field name. pct() helper
+      // auto-converts 0-100 → 0-1, so no explicit unit conversion needed.
+      const occ = pct(i.occupancy ?? i.occupancyRate ?? i.avgOccupancyPercent);
       const units = Math.max(1, num(i.numberOfUnits ?? i.units ?? 1));
       const amt = rate * occ * 365 * units;
       return { amount: amt, formula: `$${fmtC(rate)}/night × ${fmtP(occ)} occ × 365 × ${units} unit${units > 1 ? 's' : ''} = $${fmtC(amt)}` };
     }},
   { key: 'cleaningFeeIncome', label: 'Cleaning Fee Income', category: 'revenue', inputKeys: ['annualCleaningFeeIncome', 'cleaningFeeIncome'], computeType: 'direct' },
-  { key: 'otherIncome', label: 'Other Income', category: 'revenue', inputKeys: ['annualOtherIncome', 'otherIncome'], computeType: 'direct' },
+  { key: 'otherIncome', label: 'Other Income', category: 'revenue', inputKeys: ['annualOtherIncome', 'otherIncome', 'experienceAddonRevenue'], computeType: 'direct' },
   // Expenses
   { key: 'platformFees', label: 'Platform Fees (Airbnb/VRBO)', category: 'expense', inputKeys: ['annualPlatformFees'], computeType: 'pct_of_revenue', pctKey: 'platformFeePct', defaultPct: 0.03 },
   { key: 'cleaning', label: 'Cleaning / Turnover', category: 'expense', inputKeys: ['annualCleaning', 'cleaningExpense'], computeType: 'direct' },
   { key: 'propertyManagement', label: 'Property Management', category: 'expense', inputKeys: ['annualPropertyManagement'], computeType: 'pct_of_revenue', pctKey: 'propertyManagementPct', defaultPct: 0 },
   { key: 'annualPropertyTax', label: 'Property Tax', category: 'expense', inputKeys: ['annualPropertyTax', 'propertyTaxAnnual', 'propertyTax'], computeType: 'direct' },
   { key: 'annualInsurance', label: 'Insurance', category: 'expense', inputKeys: ['annualInsurance', 'insuranceAnnual', 'insurance'], computeType: 'direct' },
-  { key: 'annualHOA', label: 'HOA / Condo Fees', category: 'expense', inputKeys: ['annualHOA', 'hoa'], computeType: 'direct' },
-  { key: 'utilities', label: 'Utilities', category: 'expense', inputKeys: ['annualUtilities'], computeType: 'monthly_x12' },
-  { key: 'maintenance', label: 'Maintenance & Repairs', category: 'expense', inputKeys: ['annualMaintenance', 'maintenance'], computeType: 'direct' },
+  { key: 'annualHOA', label: 'HOA / Condo Fees', category: 'expense', inputKeys: ['annualHOA', 'hoa'], computeType: 'monthly_x12', monthlyInputKeys: ['hoaCondoMonthly', 'hoaCondoPerMonth'] },
+  { key: 'utilities', label: 'Utilities', category: 'expense', inputKeys: ['annualUtilities'], computeType: 'monthly_x12', monthlyInputKeys: ['utilitiesMonthly', 'utilitiesPerMonth'] },
+  { key: 'maintenance', label: 'Maintenance & Repairs', category: 'expense', inputKeys: ['annualMaintenance', 'maintenance', 'repairsMaintAnnual'], computeType: 'direct' },
   { key: 'supplies', label: 'Supplies & Furnishing', category: 'expense', inputKeys: ['annualSupplies', 'supplies'], computeType: 'direct' },
-  { key: 'landscaping', label: 'Landscaping / Lawn Care', category: 'expense', inputKeys: ['annualLandscaping', 'landscaping'], computeType: 'direct' },
-  { key: 'internet', label: 'Internet / Cable / Streaming', category: 'expense', inputKeys: ['annualInternet', 'internet'], computeType: 'direct' },
-  { key: 'pest', label: 'Pest Control', category: 'expense', inputKeys: ['annualPestControl', 'pestControl'], computeType: 'direct' },
+  { key: 'landscaping', label: 'Landscaping / Lawn Care', category: 'expense', inputKeys: ['annualLandscaping', 'landscaping'], computeType: 'monthly_x12', monthlyInputKeys: ['lawnPoolMonthly', 'lawnPoolPerMonth'] },
+  { key: 'internet', label: 'Internet / Cable / Streaming', category: 'expense', inputKeys: ['annualInternet', 'internet'], computeType: 'monthly_x12', monthlyInputKeys: ['wifiMonthly', 'wifiPerMonth', 'streamingMonthly', 'streamingServicesPerMonth'] },
+  { key: 'pest', label: 'Pest Control', category: 'expense', inputKeys: ['annualPestControl', 'pestControl'], computeType: 'monthly_x12', monthlyInputKeys: ['pestControlMonthly', 'pestControlPerMonth'] },
   { key: 'accounting', label: 'Accounting / Bookkeeping', category: 'expense', inputKeys: ['annualAccounting', 'accounting'], computeType: 'direct' },
   { key: 'capEx', label: 'Capital Reserves', category: 'expense', inputKeys: ['annualCapEx', 'capitalReserves'], computeType: 'direct' },
+  // Day 9 — new monthly-subscription lines (common STR operating costs that
+  // STR_FIELDS captures but had no STR_COA home). All are monthly_x12 because
+  // the UI captures monthly amounts.
+  { key: 'pmsSoftware', label: 'PMS Software', category: 'expense', inputKeys: ['annualPmsSoftware'], computeType: 'monthly_x12', monthlyInputKeys: ['pmsSoftwareMonthly', 'pmsFeePerMonth'] },
+  { key: 'channelManager', label: 'Channel Manager', category: 'expense', inputKeys: ['annualChannelManager'], computeType: 'monthly_x12', monthlyInputKeys: ['channelManagerMonthly', 'channelManagerPerMonth'] },
+  { key: 'smartLock', label: 'Smart Lock / Access', category: 'expense', inputKeys: ['annualSmartLock'], computeType: 'monthly_x12', monthlyInputKeys: ['smartLockMonthly', 'smartLockPerMonth'] },
 ];
 
 // ===== SFR =====
@@ -628,6 +654,18 @@ function computeLine(
     for (const key of line.inputKeys) {
       const val = num(inputs[key]);
       if (val > 0) return { amount: val };
+    }
+    // Day 9: explicit monthly-variant key names (e.g. 'utilitiesMonthly',
+    // 'hoaCondoMonthly') that the auto-derive rule below wouldn't catch.
+    // These are matched as monthly values and × 12.
+    if (line.monthlyInputKeys) {
+      for (const key of line.monthlyInputKeys) {
+        const val = num(inputs[key]);
+        if (val > 0) {
+          const annual = val * 12;
+          return { amount: annual, formula: `$${fmtC(val)}/mo × 12 = $${fmtC(annual)}` };
+        }
+      }
     }
     // Check monthly variants derived from this line's own input keys
     // (e.g. annualUtilities → monthlyUtilities). Do NOT add unrelated fallbacks
