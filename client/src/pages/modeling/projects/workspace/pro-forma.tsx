@@ -1602,7 +1602,7 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
 
                   {/* Historical Period Columns (excluding baseline) - blue tint to signify actuals */}
                   {showHistorical && priorPeriods.map(period => (
-                    <TableHead key={period.id} className="text-center w-28 bg-blue-50/60 dark:bg-blue-950/20">
+                    <TableHead key={period.id} className="text-right w-28 bg-blue-50/60 dark:bg-blue-950/20">
                       <TooltipProvider>
                         <Tooltip>
                           <TooltipTrigger asChild>
@@ -1623,12 +1623,12 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                   ))}
 
                   {/* Baseline/Actuals Column */}
-                  <TableHead className="text-center w-32 bg-blue-50 dark:bg-blue-950/30 border-x border-blue-200 dark:border-blue-800">
+                  <TableHead className="text-right w-32 bg-blue-50 dark:bg-blue-950/30 border-x border-blue-200 dark:border-blue-800">
                     <TooltipProvider>
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <div className="cursor-help">
-                            <div className="flex items-center justify-center gap-1">
+                            <div className="flex items-center justify-end gap-1">
                               <FileSpreadsheet className="h-3 w-3" />
                               <span className="text-xs text-blue-600 dark:text-blue-400">Baseline</span>
                             </div>
@@ -1660,7 +1660,7 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                     months.map((month, i) => (
                       <TableHead 
                         key={i} 
-                        className={`text-center w-24 ${isSeasonalMonth(i) ? 'bg-green-50 dark:bg-green-950/30' : ''}`}
+                        className={`text-right w-24 ${isSeasonalMonth(i) ? 'bg-green-50 dark:bg-green-950/30' : ''}`}
                       >
                         <div>{month}</div>
                         <div className="text-xs text-muted-foreground font-normal">
@@ -1671,14 +1671,14 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                   ) : (
                     // Annual columns
                     years.map((year, i) => (
-                      <TableHead key={year} className="text-center w-28">
+                      <TableHead key={year} className="text-right w-28">
                         <div>Year {i + 1}</div>
                         <div className="text-xs text-muted-foreground font-normal">{year}</div>
                       </TableHead>
                     ))
                   )}
 
-                  <TableHead className="text-center w-24">{viewMode === 'monthly' ? 'Total' : 'CAGR'}</TableHead>
+                  <TableHead className="text-right w-24">{viewMode === 'monthly' ? 'Total' : 'CAGR'}</TableHead>
                 </TableRow>
               </TableHeader>
 
