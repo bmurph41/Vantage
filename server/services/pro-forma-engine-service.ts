@@ -596,7 +596,7 @@ export class ProFormaEngineService {
           directInputs.inSeasonMonths = modelConfig.seasonConfig.defaultInSeasonMonths;
         }
       }
-      const directResult = computeDirectInputFinancials(assetClass, directInputs);
+      const directResult = computeDirectInputFinancials(assetClass, directInputs, (project.customMetrics as any)?.unitMix);
       if (directResult) {
         for (const line of directResult.revenueLines) {
           revenueBySubcat[line.label] = {
@@ -628,7 +628,7 @@ export class ProFormaEngineService {
           directInputs.inSeasonMonths = modelConfig.seasonConfig.defaultInSeasonMonths;
         }
       }
-      const directResult = computeDirectInputFinancials(assetClass, directInputs);
+      const directResult = computeDirectInputFinancials(assetClass, directInputs, (project.customMetrics as any)?.unitMix);
       if (directResult) {
         for (const line of directResult.revenueLines) {
           if (!revenueBySubcat[line.label]) {
