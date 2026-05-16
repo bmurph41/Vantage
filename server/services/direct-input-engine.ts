@@ -64,7 +64,16 @@ interface COALine {
   pctKey?: string;              // for pct-based: key for the percentage value
   defaultPct?: number;          // default percentage if using pct compute
   isSubtraction?: boolean;      // vacancy, concessions, COGS
-  formulaFn?: (inputs: Record<string, any>, computed: Record<string, number>) => { amount: number; formula: string };
+  // Day 10: optional third arg `context` carries grossRevenue + egi so
+  // formula-driven lines (e.g. platformFees blended-mix branch) can read
+  // them without a second pass. Existing formulaFns declare 2 params; JS
+  // ignores extras so this is back-compat. `formula` widened to optional
+  // for branches that return 0 without explanatory text (capEx suppression).
+  formulaFn?: (
+    inputs: Record<string, any>,
+    computed: Record<string, number>,
+    context?: { grossRevenue: number; egi: number },
+  ) => { amount: number; formula?: string };
   // Day 9: explicit monthly-variant key names (e.g. 'utilitiesMonthly',
   // 'hoaCondoMonthly') that the annual→monthly auto-derive rule below
   // wouldn't catch. Each matched value is treated as monthly and × 12.
@@ -72,20 +81,20 @@ interface COALine {
 }
 
 // ===== STR =====
-// Day 9 of engine unification — UI-form key aliases wired through STR_COA so
+// Day 9 of engine unification wired UI-form key aliases through STR_COA so
 // L1 (STR_CONFIG.inputSections) and L2 (STR_FIELDS) field names produce the
 // same output as L3 canonical names. See project_str_coverage_audit_2026_05_19.
 //
-// Deferred to Day 10 (formula territory, not pure aliases):
-//   - Seasonal ADR/occupancy (peakSeasonADR, shoulderSeasonADR, offSeasonADR
-//     × peakOccupancyPercent / shoulderOccupancyPercent / offSeasonOccupancyPercent)
-//   - Per-turn fees (cleaningFeePerTurnover × turnoversPerMonth × 12)
-//   - Per-platform host fees blended via airbnbBookingPercent × airbnbHostFeePct etc.
-//   - Reserves as % of revenue (furnishingReservePercent, capexReservePercent)
-//   - Per-stay/per-night guest fees (petFeePerStay, extraGuestFeePerNight, etc.)
-//   - Splitting 'internet' into separate Internet/Cable and Streaming lines
-//     (current monthly_x12 returns first non-zero — if user supplies both
-//     wifiMonthly and streamingMonthly, only one fires).
+// Day 10 closes the formula-change orphans Day 9 deferred:
+//   Q2 — Per-turn fees (cleaningFeeIncome / cleaning / supplies → formula)
+//   Q3 — Per-platform host fees blended (airbnbBookingPercent × airbnbHostFeePct ...)
+//   Q4 — Reserves as % of revenue (furnishingReservePercent, capexReservePercent)
+//        capEx suppressed when capexReservePercent > 0
+//   Q6 — Internet / streaming split (separate lines so both fire)
+//
+// Deferred to Day 11:
+//   Q1 — Seasonal ADR/occupancy (3-season schema + DCF↔ProForma monthly handoff)
+//   Q5 — Per-stay/per-night guest fees (petFeePerStay, extraGuestFeePerNight, ...)
 const STR_COA: COALine[] = [
   // Revenue
   { key: 'grossRentalIncome', label: 'Gross Rental Income', category: 'revenue', inputKeys: [], computeType: 'formula',
@@ -98,23 +107,111 @@ const STR_COA: COALine[] = [
       const amt = rate * occ * 365 * units;
       return { amount: amt, formula: `$${fmtC(rate)}/night × ${fmtP(occ)} occ × 365 × ${units} unit${units > 1 ? 's' : ''} = $${fmtC(amt)}` };
     }},
-  { key: 'cleaningFeeIncome', label: 'Cleaning Fee Income', category: 'revenue', inputKeys: ['annualCleaningFeeIncome', 'cleaningFeeIncome'], computeType: 'direct' },
+  // Day 10 Q2 — per-turn formula with fall-through to annual key (legacy).
+  { key: 'cleaningFeeIncome', label: 'Cleaning Fee Income', category: 'revenue', inputKeys: ['annualCleaningFeeIncome', 'cleaningFeeIncome'], computeType: 'formula',
+    formulaFn: (i, c) => {
+      const perTurn = num(i.cleaningFeePerTurnover);
+      const turns = computeTurnsPerMonth(i);
+      if (perTurn > 0 && turns > 0) {
+        const amt = perTurn * turns * 12;
+        return { amount: amt, formula: `$${fmtC(perTurn)}/turn × ${turns.toFixed(2)} turns/mo × 12 = $${fmtC(amt)}` };
+      }
+      const legacy = num(i.annualCleaningFeeIncome) || num(i.cleaningFeeIncome);
+      return { amount: legacy };
+    }},
   { key: 'otherIncome', label: 'Other Income', category: 'revenue', inputKeys: ['annualOtherIncome', 'otherIncome', 'experienceAddonRevenue'], computeType: 'direct' },
   // Expenses
-  { key: 'platformFees', label: 'Platform Fees (Airbnb/VRBO)', category: 'expense', inputKeys: ['annualPlatformFees'], computeType: 'pct_of_revenue', pctKey: 'platformFeePct', defaultPct: 0.03 },
-  { key: 'cleaning', label: 'Cleaning / Turnover', category: 'expense', inputKeys: ['annualCleaning', 'cleaningExpense'], computeType: 'direct' },
+  // Day 10 Q3 — fall-through: annualPlatformFees → legacy platformFeePct →
+  // blended mix → 3% default. ctx.grossRevenue is the post-revenue-pass
+  // totalRevPositive (matches the pre-Day-10 pct_of_revenue base).
+  { key: 'platformFees', label: 'Platform Fees (Airbnb/VRBO)', category: 'expense', inputKeys: ['annualPlatformFees'], computeType: 'formula',
+    formulaFn: (i, c, ctx) => {
+      const direct = num(i.annualPlatformFees);
+      if (direct > 0) return { amount: direct, formula: `$${fmtC(direct)} (annual direct)` };
+      const gross = ctx?.grossRevenue ?? 0;
+      const legacyPct = pct(i.platformFeePct);
+      if (legacyPct > 0 && gross > 0) {
+        const amt = gross * legacyPct;
+        return { amount: amt, formula: `$${fmtC(gross)} × ${fmtP(legacyPct)} (platformFeePct) = $${fmtC(amt)}` };
+      }
+      const airbnbBook = pct(i.airbnbBookingPercent);
+      const vrboBook = pct(i.vrboBookingPercent);
+      const directBook = pct(i.directBookingPercent);
+      const hasMix = airbnbBook > 0 || vrboBook > 0 || directBook > 0;
+      if (hasMix && gross > 0) {
+        const airbnbFee = pct(i.airbnbHostFeePct);
+        const vrboFee = pct(i.vrboHostFeePct);
+        const directFee = pct(i.directBookingCostPercent);
+        const paymentProc = pct(i.paymentProcessingPercent ?? i.paymentProcessingPct);
+        // Distribution sum not validated. If user enters >100% total
+        // booking mix, formula produces inflated fees — that's their
+        // data entry error to fix. Better than silently masking it.
+        const blended = airbnbBook * airbnbFee + vrboBook * vrboFee + directBook * directFee + paymentProc;
+        if (blended > 0) {
+          const amt = gross * blended;
+          return { amount: amt, formula: `$${fmtC(gross)} × ${fmtP(blended)} (blended Airbnb/VRBO/direct + processing) = $${fmtC(amt)}` };
+        }
+      }
+      if (gross > 0) {
+        const amt = gross * 0.03;
+        return { amount: amt, formula: `$${fmtC(gross)} × 3.00% (default) = $${fmtC(amt)}` };
+      }
+      return { amount: 0 };
+    }},
+  // Day 10 Q2 — per-turn formula with fall-through to annual key.
+  { key: 'cleaning', label: 'Cleaning / Turnover', category: 'expense', inputKeys: ['annualCleaning', 'cleaningExpense'], computeType: 'formula',
+    formulaFn: (i, c) => {
+      const perTurn = num(i.cleaningCostPerTurn);
+      const turns = computeTurnsPerMonth(i);
+      if (perTurn > 0 && turns > 0) {
+        const amt = perTurn * turns * 12;
+        return { amount: amt, formula: `$${fmtC(perTurn)}/turn × ${turns.toFixed(2)} turns/mo × 12 = $${fmtC(amt)}` };
+      }
+      const legacy = num(i.annualCleaning) || num(i.cleaningExpense);
+      return { amount: legacy };
+    }},
   { key: 'propertyManagement', label: 'Property Management', category: 'expense', inputKeys: ['annualPropertyManagement'], computeType: 'pct_of_revenue', pctKey: 'propertyManagementPct', defaultPct: 0 },
   { key: 'annualPropertyTax', label: 'Property Tax', category: 'expense', inputKeys: ['annualPropertyTax', 'propertyTaxAnnual', 'propertyTax'], computeType: 'direct' },
   { key: 'annualInsurance', label: 'Insurance', category: 'expense', inputKeys: ['annualInsurance', 'insuranceAnnual', 'insurance'], computeType: 'direct' },
   { key: 'annualHOA', label: 'HOA / Condo Fees', category: 'expense', inputKeys: ['annualHOA', 'hoa'], computeType: 'monthly_x12', monthlyInputKeys: ['hoaCondoMonthly', 'hoaCondoPerMonth'] },
   { key: 'utilities', label: 'Utilities', category: 'expense', inputKeys: ['annualUtilities'], computeType: 'monthly_x12', monthlyInputKeys: ['utilitiesMonthly', 'utilitiesPerMonth'] },
   { key: 'maintenance', label: 'Maintenance & Repairs', category: 'expense', inputKeys: ['annualMaintenance', 'maintenance', 'repairsMaintAnnual'], computeType: 'direct' },
-  { key: 'supplies', label: 'Supplies & Furnishing', category: 'expense', inputKeys: ['annualSupplies', 'supplies'], computeType: 'direct' },
+  // Day 10 Q2 — per-turn formula with fall-through to annual key.
+  { key: 'supplies', label: 'Supplies & Furnishing', category: 'expense', inputKeys: ['annualSupplies', 'supplies'], computeType: 'formula',
+    formulaFn: (i, c) => {
+      const perTurn = num(i.consumablesPerTurn);
+      const turns = computeTurnsPerMonth(i);
+      if (perTurn > 0 && turns > 0) {
+        const amt = perTurn * turns * 12;
+        return { amount: amt, formula: `$${fmtC(perTurn)}/turn × ${turns.toFixed(2)} turns/mo × 12 = $${fmtC(amt)}` };
+      }
+      const legacy = num(i.annualSupplies) || num(i.supplies);
+      return { amount: legacy };
+    }},
   { key: 'landscaping', label: 'Landscaping / Lawn Care', category: 'expense', inputKeys: ['annualLandscaping', 'landscaping'], computeType: 'monthly_x12', monthlyInputKeys: ['lawnPoolMonthly', 'lawnPoolPerMonth'] },
-  { key: 'internet', label: 'Internet / Cable / Streaming', category: 'expense', inputKeys: ['annualInternet', 'internet'], computeType: 'monthly_x12', monthlyInputKeys: ['wifiMonthly', 'wifiPerMonth', 'streamingMonthly', 'streamingServicesPerMonth'] },
+  // Day 10 Q6 — streaming entries removed from internet's monthlyInputKeys
+  // and moved to the dedicated streamingServices line below. Closes Day 9's
+  // "monthly_x12 returns first non-zero" caveat for wifi + streaming.
+  { key: 'internet', label: 'Internet / Cable', category: 'expense', inputKeys: ['annualInternet', 'internet'], computeType: 'monthly_x12', monthlyInputKeys: ['wifiMonthly', 'wifiPerMonth'] },
+  { key: 'streamingServices', label: 'Streaming Services', category: 'expense', inputKeys: ['annualStreamingServices'], computeType: 'monthly_x12', monthlyInputKeys: ['streamingMonthly', 'streamingServicesPerMonth'] },
   { key: 'pest', label: 'Pest Control', category: 'expense', inputKeys: ['annualPestControl', 'pestControl'], computeType: 'monthly_x12', monthlyInputKeys: ['pestControlMonthly', 'pestControlPerMonth'] },
   { key: 'accounting', label: 'Accounting / Bookkeeping', category: 'expense', inputKeys: ['annualAccounting', 'accounting'], computeType: 'direct' },
-  { key: 'capEx', label: 'Capital Reserves', category: 'expense', inputKeys: ['annualCapEx', 'capitalReserves'], computeType: 'direct' },
+  // Day 10 Q4 — capEx suppressed when capexReservePercent > 0 (the
+  // capexReserve line below handles it). Otherwise falls through to direct
+  // annual input (preserves legacy projects).
+  { key: 'capEx', label: 'Capital Reserves', category: 'expense', inputKeys: ['annualCapEx', 'capitalReserves'], computeType: 'formula',
+    formulaFn: (i, c, ctx) => {
+      const reservePct = pct(i.capexReservePercent);
+      if (reservePct > 0) {
+        // Suppressed; capexReserve line handles it as % of revenue.
+        return { amount: 0 };
+      }
+      const direct = num(i.annualCapEx) || num(i.capitalReserves);
+      return { amount: direct };
+    }},
+  // Day 10 Q4 — reserves as % of revenue (separate from direct capEx).
+  { key: 'furnishingReserve', label: 'Furnishing Reserve', category: 'expense', inputKeys: ['annualFurnishingReserve'], computeType: 'pct_of_revenue', pctKey: 'furnishingReservePercent', defaultPct: 0 },
+  { key: 'capexReserve', label: 'CapEx Reserve', category: 'expense', inputKeys: ['annualCapexReserve'], computeType: 'pct_of_revenue', pctKey: 'capexReservePercent', defaultPct: 0 },
   // Day 9 — new monthly-subscription lines (common STR operating costs that
   // STR_FIELDS captures but had no STR_COA home). All are monthly_x12 because
   // the UI captures monthly amounts.
@@ -122,6 +219,29 @@ const STR_COA: COALine[] = [
   { key: 'channelManager', label: 'Channel Manager', category: 'expense', inputKeys: ['annualChannelManager'], computeType: 'monthly_x12', monthlyInputKeys: ['channelManagerMonthly', 'channelManagerPerMonth'] },
   { key: 'smartLock', label: 'Smart Lock / Access', category: 'expense', inputKeys: ['annualSmartLock'], computeType: 'monthly_x12', monthlyInputKeys: ['smartLockMonthly', 'smartLockPerMonth'] },
 ];
+
+/**
+ * Day 10 — derive turnovers/month for STR per-turn fee formulas.
+ *
+ * Precedence chain:
+ *   1. Direct turnoversPerMonth or avgTurnsPerMonth input
+ *   2. Derived from avgStayLengthNights × occupancy (realistic estimate)
+ *   3. Fall back to 365/stayNights/12 (full-occupancy approximation —
+ *      overestimates by ~50% at typical 65% occupancy; user should
+ *      supply occupancy for accurate per-turn fee computation)
+ *   4. Return 0 if neither stay length nor turns directly provided
+ */
+function computeTurnsPerMonth(inputs: Record<string, any>): number {
+  const direct = num(inputs.turnoversPerMonth ?? inputs.avgTurnsPerMonth);
+  if (direct > 0) return direct;
+  const stay = num(inputs.avgStayLengthNights ?? inputs.avgStayNights);
+  if (stay <= 0) return 0;
+  const occ = pct(inputs.occupancy ?? inputs.occupancyRate ?? inputs.avgOccupancyPercent);
+  if (occ > 0) {
+    return (365 * occ) / stay / 12;
+  }
+  return 365 / stay / 12;
+}
 
 // ===== SFR =====
 const SFR_COA: COALine[] = [
@@ -636,7 +756,7 @@ function computeLine(
 ): { amount: number; formula?: string } {
   // Formula-driven line
   if (line.computeType === 'formula' && line.formulaFn) {
-    return line.formulaFn(inputs, computed);
+    return line.formulaFn(inputs, computed, { grossRevenue, egi });
   }
 
   // Direct value from inputs
