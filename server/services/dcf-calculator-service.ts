@@ -80,6 +80,10 @@ export interface DCFAnalysisResult {
   sensitivity: SensitivityMatrix;
   leaseIncome: LeaseIncomeResult;            // tenant lease income data (year 1 summary)
   yearlyLeaseIncome: LeaseYearIncome[];      // per-year lease EGI with per-tenant escalation detail
+  // Back-compat envelope for legacy dcf-calculator.tsx client (never migrated post-March-7 flat refactor)
+  baseScenario: DCFScenarioEnvelope;
+  scenarios: DCFScenarioEnvelope[];
+  sensitivityMatrix: DCFSensitivityEnvelope;
   meta: {
     source: 'proForma';
     generatedAt: string;
@@ -119,6 +123,99 @@ export interface SensitivityMatrix {
   target: 'irr';
   rows: Array<{ exitCapRate: number; values: number[] }>;
   columns: number[];                 // growth rate values
+}
+
+export interface DCFScenarioCashFlow {
+  period: number;
+  year: number;
+  noi: number;
+  cashFlowBeforeDebt: number;
+  cashFlowAfterDebt: number;
+  presentValue: number;
+}
+
+export interface DCFScenarioEnvelope {
+  id: string;
+  name: string;
+  isBase: boolean;
+  probability: number;
+  purchasePrice: number;
+  npv: number;
+  irr: number;
+  leveredIRR: number;
+  equityMultiple: number;
+  avgCashOnCash: number;
+  paybackPeriod: number;
+  terminalValueAmount: number;
+  goingInCapRate: number;
+  exitCapRate: number;
+  cashFlows: DCFScenarioCashFlow[];
+}
+
+export interface DCFSensitivityEnvelope {
+  variable1: { name: string; values: number[] };
+  variable2: { name: string; values: number[] };
+  metric: string;
+  results: number[][];
+}
+
+// Wraps the flat engine result with legacy envelope fields the pre-March-7 client expects.
+// Adapter is purely additive — flat fields stay untouched; memo-generator and decision-support
+// are not consumers of this shape.
+function wrapWithEnvelope(
+  r: Omit<DCFAnalysisResult, 'baseScenario' | 'scenarios' | 'sensitivityMatrix'>
+): DCFAnalysisResult {
+  const dr = r.meta.discountRate / 100;
+
+  let cum = 0;
+  let payback = r.holdPeriodYears;
+  for (const y of r.years) {
+    const prev = cum;
+    cum += y.leveredCF;
+    if (cum >= r.equityInvested) {
+      const need = r.equityInvested - prev;
+      payback = (y.year - 1) + (y.leveredCF > 0 ? need / y.leveredCF : 0);
+      break;
+    }
+  }
+
+  const avgCoc = r.years.length > 0
+    ? r.years.reduce((s, y) => s + y.cashOnCash, 0) / r.years.length
+    : 0;
+
+  const baseScenario: DCFScenarioEnvelope = {
+    id: 'base',
+    name: 'Base Case',
+    isBase: true,
+    probability: 1.0,
+    purchasePrice: r.purchasePrice,
+    npv: r.npv,
+    irr: r.unleveredIrr,
+    leveredIRR: r.leveredIrr,
+    equityMultiple: r.equityMultiple,
+    avgCashOnCash: avgCoc,
+    paybackPeriod: payback,
+    terminalValueAmount: r.exit.exitValue,
+    goingInCapRate: r.goingInCapRate,
+    exitCapRate: r.exitCapRate,
+    cashFlows: r.years.map(y => ({
+      period: y.year,
+      year: y.year,
+      noi: y.noi,
+      cashFlowBeforeDebt: y.ncf,
+      cashFlowAfterDebt: y.leveredCF,
+      presentValue: y.leveredCF / Math.pow(1 + dr, y.year),
+    })),
+  };
+
+  const sensitivityMatrix: DCFSensitivityEnvelope = {
+    variable1: { name: 'Exit Cap Rate', values: r.sensitivity.rows.map(row => row.exitCapRate / 100) },
+    variable2: { name: 'Revenue Growth Rate', values: r.sensitivity.columns.map(c => c / 100) },
+    metric: 'IRR',
+    results: r.sensitivity.rows.map(row => row.values),
+  };
+
+  return { ...r, baseScenario, scenarios: [baseScenario], sensitivityMatrix };
 }
 
 // ─── Main Analysis Function ──────────────────────────────────────────────────
@@ -398,7 +495,7 @@ export async function performDCFAnalysis(
     }
   );
 
-  return {
+  return wrapWithEnvelope({
     projectId,
     irr: leveredIrr,
     leveredIrr,
@@ -434,7 +531,7 @@ export async function performDCFAnalysis(
         : null,
       acquisitionDate,
     },
-  };
+  });
 }
 
 // ─── Quick IRR Endpoint Logic ────────────────────────────────────────────────
