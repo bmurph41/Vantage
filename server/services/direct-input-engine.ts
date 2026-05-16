@@ -99,13 +99,11 @@ const STR_COA: COALine[] = [
   // Revenue
   { key: 'grossRentalIncome', label: 'Gross Rental Income', category: 'revenue', inputKeys: [], computeType: 'formula',
     formulaFn: (i, c) => {
-      const rate = num(i.avgNightlyRate ?? i.nightlyRate ?? i.averageDailyRate);
-      // Day 9: avgOccupancyPercent is the L1 UI field name. pct() helper
-      // auto-converts 0-100 → 0-1, so no explicit unit conversion needed.
-      const occ = pct(i.occupancy ?? i.occupancyRate ?? i.avgOccupancyPercent);
+      // Day 11a — delegate to shared helper (3-season / 2-season / flat precedence).
+      // Canonical path stays mode='flat'; formula string byte-identical to pre-Day-11a.
       const units = Math.max(1, num(i.numberOfUnits ?? i.units ?? 1));
-      const amt = rate * occ * 365 * units;
-      return { amount: amt, formula: `$${fmtC(rate)}/night × ${fmtP(occ)} occ × 365 × ${units} unit${units > 1 ? 's' : ''} = $${fmtC(amt)}` };
+      const { annual, formula } = computeStrSeasonalRevenue(i, { count: units });
+      return { amount: annual, formula };
     }},
   // Day 10 Q2 — per-turn formula with fall-through to annual key (legacy).
   { key: 'cleaningFeeIncome', label: 'Cleaning Fee Income', category: 'revenue', inputKeys: ['annualCleaningFeeIncome', 'cleaningFeeIncome'], computeType: 'formula',
@@ -241,6 +239,123 @@ function computeTurnsPerMonth(inputs: Record<string, any>): number {
     return (365 * occ) / stay / 12;
   }
   return 365 / stay / 12;
+}
+
+/**
+ * Day 11a — STR seasonal revenue helper.
+ *
+ * Computes annual gross rental income + per-month distribution under three
+ * precedence paths. Returns the same shape regardless of mode so callers
+ * (STR_COA.grossRentalIncome formulaFn and the unit-mix block) get
+ * consistent output.
+ *
+ * Precedence (first match wins):
+ *   1. 3-season — peakMonths + shoulderMonths + offMonths all non-empty AND
+ *      at least one per-season ADR supplied. Per-month iteration picks
+ *      rate + occupancy by season membership.
+ *   2. 2-season — inSeasonMonths supplied (not all 12) AND user EXPLICITLY
+ *      distinguished seasonal occupancy (inSeasonOccupancy or offSeasonOccupancy
+ *      supplied AND not equal to the single occupancy fallback). The
+ *      explicit-distinctness gate matters: Pro Forma now auto-injects
+ *      inSeasonMonths from STR config default, so we cannot trigger this
+ *      branch on schedule alone — equal occupancies would produce the same
+ *      math as flat mode but change the formula string. Gate keeps canonical
+ *      projects (no seasonal occ supplied) in flat mode.
+ *   3. Flat — rate × occ × 365 × count. Today's behavior, formula string
+ *      preserved byte-identical to the pre-Day-11a STR_COA.grossRentalIncome.
+ *
+ * Unit-mix call site uses `opts.unitRate` / `opts.unitOcc` to override the
+ * project-level avgNightlyRate / occupancy. Per-season schedule + occupancies
+ * still come from project-level inputs.
+ */
+function computeStrSeasonalRevenue(
+  inputs: Record<string, any>,
+  opts?: {
+    unitRate?: number;
+    unitOcc?: number;
+    unitInSeasonOcc?: number;
+    unitOffSeasonOcc?: number;
+    count?: number;
+  },
+): { annual: number; monthly: number[]; formula: string; mode: 'flat' | '2-season' | '3-season' } {
+  const count = Math.max(1, num(opts?.count ?? 1));
+
+  // --- 3-season ---
+  const peakMonths: number[] = Array.isArray(inputs.peakMonths) ? inputs.peakMonths : [];
+  const shoulderMonths: number[] = Array.isArray(inputs.shoulderMonths) ? inputs.shoulderMonths : [];
+  const offMonths: number[] = Array.isArray(inputs.offMonths) ? inputs.offMonths : [];
+  const has3SeasonSchedule = peakMonths.length > 0 && shoulderMonths.length > 0 && offMonths.length > 0;
+  const has3SeasonADR = inputs.peakSeasonADR != null || inputs.shoulderSeasonADR != null || inputs.offSeasonADR != null;
+  if (has3SeasonSchedule && has3SeasonADR) {
+    const singleRate = num(opts?.unitRate ?? inputs.avgNightlyRate ?? inputs.nightlyRate ?? inputs.averageDailyRate);
+    const singleOcc = pct(opts?.unitOcc ?? inputs.occupancy ?? inputs.occupancyRate ?? inputs.avgOccupancyPercent);
+    const peakRate = num(inputs.peakSeasonADR) || singleRate;
+    const shoulderRate = num(inputs.shoulderSeasonADR) || singleRate;
+    const offRate = num(inputs.offSeasonADR) || singleRate;
+    const peakOcc = inputs.peakOccupancyPercent != null ? pct(inputs.peakOccupancyPercent) : singleOcc;
+    const shoulderOcc = inputs.shoulderOccupancyPercent != null ? pct(inputs.shoulderOccupancyPercent) : singleOcc;
+    const offOcc = inputs.offSeasonOccupancyPercent != null ? pct(inputs.offSeasonOccupancyPercent) : singleOcc;
+    const monthly: number[] = new Array(12).fill(0);
+    let peakDays = 0, shoulderDays = 0, offDays = 0;
+    let peakAmt = 0, shoulderAmt = 0, offAmt = 0;
+    for (let m = 0; m < 12; m++) {
+      const days = DAYS_PER_MONTH[m];
+      const monthNum = m + 1;
+      let rate: number, occ: number, bucketAmt: { add: (n: number) => void };
+      if (peakMonths.includes(monthNum)) {
+        rate = peakRate; occ = peakOcc; peakDays += days;
+        const amt = rate * occ * days * count;
+        monthly[m] = amt; peakAmt += amt;
+      } else if (shoulderMonths.includes(monthNum)) {
+        rate = shoulderRate; occ = shoulderOcc; shoulderDays += days;
+        const amt = rate * occ * days * count;
+        monthly[m] = amt; shoulderAmt += amt;
+      } else if (offMonths.includes(monthNum)) {
+        rate = offRate; occ = offOcc; offDays += days;
+        const amt = rate * occ * days * count;
+        monthly[m] = amt; offAmt += amt;
+      }
+      // months not in any season → 0 (defensive; ideally all 12 are covered)
+    }
+    const annual = peakAmt + shoulderAmt + offAmt;
+    const formula = `(${peakDays}d @ $${fmtC(peakRate)}×${fmtP(peakOcc)} peak + ${shoulderDays}d @ $${fmtC(shoulderRate)}×${fmtP(shoulderOcc)} shoulder + ${offDays}d @ $${fmtC(offRate)}×${fmtP(offOcc)} off) × ${count} = $${fmtC(annual)}`;
+    return { annual, monthly, formula, mode: '3-season' };
+  }
+
+  // --- 2-season ---
+  const inSeasonMonths: number[] = Array.isArray(inputs.inSeasonMonths) ? inputs.inSeasonMonths : [];
+  const hasInSeasonSchedule = inSeasonMonths.length > 0 && inSeasonMonths.length < 12;
+  const rate = num(opts?.unitRate ?? inputs.avgNightlyRate ?? inputs.nightlyRate ?? inputs.averageDailyRate);
+  const occ = pct(opts?.unitOcc ?? inputs.occupancy ?? inputs.occupancyRate ?? inputs.avgOccupancyPercent);
+  // Explicit-distinctness gate: only trigger 2-season iterator when user
+  // actually distinguished per-season occupancy. Equal occ → flat math
+  // (would produce same Σ but a different formula string).
+  const inSeasonOccRaw = opts?.unitInSeasonOcc ?? inputs.inSeasonOccupancy;
+  const offSeasonOccRaw = opts?.unitOffSeasonOcc ?? inputs.offSeasonOccupancy;
+  const inSeasonOcc = inSeasonOccRaw != null ? pct(inSeasonOccRaw) : occ;
+  const offSeasonOcc = offSeasonOccRaw != null ? pct(offSeasonOccRaw) : occ;
+  const hasDistinctSeasonalOcc = (inSeasonOccRaw != null && inSeasonOcc !== occ)
+                              || (offSeasonOccRaw != null && offSeasonOcc !== occ);
+  if (hasInSeasonSchedule && hasDistinctSeasonalOcc) {
+    const monthly: number[] = new Array(12).fill(0);
+    let inDays = 0, offDays = 0;
+    for (let m = 0; m < 12; m++) {
+      const isSeason = inSeasonMonths.includes(m + 1);
+      const mOcc = isSeason ? inSeasonOcc : offSeasonOcc;
+      const days = DAYS_PER_MONTH[m];
+      monthly[m] = rate * mOcc * days * count;
+      if (isSeason) inDays += days; else offDays += days;
+    }
+    const annual = monthly.reduce((s, v) => s + v, 0);
+    const formula = `$${fmtC(rate)}/night × (${inDays}d@${fmtP(inSeasonOcc)} + ${offDays}d@${fmtP(offSeasonOcc)}) × ${count} = $${fmtC(annual)}`;
+    return { annual, monthly, formula, mode: '2-season' };
+  }
+
+  // --- Flat (today's behavior, formula string preserved byte-identical) ---
+  const annual = rate * occ * DAYS_IN_YEAR * count;
+  const monthly: number[] = DAYS_PER_MONTH.map(days => rate * occ * days * count);
+  const formula = `$${fmtC(rate)}/night × ${fmtP(occ)} occ × 365 × ${count} unit${count > 1 ? 's' : ''} = $${fmtC(annual)}`;
+  return { annual, monthly, formula, mode: 'flat' };
 }
 
 // ===== SFR =====
@@ -573,28 +688,19 @@ function computeFromCOA(
       let formula: string;
 
       if (isNightly) {
-        const occ = pct(unit.occupancy ?? unit.occupancyRate ?? inputs.occupancy ?? 0.65);
-        const inSeasonOcc = pct(unit.inSeasonOccupancy ?? inputs.inSeasonOccupancy ?? occ);
-        const offSeasonOcc = pct(unit.offSeasonOccupancy ?? inputs.offSeasonOccupancy ?? occ);
-        const inSeasonMonths: number[] = inputs.inSeasonMonths ?? [];
-        const hasSeasonal = inSeasonMonths.length > 0 && inSeasonMonths.length < 12;
-        if (hasSeasonal) {
-          // Exact days-per-month with seasonal occupancy
-          unitAmt = 0;
-          const monthDetails: string[] = [];
-          for (let m = 0; m < 12; m++) {
-            const isSeason = inSeasonMonths.includes(m + 1);
-            const mOcc = isSeason ? inSeasonOcc : offSeasonOcc;
-            const mRev = rent * mOcc * DAYS_PER_MONTH[m] * count;
-            unitAmt += mRev;
-          }
-          const inDays = inSeasonMonths.reduce((s, m) => s + DAYS_PER_MONTH[m - 1], 0);
-          const offDays = DAYS_IN_YEAR - inDays;
-          formula = `$${fmtC(rent)}/night × (${inDays}d@${fmtP(inSeasonOcc)} + ${offDays}d@${fmtP(offSeasonOcc)}) × ${count} = $${fmtC(unitAmt)}`;
-        } else {
-          unitAmt = rent * occ * DAYS_IN_YEAR * count;
-          formula = `$${fmtC(rent)}/night × ${fmtP(occ)} × ${DAYS_IN_YEAR} × ${count} = $${fmtC(unitAmt)}`;
-        }
+        // Day 11a — delegate to shared seasonal helper. Same 3/2/flat precedence
+        // as STR_COA.grossRentalIncome. Per-unit rate + occupancy override the
+        // project-level avgNightlyRate / occupancy; seasonal schedule + per-season
+        // occupancies still come from project-level inputs.
+        const result = computeStrSeasonalRevenue(inputs, {
+          unitRate: rent,
+          unitOcc: pct(unit.occupancy ?? unit.occupancyRate),
+          unitInSeasonOcc: unit.inSeasonOccupancy != null ? pct(unit.inSeasonOccupancy) : undefined,
+          unitOffSeasonOcc: unit.offSeasonOccupancy != null ? pct(unit.offSeasonOccupancy) : undefined,
+          count,
+        });
+        unitAmt = result.annual;
+        formula = result.formula;
       } else {
         unitAmt = rent * 12 * count;
         formula = `$${fmtC(rent)}/mo × 12 × ${count} = $${fmtC(unitAmt)}`;
@@ -701,16 +807,18 @@ function computeFromCOA(
       if (line.key?.startsWith('unitMix_') && unitMix) {
         const unitLabel = line.key.replace('unitMix_', '');
         const unit = unitMix.find((u: any) => (u.label ?? u.type ?? u.name ?? u.size ?? 'Unit') === unitLabel);
-        if (unit && (unit.nightlyRate || unit.averageDailyRate) && _hasSeasonal) {
-          const rate = num(unit.nightlyRate ?? unit.averageDailyRate ?? 0);
-          const cnt = num(unit.count ?? unit.quantity ?? unit.units ?? 1);
-          const baseOcc = pct(unit.occupancy ?? unit.occupancyRate ?? inputs.occupancy ?? 0.65);
-          const mOcc = seasonTag === 'in'
-            ? pct(unit.inSeasonOccupancy ?? inputs.inSeasonOccupancy ?? baseOcc)
-            : seasonTag === 'off'
-            ? pct(unit.offSeasonOccupancy ?? inputs.offSeasonOccupancy ?? baseOcc)
-            : baseOcc;
-          monthRevenue += rate * mOcc * days * cnt;
+        if (unit && (unit.nightlyRate || unit.averageDailyRate)) {
+          // Day 11a — delegate to shared seasonal helper for monthly[] output,
+          // matching the unit-mix annual block. Helper's mode determination
+          // (3/2/flat) keeps per-month values consistent with the annual total.
+          const result = computeStrSeasonalRevenue(inputs, {
+            unitRate: num(unit.nightlyRate ?? unit.averageDailyRate),
+            unitOcc: pct(unit.occupancy ?? unit.occupancyRate),
+            unitInSeasonOcc: unit.inSeasonOccupancy != null ? pct(unit.inSeasonOccupancy) : undefined,
+            unitOffSeasonOcc: unit.offSeasonOccupancy != null ? pct(unit.offSeasonOccupancy) : undefined,
+            count: num(unit.count ?? unit.quantity ?? unit.units ?? 1),
+          });
+          monthRevenue += result.monthly[m];
         } else {
           // line.amount is already signed (subtraction lines stored as negative at line 461).
           monthRevenue += line.amount * dayFraction;

@@ -57,6 +57,7 @@ import {
 import { loadCanonicalActuals, normalizeCategory } from './canonical-actuals-loader';
 import { getConsolidatedPnL } from './consolidated-pnl-service';
 import { computeDirectInputFinancials } from './direct-input-engine';
+import { getModelConfig } from '../../shared/asset-class-model-config';
 
 // ============================================
 // TYPES
@@ -576,7 +577,18 @@ export class ProFormaEngineService {
 
     if (shouldUseDirectInput) {
       const assetClass = (project as any).assetClass || 'marina';
-      const directResult = computeDirectInputFinancials(assetClass, inputAssumptions);
+      // Day 11a — mirror DCF's seasonality injection (dcf-calculator-service.ts:179-186).
+      // inSeasonMonths is not in inputAssumptions today (Zod strips it on save). Without
+      // this fall-back, the engine's seasonal compute never fires from the Pro Forma path.
+      // The helper's explicit-distinctness gate keeps canonical projects in flat mode.
+      const directInputs: Record<string, any> = { ...inputAssumptions };
+      if (!directInputs.inSeasonMonths || directInputs.inSeasonMonths.length === 0) {
+        const modelConfig = getModelConfig(assetClass);
+        if (modelConfig.seasonConfig.defaultInSeasonMonths?.length) {
+          directInputs.inSeasonMonths = modelConfig.seasonConfig.defaultInSeasonMonths;
+        }
+      }
+      const directResult = computeDirectInputFinancials(assetClass, directInputs);
       if (directResult) {
         for (const line of directResult.revenueLines) {
           revenueBySubcat[line.label] = {
@@ -600,7 +612,15 @@ export class ProFormaEngineService {
     } else if (inputMode === 'hybrid' && hasInputAssumptions) {
       // Hybrid: only add direct-input lines that DON'T already exist from actuals
       const assetClass = (project as any).assetClass || 'marina';
-      const directResult = computeDirectInputFinancials(assetClass, inputAssumptions);
+      // Day 11a — same seasonality injection as the direct_input branch above.
+      const directInputs: Record<string, any> = { ...inputAssumptions };
+      if (!directInputs.inSeasonMonths || directInputs.inSeasonMonths.length === 0) {
+        const modelConfig = getModelConfig(assetClass);
+        if (modelConfig.seasonConfig.defaultInSeasonMonths?.length) {
+          directInputs.inSeasonMonths = modelConfig.seasonConfig.defaultInSeasonMonths;
+        }
+      }
+      const directResult = computeDirectInputFinancials(assetClass, directInputs);
       if (directResult) {
         for (const line of directResult.revenueLines) {
           if (!revenueBySubcat[line.label]) {
