@@ -228,6 +228,14 @@ export interface ProFormaData {
     avgDscr?: number;
     debtYield?: number;
     ltv?: number;
+    // Day 11b — STR-specific KPI metrics. Gated by assetClass === 'str' AND
+    // avgNightlyRate present. Omitted entirely for other asset classes.
+    adr?: number;                 // Year 1 average daily rate
+    occupancy?: number;           // Year 1 annual occupancy as decimal (0-1)
+    revPAR?: number;              // Year 1 RevPAR = ADR × occupancy
+    adrByYear?: number[];         // Per-projection-year ADR
+    occupancyByYear?: number[];   // Per-projection-year occupancy (flat today)
+    revPARByYear?: number[];      // Per-projection-year RevPAR
   };
   
   // Validation
@@ -1461,7 +1469,38 @@ export class ProFormaEngineService {
     // ========================================
     // 10. RETURN COMPLETE PRO FORMA
     // ========================================
-    
+
+    // Day 11b — STR KPI metrics. Gated by assetClass + avgNightlyRate presence;
+    // undefined for non-STR. Computed once, spread into metrics literal below.
+    let strKpis: {
+      adr: number;
+      occupancy: number;
+      revPAR: number;
+      adrByYear: number[];
+      occupancyByYear: number[];
+      revPARByYear: number[];
+    } | undefined;
+    if (assetClass === 'str' && inputAssumptions) {
+      const rawAdr = Number(inputAssumptions.avgNightlyRate ?? inputAssumptions.nightlyRate ?? inputAssumptions.averageDailyRate);
+      const rawOcc = Number(inputAssumptions.occupancy ?? inputAssumptions.occupancyRate ?? inputAssumptions.avgOccupancyPercent);
+      if (Number.isFinite(rawAdr) && rawAdr > 0 && Number.isFinite(rawOcc) && rawOcc > 0) {
+        const adrVal = rawAdr;
+        const occVal = rawOcc > 1 ? rawOcc / 100 : rawOcc;  // mirror pct() helper convention
+        const revGrowth = flatRevenueGrowthRate.toNumber();
+        const adrByYear = annualPeriods.map((_, idx) => adrVal * Math.pow(1 + revGrowth, idx));
+        const occupancyByYear = annualPeriods.map(() => occVal);  // flat; projection-time occupancy curve is a Day 5 stub
+        const revPARByYear = adrByYear.map((a, idx) => a * occupancyByYear[idx]);
+        strKpis = {
+          adr: adrVal,
+          occupancy: occVal,
+          revPAR: adrVal * occVal,
+          adrByYear,
+          occupancyByYear,
+          revPARByYear,
+        };
+      }
+    }
+
     return {
       projectId,
       scenarioType,
@@ -1566,6 +1605,13 @@ export class ProFormaEngineService {
         debtYield,
         ltv,
         equityInvested: totalEquityInvested,
+        // Day 11b — STR KPIs (undefined for non-STR; gate is asset class + avgNightlyRate presence)
+        adr: strKpis?.adr,
+        occupancy: strKpis?.occupancy,
+        revPAR: strKpis?.revPAR,
+        adrByYear: strKpis?.adrByYear,
+        occupancyByYear: strKpis?.occupancyByYear,
+        revPARByYear: strKpis?.revPARByYear,
       },
       
       errors,
