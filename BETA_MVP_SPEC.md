@@ -126,6 +126,7 @@ Each requires its own COA + canonical seed + department inference branch + sampl
 - **Mobile responsive audit** — many workspace pages are desktop-first today.
 - **8 duplicate Sunset Bay Marina fixtures** — seeded by beta-mock-test, accumulated; cleanup not in MVP scope.
 - **CLAUDE.md "Test Project (STR)" reference** — the canonical ID `6b3a9021-...` was deleted 2026-05-17; needs replacement with STR fixture `b1a0eebc-...`.
+- **User-editable COA mapping** — settings UI for org-level chart-of-accounts overrides (add / edit / reassign / delete keyword-to-department mappings) propagating across all projects in the org. Institutional users expect to customize COA mappings per their internal accounting conventions. Scope: ~3-5 days for first cut. Touches DB schema (new override table), settings UI (CRUD per asset class), `inferDepartment` read path (query overrides before fallback cascade), per-org caching layer, retroactive re-classification policy, role permissions, audit log. Architectural prerequisites: Phase 1 (asset-class-agnostic infrastructure) and Phase 2 (upload pipeline asset-class-aware) solid first; also requires resolving which of the 4 registries are user-editable (`inferDepartment` cascade only? `PRO_FORMA_REGISTRY` too? both?). Recommended sequencing: post-Phase 1, after real friendly P&L upload data shows whether defaults are close enough or too far off for the MVP. Raised by Brett 2026-05-17 mid-Phase-1 Task 3 as a product gap worth capturing.
 
 ---
 
