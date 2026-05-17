@@ -568,10 +568,17 @@ export class ProFormaEngineService {
     }
 
     // ========================================
-    // 4b. ENRICH WITH PROFIT CENTERS DATA
+    // 4b. ENRICH WITH PROFIT CENTERS DATA (marina-only)
     // ========================================
-    
-    await this.enrichFromProfitCenters(projectId, revenueBySubcat, cogsBySubcat, expensesBySubcat);
+    // The 8 asmp_* tables queried here are marina-specific (fuel, ship store,
+    // boat rentals/club/sales, service, commercial tenants, bookkeeping).
+    // Gated on assetClass === 'marina' so non-marina projects don't pay the
+    // 8-query cost for a guaranteed no-op (Phase 0-B audit 2026-05-17:
+    // BETA_MVP_SPEC.md Section 7.B item #1). Commercial tenants for office/MF
+    // will be handled through a separate rent-roll path post-MVP.
+    if (assetClass === 'marina') {
+      await this.enrichFromProfitCenters(projectId, revenueBySubcat, cogsBySubcat, expensesBySubcat);
+    }
 
     // ========================================
     // 4c. DIRECT INPUT FALLBACK
