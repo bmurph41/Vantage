@@ -1,5 +1,89 @@
 # MarinaMatch Platform Journal
 
+## ✅ Phase 1 items #1/#2/#3 shipped — asset-class-agnostic infrastructure (2026-05-17)
+
+Six commits across one session executing BETA_MVP_SPEC.md Section 7.B surgical changes plus closing spec/test scaffolding. Three of five Phase 1 items landed (silent fallback removal, enrichFromProfitCenters gate, inferDepartment asset-class branches); items #4 (client UI `STORAGE_SUB_TYPES`) and #5 (LLM prompt branching) plus multifamily fixture seed remain for next session.
+
+### What changed
+
+**Commit `3877ef9e` — Task 1: silent fallback removal (Phase 1 item #2)**
+- `shared/asset-class-model-config.ts:4388` (`getModelConfig`) — split behavior: throws `Error("Unknown asset class: X. Registered: <32 classes>")` on unknown string; warns + returns MARINA_CONFIG on null/undefined (React hydration back-compat). Warn message includes guidance for caller to coalesce explicitly.
+- `server/services/pro-forma-engine-service.ts:395/587/622` — 3 sites replace `|| 'marina'` with explicit `throw Error('pro-forma engine: project <id> missing assetClass — <path> compute path requires explicit asset class')` (path = projection / direct-input / hybrid).
+- Empirical: 0/16 live projects have null asset_class — throws are unreachable today but surface the latent invariant.
+
+**Commit `11c5aa44` — Task 2: enrichFromProfitCenters gate (Phase 1 item #1)**
+- `server/services/pro-forma-engine-service.ts:574` — wrap the 8-table marina query block in `if (assetClass === 'marina')`. Method body unchanged; gate is purely at the call site using assetClass already in scope from line 395.
+- Empirical: all 8 `asmp_*` tables empty across all 16 projects — method was a no-op for every fixture today. Gate is pure performance cleanup with zero behavior change.
+
+**Commit `26ecfb2b` — Task 3: inferDepartment asset-class branches (Phase 1 item #3)**
+- `server/utils/department-mapping.ts` — `inferDepartment` now dispatches via `switch(assetClass)`:
+  - `'str'` → new `inferDepartmentSTR` helper (4 departments: Rental / Cleaning / Platform Fees / Operating)
+  - `'multifamily'` → new `inferDepartmentMultifamily` helper (7 departments: Mgmt Fee / Payroll / Other Income / Utilities / R&M / Rental / Operating)
+  - default → new `inferDepartmentMarina` helper (verbatim extraction of pre-edit cascade; also catches null/undefined + non-MVP asset classes)
+- File 353 → 474 LoC. Dispatch + 3 helpers = 196 LoC; well within 350 budget.
+
+**Commit `71abfdb7` — COA editor deferred to spec**
+- `BETA_MVP_SPEC.md` Section 3.5 — added User-editable COA mapping bullet (scope ~3-5 days, architectural prerequisites, recommended post-MVP sequencing).
+
+**Commit `89905a06` — Probe → tests/ regression baseline**
+- `tests/department-mapping-baseline.mjs` (new) — promoted from `/tmp/probe-infer-department.mjs`. 3-suite synthetic probe (Suite 1A marina byte-identity 36×3, Suite 2 STR 26, Suite 3 MF 40 + intentional-misses section).
+- `package.json` — `"test:dept-mapping": "tsx tests/department-mapping-baseline.mjs"`.
+
+**Commit `da69a5ce` — Spec reorganization 3.5 → 3.5+3.6**
+- `BETA_MVP_SPEC.md` Section 3.5 now contains 5 cleanup items (mobile audit, dup fixtures, stale CLAUDE.md ref, institutional analysis fixes, reimbursement routing). Section 3.6 new — Post-MVP feature roadmap (v1.1): COA editor, per-cell editing redesign, VDR role-aware access. Cross-reference pointer to §3.1-3.4 for existing v1.1 feature work.
+
+### Decisions made
+
+**Task 3 — 5-question taxonomy resolution.** Design surface presented before code; Brett resolved Q1-Q5:
+- **Q1 (STR):** Add `resort fee` / `amenity fee` / `destination fee` → Rental, placed BEFORE service-fee check.
+- **Q2 (MF):** Bare `gas` → Utilities for MF; marina disambiguates separately via `gas dock` / `gas sale`. Different asset classes routing same string differently is the point of the branch.
+- **Q3 (MF):** `rent` catch-all in Rental excludes `rent expense` / `lease expense` / `ground lease` / `equipment rental`.
+- **Q4:** Default name asymmetry intentional — marina retains `General` (preservation requirement); STR + MF use `Operating` (they don't share marina's taxonomy). Code comment documents.
+- **Q5 (MF Other Income):** Dropped late_fee / application_fee / pest_control_fee / misc_income / other_income — they fall to Operating. Avoids category-conditional logic for MVP; revisit post-MVP with real friendly P&L data.
+
+**Default-when-undefined preserves marina cascade.** 3 callers pass `undefined` for assetClass (canonical-actuals-loader:293, promote-to-actuals:147, quickbooks-service:609). Rather than thread assetClass through 3 services (out-of-scope), the `switch` default catches them and routes to marina cascade — preserves their pre-edit behavior exactly. Future cleanup pass should thread assetClass through for correct STR/MF routing.
+
+**Marina cascade extracted byte-identical.** `inferDepartmentMarina` is a verbatim copy of lines 23-95 of pre-edit body. Suite 1A's 36 inputs × 3 dispatch paths (`marina` === `undefined` === `null`) prove zero identity breaks.
+
+**Adjustment made mid-probe:** Synthetic probe revealed `Utility Reimbursement` was routing to Utilities instead of Other Income (Utilities check fired first via `utility` keyword). Reordered MF dispatch: Other Income now BEFORE Utilities. Fix verified — 40/40 MF assertions pass.
+
+**Bare-rent catch-all removed from STR.** Original draft had `lower.includes('rent') && !rent expense && !lease expense` in STR Rental branch. Removed per Brett — STR P&Ls typically use "Booking Revenue" / "Nightly Revenue" / "Reservation Income" rather than bare "Rent"; including bare 'rent' would introduce Pet Rent / Storage Rent / Equipment Rental / Ground Lease misroute risk.
+
+**"Natural Gas Reimbursement" surprise — documented as 3.5 cleanup.** Surfaced via synthetic probe: routes to Utilities (via `gas` keyword) NOT Other Income, because Other Income branch matches the exact substring `utility reimbursement` only. Quick fix (`'reimburs'` generic keyword) and proper fix (category-conditional logic) both documented in spec; deferred pending real friendly P&L data.
+
+### Verification
+
+- `tsc -p shared` — 0 errors after each of the 3 code commits.
+- Synthetic probe (after Task 3): Suite 1A 36 marina inputs × 3 dispatches, zero identity breaks; Suite 2 STR 26/26; Suite 3 MF 40/40; intentional misses match Q5 intent.
+- Live API on 5 fixtures (str `b1a0eebc` / marina `c4199dfb` / multifamily `d4dcdaa5` / business `54c1b93a` / laundromat `9e98e156`): all 200, 5-year pro-forma, zero throws in dev log after each commit.
+- Smoke routes against marina fixture (`c4199dfb`): held steady at 17 green / 8 pre-existing infra non-green (tax-waterfall Vite catchall, fund-reporting on placeholder fund ID) across all 3 code commits.
+- `npm run test:dept-mapping` runs from clean state, exit 0, identical 3-suite output.
+
+### Architectural patterns confirmed
+
+- **Pre-flight empirical baseline before code prevented scope errors.** Querying live DB for `0/16 projects with null asset_class` informed Task 1's confident throw decision. Querying for `0 rows in 8 asmp_* tables` confirmed Task 2 was zero-behavior-change cleanup. Both reduced risk surface to nil before edits.
+- **Design surface before code on Task 3 caught two real bugs.** Surfacing proposed bodies for review pre-write caught (a) the bare-rent catch-all misroute risk for STR, and (b) the Other-Income-before-Utilities ordering bug that the probe later confirmed. Skipping that step would have shipped both bugs.
+- **Synthetic probe + live API probe + smoke = full verification stack.** Synthetic asserts routing correctness; live API asserts absence of regression; smoke asserts no broader infra break. Three layers; each catches different failure modes.
+- **Stop-condition "callers pass undefined" resolved by default-to-marina dispatch.** Avoided the threading work for 3 services by treating undefined as marina cascade. Out-of-scope work deferred without compromising correctness.
+
+### Pacing observation
+
+6 commits across ~4 working hours. Tasks 1+2 took ~1 hour combined (small scope, deep verification). Task 3 took ~3 hours (foundational, design-heavy, design-surface review before code). Maintenance commits (spec entries + probe promotion) ~30 min total. Sustainable rhythm — no 19-commit-day churn.
+
+### Next session
+
+**Phase 1 remaining (2 of 5 items + 1 fixture):**
+- **Task 4 — client UI `STORAGE_SUB_TYPES`** (Section 7.B item #5). Replace marina `STORAGE_SUB_TYPES` with `getModelConfig(assetClass).unitMix.types`. Files: `client/src/pages/modeling/projects/workspace.tsx:280`, `workspace/uploads.tsx:161`, `workspace/replacement-cost.tsx` tab-gate. ~3 hr. Needs browser verification (UI work).
+- **Task 5 — LLM prompt branching in doc-intel** (Section 7.B item #4). Replace marina-only LLM prompt; branch by assetClass. File: `server/services/doc-intel-service.ts:1760-1797`. ~4 hr. Depends on D8 decision (per spec).
+- **Multifamily fixture seed** — ~2 hr. Now that Task 3's MF branch exists, seed a real MF fixture so live API probes can exercise the multifamily code path with real assumptions.
+
+**Other follow-ups:**
+- Thread `assetClass` through `canonical-actuals-loader`, `promote-to-actuals`, `quickbooks-service` (currently pass undefined → fall to marina cascade). Post-MVP scope but worth filing.
+- Reimbursement routing for Multifamily (BETA_MVP_SPEC.md Section 3.5) — quick fix or proper fix pending real friendly P&L data.
+- Per Section 3.5: replace CLAUDE.md "Test Project (STR)" reference `6b3a9021-...` (deleted 2026-05-17) with STR fixture `b1a0eebc-...`.
+
+---
+
 ## ✅ Doc Studio asset-class drift cleanup — Phase 1 + 2 shipped (2026-05-13)
 
 Completed next-session option (a) from the 2026-05-08 session. Two commits removed the marina-specific copy that was leaking into non-marina documents through the Document Studio token resolver, bindings catalog, and AI prompt pipeline. The runtime now resolves a deal's asset class (project → property → deal → marina default), populates asset-class-agnostic tokens, filters the bindings catalog, and parameterizes AI systemPrompts + userPromptTemplates so generated content reads correctly for multifamily / hotel / office / etc.
@@ -4547,3 +4631,153 @@ Engine unification Days 1-4 will be complete. The next phase is Days 5-6 (marina
 - Inputs & Assumptions UI redesign (post-beta)
 - Pro Forma chart flat-zero bug (during Days 15-17 polish)
 - Layout findings 4-5 (during Days 15-17 polish)
+
+---
+
+# Next session pickup — 2026-05-18
+
+## State at session start
+- HEAD: 89f6f5c8 (Day 4 Commit 4 — dcfCalculatorService migration)
+- All work pushed to origin/main
+- Days 1-4 of engine unification complete
+- Beta clock: ~13 working days remaining
+
+## Day 4 close-out summary
+All 5 readers identified in Day 3 Phase 0 now read from canonical store:
+- proFormaEngineService (220da6a3)
+- debtSensitivityService (8912e94d)
+- vdrModelingIntegrationService comparison-export (9ee966cd)
+- scenarioGovernanceService 4 of 5 sites (b6c57c3c, mapToScenarioVersion deferred)
+- dcfCalculatorService (89f6f5c8)
+
+Verification standard maintained: byte-identical output (or normalized identical when wall-clock timestamps differ) for all migrations.
+
+## First task — Agent watch
+`git log --oneline -10` — check for autonomous commits since 89f6f5c8.
+Pattern: 6 incidents in 14 days, latest was ede8bc82 design override (reverted).
+
+## Second task — read these memories before any code (~10 min)
+1. `project_engine_unification_architecture_2026_05_14.md` — canonical reference, Day 5 plan
+2. `project_marina_phase0_state_map_2026_05_14.md` — Day 1 foundation
+3. `project_pro_forma_assumptions_audit_2026_05_14.md` — assumption store audit (Q2 has the marina-specific projection logic findings)
+
+## Day 5-6 plan — Marina projection model generalization
+
+Per architecture doc, Days 5-6 generalize the two marina-hardcoded projection models in pro-forma-engine-service.ts:
+
+### Day 5: Occupancy × rate model generalization
+- **Current state**: `getOccupancyAdjustment(department, subcategory, year)` is wired ONLY for Storage department (lines 659-673). Returns Decimal(1) for everything else.
+- **Target state**: Asset-class-aware occupancy×rate, supporting STR (per-unit occupancy/rate) and multifamily (per-unit-type occupancy/rate) in addition to marina-Storage.
+- **Subcategory key map**: `storageSubcategoryToTypeKey()` (wet_slips, dry_racks, moorings, lift_slips, houseboats) is also marina-only.
+
+### Day 6: Margin model generalization
+- **Current state**: COGS path at line 762-799 keyed off `granularMargins[departmentToAssumptionKey(department)]`. Line 765: `revenueKey = department === 'Fuel' ? 'fuel_dock' : departmentToAssumptionKey(department)` — Fuel-specific marina logic.
+- **Expense path**: Line 898 has known latent bug — `revenueKey = department === 'Fuel' ? 'fuel_dock' : 'ship_store'`. Every non-Fuel margin-modeled expense matches against ship_store revenue. Wrong for any asset class. Fix this incidentally.
+
+## Day 7 plan — Historical/Pro-Forma handoff
+
+Per architecture doc:
+- Historical engine becomes canonical for marina baseline
+- Pro Forma reads baseline from Historical engine output (not raw modeling_actuals)
+- modeling_projection_decisions respected in Pro Forma
+- 4-view unification (Single Year, All Years, Compare, Consolidated)
+
+This is the biggest commit of the Marina week. Will likely need its own Phase 0.
+
+## Stop conditions
+- Output differs before/after migration → STOP, investigate
+- Warning logs for backfilled scenarios → STOP, canonical coverage incomplete
+- Replit Agent autonomous commit between sessions → STOP, investigate
+- Marina/STR/multifamily projection models surface architectural mismatches → STOP, design decision needed
+
+## Standing reminders
+- Never `npm run db:push` (disabled in post-merge.sh)
+- Path C verification: tsc -b shared + scoped tsc + smoke routes
+- Failure-isolated patterns where possible
+- Field-specific assertions in smoke tests
+- Byte-identical (or normalized) verification for migrations
+
+## Open follow-ups
+- scenarioGovernanceService L813 mapToScenarioVersion (deferred from Day 4 Commit 3)
+- forkScenario L291 write-side blob copy (deferred from Day 4 Commit 3)
+- Dead governance writer at scenario-governance-service.ts:206-211 (still broken/unwired)
+- JSONB column deprecation (Phase D of dual-write — post-beta)
+- Orphan scenario_version cleanup + FK addition (post-beta)
+- Unprefixed middleware mounts at server/routes.ts:1558, 1559, 1574 (deferred root cause)
+- 131 orphan tables (post-beta)
+- Inputs & Assumptions UI redesign (post-beta)
+- Pro Forma chart flat-zero bug (during Days 15-17 polish)
+- Layout findings 4-5 (during Days 15-17 polish)
+
+---
+
+# Next session pickup — 2026-05-19 (or whenever resumed)
+
+## State at session start
+- HEAD: ff92aac8 (Day 7a — Pro Forma reads Historical baseline)
+- All work pushed to origin/main
+- Marina week (Days 1-7) complete
+- STR week (Days 8-11) starts next
+- Beta clock: ~10 working days remaining
+
+## First task — Agent watch
+`git log --oneline -10` — check for autonomous commits since ff92aac8.
+Pattern: 6 incidents in 14 days. Latest was ede8bc82 (design override, reverted).
+
+## Marina week close-out summary
+
+All 13 commits delivered Days 1-7 work:
+- Day 1: Asset class threading at inferDepartment (forward-compat)
+- Day 2: Canonical assumption store + dual-write + hash bug fix
+- Day 3: Backfill + proForma reader migration
+- Day 4: Remaining 4 reader migrations (debtSensitivity, vdr, governance, dcf)
+- Day 5: Occupancy adjustment asset-class dispatch
+- Day 6: Margin/COGS ship_store bug fix
+- Day 7a: Pro Forma reads Historical baseline (Consolidated handoff)
+
+Day 7b (4-view unification) deferred to Days 15-17 polish bucket.
+
+Cross-surface consistency now verified: Pro Forma Year 0 NOI = Consolidated latestYear NOI + projected cells. The divergence the architecture memo identified is closed.
+
+## STR week plan
+
+STR projects today:
+- Single test project: 6b3a9021 (948 Florida Ave., asset_class='str')
+- STR uses direct-input-engine for Year 1 (per STR_COA)
+- Pro forma grows Year 1 via revenueGrowthRate scalar
+- No projection-time occupancy curve (Day 5 stub)
+
+Days 8-11 likely involves:
+- Day 8 Phase 0: Map STR-specific data flows end-to-end
+- Day 9-10: STR-specific implementation work (TBD based on Phase 0)
+- Day 11: STR beta test prep
+
+Each Day in STR week likely needs its own Phase 0 — STR has different data shapes than marina.
+
+## Stop conditions
+- Output differs unexpectedly before/after any migration → STOP
+- Replit Agent autonomous commit between sessions → STOP
+- STR data shape work surfaces beta-blocking design decisions → STOP, discuss
+
+## Standing reminders
+- Never `npm run db:push` (disabled in post-merge.sh)
+- Path C verification: tsc -b shared + scoped tsc + smoke routes
+- Byte-identical (or normalized) verification for migrations
+- Synthetic verification when live data doesn't exercise the changed code path
+- Phase 0 investigation before any substantial commit
+- Fixture cleanup discipline (Day 7a precedent: hard-delete with marker filter)
+
+## Open follow-ups
+- 4-view unification / Day 7b (Days 15-17 polish)
+- scenarioGovernanceService L813 mapToScenarioVersion (deferred from Day 4 Commit 3)
+- forkScenario L291 write-side blob copy (deferred from Day 4 Commit 3)
+- Dead governance writer at scenario-governance-service.ts:206-211
+- JSONB column deprecation (Phase D, post-beta)
+- Orphan scenario_version cleanup + FK addition (post-beta)
+- Marina occupancy UI/engine key mismatch (post-beta, project_marina_occupancy_key_mismatch_2026_05_18.md)
+- Unprefixed middleware mounts at server/routes.ts:1558, 1559, 1574
+- 131 orphan tables (post-beta)
+- Inputs & Assumptions UI redesign (post-beta)
+- Pro Forma chart flat-zero bug (Days 15-17 polish)
+- Layout findings 4-5 (Days 15-17 polish)
+- Phase 3 addback semantic: project on adjustedAmount stream for full consistency (post-beta)
