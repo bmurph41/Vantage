@@ -119,14 +119,19 @@ hotel, retail, office, industrial, medical, golf, laundromat, RV park, MHP (mobi
 
 Each requires its own COA + canonical seed + department inference branch + sample fixtures. Estimated ~2-3 days per class (no engine work required if Phase 1 infrastructure is solid).
 
-### 3.5 Other deferred work
-- **Inputs / Pro Forma per-cell editing redesign** (Option C from 2026-05-16 discussion — full 15-25 day rebuild).
-- **Institutional analysis suite fixes** — 10+ POST calculator endpoints currently 400 on bare `{projectId}`; needs `resolveFromProject` pattern lifted from IRR Attribution.
-- **VDR role-aware access** — currently all-or-nothing; v1.1 adds per-document per-role permissions.
+### 3.5 Near-term cleanups (post-MVP polish)
 - **Mobile responsive audit** — many workspace pages are desktop-first today.
 - **8 duplicate Sunset Bay Marina fixtures** — seeded by beta-mock-test, accumulated; cleanup not in MVP scope.
 - **CLAUDE.md "Test Project (STR)" reference** — the canonical ID `6b3a9021-...` was deleted 2026-05-17; needs replacement with STR fixture `b1a0eebc-...`.
+- **Institutional analysis suite fixes** — 10+ POST calculator endpoints currently 400 on bare `{projectId}`; needs `resolveFromProject` pattern lifted from IRR Attribution.
+- **Reimbursement routing for Multifamily** — non-utility reimbursements (e.g., "Natural Gas Reimbursement," "Trash Reimbursement," "Pest Control Reimbursement") currently route to their utility/expense category instead of Other Income because the `inferDepartment` Other Income branch only matches the exact `"utility reimbursement"` substring. Quick fix: add `'reimburs'` as a generic Other Income keyword (risk: false positive on expense items containing "reimburs" — unlikely but possible). Proper fix: category-conditional logic per Q5 design discussion. Deferred to post-MVP pending real friendly P&L data showing whether this is common enough to warrant either fix. Surfaced 2026-05-17 via synthetic probe in `tests/department-mapping-baseline.mjs`.
+
+### 3.6 Post-MVP feature roadmap (v1.1)
 - **User-editable COA mapping** — settings UI for org-level chart-of-accounts overrides (add / edit / reassign / delete keyword-to-department mappings) propagating across all projects in the org. Institutional users expect to customize COA mappings per their internal accounting conventions. Scope: ~3-5 days for first cut. Touches DB schema (new override table), settings UI (CRUD per asset class), `inferDepartment` read path (query overrides before fallback cascade), per-org caching layer, retroactive re-classification policy, role permissions, audit log. Architectural prerequisites: Phase 1 (asset-class-agnostic infrastructure) and Phase 2 (upload pipeline asset-class-aware) solid first; also requires resolving which of the 4 registries are user-editable (`inferDepartment` cascade only? `PRO_FORMA_REGISTRY` too? both?). Recommended sequencing: post-Phase 1, after real friendly P&L upload data shows whether defaults are close enough or too far off for the MVP. Raised by Brett 2026-05-17 mid-Phase-1 Task 3 as a product gap worth capturing.
+- **Inputs / Pro Forma per-cell editing redesign** (Option C from 2026-05-16 discussion — full 15-25 day rebuild).
+- **VDR role-aware access** — currently all-or-nothing; v1.1 adds per-document per-role permissions.
+
+See also: real v1.1 feature work tracked separately in §3.1 (user type extensions — sub-classifications, Deal Teams, third-party invites, additional primary types), §3.2 (portfolio management), §3.3 (system-triggered feature activation), §3.4 (13 additional asset classes).
 
 ---
 
