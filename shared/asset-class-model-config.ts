@@ -4382,10 +4382,25 @@ const MODEL_CONFIG_REGISTRY: Record<string, AssetClassModelConfig> = {
 
 /**
  * Get the full model configuration for an asset class.
- * Falls back to marina if asset class is null or unknown.
+ *
+ * - Unknown asset class string → throws (catches typos/drift loudly).
+ * - null / undefined → warns + returns MARINA_CONFIG as back-compat for React
+ *   hydration paths. Callers should coalesce explicitly (useModelConfig hook
+ *   does this; direct callers should gate on project loaded first).
  */
 export function getModelConfig(assetClass: string | null | undefined): AssetClassModelConfig {
-  return MODEL_CONFIG_REGISTRY[assetClass || 'marina'] || MARINA_CONFIG;
+  if (assetClass === null || assetClass === undefined) {
+    console.warn(
+      `[getModelConfig] called with ${assetClass === null ? 'null' : 'undefined'} assetClass — returning MARINA_CONFIG as back-compat. Caller should coalesce explicitly: use useModelConfig hook or pass project.assetClass directly with a project-loaded guard.`,
+    );
+    return MARINA_CONFIG;
+  }
+  const config = MODEL_CONFIG_REGISTRY[assetClass];
+  if (!config) {
+    const registered = Object.keys(MODEL_CONFIG_REGISTRY).sort().join(', ');
+    throw new Error(`Unknown asset class: ${assetClass}. Registered: ${registered}`);
+  }
+  return config;
 }
 
 /**

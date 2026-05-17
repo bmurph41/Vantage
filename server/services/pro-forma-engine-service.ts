@@ -391,8 +391,13 @@ export class ProFormaEngineService {
     const purchasePrice = new Decimal(project.purchasePrice?.toString() || '0');
 
     // Day 5 of engine unification: asset-class dispatch for projection models.
-    // Default 'marina' preserves current behavior for projects without assetClass.
-    const assetClass = (project as any).assetClass || 'marina';
+    // 2026-05-17: silent marina fallback removed (MVP Phase 1 item #2).
+    const assetClass = (project as any).assetClass;
+    if (!assetClass) {
+      throw new Error(
+        `pro-forma engine: project ${(project as any).id} missing assetClass — projection compute path requires explicit asset class`,
+      );
+    }
     
     const stabilizedNoiMode = (config?.stabilizedNoiMode as StabilizedNoiMode) || 'fixed_year';
     const stabilizedNoiYear = config?.stabilizedNoiYear || 3;
@@ -584,7 +589,12 @@ export class ProFormaEngineService {
       (inputMode === 'auto' && !hasUploadedActuals && hasInputAssumptions);
 
     if (shouldUseDirectInput) {
-      const assetClass = (project as any).assetClass || 'marina';
+      const assetClass = (project as any).assetClass;
+      if (!assetClass) {
+        throw new Error(
+          `pro-forma engine: project ${(project as any).id} missing assetClass — direct-input compute path requires explicit asset class`,
+        );
+      }
       // Day 11a — mirror DCF's seasonality injection (dcf-calculator-service.ts:179-186).
       // inSeasonMonths is not in inputAssumptions today (Zod strips it on save). Without
       // this fall-back, the engine's seasonal compute never fires from the Pro Forma path.
@@ -619,7 +629,12 @@ export class ProFormaEngineService {
       }
     } else if (inputMode === 'hybrid' && hasInputAssumptions) {
       // Hybrid: only add direct-input lines that DON'T already exist from actuals
-      const assetClass = (project as any).assetClass || 'marina';
+      const assetClass = (project as any).assetClass;
+      if (!assetClass) {
+        throw new Error(
+          `pro-forma engine: project ${(project as any).id} missing assetClass — hybrid compute path requires explicit asset class`,
+        );
+      }
       // Day 11a — same seasonality injection as the direct_input branch above.
       const directInputs: Record<string, any> = { ...inputAssumptions };
       if (!directInputs.inSeasonMonths || directInputs.inSeasonMonths.length === 0) {
