@@ -11,15 +11,34 @@ for (const item of MARINA_COA_SEED) {
 }
 
 /**
- * @param assetClass Optional. Accepted for forward-compatibility with the
- *   engine-unification work (see project_engine_unification_architecture_2026_05_14).
- *   NOT yet consumed — current behavior is the marina-keyword cascade regardless
- *   of asset class. A later Day 2+ commit will branch on this.
+ * Asset-class-aware department inference.
+ *
+ * Dispatches on `assetClass`:
+ *   - 'str'         → 4 departments: Rental / Cleaning / Platform Fees / Operating
+ *   - 'multifamily' → 7 departments: Rental / Other Income / Operating / Payroll / R&M / Utilities / Mgmt Fee
+ *   - 'marina' / undefined / null / other → marina cascade (preserved verbatim from
+ *     pre-2026-05-17 behavior). The `default` branch catches not just 'marina' but
+ *     also the 3 callers that pass `undefined` (canonical-actuals-loader,
+ *     promote-to-actuals, quickbooks-service) and all non-MVP asset classes
+ *     (hotel / business / laundromat / etc.) which are out-of-scope per
+ *     BETA_MVP_SPEC.md Section 3.4.
+ *
+ * Marina retains 'General' as catch-all. STR and Multifamily use 'Operating' as
+ * catch-all — different department naming is intentional; these asset classes do
+ * not share marina's taxonomy.
  */
 export function inferDepartment(subcategory: string, category?: string, assetClass?: string): string {
   const lower = subcategory.toLowerCase();
   const cat = (category || '').toLowerCase();
 
+  switch (assetClass) {
+    case 'str':         return inferDepartmentSTR(lower, cat);
+    case 'multifamily': return inferDepartmentMultifamily(lower, cat);
+    default:            return inferDepartmentMarina(lower, cat);
+  }
+}
+
+function inferDepartmentMarina(lower: string, cat: string): string {
   if (COA_DEPARTMENT_MAP[lower]) return COA_DEPARTMENT_MAP[lower];
 
   for (const item of MARINA_COA_SEED) {
@@ -93,6 +112,111 @@ export function inferDepartment(subcategory: string, category?: string, assetCla
   if (lower.includes('lease') || lower.includes('ground lease') || lower.includes('land lease') || lower.includes('rent expense')) return 'Leases';
 
   return 'General';
+}
+
+function inferDepartmentSTR(lower: string, _cat: string): string {
+  // Resort/amenity/destination fees → Rental (auxiliary rental revenue, not platform commission).
+  // Must come BEFORE 'service fee' check so "amenity fee" doesn't fall to Platform Fees.
+  if (lower.includes('resort fee') || lower.includes('amenity fee') || lower.includes('destination fee'))
+    return 'Rental';
+
+  // Cleaning — broad keyword, routes both revenue (guest cleaning fees) and expense
+  // (cleaning service costs) sides. Comes BEFORE Platform Fees so "cleaning service fee"
+  // hits Cleaning, not Platform Fees.
+  if (lower.includes('cleaning') || lower.includes('cleaner') || lower.includes('housekeeping') ||
+      lower.includes('turnover') || lower.includes('turn fee') || lower.includes('turn cost'))
+    return 'Cleaning';
+
+  // Platform Fees — booking platform commissions and host service fees.
+  if (lower.includes('airbnb') || lower.includes('vrbo') || lower.includes('booking.com') ||
+      lower.includes('expedia') || lower.includes('platform fee') || lower.includes('platform commission') ||
+      lower.includes('host service fee') || lower.includes('channel fee') ||
+      lower.includes('channel manager') || lower.includes('booking fee') || lower.includes('service fee'))
+    return 'Platform Fees';
+
+  // Rental — nightly rental revenue. Explicit-keyword list only (no bare 'rent' catch-all);
+  // STR P&Ls typically use "Booking Revenue" / "Reservation Income" / "Nightly Revenue".
+  if (lower.includes('rental income') || lower.includes('gross rental') ||
+      lower.includes('nightly') || lower.includes('booking revenue') ||
+      lower.includes('reservation') || lower.includes('lodging') ||
+      lower.includes('accommodation') || lower.includes('room revenue') ||
+      lower.includes('rental revenue') || lower.includes('stay'))
+    return 'Rental';
+
+  // Operating — explicit fall-through. Utilities, insurance, taxes, mgmt, repairs, etc. land here.
+  return 'Operating';
+}
+
+function inferDepartmentMultifamily(lower: string, _cat: string): string {
+  // Mgmt Fee — specific 2-word phrases first.
+  if (lower.includes('property management') || lower.includes('property mgmt') ||
+      lower.includes('pm fee') || lower.includes('management fee') || lower.includes('mgmt fee') ||
+      lower.includes('asset management') || lower.includes('asset mgmt'))
+    return 'Mgmt Fee';
+
+  // Payroll — employee comp + benefits. Comes BEFORE Utilities so 'health/medical insurance'
+  // route to Payroll; bare 'insurance' falls all the way to Operating.
+  // Guard: 'membership benefit' or similar non-payroll phrases don't match.
+  if (lower.includes('payroll') || lower.includes('wage') || lower.includes('salary') || lower.includes('salaries') ||
+      lower.includes('workers comp') || lower.includes('soc security') || lower.includes('social security') ||
+      lower.includes('medicare') || lower.includes('futa') || lower.includes('sui') ||
+      lower.includes('on-site manager') || lower.includes('leasing agent') ||
+      lower.includes('maintenance tech') || lower.includes('employee') || lower.includes('staff') ||
+      lower.includes('health insurance') || lower.includes('medical insurance') ||
+      lower.includes('dental insurance') || lower.includes('retirement') || lower.includes('401k') ||
+      (lower.includes('benefit') && !lower.includes('membership')))
+    return 'Payroll';
+
+  // Other Income — unambiguous revenue-only keywords. Comes BEFORE Utilities so
+  // 'utility reimbursement' (revenue) doesn't fall to Utilities via the 'utility' keyword.
+  // Late fee / application fee / misc income / other income / pest control fee
+  // deliberately omitted per Q5 simplification — they fall to Operating instead.
+  // Post-MVP: revisit when real friendly P&L data is available.
+  if (lower.includes('pet rent') || lower.includes('pet fee') ||
+      lower.includes('storage rent') ||
+      lower.includes('parking income') || lower.includes('parking revenue') ||
+      lower.includes('laundry') || lower.includes('vending') ||
+      lower.includes('utility reimbursement') || lower.includes('rubs'))
+    return 'Other Income';
+
+  // Utilities — building utilities. Bare 'gas' → Utilities for MF; marina disambiguates
+  // separately via gas dock / gas sale keywords.
+  if (lower.includes('utility') || lower.includes('utilities') ||
+      lower.includes('electric') || lower.includes('electricity') ||
+      lower.includes('water') || lower.includes('sewer') ||
+      lower.includes('trash') || lower.includes('garbage') ||
+      lower.includes('internet') || lower.includes('cable') || lower.includes('wifi') ||
+      lower.includes('phone') || lower.includes('telecom') || lower.includes('telephone') ||
+      lower.includes('gas'))
+    return 'Utilities';
+
+  // R&M — repairs and maintenance.
+  if (lower.includes('r&m') || lower.includes('repair') || lower.includes('maintenance') ||
+      lower.includes('make-ready') || lower.includes('make ready') || lower.includes('makeready') ||
+      lower.includes('turn cost') || lower.includes('turnover') ||
+      lower.includes('hvac') || lower.includes('plumbing') || lower.includes('electrical repair') ||
+      lower.includes('paint') || lower.includes('painting') ||
+      lower.includes('carpet') || lower.includes('flooring') || lower.includes('roof'))
+    return 'R&M';
+
+  // Rental — apartment rental revenue. Catch-all 'rent' last with 4 exclusions
+  // (rent expense / lease expense / ground lease / equipment rental → Operating).
+  if (lower.includes('gross potential rent') || lower.includes('gpr') ||
+      lower.includes('rental income') || lower.includes('scheduled rent') ||
+      lower.includes('rent revenue') || lower.includes('rent income') ||
+      lower.includes('apartment rent') ||
+      lower.includes('vacancy') || lower.includes('concession') ||
+      lower.includes('bad debt') || lower.includes('loss to lease') ||
+      lower.includes('collected rent') ||
+      (lower.includes('rent') &&
+       !lower.includes('rent expense') &&
+       !lower.includes('lease expense') &&
+       !lower.includes('ground lease') &&
+       !lower.includes('equipment rental')))
+    return 'Rental';
+
+  // Operating — default catch-all (insurance, taxes, marketing, professional, legal, etc.).
+  return 'Operating';
 }
 
 const LEGACY_DEPARTMENT_MAP: Record<string, string> = {
