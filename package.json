@@ -17,7 +17,8 @@
     "install-hooks": "bash scripts/install-hooks.sh",
     "postinstall": "bash scripts/install-hooks.sh",
     "test:e2e": "playwright test",
-    "test:e2e:install-browsers": "playwright install chromium"
+    "test:e2e:install-browsers": "playwright install chromium",
+    "test:dept-mapping": "tsx tests/department-mapping-baseline.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.68.0",
