@@ -20,6 +20,7 @@ import { multifamilyOMTemplate } from './multifamily-om';
 import { hotelOMTemplate } from './hotel-om';
 import { retailOMTemplate } from './retail-om';
 import { industrialOMTemplate } from './industrial-om';
+import { strOMTemplate } from './str-om';
 
 export const omTemplateRegistry: OMTemplate[] = [
   marinaOMTemplate,
@@ -27,6 +28,7 @@ export const omTemplateRegistry: OMTemplate[] = [
   hotelOMTemplate,
   retailOMTemplate,
   industrialOMTemplate,
+  strOMTemplate,
 ];
 
 export function getOMTemplateById(id: string): OMTemplate | undefined {
