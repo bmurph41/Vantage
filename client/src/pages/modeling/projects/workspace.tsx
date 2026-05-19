@@ -101,7 +101,6 @@ import WorkspaceDealComparison from './workspace/deal-comparison';
 import ExportModel from './workspace/export-model';
 import SensitivityTornado from './workspace/sensitivity-tornado';
 import ValidationWarnings from './workspace/validation-warnings';
-import ValuatorProfitCenters from './workspace/valuator-profit-centers';
 import PropertyTaxTab from './workspace/property-tax';
 import TaxAndDistributionsPage from './workspace/tax-distributions';
 import DebtInputs from './workspace/debt-inputs';
