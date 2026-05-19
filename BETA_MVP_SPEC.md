@@ -342,21 +342,72 @@ Plus ~2 hr for a multifamily fixture seed. **Total: ~16 hr / 2 days.** STR fixtu
 
 ---
 
-## 8. Per-class content inventory (Phase 1.5)
+## 8. Per-class content inventory (Phase 1.5 — completed 2026-05-19)
 
-The architectural principles in §5 (#1 asset-class-agnostic architecture and #7 progressive per-class content depth) commit Vantage to per-class content across the product. Phase 1.5 is the audit that inventories every per-class surface and sizes the content build for MVP classes (marina, STR, MF).
+Phase 1.5 audit completed across three passes:
+- **Pass 1** — grep-driven enumeration + 4-registry audit + tab-gate audit (commit `cef8f749`).
+- **Pass 2** — code-walkthrough user-journey friction log for Journey A (MF investor) and Journey B (marina owner) (commit `3ad61100`).
+- **Pass 3** — prioritized work list + Phase 4a / 4b scope drafts (this commit).
 
-**Phase 1.5 deliverables:**
-- Inventory of all per-class surfaces (tabs, reports, forms, KPIs, document templates, dashboards).
-- Classification per surface: unified / branched / hidden / missing.
-- Per-MVP-class effort estimate per surface.
-- Prioritization by friendly value (which surfaces matter most for demonstrating cross-class institutional depth?).
+Structured backing data lives in `BETA_MVP_PHASE_1_5_AUDIT.md` at workspace root. That document contains the full inventory (~89 surfaces across 11 categories), the journey friction log (~60 entries across both journeys), the prioritized work list (18 Core + 9 Ops items), and detailed scope drafts.
 
-**Phase 1.5 sequencing:** starts after Phase 1 infrastructure work completes (current Tasks 4 + 5 + MF fixture seed shipped; plus any cleanup that surfaces). Likely 1-2 days of audit work producing the per-class content build roadmap.
+### Headline findings
 
-**Phase 1.5 output feeds into Phase 4** (engine completeness per class) — reframed as Phase 4 (per-class content completeness).
+**Registry coverage:** All 4 registries (`MODEL_CONFIG_REGISTRY`, `COA_REGISTRY`, `COA_FIELD_REGISTRY`, `PRO_FORMA_REGISTRY`) cover all 3 MVP classes (marina, STR, MF) at 100% breadth. Depth varies — STR_COA is 7× deeper than MARINA_COA / MULTIFAMILY_COA; MARINA_FIELDS is the shortest direct-input field set.
 
-**Replacement Cost is the worked example** that triggered this principle (2026-05-18 Task 4 discussion): mechanism shipped marina-only via `tabs.replacementCost` flag in commit `97f61887`; per-class content build deferred to Phase 1.5 prioritization output.
+**STR has the biggest Core gap:** missing OM template, missing DD template, missing rent-roll-v2 adapter. These are the highest-priority Phase 4a items (3 concrete deliverables).
+
+**S4 — Wizard data shape leak:** `marinaName` / `marinaAddress` / `portfolioMarinas` written for all classes regardless of asset class. Phase 4a anchor.
+
+**S1 — orphan valuator-\* stack:** 5,375 lines of marina-specific UI code imported but not rendered. Verified 0% overlap with active code paths. Safe to delete in Phase 4a (item 12).
+
+**Operations sidebar asymmetry (new in Pass 2):** marina has 13 sidebar entries / 8 dedicated tabbed-ops modules; MF has 1 module / 4 sub-tabs; STR has 0. This is a Phase 4b (Ops productization) scope dimension, not Phase 4a.
+
+### Phase 4 split — Core vs Ops (per §3.7)
+
+**Phase 4a — Core completeness (per-class modeling polish).** 18 items, 4 anchors. Estimate 2.0-2.4 weeks (80-96h). See §6.A of `BETA_MVP_PHASE_1_5_AUDIT.md`.
+
+Phase 4a anchors:
+1. STR OM template
+2. S4 wizard data shape fix (`marinaName` → `propertyName`)
+3. User-editable COA mapping (promoted from §3.6)
+4. Ops gating mechanism placeholder + Phase 4b Phase 0 design audit
+
+**Phase 4b — Ops add-on productization.** 9 items (6 in-scope for v1.0, 3 deferred to v1.1). Estimate ~10-11 weeks. See §6.B of `BETA_MVP_PHASE_1_5_AUDIT.md`.
+
+Phase 4b sequence:
+1. Phase 0 audit (1 week)
+2. STR Ops MVP — 5 sub-tabs: Listings, Bookings, Channel Mix, Cleaning Ops, Pricing (6 weeks)
+3. PMS connector framework + 1 reference connector (2 weeks)
+4. Sidebar gating wiring (0.2 weeks)
+5. MF Ops depth pass (1 week)
+6. Marina Ops formalization (0.5-1 week)
+
+### §3.5 cleanup items closed in Phase 4a
+
+The following §3.5 entries are closed by Phase 4a:
+- §3.5 "Reimbursement routing for Multifamily" — item 9
+- §3.5 "`STORAGE_SUB_TYPES` reconciliation" — covered by item 18 (unitMix label policy) + item 17 (icon audit)
+- §3.5 "`unitMix.tabIcon` anchor-icon leak" — item 11 + item 17
+- §3.5 "Inconsistent `unitMix` tab labels" — item 18
+- §3.5 "`doc-intel-service.ts` marina hardcoding" — item 14
+- §3.5 "`pct()` helper ambiguity" — item 10
+- §3.5 "Wizard `marinaName` / `marinaAddress` leak" — anchor 2 (S4 fix)
+- §3.5 "Audit Trail 500 + Assumption Audit HTML + Pro Forma Charts y=0" — items 7-8
+
+§3.5 cleanups NOT closed by Phase 4a (carried forward to v1.1 or separate scope):
+- Mobile responsive audit · 8 duplicate Sunset Bay fixtures (bundled with valuator-* cleanup item 12) · Institutional analysis suite fixes · LLM provider divergence.
+
+### Total per-class content build roadmap
+
+| Phase | Scope | Estimate | Sequencing |
+|---|---|---|---|
+| Phase 4a | Core completeness across MVP classes | 2.0-2.4 weeks | Starts after Phase 1.5 commit |
+| Phase 4b Phase 0 | Activation matrix design audit | 1 week | After Phase 4a anchor 4 stub lands |
+| Phase 4b items 2-6 | Ops module productization | 9-10 weeks | After Phase 4b Phase 0 |
+| **Total to v1.0** | **Phase 4a + 4b** | **~12-13 weeks** | |
+
+**Replacement Cost** per-class build (Phase 1.5 worked example) is NOT in Phase 4a — marina has it via the existing `replacement-cost.tsx`; STR and MF won't get class-specific Replacement Cost UIs in MVP. Re-evaluate for v1.1 if friendly demand surfaces.
 
 ---
 

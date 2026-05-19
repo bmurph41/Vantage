@@ -474,13 +474,348 @@ Decision points the user should weigh:
 
 **Confirmed scope: NO code changes today, only documentation.**
 
-## 5. Prioritized work list — PENDING (Pass 3)
+## 5. Prioritized work list (Pass 3)
 
-To be filled in Pass 3. Will rank all ~80 surfaces by:
-- Friendly-value (0-5 scale)
-- Effort (small <2h / medium 2-8h / large >8h)
-- Dependencies on §3.5 cleanups
-- Top 10 → Phase 4 scope candidates (per spec commit `b61fbd1f`)
+Surfaces are ranked into two columns: **Core (Phase 4a candidates)** and **Ops (Phase 4b candidates)**, per §3.7 product structure split. Each row has friendly-value (0-5), effort (S <2h · M 2-8h · L >8h), and dependencies.
+
+Friendly-value scale (0-5): **5** = friendly will notice missing immediately during a demo · **4** = friendly will notice within first session · **3** = friendly will notice on second session or close inspection · **2** = friendly may notice eventually · **1** = friendly likely never notices · **0** = internal-only cleanup.
+
+### 5.A — Core (Phase 4a) — 18 items
+
+The top 4 are the **Phase 4a anchors** per Brett's Q4 direction. Remaining 14 are ranked but flexible within Phase 4a scope.
+
+| Rank | Surface | Friendly-value | Effort | Dependencies | Notes |
+|---|---|---|---|---|---|
+| **1** [ANCHOR] | **STR OM template** — build `server/templates/om-templates/str-om.ts` modeled after `multifamily-om.ts` + STR-appropriate sections (Listing Setup, Channel Mix, Pricing Strategy, Cleaning & Turnover, RevPAR/ADR metrics, comparable STRs). Register in `om-templates/index.ts`. | 5 | M (~6h) | None | Pass 1 #52. Highest-visibility STR demo gap. |
+| **2** [ANCHOR] | **S4 wizard data shape fix** — rename `marinaName`→`propertyName`, `marinaAddress`→`propertyAddress`, `portfolioMarinas`→`portfolioProperties` in `OnboardingWizard.tsx` (line 285-286, ~10 read sites). Rename `renderMarinaDetailsStep`→`renderPropertyDetailsStep`. Dialog header icon read from `config.unitMix.tabIcon`. Plus DealType `owned_marina`→`owned_property`. | 4 | M (~6h) | Schema migration check (no DB writes today, but check downstream readers of project state). | Pass 1 S4 / Pass 2 rows 86-88. |
+| **3** [ANCHOR] | **User-editable COA mapping** — settings UI for org-level COA overrides. Add `coa_overrides` table, settings page (CRUD per class), wire `inferDepartment` to read overrides before fallback cascade, per-org caching, role permissions, audit log. Per-class COA coverage (Decision 2: relevance-driven) is bundled — friendlies tune defaults via this editor. | 5 | L (~24-30h = 3-4 days) | Depends on resolving registry edit scope (`inferDepartment` cascade only, or PRO_FORMA_REGISTRY too?). | Promoted from §3.6 to Phase 4a on 2026-05-19. Single biggest Core depth lever. |
+| **4** [ANCHOR] | **Ops gating mechanism placeholder + Phase 0 design audit for 4b** — design + ship per-project `ownershipState` flag (`owned` / `evaluated` / `null`) in `modeling_projects` schema. Wire sidebar `opsModuleKey` filter to also check `ownershipState === 'owned'` for current project. Document the activation matrix (tier × user_type × ownershipState) and capture decisions in a §3.7 follow-up. This unblocks 4b. | 5 | M (~6-8h spec + minimal stub) | Schema migration for `ownershipState` column. | Per §3.7. Unblocks all Phase 4b work. The Phase 0 audit deliverable is a separate document. |
+| 5 | **STR DD checklist** — build `server/templates/ddTemplates/str.ts` with STR-specific items (host fee verification, channel mix audit, occupancy by season, cleaning fee structure, dynamic pricing tool, license/permits, HOA/STR-ordinance status, smart lock + insurance). Wire into `ddTemplates/index.ts`. | 4 | M (~4h) | None | Pass 1 #53 + Decision 3 (both DD checklists for MVP). |
+| 6 | **MF DD checklist** — build `server/templates/ddTemplates/multifamily.ts` with MF-specific items (rent roll vs lease file reconciliation, T-12 OpEx variance, submarket vacancy/new supply, lease audit, utility sub-meter verification, R&M turnover history, concession/loss-to-lease analysis). | 4 | M (~4h) | None | Pass 1 #53 + Decision 3. |
+| 7 | **Pro Forma Charts y=0 bug** — diagnose + fix per memory `project_pro_forma_chart_flat_zero_bug`. Chart plots y=0 across 2026-2030 while KPI tiles above show real NOI. Likely chart data source mismatched from engine. | 5 (if it fires) | S-M (~3h) | None | Pre-existing §3.5. Friendly-blocker if it fires during demo. |
+| 8 | **Pre-existing §3.5 bugs that fire in both journeys** — Audit Trail tab 500, Assumption Audit HTML-not-JSON. Each ~2h. | 4 | S each (~4h total) | None | §3.5 / Pass 2 A39. |
+| 9 | **Reimbursement routing for MF** — quick fix add `'reimburs'` substring to Other Income branch in `inferDepartment` per §3.5. Risk: false positive on expense items containing "reimburs" (unlikely). | 3 | S (~2h) | None | Pairs with anchor 3 (user-editable COA) — overrides will be the proper fix; this is the stop-gap. |
+| 10 | **`pct()` helper boundary fix** — decision pass on the 3 candidates in §3.5, then implement chosen contract + audit all callers + migrate data. | 3 | S-M (~3-4h, mostly decision + caller audit) | None | §3.5 / surfaced from MF fixture seed. |
+| 11 | **Storage Leases anchor-icon hardcoded leak** — `workspace.tsx:174` hardcodes `Anchor` icon for the storage-leases tab entry. Replace with class-aware icon from `config.unitMix.tabIcon`. | 3 | S (~1h) | None | Pass 2 A16. Trivial visible fix. |
+| 12 | **valuator-\* stack deletion** — 9 files, 5,375 lines, fully orphan per S1. Remove import in `workspace.tsx:104`, delete 9 files, run TypeScript check. | 3 (cleanup) | S (~1h) | None | Pass 2 S1 confirmed zero regression. |
+| 13 | **Parallel profit-center registry reconcile** — Pass 2 #85. Two parallel registries for same conceptual data (`MODEL_CONFIG_REGISTRY[ac].profitCenters.departments` vs `asset-class-catalog.ts.{ASSET}_PROFIT_CENTERS`). Decide canonical, deprecate the other, or document intent. | 3 | S-M (~2h) | None | Pass 2 finding. Should pair with anchor 3 (user-editable COA) sequencing — single source first. |
+| 14 | **Doc-intel marina hardcoding cleanup** — 4 code paths in `doc-intel-service.ts` (L211/L219, L2401-2441, L2528). Make asset-class-aware or move to registry. | 3 | M (~6h) | None | §3.5 / Pass 1 #71-#73. |
+| 15 | **MARINA_FIELDS depth pass** — bring `MARINA_FIELDS` in `direct-input-coa.ts` from 27 lines to roughly the depth of MULTIFAMILY_FIELDS (50) or STR_FIELDS (57). Add fields for fuel margin, average ticket, slip occupancy by section, service labor utilization. | 4 | M (~4h) | None | Pass 1 S3. Closes the marina direct-input gap independently of valuator-* deletion. |
+| 16 | **Token resolver marina branches cleanup** — `token-resolver-service.ts:107, 137-138, 157`. Generalize via unit count + assetClass coalesce; remove marina-as-default branches. | 2 | S (~2h) | None | Pass 1 #64-65. |
+| 17 | **unitMix tabIcon audit across 32 configs** — `MODEL_CONFIG_REGISTRY` — verify each config has a class-appropriate icon and not the default marina/anchor leak. Fix any wrong defaults. | 2 | S (~2h) | None | §3.5 / Pass 1 #4. Mostly trivial config edits. |
+| 18 | **unitMix label naming policy decision + apply** — institutional convention ("Unit Mix") vs operator convention ("Slips", "Listings"). Decide + apply per-class. | 2 | S (~1-2h after decision) | None | §3.5 open product question / Pass 1 #5. |
+
+**Core total estimate: 80-110 hours = 2-3 weeks at 40h/week** (within Phase 4a target of 2-3 weeks).
+
+### 5.B — Ops (Phase 4b) — 9 items
+
+Phase 4b starts with its own Phase 0 audit (driven by anchor 4 above). Items below are scoped at the placeholder level.
+
+| Rank | Surface | Friendly-value | Effort | Dependencies | Notes |
+|---|---|---|---|---|---|
+| 1 | **Phase 4b Phase 0 audit** — extends anchor 4 above. Detailed activation matrix design, schema additions, sidebar gating wiring, ops-tab insertion points in workspace, telemetry plan. Output: a 4b-scope spec doc separate from this audit. | 5 | M (~40h = 1 week) | Anchor 4 stub landed. | Decision-only week. No 4b code starts until this lands. |
+| 2 | **STR Ops MVP module** — `pages/operations/str/` with 5 sub-tabs: Listings (master listing roster with status/availability), Bookings (reservation pipeline), Channel Mix (Airbnb / VRBO / direct / OTA share + revenue by channel), Cleaning Ops (turnover schedule + cleaner assignment), Pricing (dynamic pricing config + per-listing rate strategy). | 5 | L (~6 weeks for full v1.0 module — 1 week per sub-tab + 1 week glue) | Phase 4b Phase 0 audit complete · PMS connector framework (item 3). | Decision 1 (full-build) / Pass 2 finding. Sub-tabs sized to roughly mirror marina ops module depth. |
+| 3 | **PMS connector framework** — adapter interface for Bookd, Guesty, Hostaway, Lodgify, OwnerRez. Connector contract: list listings, fetch reservations, fetch financials, push pricing. Bookd treated as one PMS option among several per Reading A; reference Bookd's existing `ChannelAdapter` pattern but don't depend on it. | 5 | L (~2 weeks for framework + 1 connector reference impl) | Phase 4b Phase 0 audit. | Decision 1 framing. Reference impl probably Hostaway or OwnerRez (well-documented APIs). |
+| 4 | **Operations sidebar gating per project ownership** — wire `opsModuleKey` filter to also check `ownershipState === 'owned'` for the current project context. Module visibility tied to current-project ownership, not just org-pack flags. | 4 | M (~6h) | Anchor 4 schema lands. | Implements §3.7 activation mechanism end-to-end for sidebar. |
+| 5 | **MF Ops depth pass** — current `MultifamilyTabbed` has 4 sub-tabs (Dashboard, Units, Lease Expiry, Turn Tracking). Add Rent Roll Detail (single-source-of-truth with workspace), Renewals Workflow, Concessions Tracking, R&M Work Order Log. Don't try to match marina's depth — match MF operator's real workflow. | 3 | L (~1 week) | Phase 4b Phase 0 audit. | Pass 2 finding (MF Ops shallow). |
+| 6 | **Marina Ops formalization** — exists today, but probably isn't gated by ownership state. Add the gating, ensure it lives in §3.7 product structure. No new modules. | 3 | M (~1 week) | Anchor 4 schema lands. | Pass 2 finding (currently un-gated). |
+| 7 | **Retail Ops** — v1.1 placeholder. Tenant Roster, Lease Expiry, CAM Reconciliation, Percentage Rent Tracker. | 2 | (v1.1) | — | Captured for visibility; not in 4b scope. |
+| 8 | **Self-Storage Ops** — v1.1 placeholder. Unit Inventory, Tenant Roster, Move-In/Move-Out, Auction Tracking. | 2 | (v1.1) | — | Captured for visibility; not in 4b scope. |
+| 9 | **Hotel Ops** — v1.1 placeholder. Room Inventory, Reservations, RevPAR by Channel, Housekeeping Schedule, F&B Daily Sales. | 2 | (v1.1) | — | Captured for visibility; not in 4b scope. |
+
+**Phase 4b in-scope (items 1-6) total estimate: 9-10 weeks** (within Phase 4b target of 6-10 weeks, slightly toward upper bound). Items 7-9 are v1.1 placeholders, not in this scope.
+
+**Stop condition check (Pass 3):**
+- Prioritized work list size: 18 + 9 = **27 items**. Under 30 stop condition.
+- Phase 4a scope: 2-3 weeks. Within target.
+- Phase 4b STR Ops MVP features: 5 (Listings, Bookings, Channel Mix, Cleaning Ops, Pricing). Under 15 stop condition.
+- §8 draft: will keep under 100 lines (Section 7 below).
+
+---
+
+## 6. Phase 4a + 4b scope drafts
+
+### 6.A — Phase 4a (Core completeness) scope
+
+#### Anchor 1 — STR OM template
+- **Effort:** ~6h
+- **Files touched:**
+  - NEW `server/templates/om-templates/str-om.ts` (~150 lines, modeled after `multifamily-om.ts`)
+  - `server/templates/om-templates/index.ts` (register `strOMTemplate` in `omTemplateRegistry`)
+- **Acceptance criteria:**
+  - `getOMTemplatesByAssetClass('str')` returns `strOMTemplate`.
+  - OM builder UI for an STR project surfaces the STR template as default.
+  - Generated OM PDF includes STR-appropriate sections (Listing Setup, Channel Mix table, Pricing Strategy, Cleaning & Turnover, RevPAR/ADR metrics, Comparable STRs).
+  - All sections have non-empty `defaultContent`.
+- **Dependencies:** None.
+- **Verification:** Generate an OM for the STR fixture `b1a0eebc-...` and confirm all sections render. Compare narrative depth against `marinaOMTemplate` + `multifamilyOMTemplate`.
+
+#### Anchor 2 — S4 wizard data shape fix
+- **Effort:** ~6h
+- **Files touched:**
+  - `client/src/components/onboarding/OnboardingWizard.tsx` — rename state fields `marinaName`→`propertyName`, `marinaAddress`→`propertyAddress`, `portfolioMarinas`→`portfolioProperties`. Rename `renderMarinaDetailsStep`→`renderPropertyDetailsStep`. Dialog header icon read from `getModelConfig(state.assetClass).unitMix.tabIcon` (with sensible icon-name → component mapping). DealType `owned_marina`→`owned_property`.
+  - Any consumer of `WizardData.marinaName` / `marinaAddress` / `portfolioMarinas` (likely in the wizard's submit handlers + any test fixtures).
+  - Schema: confirm no DB column relies on the wizard-side names (this is wizard state, not persisted DB shape — but verify).
+- **Acceptance criteria:**
+  - `grep -rn "marinaName\|marinaAddress\|portfolioMarinas" client/src/components/onboarding/` returns 0 hits.
+  - Wizard renders for marina, STR, MF and writes class-appropriate state.
+  - Existing in-progress wizard state (if persisted to localStorage) gracefully migrates or is invalidated.
+- **Dependencies:** None for state-shape rename; schema check is read-only.
+- **Verification:** Walk all 3 MVP-class wizard flows, confirm no marina-named state leakage. `tsc --noEmit` clean.
+
+#### Anchor 3 — User-editable COA mapping
+- **Effort:** ~24-30h (~3-4 days)
+- **Files touched:**
+  - NEW DB migration (raw SQL, per CLAUDE.md rules): `coa_overrides` table — `(id, org_id, asset_class, override_type, key_pattern, target_department, target_subcategory, created_at, created_by, notes)`. RLS enabled by `org_id`.
+  - `server/services/direct-input-engine.ts` — `inferDepartment` read path: query `coa_overrides` first (per org_id + asset_class), then fall through to existing cascade.
+  - NEW `client/src/pages/settings/coa-editor.tsx` — list / add / edit / delete overrides per asset class. Pattern-match preview against sample line items.
+  - `client/src/components/unified-sidebar.tsx` — settings entry for "Chart of Accounts Editor."
+  - Audit log: every override CRUD writes to `financial_audit_log` (existing immutable log).
+- **Acceptance criteria:**
+  - Org admin can add `"trash reimbursement"` → `other_income` override for MF, and the next upload routes correctly.
+  - Override is org-scoped — other orgs unaffected.
+  - Override CRUD is audit-logged.
+  - Retroactive re-classification: existing actuals can be re-categorized when an override is added (with confirmation).
+  - `inferDepartment` cascade: overrides → existing keyword cascade → default. PRO_FORMA_REGISTRY edit scope deferred (decision needed during 4a Phase 0 sub-audit if required).
+- **Dependencies:** Resolves Pass 2 #85 (parallel registry reconcile) — overrides are the canonical user-edit path; the two-registry drift becomes a "config defaults vs user overrides" split. Pairs with #13 ranked item.
+- **Verification:** Add an override against `tests/department-mapping-baseline.mjs` synthetic line items, confirm routing matches. End-to-end fixture: MF P&L with "Trash Reimbursement" line, override routes to `other_income`, Pro Forma re-computes.
+
+#### Anchor 4 — Ops gating mechanism placeholder + Phase 0 design audit for 4b
+- **Effort:** ~6-8h for stub + activation matrix doc (the full Phase 4b Phase 0 audit is ~1 week and lives in 4b scope, item 1 of §5.B)
+- **Files touched:**
+  - DB migration (raw SQL): add `ownership_state` column to `modeling_projects` — enum `('evaluated', 'owned', 'archived')` default `'evaluated'`.
+  - `shared/schema.ts` — add to type. (Drizzle is read-only for the column to avoid the RLS-empty pitfall per CLAUDE.md.)
+  - NEW `BETA_MVP_PHASE_4B_PHASE_0.md` at workspace root — captures activation matrix decisions (tier × user_type × ownership_state), schema decisions, sidebar gating contract, telemetry plan. This is the spec deliverable, not code.
+- **Acceptance criteria:**
+  - `ownership_state` column exists in `modeling_projects` with default 'evaluated'.
+  - All existing projects backfill to 'evaluated' on migration.
+  - Activation matrix document committed to workspace root.
+  - Sidebar `opsModuleKey` filter logic in `unified-sidebar.tsx` documented but not yet wired (wiring is 4b item 4).
+- **Dependencies:** None.
+- **Verification:** Migration runs cleanly, every existing project has `ownership_state = 'evaluated'`. Document review by Brett.
+
+#### Items 5-18 — Phase 4a remainder
+Effort estimates rolled up:
+
+| Item | Effort | Files |
+|---|---|---|
+| 5. STR DD checklist | ~4h | NEW `server/templates/ddTemplates/str.ts` + `ddTemplates/index.ts` |
+| 6. MF DD checklist | ~4h | NEW `server/templates/ddTemplates/multifamily.ts` + `ddTemplates/index.ts` |
+| 7. Pro Forma Charts y=0 bug | ~3h | `pro-forma-charts.tsx` (memory `project_pro_forma_chart_flat_zero_bug`) |
+| 8. Audit Trail 500 + Assumption Audit HTML | ~4h | `workspace/audit-trail.tsx`, `workspace/assumption-audit.tsx` + server routes |
+| 9. Reimbursement routing for MF | ~2h | `direct-input-engine.ts` `inferDepartment` Other Income branch |
+| 10. `pct()` helper boundary fix | ~3-4h | `direct-input-engine.ts:956` + caller audit |
+| 11. Storage Leases anchor-icon fix | ~1h | `workspace.tsx:174` |
+| 12. valuator-* stack deletion | ~1h | Remove 9 files in `workspace/valuator-*` + `workspace.tsx:104` import |
+| 13. Parallel profit-center registry reconcile | ~2h | `marina-catalog.ts` + `asset-class-catalog.ts` + `asset-class-model-config.ts` decision pass |
+| 14. Doc-intel marina hardcoding cleanup | ~6h | `doc-intel-service.ts` L211/L219, L2401-2441, L2528 |
+| 15. MARINA_FIELDS depth pass | ~4h | `direct-input-coa.ts:248-274` (MARINA_FIELDS) — expand to ~50 lines |
+| 16. Token resolver marina branches cleanup | ~2h | `token-resolver-service.ts:107, 137-138, 157` |
+| 17. unitMix tabIcon audit | ~2h | `asset-class-model-config.ts` — 32 configs |
+| 18. unitMix label naming policy | ~1-2h | Decision + apply across configs |
+
+#### Phase 4a rollup
+
+| Bucket | Hours |
+|---|---|
+| 4 anchors (items 1-4) | ~40-50h |
+| Items 5-18 (remainder) | ~40-46h |
+| **Total** | **~80-96 hours** |
+| **Weeks (40h/week)** | **2.0-2.4 weeks** |
+
+Within Phase 4a target (2-3 weeks). Adds ~10-20% buffer for verification, articulation blocks, and any unanticipated dependencies — still under 3 weeks total.
+
+### 6.B — Phase 4b (Ops productization) scope
+
+Less detailed because 4b starts with its own Phase 0 audit. Captured here at the planning level.
+
+#### Phase 4b Phase 0 audit (~1 week — item 1 of §5.B)
+
+The audit deliverable is `BETA_MVP_PHASE_4B_PHASE_0.md` (stub created during anchor 4 in 4a). Must answer:
+
+1. **Activation matrix decisions** — what combinations of (tier × user_type × ownership_state) activate which Ops modules? Default rule: `ownership_state === 'owned'` activates the class-specific Ops tab for that project's asset class. Layered rules pending design (e.g., does an `analyst` user under an `institutional` tier always see Ops in read-only mode regardless of ownership?).
+2. **Schema additions** — beyond `modeling_projects.ownership_state`, do we need `ops_module_enabled` per (org_id, project_id, module_key)? Or is the rule purely derived?
+3. **Sidebar gating contract** — `opsModuleKey` filter today gates by org packs. New filter: gate by (org pack) AND (current project ownership) when in project context. Document the precedence.
+4. **Ops tab insertion in workspace** — does the Ops module live as a sidebar entry (today's pattern) or also as a workspace tab inside the project view? If both: which is canonical?
+5. **Telemetry plan** — how do we measure Ops module usage for v1.0 → v1.1 prioritization?
+6. **Cross-class data plumbing** — does the Pro Forma engine consume Ops actuals (today: not really, except for marina's `enrichFromProfitCenters` per Pass 1 #62)? If yes, the bridge is its own scope item.
+7. **Sub-audit decisions** — registry edit scope for anchor 3 (PRO_FORMA_REGISTRY editability) if not resolved during Phase 4a.
+
+#### STR Ops MVP feature inventory (5 features, ~6 weeks build — item 2 of §5.B)
+
+Each sub-tab sized at ~1 week build + 1 week glue.
+
+| Sub-tab | Scope summary | Key data |
+|---|---|---|
+| Listings | Master listing roster: address, listing IDs across platforms, bedrooms/baths/guests, amenities, status (active / paused / archived), photos count, listing-level revenue summary. | One row per listing. Synced from PMS. |
+| Bookings | Reservation pipeline: upcoming + past stays, guest name (PII gated), nights, channel, nightly rate, cleaning fee, total, status (confirmed / cancelled / completed). Day/week/month aggregation views. | Per-reservation rows. PMS-synced. |
+| Channel Mix | Revenue + bookings share by channel (Airbnb / VRBO / Booking.com / direct / other OTA). Time-series view, period-over-period comparison. ADR by channel. Take-rate / commission audit. | Aggregated from Bookings. |
+| Cleaning Ops | Turnover schedule (calendar view) by listing. Cleaner assignment + status (assigned / in-progress / inspected / ready). Avg turnover time. Cleaning fee billed vs. cost. | Per-turn rows. May integrate with cleaner-side tools (Turno, Properly) post-MVP. |
+| Pricing | Dynamic pricing config (base rate, weekend premium, seasonal multipliers, gap-night discounts), per-listing rate strategy override, peek at next 90 days of expected rates. Integration hooks for PriceLabs / Wheelhouse / Beyond Pricing in v1.1. | Per-listing pricing config. |
+
+Excludes from v1.0 STR Ops (deferred to v1.1): cleaner payroll/payments, owner statements (handled by separate LP-reporting flow), maintenance work-order tracking, multi-property portfolio analytics beyond Channel Mix.
+
+#### PMS connector framework (~2 weeks — item 3 of §5.B)
+
+Reference Bookd's existing `ChannelAdapter` pattern for shape, but build fresh in Vantage to avoid coupling. Connector contract:
+
+```typescript
+interface PMSConnector {
+  id: 'bookd' | 'guesty' | 'hostaway' | 'lodgify' | 'ownerrez';
+  authenticate(orgId: string, credentials: PMSCredentials): Promise<PMSAuthResult>;
+  listListings(connectionId: string): Promise<PMSListing[]>;
+  fetchReservations(connectionId: string, range: DateRange): Promise<PMSReservation[]>;
+  fetchFinancials(connectionId: string, range: DateRange): Promise<PMSFinancialLine[]>;
+  pushPricing?(connectionId: string, listingId: string, rates: PricingRates): Promise<void>;
+}
+```
+
+V1.0 ships:
+- Framework + types.
+- 1 reference connector implementation (recommend Hostaway or OwnerRez — well-documented APIs).
+- Stubs for the other 4 connectors (Bookd, Guesty, Lodgify, plus the unbuilt one of Hostaway/OwnerRez).
+
+V1.1 adds: real implementations for the other connectors as friendlies demand them.
+
+#### MF Ops depth pass (~1 week — item 5 of §5.B)
+
+Current `MultifamilyTabbed` has 4 sub-tabs: Dashboard, Units, Lease Expiry, Turn Tracking. Add for v1.0:
+- **Rent Roll Detail** — single source of truth shared with workspace's storage-leases tab; resolves dual-source risk.
+- **Renewals Workflow** — leases up for renewal in next 60/90/180 days; renewal offer status (sent / accepted / declined / pending).
+- **Concessions Tracking** — concession by unit / lease term, $ + % impact on EGI.
+- **R&M Work Order Log** — open / closed work orders, $/unit cost trend.
+
+Out of scope for v1.0 (v1.1): tenant portal, payment processing, eviction tracking, AR aging.
+
+#### Marina Ops formalization (~1 week — item 6 of §5.B)
+
+Marina Ops modules exist today (Pass 2 row 81) and are unconditionally available in the sidebar gated by `opsModuleKey`. After anchor 4 lands, wire each marina ops module's `opsModuleKey` to also respect `ownership_state === 'owned'`. No new modules; just enforcement of the activation matrix on the existing 8 modules.
+
+#### Phase 4b rollup
+
+| Item | Weeks |
+|---|---|
+| 1. Phase 0 audit | 1 |
+| 2. STR Ops MVP build (5 sub-tabs) | 6 |
+| 3. PMS connector framework + 1 reference impl | 2 |
+| 4. Sidebar gating wiring | 0.2 |
+| 5. MF Ops depth pass | 1 |
+| 6. Marina Ops formalization | 0.5-1 |
+| **Total** | **~10-11 weeks** |
+
+Slightly above the 6-10 week target's upper bound. Two levers to tighten if needed:
+- Defer Marina Ops formalization to early v1.1 (its functionality exists today; gating is the only delta).
+- STR Ops MVP from 6 weeks to 4 weeks by deferring Cleaning Ops + Pricing to v1.1 (keeps Listings + Bookings + Channel Mix as the MVP triad, which most institutional STR friendlies will demo around).
+
+Item 7-9 (Retail / Self-Storage / Hotel Ops) are v1.1 placeholders — captured in §5.B for visibility, **not in 4b scope**.
+
+---
+
+## 7. Draft §8 update for BETA_MVP_SPEC.md
+
+This is the text I'll apply to BETA_MVP_SPEC.md §8 in the same Pass 3 commit. Kept under 100 lines per stop condition.
+
+```markdown
+## 8. Per-class content inventory (Phase 1.5 — completed 2026-05-19)
+
+Phase 1.5 audit completed across three passes:
+- **Pass 1** — grep-driven enumeration + 4-registry audit + tab-gate audit (commit `cef8f749`).
+- **Pass 2** — code-walkthrough user-journey friction log for Journey A (MF investor) and Journey B (marina owner) (commit `3ad61100`).
+- **Pass 3** — prioritized work list + Phase 4a / 4b scope drafts (this commit).
+
+Structured backing data lives in `BETA_MVP_PHASE_1_5_AUDIT.md` at workspace root. That document contains the full inventory (~89 surfaces across 11 categories), the journey friction log (~60 entries across both journeys), the prioritized work list (18 Core + 9 Ops items), and detailed scope drafts.
+
+### Headline findings
+
+**Registry coverage:** All 4 registries (`MODEL_CONFIG_REGISTRY`, `COA_REGISTRY`, `COA_FIELD_REGISTRY`, `PRO_FORMA_REGISTRY`) cover all 3 MVP classes (marina, STR, MF) at 100% breadth. Depth varies — STR_COA is 7× deeper than MARINA_COA / MULTIFAMILY_COA; MARINA_FIELDS is the shortest direct-input field set.
+
+**STR has the biggest Core gap:** missing OM template, missing DD template, missing rent-roll-v2 adapter. These are the highest-priority Phase 4a items (3 concrete deliverables).
+
+**S4 — Wizard data shape leak:** `marinaName` / `marinaAddress` / `portfolioMarinas` written for all classes regardless of asset class. Phase 4a anchor.
+
+**S1 — orphan valuator-\* stack:** 5,375 lines of marina-specific UI code imported but not rendered. Verified 0% overlap with active code paths. Safe to delete in Phase 4a (item 12).
+
+**Operations sidebar asymmetry (new in Pass 2):** marina has 13 sidebar entries / 8 dedicated tabbed-ops modules; MF has 1 module / 4 sub-tabs; STR has 0. This is a Phase 4b (Ops productization) scope dimension, not Phase 4a.
+
+### Phase 4 split — Core vs Ops (per §3.7)
+
+**Phase 4a — Core completeness (per-class modeling polish).** 18 items, 4 anchors. Estimate 2.0-2.4 weeks (80-96h). See §6.A of `BETA_MVP_PHASE_1_5_AUDIT.md`.
+
+Phase 4a anchors:
+1. STR OM template
+2. S4 wizard data shape fix (`marinaName` → `propertyName`)
+3. User-editable COA mapping (promoted from §3.6)
+4. Ops gating mechanism placeholder + Phase 4b Phase 0 design audit
+
+**Phase 4b — Ops add-on productization.** 9 items (6 in-scope for v1.0, 3 deferred to v1.1). Estimate ~10-11 weeks. See §6.B of `BETA_MVP_PHASE_1_5_AUDIT.md`.
+
+Phase 4b sequence:
+1. Phase 0 audit (1 week)
+2. STR Ops MVP — 5 sub-tabs: Listings, Bookings, Channel Mix, Cleaning Ops, Pricing (6 weeks)
+3. PMS connector framework + 1 reference connector (2 weeks)
+4. Sidebar gating wiring (0.2 weeks)
+5. MF Ops depth pass (1 week)
+6. Marina Ops formalization (0.5-1 week)
+
+### §3.5 cleanup items closed in Phase 4a
+
+The following §3.5 entries are closed by Phase 4a:
+- §3.5 "Mobile responsive audit" — out of scope (deferred to v1.1)
+- §3.5 "8 duplicate Sunset Bay Marina fixtures" — bundled with valuator-* cleanup (item 12)
+- §3.5 "Institutional analysis suite fixes" — separate scope, not Phase 4a
+- §3.5 "Reimbursement routing for Multifamily" — item 9
+- §3.5 "`STORAGE_SUB_TYPES` reconciliation" — covered by item 18 (unitMix label policy) + item 17 (icon audit)
+- §3.5 "`unitMix.tabIcon` anchor-icon leak" — item 11 + item 17
+- §3.5 "Inconsistent `unitMix` tab labels" — item 18
+- §3.5 "`doc-intel-service.ts` marina hardcoding" — item 14
+- §3.5 "LLM provider divergence" — out of scope (deferred per spec entry)
+- §3.5 "`pct()` helper ambiguity" — item 10
+- §3.5 "Wizard `marinaName` / `marinaAddress` leak" — anchor 2 (S4 fix)
+
+§3.5 cleanups not closed by Phase 4a (carried forward):
+- Audit Trail 500 + Assumption Audit HTML + Pro Forma Charts y=0 — items 7-8 (bundled into Phase 4a as bug-fix items, ranked 7-8)
+
+### Total per-class content build roadmap
+
+| Phase | Scope | Estimate | Sequencing |
+|---|---|---|---|
+| Phase 4a | Core completeness across MVP classes | 2.0-2.4 weeks | Starts after Phase 1.5 commit |
+| Phase 4b Phase 0 | Activation matrix design audit | 1 week | After Phase 4a anchor 4 stub lands |
+| Phase 4b items 2-6 | Ops module productization | 9-10 weeks | After Phase 4b Phase 0 |
+| **Total to v1.0** | **Phase 4a + 4b** | **~12-13 weeks** | |
+
+Replacement Cost per-class build (Phase 1.5 worked example) is **NOT** in Phase 4a — marina has it via the existing `replacement-cost.tsx`; STR and MF won't get class-specific Replacement Cost UIs in MVP. Re-evaluate for v1.1 if friendly demand surfaces.
+```
+
+---
+
+## 8. Pass 3 articulation block
+
+**Total Phase 4a scope estimate:** 2.0-2.4 weeks (80-96 hours).
+**Total Phase 4b scope estimate:** ~10-11 weeks (slightly above the 6-10 target's upper bound; two tightening levers identified in §6.B).
+
+**Top 4 anchors — confirmed scope estimates:**
+
+| Anchor | Hours | Notes |
+|---|---|---|
+| 1. STR OM template | ~6h | Modeled after `multifamily-om.ts`; no dependencies. |
+| 2. S4 wizard data shape fix | ~6h | Rename + ~10 read sites + dialog icon + DealType. |
+| 3. User-editable COA mapping | ~24-30h | Largest 4a item by far; depends on resolving registry edit scope. |
+| 4. Ops gating placeholder + 4b Phase 0 design | ~6-8h for 4a stub | Full Phase 4b Phase 0 audit is a separate 1-week 4b item. |
+
+**Surfaced in Pass 3 (not in Pass 1 or Pass 2):**
+- The two-axis split — Core completeness (4a) vs Ops productization (4b) — formalized in §3.7 (Piece A commit) is itself a Pass 3 product structure decision worth noting in audit history.
+- The relationship between anchor 3 (user-editable COA) and Pass 2 #85 (parallel profit-center registry reconcile): item 13's "reconcile or document" framing collapses into anchor 3's user-edit canonical path — overrides become the canonical user-edit path; the dual-source becomes "config defaults vs overrides" not "two competing registries."
+
+**Items where ranking required judgment Brett should review:**
+
+1. **Item 15 — MARINA_FIELDS depth pass at value 4, M effort.** This addresses Pass 1 S3 (marina has shortest direct-input fields). I ranked it 4 because friendlies entering marinas via direct input today see a sparse form, but no friendly has complained yet. Could deprioritize to value 3 if direct-input is a thin demo path for marinas (most marina friendlies upload P&L, not direct-input).
+2. **Item 14 — Doc-intel marina hardcoding cleanup at value 3, M effort.** Could be deferred to v1.1 if the four code paths don't fire under current MF/STR uploads. Worth running a single MF + STR P&L through doc-intel and observing whether the marina paths trigger before committing 6h to this.
+3. **Item 11 vs 17 — Storage Leases icon fix (single-tab fix) vs unitMix tabIcon audit (32-config sweep).** I ranked them separately because the single-tab fix is the user-visible win (~1h) and the 32-config sweep is the cleanup that prevents the same leak elsewhere (~2h). Could be bundled into one item if Brett prefers a single commit.
+4. **Phase 4b STR Ops MVP — 5 sub-tabs vs 3.** Decision 1 was full-build; I sized for 5 sub-tabs (~6 weeks). Tightening lever in §6.B suggests dropping to 3 (Listings + Bookings + Channel Mix) would save 2 weeks. Reasonable for MVP demo with institutional STR friendlies; Cleaning Ops + Pricing become v1.1 priorities.
+5. **Phase 4a buffer.** I sized at 80-96h (2.0-2.4 weeks) but the realistic ceiling with verification overhead is closer to 3 weeks. Worth flagging if 4a slips past 3 weeks → consider deferring items 16-18 (token resolver / icon audit / label policy) to a Phase 4a.1 cleanup wave.
+
+**Confirmed scope: NO code changes today, only documentation.**
 
 ---
 
