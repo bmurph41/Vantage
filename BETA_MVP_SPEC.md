@@ -136,12 +136,32 @@ Each requires its own COA + canonical seed + department inference branch + sampl
 - **Wizard data shape leaks `marinaName` / `marinaAddress` into non-marina projects** — Phase 1.5 audit Pass 1 (2026-05-19) surfaced that `client/src/components/onboarding/OnboardingWizard.tsx` writes marina-flavored field names (`marinaName`, `marinaAddress`) into the project's wizard state regardless of asset class. This is a Path 1 violation per Section 5 principle #1 (asset-class-agnostic architecture) at the wizard data layer. STR + MF + other-class projects end up with marina-named fields in their wizard payload, which is both semantically wrong and a downstream gotcha for anyone reading project state. Fix candidates: (a) generic field names (`propertyName`, `propertyAddress`) used universally, (b) class-aware field names sourced from `MODEL_CONFIG_REGISTRY[assetClass].terminology.entityNouns`, (c) hybrid — store under generic names but display class-appropriate labels. Decision pending Phase 4 / wizard refactor pass; existing wizard state shape may need migration. Surfaced 2026-05-19 during Phase 1.5 audit Pass 1 (commit `cef8f749`).
 
 ### 3.6 Post-MVP feature roadmap (v1.1)
-- **User-editable COA mapping** — settings UI for org-level chart-of-accounts overrides (add / edit / reassign / delete keyword-to-department mappings) propagating across all projects in the org. Institutional users expect to customize COA mappings per their internal accounting conventions. Scope: ~3-5 days for first cut. Touches DB schema (new override table), settings UI (CRUD per asset class), `inferDepartment` read path (query overrides before fallback cascade), per-org caching layer, retroactive re-classification policy, role permissions, audit log. Architectural prerequisites: Phase 1 (asset-class-agnostic infrastructure) and Phase 2 (upload pipeline asset-class-aware) solid first; also requires resolving which of the 4 registries are user-editable (`inferDepartment` cascade only? `PRO_FORMA_REGISTRY` too? both?). Recommended sequencing: post-Phase 1, after real friendly P&L upload data shows whether defaults are close enough or too far off for the MVP. Raised by Brett 2026-05-17 mid-Phase-1 Task 3 as a product gap worth capturing.
+- ~~**User-editable COA mapping**~~ — *promoted from §3.6 to Phase 4a on 2026-05-19 during Phase 1.5 audit Pass 2 review. Comprehensive per-class COA coverage (Pass 2 Decision 2 — relevance-driven, not symmetry-driven) is incomplete without a user-editable layer for org-specific overrides. Brett's Decision 2 framing explicitly cited user editability as part of the design. See §4 Phase 4a entry for the active scope. Original §3.6 entry text preserved in git history (commit `b2790a4c` and earlier).*
 - **User-extensible rent-roll subType taxonomy** — settings UI for org-level subType taxonomy per asset class (add / edit / reassign / delete). Each asset class has canonical defaults (marina: slips by type; STR: Airbnb / VRBO / Booking.com / direct / corporate bookings; hotel: Room Revenue / F&B / Spa / Parking; self-storage: by unit size / climate / non-climate / drive-up; retail: commercial tenants; MF: apartments by unit type; RV: sites by hookup type / seasonal / annual). Users extend per their accounting conventions. Architectural prerequisites: Phase 1 (asset-class-agnostic infrastructure), Phase 2 (upload pipeline), 4-registry reconciliation, AND principle #6 (taxonomies as data, not code) being applied to existing consumers. Pairs with the COA editor as the second user-extensible taxonomy. Recommended sequencing: post-MVP, in concert with COA editor design pass. Surfaced by Brett 2026-05-17 during Task 4 Phase 0.
 - **Inputs / Pro Forma per-cell editing redesign** (Option C from 2026-05-16 discussion — full 15-25 day rebuild).
 - **VDR role-aware access** — currently all-or-nothing; v1.1 adds per-document per-role permissions.
 
 See also: real v1.1 feature work tracked separately in §3.1 (user type extensions — sub-classifications, Deal Teams, third-party invites, additional primary types), §3.2 (portfolio management), §3.3 (system-triggered feature activation), §3.4 (13 additional asset classes).
+
+### 3.7 Product structure: Vantage Core vs Vantage Ops (add-on)
+
+Vantage is structured in two product layers:
+
+**Vantage Core (universal, all users).** The modeling, underwriting, pro forma, DCF, exit strategy, investment memo, DD checklist, and OM generation surfaces. Works across all asset classes. This is the foundation institutional investors, brokers, analysts, GPs, and LPs use for evaluating deals. Per-class content depth follows principle #7 (content depth is per-class and progressive).
+
+**Vantage Ops (add-on, activated per-class when user owns the asset).** Class-specific operational management UI. Marina Ops (today: 13 sidebar entries / 8 dedicated tabbed modules — Fuel, Ship Store, Service, Boat Rentals, Boat Club, Boat Sales, Dockit, Bookkeeping, plus Payroll, Marketing, Budgeting, Rent Roll, Commercial Tenants). MF Ops (today: 1 module / 4 sub-tabs via MultifamilyTabbed). STR Ops (to be built as Phase 4b — Listings, Bookings, Channel Mix, Cleaning Ops, Pricing). Retail Ops, Self-Storage Ops, Hotel Ops as future scope.
+
+**Activation mechanism (v1.0 placeholder, pending design):** per-project flag distinguishing "owned" vs "evaluated" projects. Owned projects activate the Ops tab(s) for their asset class. Evaluated projects show only Core surfaces. Tier-based or user_type-based gating may layer on top in v1.1 once Ops modules have real users. Final activation design is its own Phase 0 audit before Phase 4b begins.
+
+**STR Ops + PMS connector pattern (specific to STR).** STR Ops in Vantage is its own UI built for the institutional-grade STR asset manager. PMS connectors (Bookd, Guesty, Hostaway, Lodgify, OwnerRez) feed external operational data into Vantage's STR Ops UI. Bookd is treated as one PMS option among several — no special integration tier (Reading A per 2026-05-19 product structure discussion). Bookd remains an independent standalone product on its own roadmap; Vantage Ops for STR is built fresh as Vantage's own UI.
+
+**Why this matters for content depth (principle #7).** Per-class "completeness" lives in two axes:
+- Core completeness — per-class modeling/memo/DD/OM content (Phase 4a)
+- Ops completeness — per-class operational management UI (Phase 4b)
+
+Phase 4a is "MVP modeling polish across MVP classes." Phase 4b is "Ops add-on productization." They are different scopes, different timelines, and likely staffed/sequenced separately.
+
+Surfaced 2026-05-19 during Phase 1.5 audit Pass 2 review.
 
 ---
 
@@ -182,15 +202,26 @@ Audit pass inserted between Phase 1 and Phase 2 per the 2026-05-18 architectural
 - Permission module — single `canAccess(user, feature)` helper used at every gated route + UI surface
 - Tier gating wired soft — all MVP friendlies bypass tier checks via env or org flag
 
-### Phase 4 — Engine completeness per class
+### Phase 4a — Core completeness (per-class modeling polish)
 
-- Pro Forma + DCF + Returns + Historical P&L verified end-to-end for marina + STR + multifamily
-- Historical P&L Sep-Dec overlay (Option B — projection cells overlaid with badge) on `/actuals`, `/actuals/multi-year`, `/historical-pl`
-- DCF cashflow envelope (shipped Day 12a — commit `b84b478e`)
-- Pro Forma unitMix arg fix (shipped Day 12b — commit `f0d6ce90`)
-- Returns ledger seeded for fixtures
-- Marina fixture key-shape cleanup (snake_case → camelCase OR MARINA_COA inputKeys widening)
-- 948 project (legacy STR test) replaced in CLAUDE.md by STR fixture `b1a0eebc-...`
+Output of Phase 1.5 audit Pass 3 prioritization. Per-class polish across Core MVP surfaces — modeling, memo, DD, OM — for the 3 MVP classes (marina, STR, MF). Closes the §3.5 cleanup items that affect Core surfaces. Includes user-editable COA mapping (promoted from §3.6).
+
+Scope estimate: 2-3 weeks (refined by Pass 3 deliverable in `BETA_MVP_PHASE_1_5_AUDIT.md` §6a).
+
+Pre-split work already shipped (preserved for traceability):
+- Pro Forma + DCF + Returns + Historical P&L end-to-end verification across marina + STR + MF (rolling).
+- Historical P&L Sep-Dec overlay (Option B — projection cells overlaid with badge) on `/actuals`, `/actuals/multi-year`, `/historical-pl`.
+- DCF cashflow envelope (shipped Day 12a — commit `b84b478e`).
+- Pro Forma unitMix arg fix (shipped Day 12b — commit `f0d6ce90`).
+- Returns ledger seeded for fixtures.
+- Marina fixture key-shape cleanup (snake_case → camelCase OR MARINA_COA inputKeys widening).
+- 948 project (legacy STR test) replaced in CLAUDE.md by STR fixture `b1a0eebc-...`.
+
+### Phase 4b — Ops add-on productization
+
+Builds Vantage Ops as a productized add-on layer. Phase 0 audit first to design the activation mechanism (per-project flag vs tier vs user_type), then STR Ops MVP (per Decision 1 — full-build STR ops module with PMS connectors). MF Ops depth pass. Marina Ops formalization (it exists today but probably isn't gated). Retail, Self-Storage, Hotel Ops deferred to v1.1.
+
+Scope estimate: significantly larger than 4a — likely 6-10 weeks, defined by Pass 3 deliverable in `BETA_MVP_PHASE_1_5_AUDIT.md` §6b.
 
 ### Phase 5 — MVP polish + verification
 
@@ -354,3 +385,4 @@ The architectural principles in §5 (#1 asset-class-agnostic architecture and #7
 | 2026-05-18 | Brett + Claude (Opus 4.7 1M) | Task 5 Phase 0 audit added two §3.5 cleanups: `doc-intel-service.ts` marina hardcoding outside Task 5 scope (four code paths at L211/L219, L2401-2441, L2528 → Phase 1.5 per-class cleanup), and LLM provider divergence OpenAI vs Anthropic across services (no `LlmProvider` abstraction → post-MVP consolidation decision pass). Original D8 framing (mock vs real LLM, hybrid adapter pattern) invalidated by Phase 0 — no mock exists; existing code calls real OpenAI directly. Task 5 scope re-bounded to asset-class-aware prompt only, keeping OpenAI in place. |
 | 2026-05-19 | Brett + Claude (Opus 4.7 1M) | Captured `pct()` helper ambiguity finding from yesterday's MF fixture seed work. |
 | 2026-05-19 (later) | Brett + Claude (Opus 4.7 1M) | Captured S4 from Phase 1.5 audit Pass 1: wizard data shape leaks marinaName/marinaAddress into non-marina projects (Path 1 violation at wizard data layer). |
+| 2026-05-19 (later) | Brett + Claude (Opus 4.7 1M) | Phase 1.5 Pass 2 review surfaced Vantage product structure clarity (Core vs Ops add-on); added §3.7 capturing this. User-editable COA promoted from §3.6 to Phase 4a. Phase 4 split into 4a (Core completeness) and 4b (Ops productization). |
