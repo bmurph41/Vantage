@@ -293,19 +293,186 @@ These 35+ workspace tabs use unified math/data layer and do not branch on asset 
 
 ---
 
-## 4. Journey friction log — PENDING (Pass 2)
+## 4. Journey friction log (Pass 2)
 
-To be filled in Pass 2. Will capture step-by-step:
-- Journey A: Investor/Operator evaluating an MF deal end-to-end.
-- Journey B: Owner uploading marina P&L end-to-end.
+### 4.0 Methodology note
 
-For each step:
-- What the user sees per class
-- Marina-flavored words/icons/columns/KPIs leaking into non-marina
-- Class-specific content gaps
-- Institutional expectations missing universally
+This is a **code-walkthrough** journey, not a live browser-clickthrough. The dev server was not started for this pass — instead, every component, route, and registry the user would touch in each step was read directly. This is honest about its limits: I can verify what the code does today, but not screen-level rendering quirks (z-index issues, CSS regressions, race conditions, exact pixel positioning). Where browser-only friction would only surface via UI, I flag it explicitly as `[needs-browser-verify]`.
 
----
+### 4.1 S1 verification — CRITICAL result
+
+**Pass 1 framing was wrong, and the corrected finding is more useful than the original concern.**
+
+**What I expected to find:** `ProfitCentersDynamic` covers X% of valuator-*'s functionality; the gap = marina content that needs to move.
+
+**What I actually found:** `ProfitCentersDynamic` and the orphan `valuator-*` stack solve **different problems**. They are not migration peers.
+
+**Evidence:**
+
+- `ProfitCentersDynamic` (`workspace/profit-centers-dynamic.tsx`, 386 lines): reads `getModelConfig(assetClass).profitCenters.departments`. For each department, the user enters **forward-looking monthly $ assumptions** in three buckets (revenue / COGS / expense). It's a **modeling-assumption form** for the multi-year projection. State persists to `modeling_projects.profitCentersData`.
+
+- `valuator-fuel-sales.tsx` (657 lines): reads `/api/operations-context/projects/:projectId/ops/fuel`. Per-transaction record entry — `txnDate`, `fuelType`, `gallons`, `grossSales`, `cogs`. It's an **operational ledger entry UI**, not modeling. Same pattern in `valuator-ship-store.tsx` (per-transaction `category`, `grossSales`, `cogs`, `txnCount`) and `valuator-boat-rentals.tsx` (per-rental `rentalDate`, `hours`, `grossSales`, `channel`, `boatType`).
+
+- The **real successor to valuator-*** is the `pages/operations/` tabbed-module stack, e.g., `pages/operations/fuel/{Dashboard,Transactions,Inventory,Analytics,Reports,FinancialModel,ImportHistory,AuditTrail}.tsx` (10 dedicated fuel module files). Same pattern for Ship Store (`ShipStoreTabbed.tsx`), Boat Rentals (`BoatRentalsTabbed.tsx`), Service (`ServiceTabbed.tsx`), Boat Club, Boat Sales, Bookkeeping, etc.
+
+**S1 result: valuator-* IS safe to delete.** The 5,375 lines are dead code superseded by the `pages/operations/*Tabbed.tsx` stack (which is the active operations-context UI in the sidebar) AND by `ProfitCentersDynamic` (which is the active modeling-assumption UI in the workspace).
+
+**Overlap calculation: 0%.** No content lives only in `valuator-*` that doesn't live in either the ops-context successors or the modeling-dynamic component. ProfitCentersDynamic covers the modeling axis (forward $/mo assumptions). The ops/* tabbed modules cover the operations axis (per-transaction record entry).
+
+**Architectural correction for the audit doc:** Pass 1 S3 ("Marina has the shortest field set in COA_FIELD_REGISTRY") is NOT actually masked by valuator-* migration risk. The valuator-* stack was never feeding COA_FIELD content — that's a different axis entirely. The shallow MARINA_FIELDS (27 lines) remains a real but separate content gap.
+
+### 4.2 S5 verification — Profit Centers step in MF wizard
+
+**Result: NOT a leak.** Wizard's Profit Centers step uses `getAssetClassCatalog(assetClass)` (line 514 in `OnboardingWizard.tsx`), which dispatches to per-class catalogs in `shared/asset-class-catalog.ts` (a separate registry from `marina-catalog.ts`).
+
+For MF wizard pass, user sees the 7 entries in `MULTIFAMILY_PROFIT_CENTERS`: Residential Rent, Parking, Laundry & Vending, Pet Fees, Storage Units, Application & Admin Fees, Utility Reimbursement.
+
+For STR wizard pass, user sees the 5 entries in `STR_PROFIT_CENTERS`: Nightly Revenue, Cleaning Fees, Extra Guest Fees, Pet Fees, Early/Late Check Fees.
+
+**However, S5 produced a new finding:** there are now **two parallel per-class profit-center registries** in the codebase:
+1. `MODEL_CONFIG_REGISTRY[ac].profitCenters.departments` (used by workspace's `ProfitCentersDynamic`)
+2. `asset-class-catalog.ts.{ASSET}_PROFIT_CENTERS` (used by wizard)
+
+These DO NOT MATCH. For MF:
+- Workspace registry has 6 departments: parking, laundry_vending, pet_fees, utility_reimbursement, storage_units, application_fees.
+- Wizard catalog has 7 entries: residential_rent + the same 6.
+
+That's the only difference (workspace registry assumes residential rent is modeled via the unit-mix tab, not as a "profit center"), but the dual-source for the same conceptual data is fragile. **NEW SURFACE — flagging as a registry drift candidate for §3.5.**
+
+### 4.3 Journey A — Investor/Operator evaluating MF deal
+
+Friction entries reference the surface number from Section 2 where applicable. Severity scale: **blocker** (cannot complete journey) · **friction** (works but jarring) · **nice-to-have** (could be better) · **none** (works correctly).
+
+| # | Step | What user sees | Class-appropriate? | Marina-leaking? | Missing content? | Severity |
+|---|---|---|---|---|---|---|
+| A1 | Login → land on dashboard (`pages/dashboard.tsx`) | Dashboard renders persona-driven modules (QuickAccessSection, FundSelector, RevenueCharts, CRMCharts, etc.). Imports `Fuel`, `ShoppingCart`, `Anchor` icons among many — these only render when their module is enabled. | Yes — dashboard is module-driven, not class-driven. | No (icons present but only render for relevant modules). | MF-specific KPI tiles (NOI, $/Unit, Cap Rate, Avg Rent) don't appear on dashboard unless a specific module wires them. Friendly may not see a "this is a multifamily portfolio at a glance" landing. | nice-to-have |
+| A2 | Open New Project Wizard | Dialog title shows `<Anchor />` icon if `assetClass==="marina"`, else `<Building2 />` (line 2425 of `OnboardingWizard.tsx`). MF gets generic Building2 — not class-appropriate (a Home or Building icon would fit). | Partial — class detection works, but only 2 icons defined. | Yes — anchor icon is the privileged path. | Per-class wizard icon. Trivial fix. | friction |
+| A3 | Wizard step 1: Welcome | Generic welcome step. | Yes. | No. | None. | none |
+| A4 | Wizard step 2: Deal Structure | Generic deal-structure picker (single vs portfolio). DealType options include `"owned_marina"` but no MF analog like `"owned_property"` (see Pass 1 row 48). | Partial. | Yes — DealType has marina-flavored enum. | MF-equivalent ownership state. | friction |
+| A5 | Wizard step 3: Property Details | Heading reads `{assetTerms.heading}` — class-aware. Property name field is labeled `{assetTerms.property}` (good). **BUT** the underlying state is `state.marinaName` and `state.marinaAddress` regardless of class. UI = correct; data = S4 leak. | Partial (UI correct, data wrong). | Yes — at the data layer (S4). | None visible to user; downstream consumers of project state see `marinaName` on a non-marina project. | friction (UI ok, data integrity issue) |
+| A6 | Wizard step 4: Deal Type | Generic. | Yes. | No. | None. | none |
+| A7 | Wizard step 5: Profit Centers | Renders 7 MF-appropriate entries from `MULTIFAMILY_PROFIT_CENTERS` in `asset-class-catalog.ts`. Each is a toggle. (S5 confirmed not a leak.) | Yes. | No. | Could be deeper (no per-department revenue ranges shown at this step). | none |
+| A8 | Wizard step 6: Amenities | Renders 12 MF-appropriate entries (pool, fitness center, clubhouse, dog park, etc.) from `MULTIFAMILY_AMENITIES`. | Yes. | No. | None. | none |
+| A9 | Wizard step 7: Storage | Step **HIDDEN** for MF via `shouldShowStep` (`cfg.tabs.physicalStorage = false` for MF). | Yes. | No. | None. | none |
+| A10 | Wizard step 8: Documents | Generic upload step. | Yes. | No. | None. | none |
+| A11 | Wizard step 9: Features | Generic feature-flag picker. | Yes. | No. | None. | none |
+| A12 | Wizard step 10: Get Started | Generic CTA. | Yes. | No. | None. | none |
+| A13 | Land in workspace → Overview tab | `overview-dynamic.tsx` reads `config.kpis` from MULTIFAMILY_CONFIG. Shows 8 KPI tiles: Purchase Price, Cap Rate, Total Units (icon: `home`), NOI, $/Unit, Avg Rent/Unit, Occupancy, Expense Ratio. All MF-appropriate. | Yes. | No. | Could add MF-specific tiles: Loss-to-Lease (already in inputs), Renewal Rate, Concessions. Not blocking. | none |
+| A14 | Inputs & Assumptions tab | Renders 5 MF input sections from `MULTIFAMILY_CONFIG.inputSections`: Property Details (12 fields), Rent Assumptions (8 fields), Other Income (8 fields), Operating Expenses (18 fields), Capital Reserves (5 fields). Total ~51 MF-specific fields. | Yes — rich and MF-appropriate. | No. | None obvious. | none |
+| A15 | Property Tax tab | Universal; works for MF. | Yes. | No. | None. | none |
+| A16 | Storage Leases tab (renamed "Unit Mix" via `unitMix.tabLabel`) | `unit-mix-leases.tsx` (class-aware per Task 4) reads `unitMix.types` from MULTIFAMILY_CONFIG. Shows 9 MF unit types (Studio, 1BR/1BA, 2BR/1BA, 2BR/2BA, 2BR/1.5BA, 3BR/2BA, 3BR/2.5BA, 4BR+, Townhome). Column labels: "Units" + "Avg Rent/Mo" + "Avg SF". Rate type: monthly. | Yes — Task 4 working. | **tabIcon leak** — `unitMix.tabIcon='home'` in MF config, but workspace TAB_GROUPS line 174 hardcodes `Anchor` icon for the "storage-leases" tab entry. Per §3.5 unitMix tabIcon entry — marina-flavored icon leaks to MF/STR. | None content-wise. | friction |
+| A17 | Commercial Leases tab | **HIDDEN** for MF (`tabs.commercialLeases = false`). | Yes. | No. | Per S6 — mixed-use MF might want this. Open product question. | none for MVP MF |
+| A18 | Profit Centers tab (renamed "Other Income" via `profitCenters.tabLabel`) | `ProfitCentersDynamic` renders the 6 MF departments. User can toggle each, enter monthly $ revenue / monthly $ COGS / monthly $ expense per line item. | Yes. | No. | Per S3 — depth is flat; no volume × rate modeling. Acceptable for MF (revenue is mostly rent-based, covered in unit mix). | none |
+| A19 | Document Uploads tab | Universal upload UI. Asset-class-aware doc-intel prompt (commit 11b7f18f) applies during extraction. | Yes. | No. | None. | none |
+| A20 | Upload an MF P&L → categorization output | LLM uses `multifamily` docIntelPromptHints (revenueDepts: gross_potential_rent, vacancy_loss, concessions, bad_debt, parking, laundry_vending, pet_fees, utility_reimbursement, etc.). | Yes — shipped 2026-05-18. | No. | `inferDeptForActual` has a `TODO: assetClass not in scope` per §3.5 — uses default vocabulary. **Possible department mis-routing** for MF "Trash Reimbursement"-type lines (§3.5 reimbursement routing entry). | friction |
+| A21 | Historical P&L tab | Universal. Renders extracted/promoted actuals. | Yes. | No. | None. | none |
+| A22 | Pro Forma tab | `pro-forma.tsx` renders `MULTIFAMILY_PRO_FORMA` shape: GPR → vacancy/concessions/badDebt (indented) → effectiveRent → otherIncome → EGI → 9 operating expense lines → totalExpenses → NOI. | Yes — MF-appropriate structure. | No. | None visible. | none |
+| A23 | Pro Forma Charts tab | TBD `[needs-browser-verify]`. Memory `project_pro_forma_chart_flat_zero_bug` says chart plots y=0 across 2026-2030 in some configurations. | Pre-existing bug. | No. | Bug per §3.5. | blocker (if bug triggers for MF) |
+| A24 | Stabilized NOI tab | Universal. | Yes. | No. | None. | none |
+| A25 | Pricing tab | Universal. | Yes. | No. | None. | none |
+| A26 | CapEx Budget tab | Universal. | Yes. | No. | None. | none |
+| A27 | Debt / Loan Sizing / Capital Stack | Universal fund-level math. | Yes. | No. | None. | none |
+| A28 | Exit Strategy tab | Universal. | Yes. | No. | None. | none |
+| A29 | DCF tab | Universal. | Yes. | No. | None. | none |
+| A30 | Returns / Multi-Year / Tax & Distributions | Universal. | Yes. | No. | None. | none |
+| A31 | Analytics tab | Universal. | Yes. | No. | None. | none |
+| A32 | IRR Attribution tab | Universal. Per §3.5, open product question (keep/remove/tier-gate). | Yes. | No. | UX gap. | nice-to-have |
+| A33 | Mark-to-Market tab | Universal. Per §3.5, needs tooltip explanation. | Yes. | No. | UX gap. | nice-to-have |
+| A34 | **Replacement Cost tab** | **HIDDEN** for MF (`tabs.replacementCost = false`). User does not see this tab. | Yes — appropriate hidden. | No. | If MF Phase 4 wants Replacement Cost, needs MF-specific cost inputs (e.g., $/SF construction + soft costs + land), entirely new component. The existing `replacement-cost.tsx` is 100% marina-hardcoded (floating docks, pilings, slips, dry racks). | none for MVP; **large** for Phase 4 if scoped |
+| A35 | Pro Forma Charts / Scenario Compare / Deal Compare / Sensitivity / Monte Carlo / Stress Tests / Benchmark Overlay / Comp Adjustments | All universal. | Yes. | No. | None. | none |
+| A36 | Operator Benchmark tab | TBD — likely marina-flavored given the marina vertical's benchmark data sources. `[needs-browser-verify]` | Unknown. | Possible. | TBD. | nice-to-have to verify |
+| A37 | Environmental Risk tab | Universal. | Yes. | No. | None. | none |
+| A38 | Fund Metrics / Fund Cash Flow / G&A / GP Partners / LP Reporting / Portfolio Risk | Universal fund-level. | Yes. | No. | None. | none |
+| A39 | Scenarios group: Cases / Model Versions / Assumption Audit / Audit Trail | Audit Trail tab returns 500 per §3.5 / memory `project_audit_trail_500`. Assumption Audit returns HTML instead of JSON per §3.5. Cases + Versions universal. | Pre-existing bugs. | No. | Bugs per §3.5. | friction (pre-existing) |
+| A40 | IC Memo tab | Universal — though token resolver has marina branches (Pass 1 #64, #65 — `slips ?? capacity ?? units` fallback, marina assumed when missing). For MF, would render with `capacity ?? units` path. | Mostly yes. | Minor (token-resolver marina default). | None content-wise. | nice-to-have (clean up branches) |
+| A41 | Investment Materials tab | Renders OM-builder hub. Available OM templates filtered by asset class via `getOMTemplatesByAssetClass`. MF gets `multifamilyOMTemplate` (rich, 9+ sections: Exec Summary, Property Overview with unit mix, Financial Analysis with rent roll summary, Rent Roll, Market Overview with submarket demographics, Comparable Sales, Photos, Operations, Appendix). | Yes — full MF coverage. | No. | None. | none |
+| A42 | Comps & Links tab | Universal. | Yes. | No. | None. | none |
+| A43 | Export tab | Universal. | Yes. | No. | None. | none |
+| A44 | Generate IC Memo / OM (download) | MF gets `multifamilyOMTemplate.sections` rendered via doc-builder. Sections include unit mix, rent roll, market demographics. | Yes. | No. | None. | none |
+| A45 | Generate DD checklist | **No MF-specific DD template exists.** Falls back to `generalCre.ts` (Pass 1 #53). Friendly sees generic CRE DD items, not MF-tailored items (e.g., no "verify rent roll vs lease files," "T-12 OpEx variance analysis," "submarket vacancy analysis," "lease audit"). | Partial — works but thin. | No (just generic). | Yes — MF DD checklist depth. | friction |
+| A46 | Open same project in CRM (`pages/deal-detail.tsx` or `[workspaceId].tsx`) | Deal record page renders. Asset-class field shows "multifamily" badge. | Yes. | No detected. | Per memory `project_deal_workspace_audit_2026_05_07` — there are two deal record pages (13-tab vs 8-tab); marina copy still leaks in one of them. `[needs-browser-verify]` | friction (likely) |
+| A47 | Sidebar Operations menu for MF user | If `multifamily_ops` module is enabled, sidebar shows "Multifamily Ops" link → `MultifamilyTabbed`. Has 4 ops tabs: Dashboard, Units, Lease Expiry, Turn Tracking. Marina-only sidebar items (Fuel Sales, Ship Store, Boat Rentals, Boat Club, Boat Sales, Service & Parts, Dockit) are filtered out based on `opsModuleKey`. | Yes. | No (filtered out by module key). | MF has only **4 ops tabs**, marina has **8 dedicated modules**. MF ops depth is shallow by comparison. | friction (MF user has less ops surface than marina user) |
+
+### 4.4 Journey B — Owner uploading marina P&L (Keystone Point)
+
+| # | Step | What user sees | Class-appropriate? | Non-marina-leaking? | Missing content? | Severity |
+|---|---|---|---|---|---|---|
+| B1 | Login → land on dashboard | Same dashboard component as Journey A. Marina-specific ops modules (Fuel, Ship Store, Boat Rentals, etc.) show up as sidebar items when their packs are active. | Yes. | No. | None. | none |
+| B2 | Open Keystone Point project from project list | Workspace loads with marina config. Anchor icon in title, marina KPIs in Overview. | Yes. | No. | None. | none |
+| B3 | Inputs & Assumptions tab | `MARINA_CONFIG.inputSections` shows 2 sections: General Assumptions (4 fields), Seasonality (2 fields). **27 total lines in MARINA_FIELDS** (Pass 1 finding S3). | Partial. | No. | Yes — marina inputs are **thinner than MF's 51 fields**. Friendly entering a marina by hand has very few assumption fields available, even though marina is an operating business with rich underwriting (per-pump fuel margin, average ticket, slip occupancy by type, service labor utilization, etc.). | friction |
+| B4 | Storage Leases tab | Renders 15 marina unit-mix types via `MARINA_CONFIG.unitMix.types` (Wet Slips Fixed/Floating/T-Head/Side-Tie/Mega/Superyacht, Moorings, Anchorage, Lift Slips, Dinghies, Dry Stack/Rack Indoor, Trailer Parking, RV Sites, Vehicle Parking, Kayak/Paddleboard, Jet Ski, etc.). Column labels: "Slips / Spaces" + "Monthly Rate". Rate type: monthly. Seasonal switches available per type. | Yes — rich. | No. | None. | none |
+| B5 | Profit Centers tab | `ProfitCentersDynamic` renders 7 marina departments (Fuel Sales, Ship's Store, Service & Repairs, Boat Rentals, Boat Club, F&B/Restaurant, Third-Party Leases). User toggles each + enters monthly $ revenue / COGS / expense per line item. Each line type has 3 default lines (e.g., Fuel Sales has Gas/Diesel/Pump-Out + COGS + Labor). | Yes. | No. | **S3 confirmed:** ProfitCentersDynamic is flat $/mo entry per line. NO volume × margin modeling (no "gallons sold × markup per gallon", no "labor hours × billable rate", no "occupancy × ticket × turns"). For marina underwriting, this is structurally lighter than needed. Per S1, the deep operational modeling lives in the `pages/operations/fuel/*` tabbed modules — but those don't feed marina's modeling assumptions (they capture actuals only). | friction (marina-modeling math is thinner than marina-ops math) |
+| B6 | Physical Storage tab | Only marina has `tabs.physicalStorage = true`. Wizard's Storage step is also gated on this. `[needs-browser-verify]` — what does this tab actually show? May be redundant with Storage Leases. | TBD. | No. | TBD. | nice-to-have to verify |
+| B7 | Commercial Leases tab | `tabs.commercialLeases = true` for marina. Renders generic commercial-lease UI (third-party leases at marina, e.g., restaurant tenant). | Yes. | No. | None. | none |
+| B8 | Replacement Cost tab | Marina-only. `replacement-cost.tsx` renders 15+ marina-specific cost inputs: floating dock cost per LF, total dock LF, piling cost, piling count, electrical per slip, water per slip, total slips, dry rack cost per unit, dry rack units, building $/SF, total building SF, soft costs %, developer profit %, acquisition price. Outputs: total replacement cost, discount to replacement, replacement multiple, $/slip, cost component pie chart. | Yes — rich. | No. | None for marina. (Per §3.5 this is the worked example — exists for marina, missing for STR/MF.) | none |
+| B9 | Upload marina P&L | Marina docIntelPromptHints (persona: "marina/boat storage financial analyst", revenueDepts: storage, fuel, marina_amenities, ship_store_retail, service, parts, ...). Plus the 4 marina-hardcoded regex paths in doc-intel-service.ts (L211/L219, L2401-2441, L2528) trigger for marina. | Yes — rich extraction. | No. | None. | none |
+| B10 | Historical P&L | Extracted actuals render. | Yes. | No. | None. | none |
+| B11 | Pro Forma | MARINA_PRO_FORMA: 7 revenue items (Wet Slip, Dry Storage, Fuel, Ship Store, Service, Other) → total → 9 expense items → NOI. | Yes — rich. | No. | None. | none |
+| B12 | Pro Forma Charts | Same potential bug as Journey A23 per §3.5. `[needs-browser-verify]` | Pre-existing bug. | No. | Bug per §3.5. | blocker if bug fires |
+| B13 | DCF / Returns / Exit / Waterfall etc | Universal. | Yes. | No. | None. | none |
+| B14 | Investment Materials → generate Marina OM | `marinaOMTemplate` rendered (rich marina-specific sections). | Yes. | No. | None. | none |
+| B15 | DD checklist → generate marina DD | `marina.ts` DD template (rich marina-specific items per `server/templates/ddTemplates/marina.ts`). | Yes — only class with dedicated DD. | No. | None. | none |
+| B16 | Open Keystone Point in CRM | Asset-class field shows "marina". Per memory `project_deal_workspace_audit_2026_05_07`, marina copy still leaks in one of the two deal record pages (13-tab vs 8-tab variants). `[needs-browser-verify]` | Mostly yes. | N/A (no non-marina to leak). | None. | none |
+| B17 | Sidebar Operations menu for marina user | Marina user sees: Bookkeeping, Payroll, Dockit, Rent Roll, Commercial Tenants, Fuel Sales, Ship Store, Service & Parts, Boat Rentals, Boat Club, Boat Sales, Marketing, Budgeting. **13 ops modules.** Each is a fully-tabbed module (e.g., FuelSalesTabbed has 9 sub-tabs: Dashboard, Transactions, Inventory, Analytics, Reports, FinancialModel, ImportHistory, AuditTrail, IntegrationSettings). | Yes — rich. | No. | None. | none |
+
+### 4.5 New surfaces discovered in Pass 2 (not in Pass 1 inventory)
+
+These are surfaces grep missed in Pass 1 because they're in directories or use patterns the Pass 1 sweep didn't query. Adding to inventory.
+
+| # | Surface | Location | Category | Classification | Marina | STR | MF | Notes |
+|---|---|---|---|---|---|---|---|---|
+| 80 | Operations sidebar (18+ module entries gated by `opsModuleKey`) | `client/src/components/unified-sidebar.tsx:73-91` | navigation | unified (module-gated) | 13 modules | **0 dedicated** | 4 (via MultifamilyTabbed) | Operations sidebar coverage is wildly asymmetric across MVP classes. STR friendlies have NO class-specific operations entry point. |
+| 81 | Class-specific tabbed ops modules | `client/src/pages/operations/{Multifamily,Hotel,RetailOffice,SelfStorage,FuelSales,ShipStore,Service,BoatRentals,BoatClub,BoatSales,Dockit,Bookkeeping,Marketing,Budgeting,Payroll,RentRoll}Tabbed.tsx` | tabbed-module | dedicated-per-class | full × 8 | **none** | full × 1 (MultifamilyTabbed: 4 tabs) | STR has zero dedicated ops modules. MF has one (4 tabs). Marina has 8+ (each with 5-9 sub-tabs). |
+| 82 | `pages/operations/fuel/*` (10 files) | `client/src/pages/operations/fuel/{Dashboard,Transactions,Inventory,Analytics,Reports,FinancialModel,ImportHistory,AuditTrail,IntegrationSettings,Settings}.tsx` | per-class deep ops UI | dedicated-per-class | full (very deep) | N/A | N/A | The "real successor" to `valuator-fuel-sales.tsx`. Confirms S1 result. |
+| 83 | `pages/operations/multifamily/*` (4 files) | `Dashboard.tsx, Units.tsx, LeaseExpiry.tsx, TurnTracking.tsx` | per-class deep ops UI | dedicated-per-class | N/A | N/A | full (shallow vs marina equivalent) | MF ops module exists but is much shallower than marina's stack. |
+| 84 | `pages/operations/<class>` STR path | does not exist | per-class deep ops UI | missing | N/A | **none** | N/A | STR friendlies cannot access class-specific operations UI. |
+| 85 | Parallel per-class profit-center catalogs (S5 finding) | `MODEL_CONFIG_REGISTRY[ac].profitCenters.departments` vs `asset-class-catalog.ts.{ASSET}_PROFIT_CENTERS` | registry | drift | both registries populated, slightly different content (MF: 6 in workspace vs 7 in wizard) | both populated | both populated | **Registry drift candidate for §3.5.** Single source of truth violation — two registries with same conceptual data and similar but non-identical entries. |
+| 86 | Property Details wizard step function name `renderMarinaDetailsStep` | `OnboardingWizard.tsx:1266` | wizard-internal | branched (marina-named function for universal step) | full | full | full | Functionally universal but name leaks marina origin; cosmetic but reinforces S4 narrative. |
+| 87 | Wizard dialog header icon | `OnboardingWizard.tsx:2425` | wizard | branched | Anchor icon | Building2 (generic) | Building2 (generic) | Only marina gets a class-specific dialog icon; trivial fix — read from `config.unitMix.tabIcon` or similar. |
+| 88 | Portfolio mode terminology `portfolioMarinas` | `OnboardingWizard.tsx:1284,701` | wizard-data | branched | full | partial | partial | Even for non-marina portfolio mode, internal state and variable names are `validMarinas` / `portfolioMarinas`. Pairs with S4. |
+
+### 4.6 Pass 2 articulation block
+
+**Friction log entries by severity:**
+
+| Severity | Count |
+|---|---|
+| blocker | 2 (Pro Forma Charts bug A23/B12 — pre-existing, fires under unknown conditions) |
+| friction | 12 (mostly thin content + label/icon/data-name leaks + pre-existing §3.5 bugs) |
+| nice-to-have | 6 |
+| none | ~40 (universal surfaces working as expected) |
+
+**S1 migration-completeness result: 0% overlap between ProfitCentersDynamic and valuator-* stack.** They solve different problems. Valuator-* is operations-context ledger entry; ProfitCentersDynamic is modeling-assumption form. Real successor to valuator-* is the `pages/operations/*Tabbed.tsx` stack. **Recommendation: safe to delete valuator-* stack with zero functional regression.** Pass 1 S3 (thin MARINA_FIELDS) is a separate concern not masked by valuator-* migration risk.
+
+**S5 confirmation result: NOT a leak.** Wizard uses `getAssetClassCatalog(assetClass)` which dispatches to per-class catalogs in `shared/asset-class-catalog.ts`. MF gets MF content, STR gets STR content. **But** Pass 2 found a related issue: two parallel per-class profit-center registries exist (workspace's `MODEL_CONFIG_REGISTRY[ac].profitCenters.departments` vs wizard's `asset-class-catalog.ts.{ASSET}_PROFIT_CENTERS`) — registry drift candidate for §3.5.
+
+**New surfaces found in Pass 2 (not in Pass 1 inventory): 9 (rows 80-88).** Well under the 20-surface stop condition. Key adds:
+- Operations sidebar module asymmetry (marina 13 / MF 4 / STR 0)
+- Class-specific tabbed-ops module stack (marina 8 / MF 1 / STR 0)
+- Parallel profit-center registry drift
+- Wizard dialog icon leak
+
+**Architectural correction worth surfacing:** The audit's most useful Pass 2 finding is that **the operations sidebar + per-class tabbed ops module stack is itself a major surface area where Phase 4 content depth lives**. Pass 1 framed Phase 4 as primarily about workspace tabs + document templates + COA depth. Pass 2 reveals that **per-class operations UI depth is a separate (and currently more asymmetric) axis**. STR friendlies have zero class-specific operations modules today; MF friendlies have one shallow one. Marina has the gold standard with 13 module entries and 8 dedicated tabbed modules. This is a meaningful Phase 4 scope question.
+
+**Pass 3 prioritization recommendation, informed by Pass 2 findings, leaning per task guidance toward (c) user-visible per-class polish surfaces:**
+
+1. **STR OM template, STR DD checklist** — concrete, scoped, addresses immediate friendly demo gap. Pass 1 + Pass 2 both surfaced. (medium each, ~4-6h total)
+2. **Wizard data shape S4 fix** — rename `marinaName`/`marinaAddress` → `propertyName`/`propertyAddress` end-to-end, plus dialog icon, plus `renderMarinaDetailsStep` rename, plus `portfolioMarinas` → `portfolioProperties`. (medium, ~3-5h, touches schema + state + ~10 read sites)
+3. **Storage Leases tab `Anchor` icon hardcoded leak** (Pass 2 A16) — quick win for visible non-marina friction. (small, ~30 min)
+4. **MF DD checklist** — friendly evaluating MF deal today gets generic CRE DD; deserves MF-tailored items. (medium, ~3-4h)
+5. **valuator-* stack deletion** — 5,375 lines of dead code, zero regression risk per S1 verification. (small, ~1h)
+6. **Operations sidebar STR module decision** — product question: does STR need a dedicated tabbed ops module? If yes, scope it. (large if scoped to build; small if scoped to defer.)
+7. **Wizard Property Details data flow** — even after rename, the underlying schema may need migration. (depends on #2)
+8. **Parallel profit-center registry drift** (Pass 2 #85) — reconcile or document the dual-source intent. (small, ~1h)
+9. **Audit Trail 500 / Assumption Audit HTML** — pre-existing §3.5 bugs that fire in both Journey A and Journey B. (small each)
+10. **Replacement Cost for STR + MF** — large, deferred per §3.5; not in top 10 if leaning (c) since users don't need it for demo flow.
+
+Decision points the user should weigh:
+- **Operations sidebar parity**: Does STR need a dedicated MultifamilyTabbed-style module? Or is STR's operating model thin enough (one listing, one channel mix, one PMS) that no dedicated module is needed?
+- **Phase 4 depth-vs-breadth**: Do we deepen MF/marina COA_FIELD sets (Pass 1 S3, S7) to STR-depth, or accept the structural difference?
+- **Per-class DD checklists**: Just MF for MVP? Or both MF + STR?
+
+**Confirmed scope: NO code changes today, only documentation.**
 
 ## 5. Prioritized work list — PENDING (Pass 3)
 
