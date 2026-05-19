@@ -84,7 +84,7 @@ export interface AssetClassModelConfig {
   kpis: KPIConfig[];
 
   // ─── Tab Visibility ─────────────────────────────────────
-  tabs: { storageLeases: boolean; physicalStorage: boolean; commercialLeases: boolean; profitCenters: boolean },
+  tabs: { storageLeases: boolean; physicalStorage: boolean; commercialLeases: boolean; profitCenters: boolean; replacementCost: boolean },
 
   // ─── Rental Mode (for small residential) ──────────────
   rentalModes?: ('long_term' | 'short_term')[];  // available modes for this asset class
@@ -331,7 +331,7 @@ const MARINA_CONFIG: AssetClassModelConfig = {
     { id: 'totalUnits', label: 'Total Slips', field: 'totalStorageUnits', format: 'number', icon: 'anchor' },
     { id: 'ebitda', label: 'EBITDA', field: 'ebitda', format: 'currency', icon: 'trending-up' },
   ],
-  tabs: { storageLeases: true, physicalStorage: true, commercialLeases: true, profitCenters: true },
+  tabs: { storageLeases: true, physicalStorage: true, commercialLeases: true, profitCenters: true, replacementCost: true },
 };
 
 
@@ -520,7 +520,7 @@ const MULTIFAMILY_CONFIG: AssetClassModelConfig = {
     { id: 'occupancy', label: 'Occupancy', field: 'occupancyPercent', format: 'percent', icon: 'bar-chart' },
     { id: 'expenseRatio', label: 'Expense Ratio', field: 'expenseRatio', format: 'percent', icon: 'pie-chart' },
   ],
-  tabs: { storageLeases: true, physicalStorage: false, commercialLeases: false, profitCenters: true },
+  tabs: { storageLeases: true, physicalStorage: false, commercialLeases: false, profitCenters: true, replacementCost: false },
 };
 
 
@@ -692,7 +692,7 @@ const HOTEL_CONFIG: AssetClassModelConfig = {
     { id: 'ebitdaMultiple', label: 'EBITDA Multiple', field: 'ebitdaMultiple', format: 'multiple', icon: 'x' },
     { id: 'totalRevenue', label: 'Total Revenue', field: 'totalRevenue', format: 'currency', icon: 'dollar-sign' },
   ],
-  tabs: { storageLeases: true, physicalStorage: false, commercialLeases: false, profitCenters: true },
+  tabs: { storageLeases: true, physicalStorage: false, commercialLeases: false, profitCenters: true, replacementCost: false },
 };
 
 
@@ -872,7 +872,7 @@ const STR_CONFIG: AssetClassModelConfig = {
     { id: 'cashOnCash', label: 'Cash-on-Cash', field: 'cashOnCash', format: 'percent', icon: 'percent' },
     { id: 'totalAncillaryRevenue', label: 'Ancillary Revenue', field: 'totalAncillaryRevenue', format: 'currency', icon: 'dollar-sign' },
   ],
-  tabs: { storageLeases: true, physicalStorage: false, commercialLeases: false, profitCenters: false },
+  tabs: { storageLeases: true, physicalStorage: false, commercialLeases: false, profitCenters: false, replacementCost: false },
 };
 
 
@@ -999,7 +999,7 @@ const RETAIL_CONFIG: AssetClassModelConfig = {
     { id: 'occupancy', label: 'Occupancy', field: 'avgOccupancy', format: 'percent', icon: 'bar-chart' },
     { id: 'walt', label: 'WALT', field: 'walt', format: 'number', icon: 'clock' },
   ],
-  tabs: { storageLeases: false, physicalStorage: false, commercialLeases: true, profitCenters: false },
+  tabs: { storageLeases: false, physicalStorage: false, commercialLeases: true, profitCenters: false, replacementCost: false },
 };
 
 
@@ -1159,7 +1159,7 @@ const SELF_STORAGE_CONFIG: AssetClassModelConfig = {
     { id: 'economicOccupancy', label: 'Economic Occupancy', field: 'economicOccupancy', format: 'percent', icon: 'bar-chart' },
     { id: 'pricePerSF', label: '$/SF', field: 'pricePerUnit', format: 'currency', icon: 'ruler' },
   ],
-  tabs: { storageLeases: true, physicalStorage: false, commercialLeases: false, profitCenters: true },
+  tabs: { storageLeases: true, physicalStorage: false, commercialLeases: false, profitCenters: true, replacementCost: false },
 };
 
 
@@ -1329,7 +1329,7 @@ const OFFICE_CONFIG: AssetClassModelConfig = {
     { id: 'walt', label: 'WALT', field: 'walt', format: 'number', icon: 'clock' },
     { id: 'occupancy', label: 'Occupancy', field: 'avgOccupancy', format: 'percent', icon: 'bar-chart' },
   ],
-  tabs: { storageLeases: false, physicalStorage: false, commercialLeases: true, profitCenters: true },
+  tabs: { storageLeases: false, physicalStorage: false, commercialLeases: true, profitCenters: true, replacementCost: false },
 };
 
 
@@ -1494,7 +1494,7 @@ const INDUSTRIAL_CONFIG: AssetClassModelConfig = {
     { id: 'clearHeight', label: 'Clear Height (ft)', field: 'clearHeightFt', format: 'number', icon: 'arrow-up' },
     { id: 'walt', label: 'WALT', field: 'walt', format: 'number', icon: 'clock' },
   ],
-  tabs: { storageLeases: false, physicalStorage: false, commercialLeases: true, profitCenters: true },
+  tabs: { storageLeases: false, physicalStorage: false, commercialLeases: true, profitCenters: true, replacementCost: false },
 };
 
 
@@ -1666,7 +1666,7 @@ const MEDICAL_OFFICE_CONFIG: AssetClassModelConfig = {
     { id: 'investmentGradePercent', label: '% Investment-Grade', field: 'investmentGradePercent', format: 'percent', icon: 'shield' },
     { id: 'walt', label: 'WALT', field: 'walt', format: 'number', icon: 'clock' },
   ],
-  tabs: { storageLeases: false, physicalStorage: false, commercialLeases: true, profitCenters: true },
+  tabs: { storageLeases: false, physicalStorage: false, commercialLeases: true, profitCenters: true, replacementCost: false },
 };
 
 
@@ -1846,7 +1846,7 @@ const MIXED_USE_CONFIG: AssetClassModelConfig = {
     { id: 'commercialNOI', label: 'Commercial NOI', field: 'commercialNOI', format: 'currency', icon: 'store' },
     { id: 'blendedOccupancy', label: 'Blended Occupancy', field: 'blendedOccupancy', format: 'percent', icon: 'bar-chart' },
   ],
-  tabs: { storageLeases: true, physicalStorage: false, commercialLeases: true, profitCenters: true },
+  tabs: { storageLeases: true, physicalStorage: false, commercialLeases: true, profitCenters: true, replacementCost: false },
 };
 
 
@@ -2045,7 +2045,7 @@ const LAUNDROMAT_CONFIG: AssetClassModelConfig = {
     { id: 'revenuePerMachine', label: 'Revenue / Machine', field: 'revenuePerMachine', format: 'currency', icon: 'dollar-sign' },
     { id: 'turnsPerDay', label: 'Turns / Day', field: 'avgTurnsPerDay', format: 'number', icon: 'refresh-cw' },
   ],
-  tabs: { storageLeases: true, physicalStorage: false, commercialLeases: false, profitCenters: true },
+  tabs: { storageLeases: true, physicalStorage: false, commercialLeases: false, profitCenters: true, replacementCost: false },
 };
 
 
@@ -2206,7 +2206,7 @@ const SFR_CONFIG: AssetClassModelConfig = {
     { id: 'cashOnCash', label: 'Cash-on-Cash', field: 'cashOnCash', format: 'percent', icon: 'percent' },
     { id: 'pricePerSF', label: '$/SF', field: 'pricePerSF', format: 'currency', icon: 'ruler' },
   ],
-  tabs: { storageLeases: true, physicalStorage: false, commercialLeases: false, profitCenters: false },
+  tabs: { storageLeases: true, physicalStorage: false, commercialLeases: false, profitCenters: false, replacementCost: false },
 };
 
 
@@ -2351,7 +2351,7 @@ const BUSINESS_CONFIG: AssetClassModelConfig = {
     { id: 'grossMargin', label: 'Gross Margin', field: 'grossMargin', format: 'percent', icon: 'pie-chart' },
     { id: 'sde', label: 'SDE', field: 'sde', format: 'currency', icon: 'dollar-sign' },
   ],
-  tabs: { storageLeases: false, physicalStorage: false, commercialLeases: false, profitCenters: false },
+  tabs: { storageLeases: false, physicalStorage: false, commercialLeases: false, profitCenters: false, replacementCost: false },
 };
 
 
@@ -2494,7 +2494,7 @@ const CAR_WASH_CONFIG: AssetClassModelConfig = {
     { id: 'carsPerDay', label: 'Cars / Day', field: 'carsPerDayAvg', format: 'number', icon: 'bar-chart' },
     { id: 'memberCount', label: 'Members', field: 'membershipCount', format: 'number', icon: 'users' },
   ],
-  tabs: { storageLeases: true, physicalStorage: false, commercialLeases: false, profitCenters: true },
+  tabs: { storageLeases: true, physicalStorage: false, commercialLeases: false, profitCenters: true, replacementCost: false },
   allowCustomUnitTypes: true,
   allowCustomDepartments: true,
   allowCustomGrowthCategories: true,
@@ -2596,7 +2596,7 @@ const SHOPPING_CENTER_CONFIG: AssetClassModelConfig = {
     { id: 'pricePerSF', label: '$/SF', field: 'pricePerUnit', format: 'currency', icon: 'dollar-sign' },
     { id: 'occupancy', label: 'Occupancy', field: 'avgOccupancy', format: 'percent', icon: 'bar-chart' },
   ],
-  tabs: { storageLeases: false, physicalStorage: false, commercialLeases: true, profitCenters: true },
+  tabs: { storageLeases: false, physicalStorage: false, commercialLeases: true, profitCenters: true, replacementCost: false },
   allowCustomUnitTypes: true,
   allowCustomDepartments: true,
   allowCustomGrowthCategories: true,
@@ -2725,7 +2725,7 @@ const GOLF_COURSE_CONFIG: AssetClassModelConfig = {
     { id: 'avgGreenFee', label: 'Avg Green Fee', field: 'avgGreenFee', format: 'currency', icon: 'dollar-sign' },
     { id: 'utilization', label: 'Utilization', field: 'utilizationPercent', format: 'percent', icon: 'bar-chart' },
   ],
-  tabs: { storageLeases: false, physicalStorage: false, commercialLeases: false, profitCenters: true },
+  tabs: { storageLeases: false, physicalStorage: false, commercialLeases: false, profitCenters: true, replacementCost: false },
   allowCustomUnitTypes: true,
   allowCustomDepartments: true,
   allowCustomGrowthCategories: true,
@@ -2840,7 +2840,7 @@ const LANDSCAPING_CONFIG: AssetClassModelConfig = {
     { id: 'crews', label: 'Crews', field: 'numberOfCrews', format: 'number', icon: 'users' },
     { id: 'recurringPercent', label: 'Recurring %', field: 'recurringRevenuePercent', format: 'percent', icon: 'refresh-cw' },
   ],
-  tabs: { storageLeases: false, physicalStorage: false, commercialLeases: false, profitCenters: true },
+  tabs: { storageLeases: false, physicalStorage: false, commercialLeases: false, profitCenters: true, replacementCost: false },
   allowCustomUnitTypes: true,
   allowCustomDepartments: true,
   allowCustomGrowthCategories: true,
@@ -2937,7 +2937,7 @@ const CONSTRUCTION_CONFIG: AssetClassModelConfig = {
     { id: 'backlog', label: 'Backlog', field: 'currentBacklog', format: 'currency', icon: 'bar-chart' },
     { id: 'grossMargin', label: 'Gross Margin', field: 'grossMarginPercent', format: 'percent', icon: 'percent' },
   ],
-  tabs: { storageLeases: false, physicalStorage: false, commercialLeases: false, profitCenters: true },
+  tabs: { storageLeases: false, physicalStorage: false, commercialLeases: false, profitCenters: true, replacementCost: false },
   allowCustomUnitTypes: true,
   allowCustomDepartments: true,
   allowCustomGrowthCategories: true,
@@ -3041,7 +3041,7 @@ const ACCOUNTING_FIRM_CONFIG: AssetClassModelConfig = {
     { id: 'clients', label: 'Clients', field: 'numberOfClients', format: 'number', icon: 'users' },
     { id: 'retention', label: 'Retention', field: 'clientRetentionRate', format: 'percent', icon: 'refresh-cw' },
   ],
-  tabs: { storageLeases: false, physicalStorage: false, commercialLeases: false, profitCenters: true },
+  tabs: { storageLeases: false, physicalStorage: false, commercialLeases: false, profitCenters: true, replacementCost: false },
   allowCustomUnitTypes: true,
   allowCustomDepartments: true,
   allowCustomGrowthCategories: true,
@@ -3212,7 +3212,7 @@ const RV_PARK_CONFIG: AssetClassModelConfig = {
     { id: 'pricePerSite', label: '$/Site', field: 'pricePerUnit', format: 'currency', icon: 'dollar-sign' },
     { id: 'revPAR', label: 'RevPAR', field: 'revPAR', format: 'currency', icon: 'trending-up' },
   ],
-  tabs: { storageLeases: true, physicalStorage: false, commercialLeases: false, profitCenters: true },
+  tabs: { storageLeases: true, physicalStorage: false, commercialLeases: false, profitCenters: true, replacementCost: false },
   allowCustomUnitTypes: true,
   allowCustomDepartments: true,
   allowCustomGrowthCategories: true,
@@ -3321,7 +3321,7 @@ const CAR_DEALERSHIP_CONFIG: AssetClassModelConfig = {
     { id: 'totalUnits', label: 'Units Sold', field: 'totalUnitsSold', format: 'number', icon: 'car' },
     { id: 'grossPerUnit', label: 'Gross / Unit', field: 'avgGrossPerUnit', format: 'currency', icon: 'dollar-sign' },
   ],
-  tabs: { storageLeases: false, physicalStorage: false, commercialLeases: false, profitCenters: true },
+  tabs: { storageLeases: false, physicalStorage: false, commercialLeases: false, profitCenters: true, replacementCost: false },
   allowCustomUnitTypes: true,
   allowCustomDepartments: true,
   allowCustomGrowthCategories: true,
@@ -3428,7 +3428,7 @@ const GAS_STATION_CONFIG: AssetClassModelConfig = {
     { id: 'monthlyGallons', label: 'Monthly Volume', field: 'monthlyGallons', format: 'number', icon: 'fuel' },
     { id: 'pumps', label: 'Pumps', field: 'numberOfPumps', format: 'number', icon: 'gauge' },
   ],
-  tabs: { storageLeases: false, physicalStorage: false, commercialLeases: false, profitCenters: true },
+  tabs: { storageLeases: false, physicalStorage: false, commercialLeases: false, profitCenters: true, replacementCost: false },
   allowCustomUnitTypes: true,
   allowCustomDepartments: true,
   allowCustomGrowthCategories: true,
@@ -3547,7 +3547,7 @@ const RESTAURANT_CONFIG: AssetClassModelConfig = {
     { id: 'avgCheck', label: 'Avg Check', field: 'avgCheckSize', format: 'currency', icon: 'receipt' },
     { id: 'seats', label: 'Seats', field: 'totalSeats', format: 'number', icon: 'utensils' },
   ],
-  tabs: { storageLeases: false, physicalStorage: false, commercialLeases: false, profitCenters: true },
+  tabs: { storageLeases: false, physicalStorage: false, commercialLeases: false, profitCenters: true, replacementCost: false },
   allowCustomUnitTypes: true,
   allowCustomDepartments: true,
   allowCustomGrowthCategories: true,
@@ -3662,7 +3662,7 @@ const GYM_CONFIG: AssetClassModelConfig = {
     { id: 'totalMembers', label: 'Members', field: 'totalMembers', format: 'number', icon: 'users' },
     { id: 'avgDues', label: 'Avg Dues', field: 'avgMonthlyDues', format: 'currency', icon: 'credit-card' },
   ],
-  tabs: { storageLeases: false, physicalStorage: false, commercialLeases: false, profitCenters: true },
+  tabs: { storageLeases: false, physicalStorage: false, commercialLeases: false, profitCenters: true, replacementCost: false },
   allowCustomUnitTypes: true,
   allowCustomDepartments: true,
   allowCustomGrowthCategories: true,
@@ -3767,7 +3767,7 @@ const DAYCARE_CONFIG: AssetClassModelConfig = {
     { id: 'enrollment', label: 'Enrollment', field: 'currentEnrollment', format: 'number', icon: 'users' },
     { id: 'enrollmentRate', label: 'Enrollment %', field: 'enrollmentPercent', format: 'percent', icon: 'bar-chart' },
   ],
-  tabs: { storageLeases: false, physicalStorage: false, commercialLeases: false, profitCenters: true },
+  tabs: { storageLeases: false, physicalStorage: false, commercialLeases: false, profitCenters: true, replacementCost: false },
   allowCustomUnitTypes: true,
   allowCustomDepartments: true,
   allowCustomGrowthCategories: true,
@@ -3943,7 +3943,7 @@ const MOBILE_HOME_PARK_CONFIG: AssetClassModelConfig = {
     { id: 'pricePerLot', label: '$/Lot', field: 'pricePerUnit', format: 'currency', icon: 'dollar-sign' },
     { id: 'pohPercent', label: 'POH %', field: 'pohPercent', format: 'percent', icon: 'home' },
   ],
-  tabs: { storageLeases: true, physicalStorage: false, commercialLeases: false, profitCenters: true },
+  tabs: { storageLeases: true, physicalStorage: false, commercialLeases: false, profitCenters: true, replacementCost: false },
   allowCustomUnitTypes: true,
   allowCustomDepartments: true,
   allowCustomGrowthCategories: true,
@@ -4060,7 +4060,7 @@ const PARKING_CONFIG: AssetClassModelConfig = {
     { id: 'pricePerSpace', label: '$/Space', field: 'pricePerUnit', format: 'currency', icon: 'dollar-sign' },
     { id: 'occupancy', label: 'Occupancy', field: 'occupancyPercent', format: 'percent', icon: 'bar-chart' },
   ],
-  tabs: { storageLeases: true, physicalStorage: false, commercialLeases: false, profitCenters: true },
+  tabs: { storageLeases: true, physicalStorage: false, commercialLeases: false, profitCenters: true, replacementCost: false },
   allowCustomUnitTypes: true,
   allowCustomDepartments: true,
   allowCustomGrowthCategories: true,
@@ -4176,7 +4176,7 @@ const DATA_CENTER_CONFIG: AssetClassModelConfig = {
     { id: 'utilization', label: 'Utilization', field: 'utilizationPercent', format: 'percent', icon: 'bar-chart' },
     { id: 'revenuePerKW', label: '$/kW', field: 'avgRevenuePerKW', format: 'currency', icon: 'zap' },
   ],
-  tabs: { storageLeases: true, physicalStorage: false, commercialLeases: false, profitCenters: true },
+  tabs: { storageLeases: true, physicalStorage: false, commercialLeases: false, profitCenters: true, replacementCost: false },
   allowCustomUnitTypes: true,
   allowCustomDepartments: true,
   allowCustomGrowthCategories: true,
@@ -4341,7 +4341,7 @@ const LAND_CONFIG: AssetClassModelConfig = {
     { id: 'holdingCosts', label: 'Annual Holding Costs', field: 'holdingCostsAnnual', format: 'currency', icon: 'receipt' },
     { id: 'developmentProfit', label: 'Est. Development Profit', field: 'developmentProfit', format: 'currency', icon: 'trending-up' },
   ],
-  tabs: { storageLeases: false, physicalStorage: false, commercialLeases: false, profitCenters: false },
+  tabs: { storageLeases: false, physicalStorage: false, commercialLeases: false, profitCenters: false, replacementCost: false },
 };
 
 
@@ -4414,6 +4414,7 @@ export function getTabOverrides(assetClass: string | null | undefined) {
     showStorageLeases: config.tabs.storageLeases,
     showCommercialLeases: config.tabs.commercialLeases,
     showProfitCenters: config.tabs.profitCenters,
+    showReplacementCost: config.tabs.replacementCost,
     // Tab labels (dynamic)
     storageLabel: config.unitMix.tabLabel || 'Unit Mix',
     storageIcon: config.unitMix.tabIcon,

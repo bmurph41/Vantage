@@ -107,6 +107,7 @@ import TaxAndDistributionsPage from './workspace/tax-distributions';
 import DebtInputs from './workspace/debt-inputs';
 import { UploadDropzone } from '@/pages/modeling/doc-intel/UploadDropzone';
 import { getModelConfig, getTabOverrides } from "@shared/asset-class-model-config";
+import { getStorageSubTypes } from "@/lib/storage-sub-types";
 import UnitMixLeases from "./workspace/unit-mix-leases";
 import ProfitCentersDynamic from "./workspace/profit-centers-dynamic";
 
@@ -276,13 +277,6 @@ function getGroupForTab(tabValue: string): string {
   return TAB_TO_GROUP[tabValue] || 'overview';
 }
 
-const STORAGE_SUB_TYPES = [
-  'WET_SLIPS', 'DRY_STACK', 'MOORINGS', 'TRAILER_STORAGE', 'RV_STORAGE', 'SERVICE_BAYS',
-  'wet_slips', 'lift_slips', 'moorings', 'dinghies', 'jet_skis',
-  'dry_racks_indoor', 'dry_racks_outdoor', 'land_storage',
-  'boats_on_trailers', 'trailers', 'carports', 'houseboats', 'rv_sites',
-];
-
 interface UploadWithStats extends DocIntelUpload {
   stats?: {
     total: number;
@@ -299,14 +293,20 @@ function StorageLeaseUploads({ projectId }: { projectId: string }) {
   const [, navigate] = useLocation();
   const queryClient = useQueryClient();
 
+  const { data: project } = useQuery<ModelingProject>({
+    queryKey: ['/api/modeling/projects', projectId],
+    enabled: !!projectId,
+  });
+
   const { data: allUploads = [], isLoading } = useQuery<UploadWithStats[]>({
     queryKey: ['/api/modeling/projects', projectId, 'documents'],
     enabled: !!projectId,
     refetchInterval: 3000,
   });
 
+  const storageSubTypes = getStorageSubTypes((project as any)?.assetClass);
   const storageUploads = allUploads.filter(
-    (u) => u.docType === 'rent_roll' && u.rentRollSubType && STORAGE_SUB_TYPES.includes(u.rentRollSubType)
+    (u) => u.docType === 'rent_roll' && u.rentRollSubType && storageSubTypes.includes(u.rentRollSubType)
   );
 
   const deleteMutation = useMutation({
@@ -872,6 +872,7 @@ export default function ProjectWorkspace() {
               {currentGroup.tabs.filter((tab) => {
                 if (tab.value === "storage-leases" && !tabOverrides.showStorageLeases) return false;
                 if (tab.value === "profit" && !tabOverrides.showProfitCenters) return false;
+                if (tab.value === "replacement-cost" && !tabOverrides.showReplacementCost) return false;
                 if (tab.value === "commercial-leases") {
                   if (!tabOverrides.showCommercialLeases) return false;
                   const cm = project?.customMetrics as any;

@@ -71,6 +71,7 @@ import { Link } from 'wouter';
 import { UploadDropzone } from '@/pages/modeling/doc-intel/UploadDropzone';
 import type { DocIntelUpload } from '@shared/schema';
 import { WorkflowNavigation } from '@/components/modeling/workflow-navigation';
+import { getStorageRentRollSubTypes } from '@/lib/storage-sub-types';
 
 interface WorkspaceUploadsProps {
   projectId: string;
@@ -156,13 +157,6 @@ function getFileIcon(mimeType: string) {
   }
   return <FileText className="h-5 w-5 text-muted-foreground" />;
 }
-
-const STORAGE_RENT_ROLL_SUB_TYPES = new Set([
-  'WET_SLIPS', 'DRY_STACK', 'MOORINGS', 'TRAILER_STORAGE', 'RV_STORAGE', 'SERVICE_BAYS',
-  'wet_slips', 'lift_slips', 'moorings', 'dinghies', 'jet_skis',
-  'dry_racks_indoor', 'dry_racks_outdoor', 'land_storage',
-  'boats_on_trailers', 'trailers', 'carports', 'houseboats', 'rv_sites',
-]);
 
 const PNL_DOC_TYPES = new Set(['pnl', 't12', 'balance_sheet']);
 
@@ -405,9 +399,11 @@ export default function WorkspaceUploads({ projectId, onTabChange }: WorkspaceUp
     rentRollSyncMutation.mutate(uploadId);
   };
 
+  const storageRentRollSubTypes = getStorageRentRollSubTypes(project?.assetClass);
+
   const isRentRollSyncable = (upload: UploadWithStats) =>
     upload.docType === 'rent_roll' &&
-    !(upload.rentRollSubType && STORAGE_RENT_ROLL_SUB_TYPES.has(upload.rentRollSubType));
+    !(upload.rentRollSubType && storageRentRollSubTypes.has(upload.rentRollSubType));
 
   // ─── Status helpers ─────────────────────────────────────────────────────────
 
@@ -439,7 +435,7 @@ export default function WorkspaceUploads({ projectId, onTabChange }: WorkspaceUp
   // ─── Derived lists ──────────────────────────────────────────────────────────
 
   const nonStorageUploads = uploads.filter(
-    (u) => !(u.docType === 'rent_roll' && u.rentRollSubType && STORAGE_RENT_ROLL_SUB_TYPES.has(u.rentRollSubType))
+    (u) => !(u.docType === 'rent_roll' && u.rentRollSubType && storageRentRollSubTypes.has(u.rentRollSubType))
   );
   const completedUploads = nonStorageUploads.filter((u) => u.status === 'completed');
   const pendingUploads   = nonStorageUploads.filter((u) => u.status !== 'completed');
