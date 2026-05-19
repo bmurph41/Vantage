@@ -97,6 +97,25 @@ export interface AssetClassModelConfig {
 
   // ─── Unit Type Modifiers ──────────────────────────────
   unitModifiers?: UnitModifierConfig[];  // checkbox modifiers for unit types (indoor/outdoor, covered, etc.)
+
+  // ─── Doc-Intel LLM Prompt Hints ──────────────────────
+  // Optional. When present, drives the asset-class-specific prompt sent to the
+  // LLM during P&L line-item categorization in doc-intel-service. When absent,
+  // doc-intel falls back to DEFAULT_DOC_INTEL_PROMPT_HINTS (generic CRE).
+  docIntelPromptHints?: DocIntelPromptHints;
+}
+
+export interface DocIntelPromptHints {
+  /** Persona phrase used in the user prompt (e.g., "marina/boat storage financial analyst"). */
+  persona: string;
+  /** Full system-role message; should end "Respond with valid JSON only." */
+  systemMessage: string;
+  /** Class-appropriate revenue/COGS department keys the LLM should pick from when no per-upload enabledDepartments override is supplied. */
+  revenueDepts: string[];
+  /** Class-appropriate expense department keys. */
+  expenseDepts: string[];
+  /** Optional one-paragraph hint about typical line-item names the LLM should recognize for this class. */
+  lineItemGuidance?: string;
 }
 
 export interface UnitMixTypeConfig {
@@ -332,6 +351,21 @@ const MARINA_CONFIG: AssetClassModelConfig = {
     { id: 'ebitda', label: 'EBITDA', field: 'ebitda', format: 'currency', icon: 'trending-up' },
   ],
   tabs: { storageLeases: true, physicalStorage: true, commercialLeases: true, profitCenters: true, replacementCost: true },
+  docIntelPromptHints: {
+    persona: 'marina/boat storage financial analyst',
+    systemMessage: 'You are a marina financial analyst. Respond with valid JSON only.',
+    revenueDepts: [
+      'storage', 'fuel', 'marina_amenities', 'ship_store_retail', 'service', 'parts',
+      'boat_club', 'boat_rentals', 'boat_sales', 'boat_brokerage', 'boat_finance',
+      'fb', 'rv_park', 'hospitality_lodging', 'miscellaneous',
+    ],
+    expenseDepts: [
+      'payroll', 'general_admin', 'advertising', 'repairs_maintenance', 'utilities',
+      'licenses_permits', 'security_contract_services', 'bank_cc_fees',
+      'professional_services', 'insurance', 'taxes', 'leases', 'miscellaneous',
+    ],
+    lineItemGuidance: 'Common marina line items include dockage / wet slip / dry rack rentals (storage), fuel sales (fuel), boat services and repairs (service), parts and accessories (parts), ship store retail (ship_store_retail), boat club dues (boat_club), boat rentals / sales / brokerage / financing.',
+  },
 };
 
 
@@ -521,6 +555,22 @@ const MULTIFAMILY_CONFIG: AssetClassModelConfig = {
     { id: 'expenseRatio', label: 'Expense Ratio', field: 'expenseRatio', format: 'percent', icon: 'pie-chart' },
   ],
   tabs: { storageLeases: true, physicalStorage: false, commercialLeases: false, profitCenters: true, replacementCost: false },
+  docIntelPromptHints: {
+    persona: 'multifamily property accountant',
+    systemMessage: 'You are a multifamily property accountant. Respond with valid JSON only.',
+    revenueDepts: [
+      'gross_potential_rent', 'vacancy_loss', 'concessions', 'bad_debt',
+      'parking', 'laundry_vending', 'pet_fees', 'utility_reimbursement',
+      'storage_units', 'application_fees', 'late_fees', 'other_income', 'miscellaneous',
+    ],
+    expenseDepts: [
+      'payroll', 'general_admin', 'advertising', 'repairs_maintenance', 'utilities',
+      'licenses_permits', 'professional_services', 'insurance', 'taxes',
+      'property_management', 'landscaping', 'security_contract_services',
+      'reserves', 'miscellaneous',
+    ],
+    lineItemGuidance: 'Common multifamily line items include gross potential rent, vacancy loss, concessions, bad debt write-offs, parking income, laundry / vending, pet rent and deposits, utility reimbursement (RUBS or sub-metered), tenant storage rentals, application and admin fees, late fees.',
+  },
 };
 
 
@@ -873,6 +923,20 @@ const STR_CONFIG: AssetClassModelConfig = {
     { id: 'totalAncillaryRevenue', label: 'Ancillary Revenue', field: 'totalAncillaryRevenue', format: 'currency', icon: 'dollar-sign' },
   ],
   tabs: { storageLeases: true, physicalStorage: false, commercialLeases: false, profitCenters: false, replacementCost: false },
+  docIntelPromptHints: {
+    persona: 'short-term rental (Airbnb / VRBO) P&L analyst',
+    systemMessage: 'You are a short-term rental (Airbnb / VRBO / Booking.com) financial analyst. Respond with valid JSON only.',
+    revenueDepts: [
+      'nightly_rental', 'cleaning_fees', 'platform_fees_revenue', 'damage_protection',
+      'pet_fees', 'early_late_checkin', 'additional_guest_fees', 'other_income', 'miscellaneous',
+    ],
+    expenseDepts: [
+      'payroll', 'general_admin', 'advertising', 'repairs_maintenance', 'utilities',
+      'licenses_permits', 'professional_services', 'insurance', 'taxes',
+      'property_management', 'cleaning_supplies', 'platform_fees', 'miscellaneous',
+    ],
+    lineItemGuidance: 'Common short-term rental line items include nightly accommodation revenue, cleaning fees billed to guests (nightly_rental / cleaning_fees) vs cleaning labor and supplies (expense), OTA / platform commissions (Airbnb, VRBO, Booking.com — platform_fees), property management fees, supplies and consumables, repairs and maintenance.',
+  },
 };
 
 
@@ -4427,3 +4491,41 @@ export function getTabOverrides(assetClass: string | null | undefined) {
 }
 
 export { MODEL_CONFIG_REGISTRY };
+
+// ═══════════════════════════════════════════════════════════════
+// Doc-Intel Prompt Hints — default + lookup helper
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Generic-CRE fallback used when an asset class has no docIntelPromptHints
+ * populated on its config entry. Kept intentionally broad so the LLM still has
+ * a structured target vocabulary for the 50+ classes that don't yet have
+ * institutional content. Per-class hints can be added incrementally in
+ * Phase 1.5 per-class content audit (§8 of BETA_MVP_SPEC.md).
+ */
+export const DEFAULT_DOC_INTEL_PROMPT_HINTS: DocIntelPromptHints = {
+  persona: 'commercial real estate financial analyst',
+  systemMessage: 'You are a commercial real estate financial analyst. Respond with valid JSON only.',
+  revenueDepts: [
+    'rental_income', 'reimbursement_income', 'parking', 'other_income', 'miscellaneous',
+  ],
+  expenseDepts: [
+    'payroll', 'general_admin', 'advertising', 'repairs_maintenance', 'utilities',
+    'licenses_permits', 'professional_services', 'insurance', 'taxes',
+    'property_management', 'leases', 'reserves', 'miscellaneous',
+  ],
+};
+
+/**
+ * Lookup helper for the doc-intel LLM prompt hints. Returns the class-specific
+ * hints if present, otherwise the generic CRE default. Never throws for an
+ * unregistered assetClass — falls back to the default so doc-intel keeps
+ * working even if a new class lands without a registry entry.
+ */
+export function getDocIntelPromptHints(
+  assetClass: string | null | undefined,
+): DocIntelPromptHints {
+  if (!assetClass) return DEFAULT_DOC_INTEL_PROMPT_HINTS;
+  const config = MODEL_CONFIG_REGISTRY[assetClass];
+  return config?.docIntelPromptHints ?? DEFAULT_DOC_INTEL_PROMPT_HINTS;
+}

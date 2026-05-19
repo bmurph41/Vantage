@@ -51,6 +51,7 @@ import {
 import { extractDocument, assessOcrQuality } from '../utils/ocr';
 import { findAliasMatch, getMatchResult, learnAlias, buildCoaCode } from "./pnl-alias-matcher";
 import { onLineItemConfirmed, applyLearningRulesOnRetrieval } from './learning-rules.integration';
+import { getDocIntelPromptHints } from '@shared/asset-class-model-config';
 
 interface ParsedLineItem {
   rawText: string;
@@ -1500,6 +1501,25 @@ ${fullText.slice(0, 40000)}`
   }
 
   async categorizeItems(orgId: string, uploadId: string, enabledDepartments?: string[]): Promise<DocIntelExtractedItem[]> {
+    // Resolve assetClass for this upload's modeling project so the AI prompt
+    // (downstream in aiCategorizeItems) can branch on class. Falls back to
+    // null → generic-CRE hints if the upload isn't linked to a project or the
+    // project has no assetClass set.
+    let assetClass: string | null = null;
+    try {
+      const projectRow = await pool.query(
+        `SELECT mp.asset_class
+           FROM doc_intel_uploads u
+           LEFT JOIN modeling_projects mp ON mp.id = u.modeling_project_id
+          WHERE u.id = $1 AND u.org_id = $2
+          LIMIT 1`,
+        [uploadId, orgId],
+      );
+      assetClass = projectRow.rows[0]?.asset_class ?? null;
+    } catch (err: any) {
+      console.warn(`[Doc Intel] assetClass lookup failed for upload ${uploadId}: ${err?.message || err}. Falling back to generic-CRE prompt hints.`);
+    }
+
     const items = await db
       .select()
       .from(docIntelExtractedItems)
@@ -1625,7 +1645,8 @@ ${fullText.slice(0, 40000)}`
         const batchResults = await this.aiCategorizeItems(
           batch.map(i => ({ id: i.id, rawText: i.rawText, amount: i.amount })),
           allCategories,
-          enabledDepartments
+          enabledDepartments,
+          assetClass,
         );
         for (const [key, val] of batchResults.entries()) aiResults.set(key, val);
       }
@@ -1740,10 +1761,11 @@ ${fullText.slice(0, 40000)}`
   private async aiCategorizeItems(
     items: { id: string; rawText: string; amount: string | null }[],
     categories: PnlCategory[],
-    enabledDepartments?: string[]
+    enabledDepartments?: string[],
+    assetClass?: string | null,
   ): Promise<Map<string, { categoryId: string; tier: string; department: string; confidence: number }>> {
     const results = new Map<string, { categoryId: string; tier: string; department: string; confidence: number }>();
-    
+
     if (items.length === 0 || !process.env.AI_INTEGRATIONS_OPENAI_API_KEY) {
       return results;
     }
@@ -1755,21 +1777,30 @@ ${fullText.slice(0, 40000)}`
       code: c.code,
     }));
 
+    // Class-aware persona + department vocabularies (falls back to generic-CRE
+    // hints when the project's assetClass is null or has no docIntelPromptHints
+    // populated on its registry entry). Per-upload `enabledDepartments` still
+    // overrides the registry's revenueDepts list when provided.
+    const hints = getDocIntelPromptHints(assetClass);
     const revenueDeptInstruction = enabledDepartments && enabledDepartments.length > 0
       ? `For revenue/cogs, ONLY use these enabled departments: ${enabledDepartments.join(', ')}. Do NOT use departments not in this list.`
-      : `For revenue/cogs use: storage/fuel/marina_amenities/ship_store_retail/service/parts/boat_club/boat_rentals/boat_sales/boat_brokerage/boat_finance/fb/rv_park/hospitality_lodging/miscellaneous`;
+      : `For revenue/cogs use: ${hints.revenueDepts.join('/')}`;
+    const expenseDeptInstruction = `For expenses use: ${hints.expenseDepts.join('/')}`;
+    const lineItemGuidanceBlock = hints.lineItemGuidance
+      ? `\nLINE ITEM GUIDANCE:\n${hints.lineItemGuidance}\n`
+      : '';
 
     const totalPositive = items.reduce((s, i) => s + Math.max(0, parseFloat(i.amount || '0')), 0);
     const totalNegative = items.reduce((s, i) => s + Math.min(0, parseFloat(i.amount || '0')), 0);
-    
-    const prompt = `You are a marina/boat storage financial analyst. Categorize these P&L line items.
+
+    const prompt = `You are a ${hints.persona}. Categorize these P&L line items.
 
 CONTEXT:
 - Positive amounts are typically Revenue or COGS
-- Negative amounts are typically Expenses  
+- Negative amounts are typically Expenses
 - Total positive: $${Math.round(totalPositive).toLocaleString()}
 - Total negative: $${Math.round(Math.abs(totalNegative)).toLocaleString()}
-
+${lineItemGuidanceBlock}
 Categories available (tier indicates Revenue, COGS, or Expense):
 ${JSON.stringify(categoryList.slice(0, 50), null, 2)}
 
@@ -1780,7 +1811,7 @@ For each item, determine:
 1. categoryId: The best matching category ID from the list
 2. tier: "revenue", "cogs", or "expense"
 3. department: ${revenueDeptInstruction}
-   For expenses use: payroll/general_admin/advertising/repairs_maintenance/utilities/licenses_permits/security_contract_services/bank_cc_fees/professional_services/insurance/taxes/leases/miscellaneous
+   ${expenseDeptInstruction}
 4. confidence: 0.0 to 1.0
 
 Respond with JSON only:
@@ -1794,7 +1825,7 @@ Respond with JSON only:
       const response = await openai.chat.completions.create({
         model: 'gpt-4o-mini',
         messages: [
-          { role: 'system', content: 'You are a marina financial analyst. Respond with valid JSON only.' },
+          { role: 'system', content: hints.systemMessage },
           { role: 'user', content: prompt }
         ],
         response_format: { type: 'json_object' },
