@@ -14,6 +14,8 @@
 - [4. Build Phase Sequence](#4-build-phase-sequence)
 - [5. Architectural Principles](#5-architectural-principles)
 - [6. Open Decisions](#6-open-decisions)
+- [7. Audit Findings (2026-05-17)](#7-audit-findings-2026-05-17)
+- [8. Per-class content inventory (Phase 1.5)](#8-per-class-content-inventory-phase-15)
 - [Appendix A — Glossary](#appendix-a--glossary)
 - [Appendix B — Revision log](#appendix-b--revision-log)
 
@@ -157,6 +159,10 @@ See also: real v1.1 feature work tracked separately in §3.1 (user type extensio
 - `canonical-seed.ts` rework to seed from per-class registries (not the department-stripped COA_FIELD_REGISTRY)
 - Engine consumer wiring (`departmentToAssumptionKey` per class)
 
+### Phase 1.5 — Per-class content inventory (inserted 2026-05-18)
+
+Audit pass inserted between Phase 1 and Phase 2 per the 2026-05-18 architectural commitment to Path 1 (asset-class-agnostic mechanism + per-class content depth). Inventories all per-class surfaces (tabs, reports, forms, KPIs, document templates, dashboards) and sizes the content build for MVP classes. See §8 for deliverables. Output feeds into Phase 4 (reframed as per-class content completeness).
+
 ### Phase 2 — Upload pipeline asset-class awareness
 
 - Thread `project.assetClass` from upload endpoint → parse → map → promote → categorizer (3 sites today pass `undefined`)
@@ -214,7 +220,9 @@ These are non-negotiable design rules. Every PR is reviewed against them.
 
 6. **Taxonomies are data, not code.** No hardcoded enum lists of user-extensible taxonomies (subTypes, departments, COA entries, tenant categories, etc.) downstream of their canonical registry. All filtering, validation, and routing reads from the live taxonomy set. This rule makes future user-customization (settings UIs for COA editor, subType editor, etc.) possible without rewriting the consumers. Existing marina-specific hardcoded lists (`STORAGE_SUB_TYPES`, `STORAGE_TYPE_LABELS`) predate this principle and are flagged for reconciliation per Section 3.5; the v1.1 subType editor that motivates this principle is captured in Section 3.6.
 
-7. **Don't ship architectural changes mid-investigation.** When a Phase 0 audit surfaces unexpected scope, surface the finding and re-plan before code. The Day 12 pivot (engine unification → MVP) is the model.
+7. **Content depth is per-class and progressive.** Every feature is structurally available to every asset class via registry pattern. No class is hidden for lack of content — it gets sensible defaults or graceful absence. Content depth is per-class: MVP classes (marina, STR, MF) get class-specific content where it matters; non-MVP classes get sensible defaults until they enter active build. This principle complements principle #1 (asset-class-agnostic architecture): #1 is about the mechanism (no class-specific code branches); #7 is about the content policy (progressive depth, never structural exclusion). Replacement Cost is the worked example: mechanism shipped marina-only via `tabs.replacementCost` flag in commit `97f61887` (Task 4); per-class content build for MF/STR replacement-cost components deferred to Phase 1.5 prioritization (§8).
+
+8. **Don't ship architectural changes mid-investigation.** When a Phase 0 audit surfaces unexpected scope, surface the finding and re-plan before code. The Day 12 pivot (engine unification → MVP) is the model.
 
 ---
 
@@ -296,6 +304,24 @@ Plus ~2 hr for a multifamily fixture seed. **Total: ~16 hr / 2 days.** STR fixtu
 - 7 user-facing "MarinaMatch" / "Marinalytics" string mentions
 - 8 duplicate Sunset Bay Marina fixtures
 - 13 remaining asset classes
+
+---
+
+## 8. Per-class content inventory (Phase 1.5)
+
+The architectural principles in §5 (#1 asset-class-agnostic architecture and #7 progressive per-class content depth) commit Vantage to per-class content across the product. Phase 1.5 is the audit that inventories every per-class surface and sizes the content build for MVP classes (marina, STR, MF).
+
+**Phase 1.5 deliverables:**
+- Inventory of all per-class surfaces (tabs, reports, forms, KPIs, document templates, dashboards).
+- Classification per surface: unified / branched / hidden / missing.
+- Per-MVP-class effort estimate per surface.
+- Prioritization by friendly value (which surfaces matter most for demonstrating cross-class institutional depth?).
+
+**Phase 1.5 sequencing:** starts after Phase 1 infrastructure work completes (current Tasks 4 + 5 + MF fixture seed shipped; plus any cleanup that surfaces). Likely 1-2 days of audit work producing the per-class content build roadmap.
+
+**Phase 1.5 output feeds into Phase 4** (engine completeness per class) — reframed as Phase 4 (per-class content completeness).
+
+**Replacement Cost is the worked example** that triggered this principle (2026-05-18 Task 4 discussion): mechanism shipped marina-only via `tabs.replacementCost` flag in commit `97f61887`; per-class content build deferred to Phase 1.5 prioritization output.
 
 ---
 
