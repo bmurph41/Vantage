@@ -241,13 +241,16 @@ const defaultWizardAmenities: WizardAmenity[] = AMENITY_CATALOG.map(a => ({
   id: a.id, name: a.name, description: a.description, isEnabled: false, iconName: a.icon,
 }));
 
+// Icon-name → Lucide component map. Keys match both storage-icon names and
+// asset-class-model-config `unitMix.tabIcon` values (anchor/home/store/...).
+const iconMap: Record<string, typeof Anchor> = {
+  anchor: Anchor, waves: Waves, warehouse: Warehouse, container: Container,
+  mappin: MapPin, ship: Ship, car: Car, home: Home, fuel: Fuel,
+  shoppingcart: ShoppingCart, wrench: Wrench, store: Store, building: Building2,
+  utensils: Utensils, users: Users, sailboat: Sailboat,
+};
+
 function getStorageIcon(iconName: string) {
-  const iconMap: Record<string, typeof Anchor> = {
-    anchor: Anchor, waves: Waves, warehouse: Warehouse, container: Container,
-    mappin: MapPin, ship: Ship, car: Car, home: Home, fuel: Fuel,
-    shoppingcart: ShoppingCart, wrench: Wrench, store: Store, building: Building2,
-    utensils: Utensils, users: Users, sailboat: Sailboat,
-  };
   const Icon = iconMap[iconName] || Anchor;
   return <Icon className="h-4 w-4" />;
 }
@@ -283,12 +286,12 @@ interface WizardState {
   dealStructure: DealStructure;
   assetClass: WizardAssetClass;
   marinaName: string;
-  marinaAddress: MarinaAddress;
+  propertyAddress: MarinaAddress;
   dealType: DealType;
   region: string;
   dealStatus: DealStatus;
   portfolioName: string;
-  portfolioMarinas: PortfolioMarina[];
+  portfolioProperties: PortfolioMarina[];
   featuresToExplore: string[];
   profitCenters: WizardProfitCenter[];
   amenities: WizardAmenity[];
@@ -464,12 +467,12 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
     dealStructure: mode === "new_project" ? "single" : null,
     assetClass: null,
     marinaName: "",
-    marinaAddress: { ...emptyAddress },
+    propertyAddress: { ...emptyAddress },
     dealType: mode === "new_project" ? "acquisition" : null,
     region: "",
     dealStatus: "active",
     portfolioName: "",
-    portfolioMarinas: [{ name: "", address: { ...emptyAddress } }],
+    portfolioProperties: [{ name: "", address: { ...emptyAddress } }],
     featuresToExplore: [],
     profitCenters: defaultWizardProfitCenters.map(p => ({ ...p })),
     amenities: defaultWizardAmenities.map(a => ({ ...a })),
@@ -523,9 +526,9 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
 
   const hasProgress = state.step > 1 || 
     state.marinaName.trim() !== '' || 
-    (state.marinaAddress?.line1 || '').trim() !== '' ||
+    (state.propertyAddress?.line1 || '').trim() !== '' ||
     state.portfolioName.trim() !== '' ||
-    state.portfolioMarinas.some(m => m.name.trim() !== '') ||
+    state.portfolioProperties.some(m => m.name.trim() !== '') ||
     state.region !== '' ||
     state.profitCenters.some(pc => pc.isEnabled) || 
     state.amenities.some(a => a.isEnabled) ||
@@ -688,21 +691,21 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
       dealStructure: DealStructure;
       assetClass: WizardAssetClass;
       marinaName: string;
-      marinaAddress: MarinaAddress;
+      propertyAddress: MarinaAddress;
       dealType: DealType;
       region: string;
       dealStatus: DealStatus;
       portfolioName: string;
-      portfolioMarinas: PortfolioMarina[];
+      portfolioProperties: PortfolioMarina[];
     }) => {
       if (data.dealStructure === "portfolio") {
-        const validMarinas = data.portfolioMarinas.filter(m => m.name.trim() && m.address.city && m.address.state);
-        if (validMarinas.length === 0) {
+        const validProperties = data.portfolioProperties.filter(m => m.name.trim() && m.address.city && m.address.state);
+        if (validProperties.length === 0) {
           throw new Error("Please add at least one marina with a name, city, and state");
         }
         
         const results = await Promise.all(
-          validMarinas.map(async (marina) => {
+          validProperties.map(async (marina) => {
             const propertyIdToLink = await createOrLinkProperty({
               name: marina.name,
               address: marina.address.line1,
@@ -737,19 +740,19 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
         
         const propertyIdToLink = await createOrLinkProperty({
           name: data.marinaName,
-          address: data.marinaAddress.line1,
-          city: data.marinaAddress.city,
-          state: data.marinaAddress.state,
-          zipCode: data.marinaAddress.zip,
+          address: data.propertyAddress.line1,
+          city: data.propertyAddress.city,
+          state: data.propertyAddress.state,
+          zipCode: data.propertyAddress.zip,
           propertyType: data.assetClass || 'marina',
         });
 
         const projectRes = await apiRequest('POST', '/api/modeling/projects', {
           marinaName: data.marinaName,
-          address: data.marinaAddress.line1 || undefined,
-          city: data.marinaAddress.city || undefined,
-          state: data.marinaAddress.state || undefined,
-          zipCode: data.marinaAddress.zip || undefined,
+          address: data.propertyAddress.line1 || undefined,
+          city: data.propertyAddress.city || undefined,
+          state: data.propertyAddress.state || undefined,
+          zipCode: data.propertyAddress.zip || undefined,
           region: data.region || undefined,
           dealOutcome: data.dealStatus || 'active',
           assetClass: data.assetClass || "marina",
@@ -779,7 +782,7 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
       }
       
       const isPortfolio = state.dealStructure === "portfolio";
-      const projectCount = isPortfolio ? state.portfolioMarinas.filter(m => m.name.trim()).length : 1;
+      const projectCount = isPortfolio ? state.portfolioProperties.filter(m => m.name.trim()).length : 1;
       const uploadCount = state.stagedFiles.filter(f => f.status === 'pending').length;
       toast({ 
         title: isPortfolio ? "Portfolio Created!" : "Project Created!", 
@@ -842,12 +845,12 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
             toast({ title: "Required", description: `Please enter a ${getAssetTerms(state.assetClass).property.toLowerCase()}.`, variant: "destructive" });
             return;
           }
-          if (!state.marinaAddress.city.trim() || !state.marinaAddress.state.trim()) {
+          if (!state.propertyAddress.city.trim() || !state.propertyAddress.state.trim()) {
             toast({ title: "Required", description: "Please enter at least a city and state.", variant: "destructive" });
             return;
           }
         } else if (state.dealStructure === "portfolio") {
-          if (!state.portfolioMarinas.some(m => m.name.trim())) {
+          if (!state.portfolioProperties.some(m => m.name.trim())) {
             toast({ title: "Required", description: "Please add at least one property with a name.", variant: "destructive" });
             return;
           }
@@ -865,6 +868,9 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
 
   const progress = (state.step / steps.length) * 100;
 
+  // Class-aware dialog header icon — replaces hardcoded Anchor vs Building2.
+  const HeaderIcon = iconMap[getModelConfig(state.assetClass).unitMix.tabIcon] ?? Building2;
+
   const currentStepTitle = steps.find(s => s.id === state.step)?.title || '';
 
 
@@ -876,18 +882,18 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
 
   function handleFinish() {
     const hasSingleDeal = state.dealStructure === "single" && state.marinaName.trim() && state.dealType;
-    const hasPortfolio = state.dealStructure === "portfolio" && state.portfolioMarinas.some(m => m.name.trim()) && state.dealType;
+    const hasPortfolio = state.dealStructure === "portfolio" && state.portfolioProperties.some(m => m.name.trim()) && state.dealType;
     
     if (hasSingleDeal || hasPortfolio) {
       createDealMutation.mutate({
         dealStructure: state.dealStructure,
         marinaName: state.marinaName,
-        marinaAddress: state.marinaAddress,
+        propertyAddress: state.propertyAddress,
         dealType: state.dealType,
         region: state.region,
         dealStatus: state.dealStatus,
         portfolioName: state.portfolioName,
-        portfolioMarinas: state.portfolioMarinas,
+        portfolioProperties: state.portfolioProperties,
         assetClass: state.assetClass,
       });
     } else {
@@ -902,21 +908,21 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
   function addPortfolioMarina() {
     setState(s => ({
       ...s,
-      portfolioMarinas: [...s.portfolioMarinas, { name: "", address: { ...emptyAddress } }]
+      portfolioProperties: [...s.portfolioProperties, { name: "", address: { ...emptyAddress } }]
     }));
   }
 
   function removePortfolioMarina(index: number) {
     setState(s => ({
       ...s,
-      portfolioMarinas: s.portfolioMarinas.filter((_, i) => i !== index)
+      portfolioProperties: s.portfolioProperties.filter((_, i) => i !== index)
     }));
   }
 
   function updatePortfolioMarinaName(index: number, name: string) {
     setState(s => ({
       ...s,
-      portfolioMarinas: s.portfolioMarinas.map((m, i) => 
+      portfolioProperties: s.portfolioProperties.map((m, i) => 
         i === index ? { ...m, name } : m
       )
     }));
@@ -925,7 +931,7 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
   function updatePortfolioMarinaAddress(index: number, field: keyof MarinaAddress, value: string) {
     setState(s => ({
       ...s,
-      portfolioMarinas: s.portfolioMarinas.map((m, i) => 
+      portfolioProperties: s.portfolioProperties.map((m, i) => 
         i === index ? { ...m, address: { ...m.address, [field]: value } } : m
       )
     }));
@@ -946,12 +952,12 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
     if (index !== undefined) {
       setState(s => ({
         ...s,
-        portfolioMarinas: s.portfolioMarinas.map((m, i) => 
+        portfolioProperties: s.portfolioProperties.map((m, i) => 
           i === index ? { ...m, address: newAddress } : m
         )
       }));
     } else {
-      setState(s => ({ ...s, marinaAddress: newAddress }));
+      setState(s => ({ ...s, propertyAddress: newAddress }));
     }
   }
 
@@ -1263,7 +1269,7 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
     </div>
   );
 
-  const renderMarinaDetailsStep = () => {
+  const renderPropertyDetailsStep = () => {
     if (state.dealStructure === "portfolio") {
       return (
         <div className="space-y-4">
@@ -1281,11 +1287,11 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
             />
           </div>
           <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1">
-            {state.portfolioMarinas.map((marina, index) => (
+            {state.portfolioProperties.map((marina, index) => (
               <div key={index} className="p-3 rounded-lg border bg-muted/30 space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium text-muted-foreground">Property {index + 1}</span>
-                  {state.portfolioMarinas.length > 1 && (
+                  {state.portfolioProperties.length > 1 && (
                     <Button type="button" variant="ghost" size="sm" onClick={() => removePortfolioMarina(index)} className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive">
                       <Trash2 className="h-3.5 w-3.5" />
                     </Button>
@@ -1323,24 +1329,24 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
           </div>
           <div className="space-y-2">
             <Label>Address <span className="text-destructive">*</span></Label>
-            <AddressAutocompleteInput value={state.marinaAddress.line1} placeholder="Start typing an address..." onChangeText={(text) => setState(s => ({ ...s, marinaAddress: { ...s.marinaAddress, line1: text } }))} onSelectAddress={(addr) => handleAddressAutocomplete(addr)} searchType="address" />
+            <AddressAutocompleteInput value={state.propertyAddress.line1} placeholder="Start typing an address..." onChangeText={(text) => setState(s => ({ ...s, propertyAddress: { ...s.propertyAddress, line1: text } }))} onSelectAddress={(addr) => handleAddressAutocomplete(addr)} searchType="address" />
           </div>
           <div className="space-y-2">
             <Label htmlFor="addressLine2">Address Line 2 (Optional)</Label>
-            <Input id="addressLine2" placeholder="Suite, Unit, etc." value={state.marinaAddress.line2} onChange={(e) => setState(s => ({ ...s, marinaAddress: { ...s.marinaAddress, line2: e.target.value } }))} />
+            <Input id="addressLine2" placeholder="Suite, Unit, etc." value={state.propertyAddress.line2} onChange={(e) => setState(s => ({ ...s, propertyAddress: { ...s.propertyAddress, line2: e.target.value } }))} />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
             <div className="space-y-2">
               <Label htmlFor="city">City</Label>
-              <Input id="city" placeholder="City" value={state.marinaAddress.city} onChange={(e) => setState(s => ({ ...s, marinaAddress: { ...s.marinaAddress, city: e.target.value } }))} />
+              <Input id="city" placeholder="City" value={state.propertyAddress.city} onChange={(e) => setState(s => ({ ...s, propertyAddress: { ...s.propertyAddress, city: e.target.value } }))} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="state">State</Label>
-              <Input id="state" placeholder="FL" maxLength={2} value={state.marinaAddress.state} onChange={(e) => setState(s => ({ ...s, marinaAddress: { ...s.marinaAddress, state: e.target.value.toUpperCase() } }))} />
+              <Input id="state" placeholder="FL" maxLength={2} value={state.propertyAddress.state} onChange={(e) => setState(s => ({ ...s, propertyAddress: { ...s.propertyAddress, state: e.target.value.toUpperCase() } }))} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="zip">Zip</Label>
-              <Input id="zip" placeholder="33139" maxLength={10} value={state.marinaAddress.zip} onChange={(e) => setState(s => ({ ...s, marinaAddress: { ...s.marinaAddress, zip: e.target.value } }))} />
+              <Input id="zip" placeholder="33139" maxLength={10} value={state.propertyAddress.zip} onChange={(e) => setState(s => ({ ...s, propertyAddress: { ...s.propertyAddress, zip: e.target.value } }))} />
             </div>
           </div>
 
@@ -1710,7 +1716,7 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
         <h3 className="text-xl font-semibold">You're all set!</h3>
         <p className="text-muted-foreground mt-2">
           {state.dealStructure === "portfolio" 
-            ? `We'll create "${state.portfolioName || 'Untitled Portfolio'}" with ${state.portfolioMarinas.filter(m => m.name.trim()).length} marina${state.portfolioMarinas.filter(m => m.name.trim()).length > 1 ? 's' : ''}.`
+            ? `We'll create "${state.portfolioName || 'Untitled Portfolio'}" with ${state.portfolioProperties.filter(m => m.name.trim()).length} marina${state.portfolioProperties.filter(m => m.name.trim()).length > 1 ? 's' : ''}.`
             : state.marinaName 
               ? `We'll create "${state.marinaName}" as your first project.`
               : "You can create projects anytime from the Modeling page."}
@@ -2391,7 +2397,7 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
     const contentMap: Record<string, React.ReactNode> = mode === "new_project"
       ? {
           "Deal Structure": renderDealStructureStep(),
-          "Property Details": renderMarinaDetailsStep(),
+          "Property Details": renderPropertyDetailsStep(),
           "Deal Info": renderDealInfoStep(),
           "Profit Centers": renderProfitCentersStep(),
           "Amenities": renderAmenitiesStep(),
@@ -2401,7 +2407,7 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
       : {
           "Welcome": renderWelcomeStep(),
           "Deal Structure": renderDealStructureStep(),
-          "Property Details": renderMarinaDetailsStep(),
+          "Property Details": renderPropertyDetailsStep(),
           "Deal Type": renderDealTypeStep(),
           "Profit Centers": renderProfitCentersStep(),
           "Amenities": renderAmenitiesStep(),
@@ -2420,7 +2426,7 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
           <DialogHeader className="shrink-0">
             <div className="flex items-center justify-between mb-2">
               <DialogTitle className="flex items-center gap-2">
-                {state.assetClass === "marina" ? <Anchor className="h-5 w-5 text-[#1E4FAB]" /> : <Building2 className="h-5 w-5 text-[#1E4FAB]" />}
+                <HeaderIcon className="h-5 w-5 text-[#1E4FAB]" />
                 {mode === "new_project" ? "New Project" : "Setup Wizard"}
               </DialogTitle>
               <div className="flex items-center gap-1.5 mr-6 -mt-1">
