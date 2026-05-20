@@ -212,11 +212,17 @@ function OverviewTab({ project, leases, loading }: { project?: ProjectDetails; l
           onClick={() => setActiveLeasesModalOpen(true)}
           loading={loading}
         />
+        {/* Revenue Analysis drill-down hidden 2026-05-21 (mock-endpoint audit WS2 gate).
+            The Monthly Revenue card's onClick opened RevenueModal, fed by the mock
+            GET /api/rent-roll/analytics/revenue (audit Finding 3 — Math.random()
+            revenue, ignores org/year). The card still shows the real Monthly Revenue
+            value; only the mock drill-down is removed. See BETA_MVP_MOCK_ENDPOINT_AUDIT.md
+            §5 (Workstream 2). To restore: re-add onClick={() => setRevenueModalOpen(true)}
+            and un-comment the <RevenueModal> mount below. */}
         <SummaryCard
           title="Monthly Revenue"
           value={formatCurrency(project?.totalGrossRent || 0)}
           icon={DollarSign}
-          onClick={() => setRevenueModalOpen(true)}
           loading={loading}
         />
       </div>
@@ -344,7 +350,12 @@ function OverviewTab({ project, leases, loading }: { project?: ProjectDetails; l
       </div>
 
       <OccupancyModal open={occupancyModalOpen} onOpenChange={setOccupancyModalOpen} />
+      {/* RevenueModal hidden 2026-05-21 (mock-endpoint audit WS2 gate) — see the marker
+          on the Monthly Revenue card above. Fed by mock GET /api/rent-roll/analytics/revenue
+          (audit Finding 3). See BETA_MVP_MOCK_ENDPOINT_AUDIT.md §5 (Workstream 2).
+          To restore: un-comment the line below and re-add the card onClick above.
       <RevenueModal open={revenueModalOpen} onOpenChange={setRevenueModalOpen} />
+      */}
       <ActiveLeasesModal open={activeLeasesModalOpen} onOpenChange={setActiveLeasesModalOpen} />
       <ExpiringLeasesModal open={expiringLeasesModalOpen} onOpenChange={setExpiringLeasesModalOpen} />
       <CashFlowDrawer 

@@ -1282,6 +1282,13 @@ function Router() {
           </AuthGuard>
         )}
       </Route>
+      {/* Interactive Analytics page hidden 2026-05-21 (mock-endpoint audit WS2 gate).
+          Fed by GET /api/analytics/rent-roll/interactive-analytics which is a mock
+          (audit Finding 1 — 100% hardcoded marina literals, ignores every param).
+          Hidden until the real rent-roll analytics aggregation layer is wired.
+          See BETA_MVP_MOCK_ENDPOINT_AUDIT.md §5 (Workstream 2). No nav entry points
+          here, so no dead link; a direct URL falls through to the normal 404.
+          To restore: un-comment the <Route> block below (lazy import still at ~L206).
       <Route path="/rent-roll/interactive-analytics">
         {() => (
           <AuthGuard>
@@ -1293,6 +1300,7 @@ function Router() {
           </AuthGuard>
         )}
       </Route>
+      */}
 
       {/* Portfolio Routes */}
       <Route path="/portfolio">
