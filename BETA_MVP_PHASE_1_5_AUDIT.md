@@ -581,22 +581,36 @@ Phase 4b starts with its own Phase 0 audit (driven by anchor 4 above). Items bel
 - **Dependencies:** Anchor 2 safe subset shipped (commit `9eb02294`).
 - **Verification:** Pre-migration snapshot of projects with `marina_name` and `customMetrics.dealType = 'owned_marina'`; post-migration confirm same row count with new field/value; spot-check 3 projects load cleanly in workspace.
 
-#### Anchor 3 — User-editable COA mapping
-- **Effort:** ~24-30h (~3-4 days)
-- **Files touched:**
-  - NEW DB migration (raw SQL, per CLAUDE.md rules): `coa_overrides` table — `(id, org_id, asset_class, override_type, key_pattern, target_department, target_subcategory, created_at, created_by, notes)`. RLS enabled by `org_id`.
-  - `server/services/direct-input-engine.ts` — `inferDepartment` read path: query `coa_overrides` first (per org_id + asset_class), then fall through to existing cascade.
-  - NEW `client/src/pages/settings/coa-editor.tsx` — list / add / edit / delete overrides per asset class. Pattern-match preview against sample line items.
-  - `client/src/components/unified-sidebar.tsx` — settings entry for "Chart of Accounts Editor."
-  - Audit log: every override CRUD writes to `financial_audit_log` (existing immutable log).
-- **Acceptance criteria:**
-  - Org admin can add `"trash reimbursement"` → `other_income` override for MF, and the next upload routes correctly.
-  - Override is org-scoped — other orgs unaffected.
-  - Override CRUD is audit-logged.
-  - Retroactive re-classification: existing actuals can be re-categorized when an override is added (with confirmation).
-  - `inferDepartment` cascade: overrides → existing keyword cascade → default. PRO_FORMA_REGISTRY edit scope deferred (decision needed during 4a Phase 0 sub-audit if required).
-- **Dependencies:** Resolves Pass 2 #85 (parallel registry reconcile) — overrides are the canonical user-edit path; the two-registry drift becomes a "config defaults vs user overrides" split. Pairs with #13 ranked item.
-- **Verification:** Add an override against `tests/department-mapping-baseline.mjs` synthetic line items, confirm routing matches. End-to-end fixture: MF P&L with "Trash Reimbursement" line, override routes to `other_income`, Pro Forma re-computes.
+#### Anchor 3 — User-editable COA mapping (RE-SCOPED 2026-05-21)
+- **Status:** RE-SCOPED after Phase 0 reconnaissance (2026-05-21). The original entry — ~24-30h: a `coa_overrides` bolt-on table + an `inferDepartment`-cascade hook in `direct-input-engine.ts` + a new `coa-editor.tsx` settings page — is **superseded**. It is the rejected **Path 1** (see Decision below). Original entry text preserved in git history (this commit's parent and earlier). The work is re-scoped into **Anchor 3-pre** (consolidation prerequisite) + **Anchor 3** (override layer + UI), both below.
+
+**Finding — World B (2026-05-21 reconnaissance).** The spec's "user-editable COA mapping" presupposes a *canonical COA entity that does not exist*. "COA" currently resolves to **~7 distinct stores**:
+- *Per-asset-class code registries:* `COA_FIELD_REGISTRY` (`shared/direct-input-coa.ts:898`), `COA_REGISTRY` (`server/services/direct-input-engine.ts:608`), `PRO_FORMA_REGISTRY` (`shared/pro-forma-config.ts:934`), `MODEL_CONFIG_REGISTRY` (`shared/asset-class-model-config.ts:4349`).
+- *DB-backed org-scoped subsystems:* `chart_of_accounts` / `coa_mapping` / `coa_mapping_suggestions` / `coa_audit_log`; `coa_user_aliases` / `coa_mapped_line_items`; the `fin_coa_*` family.
+- *Seed layer:* `server/services/coa-taxonomy-seed.ts`, `server/services/pnl/canonical-seed.ts`.
+
+The editable entity `key → category / department / treatment` is **not assembled anywhere**: `category` is duplicated across two registries (`COA_FIELD_REGISTRY` + `COA_REGISTRY`); `department` lives in a separate, scattered inference subsystem (`server/utils/department-mapping.ts:30` + ~14 consumers + a duplicated client copy at `client/src/lib/department-inference.ts`); `treatment` does not exist in the COA layer at all. The engine COA read *is* a clean single chokepoint (`direct-input-engine.ts:655`, inside `computeDirectInputFinancials()`, ~12 downstream call sites) — but there is **no single resolver that assembles the full mapping**, so overrides cannot be injected at one point. The original ~24-30h estimate assumed exactly that clean resolver to layer overrides into; it does not hold.
+
+**Decision — Path 2 (unify, not bolt-on).** Unify the direct-input registries onto the existing DB-backed COA persistence rather than bolting a new override layer onto static code. Rationale: the existing `coa_mapping` / `coa_user_aliases` / `fin_coa_*` machinery and the `CoaMappingReview.tsx` UI already provide org-scoped CRUD, per-org overrides, alias-learning, and audit logging — they are simply wired to the upload / doc-intel COA, not the direct-input registries. **Path 1** — a new bolt-on override layer (the original `coa_overrides` table) — is **rejected**: it would add an 8th COA store to a system whose core problem is fragmentation. **Path 2** consolidates *and* doubles as the §3.5 / §7.B "parallel COA registries" debt paydown — the registry-debt paydown and the feature prerequisite are the same work.
+
+The real work is consolidate-then-override, split as follows:
+
+#### Anchor 3-pre — Canonical COA consolidation (prerequisite, split from Anchor 3)
+- Define the canonical editable COA entity (`key → category / department / treatment`).
+- Consolidate `category` (de-dup across `COA_FIELD_REGISTRY` + `COA_REGISTRY`), `department` (extract from `department-mapping.ts` + ~14 consumers + the duplicated client copy into the canonical entity), and introduce `treatment`.
+- Produce a single resolver that assembles the full mapping, fronting the existing `direct-input-engine.ts:655` chokepoint.
+- **HIGH RISK:** touches the engine read path that ~12 production call sites funnel through. Regression surface is the core financial engine. Must be done on a stable environment with a careful Phase 0 and incremental verification — rushing this destabilizes the engine to deliver a settings feature.
+- Pays down the §3.5 / §7.B "parallel COA registries" debt as a side effect.
+- Delivers standalone value even if Anchor 3 (UI) slips — consolidation improves everything downstream.
+- **Effort:** TBD by its own Phase 0 — multi-session. Do NOT estimate firmly until a dedicated Phase 0 maps the ~14 department-inference consumers and the `category` de-dup blast radius.
+- **Dependencies:** None — but run it on a stable environment, not under deadline pressure.
+
+#### Anchor 3 — Org-editable COA override layer + UI (depends on 3-pre)
+- Once 3-pre yields a canonical COA, extend the existing org-scoped persistence pattern (`coa_user_aliases`-style override + audit) to back the direct-input COA, and build/extend an editor UI (`CoaMappingReview.tsx` is a strong reference; the per-asset-class registry editor itself is greenfield).
+- Relatively cheaper than 3-pre — the hard consolidation is done and the persistence + UI patterns already exist.
+- **Open product question for Brett:** per-field remapping vs. whole-COA-per-class editing (drives UI scope).
+- **Dependency:** Anchor 3-pre complete.
+- **Effort:** TBD — sized after 3-pre's Phase 0; smaller than 3-pre.
 
 #### Anchor 4 — Ops gating mechanism placeholder + Phase 0 design audit for 4b
 - **Effort:** ~6-8h for stub + activation matrix doc (the full Phase 4b Phase 0 audit is ~1 week and lives in 4b scope, item 1 of §5.B)
@@ -867,3 +881,4 @@ Replacement Cost per-class build (Phase 1.5 worked example) is **NOT** in Phase 
 |---|---|
 | 2026-05-20 | Anchor 2 (§6.A) split into a shipped safe subset + new Anchor 2b after Phase 0 surfaced that 2 of 6 renames (`marinaName`, `owned_marina`) cross the wizard→server→DB boundary. Safe subset (4 wizard-local renames + class-aware dialog icon) shipped in commit `9eb02294`. |
 | 2026-05-20 | Item 7 (§6.A) split. Item 7 (Pro Forma Charts y=0) resolved in commit `931fbbe3` — the real bug was a client-side field-name mismatch in `pro-forma.tsx`, not the audit-named `pro-forma-charts.tsx`. New **Item 7b** added: rewrite the mock `pro-forma-charts` analytics endpoint to call `proFormaEngineService` — flagged **pre-beta blocker**, ~4-6h, friendly-value 5, with a gate/hide-the-tab fallback. Also captured in `BETA_MVP_SPEC.md` §3.5. |
+| 2026-05-21 | Anchor 3 (§6.A) re-scoped after World B reconnaissance. The original ~24-30h entry — a `coa_overrides` bolt-on table + an `inferDepartment` hook + a `coa-editor.tsx` settings page — is superseded; it is the rejected **Path 1**. Reconnaissance found "user-editable COA mapping" presupposes a canonical COA entity that does not exist: "COA" resolves to ~7 distinct stores, `department` is a scattered inference subsystem (`department-mapping.ts` + ~14 consumers + a duplicated client copy), and `treatment` does not exist in the COA layer. The engine read is a clean chokepoint but no single resolver assembles the full mapping. Decision: **Path 2** — unify the direct-input registries onto the existing DB-backed COA persistence (rejecting Path 1, which would add an 8th COA store); this also pays down the §3.5 / §7.B parallel-COA-registries debt. Split into **Anchor 3-pre** (canonical COA consolidation — HIGH RISK, touches the engine read path; effort TBD by its own Phase 0) and **Anchor 3** (org-editable override layer + UI; depends on 3-pre). Same split pattern as Anchor 2 → 2a/2b. |
