@@ -1,6 +1,7 @@
 export { GENERAL_CRE_TEMPLATE } from './generalCre';
 export { MARINA_ADDON_TEMPLATE } from './marina';
 export { STR_ADDON_TEMPLATE } from './str';
+export { MULTIFAMILY_ADDON_TEMPLATE } from './multifamily';
 export { OFFICE_ADDON_TEMPLATE, RETAIL_ADDON_TEMPLATE, INDUSTRIAL_ADDON_TEMPLATE, OPERATING_BIZ_ADDON_TEMPLATE } from './addons';
 export { QUICK_START_TEMPLATES, FINANCIAL_QUICK_TEMPLATE, LEGAL_QUICK_TEMPLATE, OPERATIONS_QUICK_TEMPLATE, ENVIRONMENTAL_QUICK_TEMPLATE, INSURANCE_COMPLIANCE_QUICK_TEMPLATE, TECHNOLOGY_QUICK_TEMPLATE } from './quickStart';
 export { SECTION_TO_VDR_FOLDER } from './types';
@@ -9,6 +10,7 @@ export type { ChecklistTemplate, ChecklistTemplateSection, ChecklistTemplateItem
 import { GENERAL_CRE_TEMPLATE } from './generalCre';
 import { MARINA_ADDON_TEMPLATE } from './marina';
 import { STR_ADDON_TEMPLATE } from './str';
+import { MULTIFAMILY_ADDON_TEMPLATE } from './multifamily';
 import { OFFICE_ADDON_TEMPLATE, RETAIL_ADDON_TEMPLATE, INDUSTRIAL_ADDON_TEMPLATE, OPERATING_BIZ_ADDON_TEMPLATE } from './addons';
 import { QUICK_START_TEMPLATES } from './quickStart';
 import { ChecklistTemplate } from './types';
@@ -18,6 +20,7 @@ export const DD_CHECKLIST_TEMPLATES: ChecklistTemplate[] = [
   GENERAL_CRE_TEMPLATE,
   MARINA_ADDON_TEMPLATE,
   STR_ADDON_TEMPLATE,
+  MULTIFAMILY_ADDON_TEMPLATE,
   OFFICE_ADDON_TEMPLATE,
   RETAIL_ADDON_TEMPLATE,
   INDUSTRIAL_ADDON_TEMPLATE,
@@ -41,6 +44,8 @@ export function countTemplateItems(): Record<string, number> {
 // Expected counts:
 // General CRE: 145 items
 // Marina Add-On: 65 items
+// STR Add-On: 50 items
+// Multifamily Add-On: 54 items
 // Office Add-On: 20 items
 // Retail Add-On: 15 items
 // Industrial Add-On: 15 items
