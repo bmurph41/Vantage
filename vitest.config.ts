@@ -10,10 +10,12 @@ export default defineConfig({
     setupFiles: ['./vitest.setup.ts'],
     include: ['**/*.{test,spec}.{js,ts,jsx,tsx}'],
     exclude: [
-      'node_modules',
+      '**/node_modules/**',
       'dist',
       'ship-store',
       'shared/exit-backup/**',
+      // Playwright e2e specs use @playwright/test, not vitest — keep them out of the unit suite
+      'e2e/**',
       // Integration test requiring supertest + live DB — excluded from unit suite
       'server/tests/workspace-routes.test.ts',
     ],

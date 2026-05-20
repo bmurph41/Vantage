@@ -819,7 +819,7 @@ function makeMockPool(
         return {
           rows: [{
             modeling_project_id: 'model-proj-1',
-            asset_class: 'mf',
+            asset_class: 'multifamily',
             custom_metrics: {
               inputAssumptions: {
                 grossRevenue: 500_000,
