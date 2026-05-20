@@ -73,7 +73,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { ExportPdfButton } from '@/components/ui/export-pdf-button';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartTooltip, ResponsiveContainer, Legend, ReferenceLine, Area, AreaChart, ComposedChart } from 'recharts';
-import type { ProjectAssumptions, ProFormaData, ActualsData, ModelingProject, LinePositions } from '@/types/modeling';
+import type { ProjectAssumptions, ProFormaData, ActualsData, ModelingProject, LinePositions, AnnualProjection } from '@/types/modeling';
 import { WorkflowNavigation } from '@/components/modeling/workflow-navigation';
 import { useDepartmentOrder } from '@/hooks/useDepartmentOrder';
 import { useModelingPnlOverrides, VALID_DEPARTMENTS } from '@/hooks/useModelingPnlOverrides';
@@ -82,6 +82,30 @@ import { REVENUE_CATEGORIES, OPEX_CATEGORIES, DEPARTMENTAL_EXPENSE_CATEGORIES } 
 interface WorkspaceProFormaProps {
   projectId: string;
   onTabChange?: (tab: string) => void;
+}
+
+/**
+ * NOI Projection chart series — one row per engine projection year.
+ *
+ * Reads revenue / noi straight off proFormaData.annualProjections (the per-year
+ * figures the engine also feeds the scenario-comparison endpoint). opex is derived
+ * as revenue − noi, which equals cogs + operating expenses because the engine
+ * defines noi = revenue − cogs − expenses. Pure: testable against a raw payload.
+ */
+export function buildNoiProjectionData(
+  annualProjections: AnnualProjection[] | undefined,
+): { year: string; revenue: number; opex: number; noi: number }[] {
+  if (!annualProjections?.length) return [];
+  return annualProjections.map((ap) => {
+    const revenue = ap.revenue ?? 0;
+    const noi = ap.noi ?? 0;
+    return {
+      year: String(ap.year ?? ''),
+      revenue: Math.round(revenue),
+      opex: Math.round(revenue - noi),
+      noi: Math.round(noi),
+    };
+  });
 }
 
 // Types for historical periods and document metadata
@@ -1269,7 +1293,7 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
       </div>
 
       {/* ── NOI Projection Chart ── */}
-      {years.length > 0 && (
+      {(proFormaData?.annualProjections?.length ?? 0) > 0 && (
         <Card>
           <CardHeader className="pb-2 pt-4 px-5">
             <div className="flex items-center justify-between">
@@ -1286,31 +1310,7 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
           </CardHeader>
           <CardContent className="pt-0 pb-4 px-5">
             <ResponsiveContainer width="100%" height={220}>
-              <ComposedChart data={years.map(year => {
-                const rev = (() => {
-                  if (!proFormaData?.revenue?.lineItems) return 0;
-                  return proFormaData.revenue.lineItems.reduce((s: number, item: any) => {
-                    const v = item.yearlyValues?.[year] ?? item.projectedValues?.[String(year)] ?? 0;
-                    return s + (typeof v === 'number' ? v : parseFloat(v) || 0);
-                  }, 0);
-                })();
-                const cogs = (() => {
-                  if (!proFormaData?.cogs?.lineItems) return 0;
-                  return proFormaData.cogs.lineItems.reduce((s: number, item: any) => {
-                    const v = item.yearlyValues?.[year] ?? item.projectedValues?.[String(year)] ?? 0;
-                    return s + (typeof v === 'number' ? v : parseFloat(v) || 0);
-                  }, 0);
-                })();
-                const exp = (() => {
-                  if (!proFormaData?.expenses?.lineItems) return 0;
-                  return proFormaData.expenses.lineItems.reduce((s: number, item: any) => {
-                    const v = item.yearlyValues?.[year] ?? item.projectedValues?.[String(year)] ?? 0;
-                    return s + (typeof v === 'number' ? v : parseFloat(v) || 0);
-                  }, 0);
-                })();
-                const noi = rev - cogs - exp;
-                return { year: String(year), revenue: Math.round(rev), opex: Math.round(cogs + exp), noi: Math.round(noi) };
-              })} margin={{ top: 4, right: 16, left: 16, bottom: 0 }}>
+              <ComposedChart data={buildNoiProjectionData(proFormaData?.annualProjections)} margin={{ top: 4, right: 16, left: 16, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.5} />
                 <XAxis dataKey="year" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
                 <YAxis tickFormatter={(v: number) => v >= 1e6 ? `${(v/1e6).toFixed(1)}M` : v >= 1e3 ? `${(v/1e3).toFixed(0)}K` : `${v}`} tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} width={64} />
