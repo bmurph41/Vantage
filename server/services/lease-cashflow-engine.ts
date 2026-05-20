@@ -150,7 +150,11 @@ export interface PropertyCashFlow {
   scenarioType: string;
   analysisDate: string;
   holdPeriod: number;
-  
+
+  // Whether the project has a configured rent roll. When false, all schedules
+  // and metrics below are empty/zero — no synthetic rent roll is fabricated.
+  hasRentRoll: boolean;
+
   // Summary by Year
   yearlyTotals: YearlyCashFlowSummary[];
   
@@ -351,6 +355,7 @@ export class LeaseCashFlowEngine {
       scenarioType,
       analysisDate: new Date().toISOString(),
       holdPeriod,
+      hasRentRoll: rentRoll.length > 0,
       yearlyTotals,
       leaseSchedule,
       rolloverSchedule,
@@ -394,51 +399,10 @@ export class LeaseCashFlowEngine {
       return assignments;
     }
     
-    // Return synthetic rent roll for modeling
-    return this.generateSyntheticRentRoll();
-  }
-  
-  private generateSyntheticRentRoll(): any[] {
-    // Generate a realistic marina rent roll for modeling purposes
-    const entries = [];
-    const unitTypes = [
-      { type: 'wet_slip', count: 50, avgRent: 850, variance: 0.3 },
-      { type: 'dry_rack', count: 100, avgRent: 350, variance: 0.2 },
-      { type: 'commercial', count: 3, avgRent: 3500, variance: 0.4 },
-    ];
-    
-    let id = 1;
-    const now = new Date();
-    
-    for (const ut of unitTypes) {
-      for (let i = 0; i < ut.count; i++) {
-        const rentVariance = 1 + (Math.random() - 0.5) * ut.variance;
-        const monthlyRent = Math.round(ut.avgRent * rentVariance);
-        const leaseMonths = [12, 24, 36][Math.floor(Math.random() * 3)];
-        const startOffset = Math.floor(Math.random() * 24) - 12;
-        
-        const startDate = new Date(now);
-        startDate.setMonth(startDate.getMonth() + startOffset);
-        
-        const endDate = new Date(startDate);
-        endDate.setMonth(endDate.getMonth() + leaseMonths);
-        
-        entries.push({
-          id: `synth-${id++}`,
-          slipNumber: `${ut.type.substring(0, 1).toUpperCase()}${String(i + 1).padStart(3, '0')}`,
-          slipType: ut.type,
-          tenantName: `Tenant ${id}`,
-          monthlyRent: String(monthlyRent),
-          startDate,
-          endDate: endDate > now ? endDate : null,
-          renewalDate: endDate > now ? endDate : null,
-          status: endDate > now ? 'active' : Math.random() > 0.1 ? 'active' : 'expired',
-          linearFeet: ut.type === 'wet_slip' ? 25 + Math.floor(Math.random() * 35) : null,
-        });
-      }
-    }
-    
-    return entries;
+    // Fail-honest: no rent roll and no slip assignments are configured for
+    // this project. Return empty instead of fabricating a synthetic rent roll —
+    // calculatePropertyCashFlow surfaces this via PropertyCashFlow.hasRentRoll.
+    return [];
   }
   
   private convertToLeaseTerms(rentRoll: any[], assumptions: MarketAssumptions): LeaseTerms[] {

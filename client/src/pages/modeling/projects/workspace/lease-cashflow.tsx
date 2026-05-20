@@ -149,6 +149,7 @@ interface PropertyCashFlow {
   scenarioType: string;
   analysisDate: string;
   holdPeriod: number;
+  hasRentRoll: boolean;
   yearlyTotals: YearlyCashFlowSummary[];
   leaseSchedule: LeaseYearCashFlow[];
   rolloverSchedule: RolloverEvent[];
@@ -197,6 +198,34 @@ export default function LeaseCashFlowPage() {
           ))}
         </div>
         <Skeleton className="h-96" />
+      </div>
+    );
+  }
+
+  // Fail-honest: when no rent roll is configured the engine no longer
+  // fabricates a synthetic rent roll, so all schedules/metrics are empty/zero.
+  // Surface that explicitly instead of rendering a zero-valued dashboard.
+  if (cashFlowData && !cashFlowData.hasRentRoll) {
+    return (
+      <div className="space-y-6 p-6" data-testid="lease-cashflow-empty">
+        <div>
+          <h1 className="text-2xl font-bold">Lease Cash Flow Analysis</h1>
+          <p className="text-muted-foreground">
+            Argus-style lease-by-lease DCF modeling with rollover analysis
+          </p>
+        </div>
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-16 text-center">
+            <Building2 className="h-12 w-12 text-muted-foreground/40 mb-4" />
+            <h2 className="text-lg font-semibold">No rent roll configured</h2>
+            <p className="text-sm text-muted-foreground mt-1 max-w-md">
+              This project has no rent roll or unit assignments, so no lease-by-lease
+              cash flow projection, rollover schedule, or valuation metrics can be
+              produced. Add a rent roll to run the analysis — no sample or synthetic
+              lease data is shown.
+            </p>
+          </CardContent>
+        </Card>
       </div>
     );
   }
