@@ -619,7 +619,8 @@ Effort estimates rolled up:
 |---|---|---|
 | 5. STR DD checklist | ~4h | NEW `server/templates/ddTemplates/str.ts` + `ddTemplates/index.ts` |
 | 6. MF DD checklist | ~4h | NEW `server/templates/ddTemplates/multifamily.ts` + `ddTemplates/index.ts` |
-| 7. Pro Forma Charts y=0 bug | ~3h | `pro-forma-charts.tsx` (memory `project_pro_forma_chart_flat_zero_bug`) |
+| 7. Pro Forma Charts y=0 bug — **RESOLVED 2026-05-20 (commit `931fbbe3`)** | ~3h (est.) | Real fix was in `pro-forma.tsx` — the NOI Projection chart on the *Pro Forma* tab — NOT the audit-named `pro-forma-charts.tsx`. See note below. |
+| 7b. Rewrite mock `pro-forma-charts` endpoint to call the engine — **PRE-BETA BLOCKER** | ~4-6h | `server/routes/analytics-routes.ts:1248` — replace hardcoded marina literals with a `proFormaEngineService` call. See note below. |
 | 8. Audit Trail 500 + Assumption Audit HTML | ~4h | `workspace/audit-trail.tsx`, `workspace/assumption-audit.tsx` + server routes |
 | 9. Reimbursement routing for MF | ~2h | `direct-input-engine.ts` `inferDepartment` Other Income branch |
 | 10. `pct()` helper boundary fix | ~3-4h | `direct-input-engine.ts:956` + caller audit |
@@ -631,6 +632,15 @@ Effort estimates rolled up:
 | 16. Token resolver marina branches cleanup | ~2h | `token-resolver-service.ts:107, 137-138, 157` |
 | 17. unitMix tabIcon audit | ~2h | `asset-class-model-config.ts` — 32 configs |
 | 18. unitMix label naming policy | ~1-2h | Decision + apply across configs |
+
+**Note on Items 7 / 7b (Pro Forma chart) — Phase 4a Item 7 Phase 0, 2026-05-20.**
+The audit named the wrong file. The original §3.5 bug (memory `project_pro_forma_chart_flat_zero_bug`) — the "NOI Projection — N-Year Hold" chart plotting a flat y=0 line while the KPI tiles directly above it showed real NOI — was a **client-side field-name mismatch in `client/src/pages/modeling/projects/workspace/pro-forma.tsx`**, not in `pro-forma-charts.tsx`. The chart re-summed line items reading `item.yearlyValues` / `item.projectedValues`, neither of which exists on the engine's `LineItem`; both resolved `undefined → ?? 0`, giving the flat zero line. **Fixed in commit `931fbbe3`** — the chart now reads `proFormaData.annualProjections`. That closes Item 7.
+
+Tracing the audit's mis-pointer to `pro-forma-charts.tsx` surfaced a separate, worse problem, filed here as **Item 7b**. The "Pro Forma Charts" workspace tab is fed by `GET /api/analytics/modeling/projects/:projectId/pro-forma-charts` (`server/routes/analytics-routes.ts:1248`), which is a **100% mock**: it returns hardcoded marina-flavored literals (Wet Slips $2.45M, Fuel Sales $2.85M, NOI $4.37M, 6.8% cap rate), destructures but never uses `projectId` / `year`, and is byte-identical for every project and asset class.
+- **Friendly-value: 5.** **Flag: blocker — pre-beta.** This is worse than the flat-zero chart Item 7 fixed: a flat-zero line reads as "no data," whereas a mock renders plausible, professional-looking fabricated financials a friendly will mistake for their own deal. Shipping fabricated numbers to friendlies is a credibility hazard.
+- **Effort ~4-6h:** rewrite the endpoint to call `proFormaEngineService` (the engine behind `GET /api/modeling/projects/:projectId/pro-forma`) and derive chart aggregations from real per-project data.
+- **Fallback:** gate or hide the "Pro Forma Charts" tab if 7b is not built before friendlies — a disabled tab is honest; a mock-fed tab is a credibility hazard.
+- Also captured in `BETA_MVP_SPEC.md` §3.5 + its Appendix B. Net Phase 4a effort impact is small (Item 7 closing ≈ offsets Item 7b's add); the rollup table below is left as-is within its stated ±buffer.
 
 #### Phase 4a rollup
 
@@ -856,3 +866,4 @@ Replacement Cost per-class build (Phase 1.5 worked example) is **NOT** in Phase 
 | Date | Change |
 |---|---|
 | 2026-05-20 | Anchor 2 (§6.A) split into a shipped safe subset + new Anchor 2b after Phase 0 surfaced that 2 of 6 renames (`marinaName`, `owned_marina`) cross the wizard→server→DB boundary. Safe subset (4 wizard-local renames + class-aware dialog icon) shipped in commit `9eb02294`. |
+| 2026-05-20 | Item 7 (§6.A) split. Item 7 (Pro Forma Charts y=0) resolved in commit `931fbbe3` — the real bug was a client-side field-name mismatch in `pro-forma.tsx`, not the audit-named `pro-forma-charts.tsx`. New **Item 7b** added: rewrite the mock `pro-forma-charts` analytics endpoint to call `proFormaEngineService` — flagged **pre-beta blocker**, ~4-6h, friendly-value 5, with a gate/hide-the-tab fallback. Also captured in `BETA_MVP_SPEC.md` §3.5. |
