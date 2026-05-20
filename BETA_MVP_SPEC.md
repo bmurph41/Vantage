@@ -348,7 +348,7 @@ Plus ~2 hr for a multifamily fixture seed. **Total: ~16 hr / 2 days.** STR fixtu
 
 **Deferred (post-MVP):**
 - Renaming `modeling_projects.marina_name` → `name` (34 client pages touch `project.marinaName`; cosmetic, renderable for any class today)
-- Unifying the 4 registries into one true source of truth (multi-week refactor)
+- Unifying the 4 registries into one true source of truth (multi-week refactor) — *partially de-deferred 2026-05-21: the COA-relevant portion (`COA_REGISTRY` + `COA_FIELD_REGISTRY` consolidation, plus extracting the scattered `server/utils/department-mapping.ts` inference layer into one canonical COA entity) is now **Phase 4a Anchor 3-pre**. World B reconnaissance found that the user-editable-COA feature prerequisite and this parallel-COA-registries debt paydown are the same work → Path 2 decision; see `BETA_MVP_PHASE_1_5_AUDIT.md` §6.A. `PRO_FORMA_REGISTRY` + `MODEL_CONFIG_REGISTRY` unification remains deferred.*
 - 7 user-facing "MarinaMatch" / "Marinalytics" string mentions
 - 8 duplicate Sunset Bay Marina fixtures
 - 13 remaining asset classes
@@ -383,7 +383,7 @@ Structured backing data lives in `BETA_MVP_PHASE_1_5_AUDIT.md` at workspace root
 Phase 4a anchors:
 1. STR OM template
 2. S4 wizard data shape fix (`marinaName` → `propertyName`)
-3. User-editable COA mapping (promoted from §3.6)
+3. User-editable COA mapping — **re-scoped 2026-05-21** (World B finding → Path 2 decision) into **Anchor 3-pre** (canonical COA consolidation — also the §7.B parallel-COA-registries debt paydown) + **Anchor 3** (org-editable override layer + UI, depends on 3-pre). See `BETA_MVP_PHASE_1_5_AUDIT.md` §6.A.
 4. Ops gating mechanism placeholder + Phase 4b Phase 0 design audit
 
 **Phase 4b — Ops add-on productization.** 9 items (6 in-scope for v1.0, 3 deferred to v1.1). Estimate ~10-11 weeks. See §6.B of `BETA_MVP_PHASE_1_5_AUDIT.md`.
@@ -454,3 +454,4 @@ The following §3.5 entries are closed by Phase 4a:
 | 2026-05-19 (later) | Brett + Claude (Opus 4.7 1M) | Captured two pre-existing DD checklist endpoint bugs surfaced during Phase 4a Item 5 verification: seed endpoint omits template_type NOT-NULL column; assetClass query param ignored on GET. Both trivial fixes recommended for Phase 4a cleanup wave. |
 | 2026-05-20 | Brett + Claude (Opus 4.7 1M) | Captured `pro-forma-charts` mock-endpoint finding as a **pre-beta blocker** (§3.5) — `GET /api/analytics/modeling/projects/:projectId/pro-forma-charts` returns hardcoded marina literals (Wet Slips $2.45M, Fuel $2.85M, NOI $4.37M) identical for every project and asset class, ignoring `projectId`. Surfaced during Phase 4a Item 7 Phase 0; ranked Item 7b. The real Item 7 bug was fixed in commit `931fbbe3` (client-side field-name mismatch in `pro-forma.tsx`, not the audit-named `pro-forma-charts.tsx`). |
 | 2026-05-20 (later) | Brett + Claude (Opus 4.7 1M) | Systematic mock/stub/fabricated-data endpoint audit (`BETA_MVP_MOCK_ENDPOINT_AUDIT.md`, ~115 candidates examined → 14 findings). Added 8 individual §3.5 entries for the pre-beta blockers (rent-roll interactive-analytics, fund send-report no-op, 3 rra analytics endpoints, rra custom-types non-persistent CRUD, Census silent mock fallback, LeaseCashFlow synthetic rent roll), each with a wire-vs-gate fallback note, plus one summary §3.5 entry for the 6 medium/low findings. Triggered by the `pro-forma-charts` and DD-seed mocks surfacing incidentally. |
+| 2026-05-21 | Brett + Claude (Opus 4.7 1M) | Re-scoped Phase 4a Anchor 3 (user-editable COA mapping) after World B reconnaissance: "COA" resolves to ~7 distinct stores and the editable `key → category/department/treatment` entity is assembled nowhere (`department` is a scattered inference subsystem; `treatment` does not exist in the COA layer). Decision **Path 2** — unify the direct-input registries onto the existing DB-backed COA persistence — rejecting **Path 1** (a bolt-on override layer, +1 COA store). Split into **Anchor 3-pre** (canonical COA consolidation — high-risk, engine read path; effort TBD by its own Phase 0) + **Anchor 3** (override layer + UI, depends on 3-pre). Anchor 3-pre is also the §7.B parallel-COA-registries debt paydown — same work. Detail in `BETA_MVP_PHASE_1_5_AUDIT.md` §6.A + its Appendix B. |
