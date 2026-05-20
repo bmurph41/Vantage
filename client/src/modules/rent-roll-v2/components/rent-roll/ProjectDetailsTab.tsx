@@ -1319,8 +1319,15 @@ export function ProjectDetailsTab({ locationId }: ProjectDetailsTabProps) {
         </CardContent>
       </Card>
 
-      {/* Custom Types Management */}
+      {/* Custom Types Management — hidden 2026-05-21 (mock-endpoint audit WS3 gate).
+          The /api/rent-roll/custom-types CRUD is non-persistent (audit Finding 6 —
+          GET returns 15 hardcoded defaults; POST/PATCH/DELETE never touch the DB, so
+          every user edit silently vanishes on the next load). Hidden until a real
+          rra_custom_types table + DB-backed handlers are wired.
+          See BETA_MVP_MOCK_ENDPOINT_AUDIT.md §5 (Workstream 3).
+          To restore: un-comment the <CustomTypesManagement /> mount below.
       <CustomTypesManagement />
+      */}
 
       {/* Auto-Sync to Pro Forma */}
       <Card>

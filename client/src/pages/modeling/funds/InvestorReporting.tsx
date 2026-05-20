@@ -7,6 +7,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { formatCurrency, formatPercent } from '@/lib/utils';
@@ -245,14 +246,30 @@ export default function InvestorReporting() {
                   <><FileText className="h-4 w-4 mr-2" />Generate Letter</>
                 )}
               </Button>
-              <Button
-                variant="outline"
-                onClick={() => sendMutation.mutate()}
-                disabled={!selectedFundId || sendMutation.isPending}
-              >
-                <Send className="h-4 w-4 mr-2" />
-                Send to Investors
-              </Button>
+              {/* "Send to Investors" disabled 2026-05-21 (mock-endpoint audit WS3 gate).
+                  POST /api/funds/:fundId/send-report is a no-op mock — it returns a fake
+                  "sent" confirmation while delivering nothing to LPs (audit Finding 2).
+                  Disabled with a tooltip until the real LP-delivery path is wired.
+                  See BETA_MVP_MOCK_ENDPOINT_AUDIT.md §5 (Workstream 3). To restore:
+                  drop the `disabled` literal + the Tooltip/span wrapper and restore
+                  disabled={!selectedFundId || sendMutation.isPending}. */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span tabIndex={0}>
+                    <Button
+                      variant="outline"
+                      onClick={() => sendMutation.mutate()}
+                      disabled
+                    >
+                      <Send className="h-4 w-4 mr-2" />
+                      Send to Investors
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>
+                  Coming soon — investor delivery is not yet available.
+                </TooltipContent>
+              </Tooltip>
             </div>
           </div>
         </CardContent>
