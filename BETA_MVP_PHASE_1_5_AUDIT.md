@@ -551,17 +551,35 @@ Phase 4b starts with its own Phase 0 audit (driven by anchor 4 above). Items bel
 - **Verification:** Generate an OM for the STR fixture `b1a0eebc-...` and confirm all sections render. Compare narrative depth against `marinaOMTemplate` + `multifamilyOMTemplate`.
 
 #### Anchor 2 — S4 wizard data shape fix
-- **Effort:** ~6h
+- **Status:** SPLIT after Phase 0 (2026-05-20). Safe subset shipped in commit `9eb02294`; `marinaName` + `owned_marina` moved to Anchor 2b below.
+- **Effort:** ~6h estimated → ~2h actual for the shipped safe subset.
 - **Files touched:**
-  - `client/src/components/onboarding/OnboardingWizard.tsx` — rename state fields `marinaName`→`propertyName`, `marinaAddress`→`propertyAddress`, `portfolioMarinas`→`portfolioProperties`. Rename `renderMarinaDetailsStep`→`renderPropertyDetailsStep`. Dialog header icon read from `getModelConfig(state.assetClass).unitMix.tabIcon` (with sensible icon-name → component mapping). DealType `owned_marina`→`owned_property`.
-  - Any consumer of `WizardData.marinaName` / `marinaAddress` / `portfolioMarinas` (likely in the wizard's submit handlers + any test fixtures).
-  - Schema: confirm no DB column relies on the wizard-side names (this is wizard state, not persisted DB shape — but verify).
+  - `client/src/components/onboarding/OnboardingWizard.tsx` — rename state fields ~~`marinaName`→`propertyName`~~ *(deferred → Anchor 2b)*, `marinaAddress`→`propertyAddress`, `portfolioMarinas`→`portfolioProperties`, `validMarinas`→`validProperties`. Rename `renderMarinaDetailsStep`→`renderPropertyDetailsStep`. Dialog header icon read from `getModelConfig(state.assetClass).unitMix.tabIcon` via the existing `iconMap` (promoted to module scope). ~~DealType `owned_marina`→`owned_property`~~ *(deferred → Anchor 2b)*.
+  - Schema: confirmed — the 4 shipped renames are pure form-local wizard state; no DB column relies on them.
 - **Acceptance criteria:**
-  - `grep -rn "marinaName\|marinaAddress\|portfolioMarinas" client/src/components/onboarding/` returns 0 hits.
-  - Wizard renders for marina, STR, MF and writes class-appropriate state.
-  - Existing in-progress wizard state (if persisted to localStorage) gracefully migrates or is invalidated.
-- **Dependencies:** None for state-shape rename; schema check is read-only.
-- **Verification:** Walk all 3 MVP-class wizard flows, confirm no marina-named state leakage. `tsc --noEmit` clean.
+  - `grep -rn "marinaAddress\|portfolioMarinas\|validMarinas\|renderMarinaDetailsStep" client/src/components/onboarding/` returns 0 hits. ✅
+  - Wizard renders for marina, STR, MF — dialog header icon is class-appropriate. ✅
+  - ~~`marinaName` → 0 hits~~ / ~~`owned_marina` → 0 hits~~ — **deferred to Anchor 2b** (cross the wizard→server→DB boundary).
+- **Dependencies:** None.
+- **Verification:** `tsc -b shared` clean; scoped tsc 0 new errors vs HEAD `2469bfb0`; dev server health 200.
+- **Phase 0 finding (2026-05-20):** The audit estimated ~10 read sites / 6h. Phase 0 measured ~62 grep hits (all in `OnboardingWizard.tsx`) and found 2 of the 6 renames cross the wizard→server→DB boundary: `marinaName` is the `POST /api/modeling/projects` payload key (`server/routes/crm-routes.ts:13937`, written to the `modeling_projects.marina_name` column); `owned_marina` is a live Postgres `deal_source` enum value (`shared/schema.ts:143`) with ~13 server/client consumers, also written into `customMetrics.dealType` JSONB. Both trip the brief's STOP conditions, so they split into Anchor 2b. The 4 wizard-local renames + class-aware dialog icon shipped as the safe subset.
+
+#### Anchor 2b — marinaName / owned_marina migration (deferred from Anchor 2)
+- **Effort:** ~8-12h (re-sized from Anchor 2's original 6h)
+- **Files touched (expected ~15):**
+  - `client/src/components/onboarding/OnboardingWizard.tsx` — rename `marinaName` state field + submit payload key
+  - `server/routes/crm-routes.ts` — accept new payload key (with transitional support for the old key during the migration window) and write to the renamed column
+  - DB migration (raw SQL): rename `modeling_projects.marina_name` to `modeling_projects.property_name` OR add a `property_name` column + dual-write during cutover
+  - DB migration (raw SQL): add `owned_property` to the `dealSourceEnum` Postgres enum; backfill `customMetrics.dealType = 'owned_marina'` to `'owned_property'` for existing projects
+  - `shared/schema.ts` — update the `dealSourceEnum` declaration + column name in the Drizzle type
+  - ~13 callsite updates across `server/routes/returns-routes.ts`, `server/routes/modeling-routes.ts`, `server/routes/crm-routes.ts`, `server/services/integration-data-pipeline.ts` and client-side consumers (DealType filter UIs, project list displays)
+  - Test fixtures that hardcode `'owned_marina'`
+- **Acceptance criteria:**
+  - `grep -rn "marinaName\|owned_marina" client/ server/ shared/` returns 0 hits OUTSIDE of migration files and code comments referencing the rename history
+  - All existing projects with `customMetrics.dealType = 'owned_marina'` successfully backfilled
+  - `tsc` clean, dev server health 200, no regressions
+- **Dependencies:** Anchor 2 safe subset shipped (commit `9eb02294`).
+- **Verification:** Pre-migration snapshot of projects with `marina_name` and `customMetrics.dealType = 'owned_marina'`; post-migration confirm same row count with new field/value; spot-check 3 projects load cleanly in workspace.
 
 #### Anchor 3 — User-editable COA mapping
 - **Effort:** ~24-30h (~3-4 days)
@@ -832,3 +850,9 @@ Replacement Cost per-class build (Phase 1.5 worked example) is **NOT** in Phase 
 - `client/src/pages/modeling/projects/workspace/valuator-profit-centers.tsx` (153 lines — orphan import chain)
 - `client/src/components/onboarding/OnboardingWizard.tsx` (2,513 lines — step logic, marina-flavored data shape)
 - Directory walks of: `client/src/pages/modeling/projects/workspace/`, `server/templates/om-templates/`, `server/templates/ddTemplates/`, `server/services/rent-roll-v2/assetStrategies/`, `server/services/rent-roll-v2/adapters/`
+
+## Appendix B — Revision log
+
+| Date | Change |
+|---|---|
+| 2026-05-20 | Anchor 2 (§6.A) split into a shipped safe subset + new Anchor 2b after Phase 0 surfaced that 2 of 6 renames (`marinaName`, `owned_marina`) cross the wizard→server→DB boundary. Safe subset (4 wizard-local renames + class-aware dialog icon) shipped in commit `9eb02294`. |
