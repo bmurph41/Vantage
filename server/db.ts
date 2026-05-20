@@ -5,10 +5,14 @@ import * as schema from "@shared/schema";
 
 neonConfig.webSocketConstructor = ws;
 
-if (!process.env.DATABASE_URL) {
-  throw new Error(
-    "DATABASE_URL must be set. Did you forget to provision a database?",
-  );
+// Fail fast in real environments; under test (NODE_ENV=test, set by the CI
+// unit-test job and vitest) the throw is skipped so pure unit tests can
+// import service modules without provisioning a database. The pool/db objects
+// still construct (the connection is deferred to first query, which unit
+// tests never trigger). Verified: new Pool({connectionString: undefined})
+// does not throw at construction. See BETA_MVP_* CI notes.
+if (!process.env.DATABASE_URL && process.env.NODE_ENV !== 'test') {
+  throw new Error("DATABASE_URL must be set. Did you forget to provision a database?");
 }
 
 // Optimized connection pool configuration for better concurrent handling
