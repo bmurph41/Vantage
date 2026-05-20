@@ -34,8 +34,8 @@ export class CensusService {
     radiusMiles: number
   ): Promise<DemographicSummary> {
     if (!this.apiKey) {
-      logger.debug({ centerLat, centerLng }, "Census API key not configured, using mock data for radius query");
-      return CensusService.getMockDemographics(centerLat, centerLng);
+      logger.warn({ centerLat, centerLng }, "Census API key not configured — demographics unavailable for radius query");
+      throw new Error('Census demographics unavailable: CENSUS_API_KEY not configured');
     }
 
     try {
@@ -378,8 +378,8 @@ export class CensusService {
 
   async getDemographicsForLocation(latitude: number, longitude: number): Promise<DemographicSummary> {
     if (!this.apiKey) {
-      logger.debug({ latitude, longitude }, "Census API key not configured, using mock data");
-      return CensusService.getMockDemographics(latitude, longitude);
+      logger.warn({ latitude, longitude }, "Census API key not configured — demographics unavailable");
+      throw new Error('Census demographics unavailable: CENSUS_API_KEY not configured');
     }
 
     try {
@@ -450,7 +450,7 @@ export class CensusService {
       };
     } catch (error) {
       console.error("Census API error:", error);
-      return CensusService.getMockDemographics(latitude, longitude);
+      throw new Error('Census demographics unavailable: Census API request failed');
     }
   }
 
@@ -1140,8 +1140,8 @@ export class CensusService {
     areaSqMiles: number
   ): Promise<DemographicSummary> {
     if (!this.apiKey) {
-      const center = this.polygonCentroid(boundaryPoints);
-      return CensusService.getMockDemographics(center.lat, center.lng);
+      logger.warn("Census API key not configured — demographics unavailable for polygon query");
+      throw new Error('Census demographics unavailable: CENSUS_API_KEY not configured');
     }
 
     try {
@@ -1236,111 +1236,5 @@ export class CensusService {
     const sumLat = points.reduce((s, p) => s + p.lat, 0);
     const sumLng = points.reduce((s, p) => s + p.lng, 0);
     return { lat: sumLat / n, lng: sumLng / n };
-  }
-
-  static getMockDemographics(latitude?: number, longitude?: number): DemographicSummary {
-    const basePopulation = 45000 + Math.floor(Math.random() * 30000);
-    const medianIncome = 55000 + Math.floor(Math.random() * 40000);
-    
-    return {
-      totalPopulation: basePopulation,
-      totalMales: Math.floor(basePopulation * 0.49),
-      totalFemales: Math.floor(basePopulation * 0.51),
-      medianAge: 36 + Math.floor(Math.random() * 10),
-      medianAgeMale: 35 + Math.floor(Math.random() * 10),
-      medianAgeFemale: 37 + Math.floor(Math.random() * 10),
-      
-      ageDistribution: {
-        under18: 22.5,
-        "18to34": 24.3,
-        "35to54": 26.1,
-        "55to64": 12.8,
-        over65: 14.3
-      },
-      ageByGender: {
-        male: { under18: 5100, "18to34": 5500, "35to54": 5900, "55to64": 2900, over65: 3200 },
-        female: { under18: 5000, "18to34": 5400, "35to54": 5800, "55to64": 2800, over65: 3400 }
-      },
-      generationalCohorts: {
-        genZ: 28.5,
-        millennials: 22.1,
-        genX: 26.1,
-        boomers: 18.2,
-        silent: 5.1
-      },
-      
-      medianHouseholdIncome: medianIncome,
-      meanHouseholdIncome: Math.floor(medianIncome * 1.25),
-      perCapitaIncome: Math.floor(medianIncome / 2.1),
-      medianFamilyIncome: Math.floor(medianIncome * 1.15),
-      incomeDistribution: {
-        under25k: 15.2,
-        "25kto50k": 22.1,
-        "50kto75k": 20.5,
-        "75kto100k": 15.3,
-        "100kto150k": 14.8,
-        over150k: 12.1
-      },
-      
-      educationLevels: {
-        lessThanHighSchool: 8.5,
-        highSchool: 25.2,
-        someCollege: 28.3,
-        bachelors: 24.1,
-        graduate: 13.9
-      },
-      
-      employmentStats: {
-        laborForceParticipation: 64.5,
-        employmentRate: 95.2,
-        unemploymentRate: 4.8,
-        employed: 29000,
-        unemployed: 1400,
-        notInLaborForce: 15600
-      },
-      industryDistribution: {
-        agriculture: 1.2,
-        construction: 6.5,
-        manufacturing: 8.3,
-        wholesale: 2.8,
-        retail: 11.2,
-        transportation: 4.5,
-        information: 2.1,
-        finance: 6.8,
-        professional: 12.5,
-        education: 23.4,
-        arts: 9.8,
-        otherServices: 4.9,
-        publicAdmin: 6.0
-      },
-      
-      housingStats: {
-        totalUnits: 18500,
-        ownerOccupied: 62.5,
-        renterOccupied: 37.5,
-        vacancyRate: 6.2,
-        medianRent: 1250,
-        medianYearBuilt: 1985
-      },
-      householdSize: 2.45,
-      medianHomeValue: 285000 + Math.floor(Math.random() * 150000),
-      
-      raceEthnicity: {
-        white: 68.5,
-        black: 12.3,
-        americanIndian: 0.8,
-        asian: 6.2,
-        pacificIslander: 0.3,
-        otherRace: 5.8,
-        twoOrMore: 6.1,
-        hispanic: 18.5
-      },
-      
-      populationDensity: Math.floor(basePopulation / 15),
-      geographicLevel: "tract",
-      fipsState: "12",
-      fipsCounty: "086",
-      fipsTract: "001200"
-    };
   }
 }

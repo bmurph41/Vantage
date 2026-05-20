@@ -47,7 +47,8 @@ import {
   RefreshCw,
   Save,
   FolderOpen,
-  Building2
+  Building2,
+  AlertTriangle
 } from "lucide-react";
 
 interface ModelingProject {
@@ -588,6 +589,7 @@ interface TradeAreaData {
   type: 'distance' | 'drivetime';
   demographics: DemographicSummary | null;
   isLoading: boolean;
+  unavailable?: boolean;
 }
 
 const DISTANCE_RINGS = [
@@ -786,7 +788,29 @@ function LocationAnalysisSection() {
           locationMap.set(tradeAreaKey, {
             ...existingData,
             demographics: data.demographics,
-            isLoading: false
+            isLoading: false,
+            unavailable: false
+          });
+        }
+        next.set(locationKey, locationMap);
+        return next;
+      });
+    },
+    onError: (_error, { location, tradeAreaKey }) => {
+      // Fail-honest: the Census service no longer substitutes mock data on
+      // missing key / API error, so a failed fetch surfaces explicitly here
+      // instead of leaving the trade area stuck on an infinite spinner.
+      const locationKey = `${location.latitude},${location.longitude}`;
+      setLocationData(prev => {
+        const next = new Map(prev);
+        const locationMap = next.get(locationKey) || new Map();
+        const existingData = locationMap.get(tradeAreaKey);
+        if (existingData) {
+          locationMap.set(tradeAreaKey, {
+            ...existingData,
+            demographics: null,
+            isLoading: false,
+            unavailable: true
           });
         }
         next.set(locationKey, locationMap);
@@ -1398,6 +1422,7 @@ function LocationAnalysisSection() {
                   const tradeAreas = getLocationTradeAreas(activeLoc);
                   const hasLoading = tradeAreas.some(ta => ta.isLoading);
                   const loadedAreas = tradeAreas.filter(ta => ta.demographics);
+                  const unavailableAreas = tradeAreas.filter(ta => ta.unavailable);
                   const locationColor = LOCATION_COLORS[activeLocationIndex % LOCATION_COLORS.length];
                   const isDistance = activeLoc.config.analysisMode === 'distance';
                   
@@ -1637,6 +1662,20 @@ function LocationAnalysisSection() {
                           <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
                           <span className="ml-2 text-sm text-muted-foreground">Loading demographics...</span>
                         </div>
+                      )}
+
+                      {unavailableAreas.length > 0 && (
+                        <Card className="border-amber-200 bg-amber-50/50">
+                          <CardContent className="py-3 flex items-start gap-2">
+                            <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+                            <div className="text-sm">
+                              <p className="font-medium text-amber-800">Demographics unavailable</p>
+                              <p className="text-amber-700 text-xs mt-0.5">
+                                Census data could not be retrieved for {unavailableAreas.map(ta => ta.label).join(', ')}. The Census API may be unreachable or not configured — no estimated or sample data is shown.
+                              </p>
+                            </div>
+                          </CardContent>
+                        </Card>
                       )}
 
                       {loadedAreas.length > 0 && (
