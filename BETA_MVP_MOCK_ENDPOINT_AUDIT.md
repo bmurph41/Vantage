@@ -369,4 +369,90 @@ The fabricated-data problem is **concentrated**, not pervasive:
 
 ## 5. Remediation plan
 
-*(Added in commit 3 — see below.)*
+The 8 pre-beta blockers group into **3 schedulable workstreams**. They are not a
+flat list — the right fix differs by category, and two of the three should be
+*gated*, not *wired*, before friendlies. The 6 medium/low findings (§3, Findings
+9–14) are a separate Phase 4a cleanup wave and are not scheduled here.
+
+Guiding principle: **a gated/hidden surface is honest; a mock-fed surface is a
+credibility hazard.** Where the real fix is large, gate before friendlies and
+schedule the wiring deliberately — do not half-build a data layer under time
+pressure (that is how the rent-roll mocks were created in the first place).
+
+### Workstream 1 — Silent fallback-to-mock (Findings 7, 8)
+
+`CensusService.getMockDemographics()` · `LeaseCashFlowEngine.generateSyntheticRentRoll()`
+
+- **Why grouped:** Both have a *real* data path and silently substitute
+  fabricated data when it is empty or errors. Neither announces it. This is the
+  most dangerous category — they serve fake data **in production, on the failure
+  path**, invisibly to anyone running a demo.
+- **Fix is NOT "make it real" — it is "fail honest."** Remove the silent
+  substitution: return an explicit empty state / `dataSource: 'unavailable'` /
+  503, or stamp `isMockData: true` so the UI can surface it. The real data
+  integration (live Census wiring; requiring a configured rent roll) is separate,
+  larger, and out of scope for de-risking friendlies.
+- **Effort:** Small — ~1–2h each, ~2–4h total.
+- **Recommendation:** **WIRE (fail-loud) — do this FIRST.** Cheapest workstream,
+  and it removes the only landmine a demo cannot catch.
+- **Friendly-visibility:** rank **1 of 3 for danger** (undetectable in a demo),
+  lower for raw noticeability — LeaseCashFlow fires on any modeling project with
+  no rent roll (common for a fresh project); Census fires on a missing key or
+  API error.
+
+### Workstream 2 — Rent-roll analytics cluster (Findings 1, 3, 4, 5)
+
+`interactive-analytics` · `rent-roll/analytics/revenue` · `…/storage-types` · `…/lease-terms`
+
+- **Why grouped:** Four fabricated rent-roll *analytics* endpoints across
+  `analytics-routes.ts` and `rra-routes.ts`, all feeding the rent-roll-v2
+  Interactive Analytics page and the rent-roll Executive Modals — the rent-roll-v2
+  UI shipped ahead of its analytics data layer. (An earlier framing counted ~5
+  endpoints, folding in the `custom-types` read; `custom-types` is handled whole
+  in Workstream 3, since its core defect is persistence, not fabricated analytics.)
+- **Effort:** Large — `interactive-analytics` alone ~1–2 days; the 3 `rra`
+  endpoints medium each. ~3–5 days to wire the whole cluster against a real
+  rent-roll aggregation service that does not yet exist.
+- **Recommendation:** **GATE as a unit before friendlies** — hide the Interactive
+  Analytics page and the analytics tabs of the Executive Modals. Then schedule
+  the real rent-roll analytics aggregation service as a dedicated workstream (it
+  pairs naturally with the `custom-types` table in WS3). Do not wire piecemeal
+  under deadline pressure.
+- **Friendly-visibility:** rank **1 of 3 for raw noticeability** — these are
+  analytics surfaces a friendly opens directly, and randomized revenue that
+  changes on every refresh is glaringly wrong.
+
+### Workstream 3 — Standalone fabrications (Findings 2, 6)
+
+`POST /api/funds/:fundId/send-report` · `/api/rent-roll/custom-types` CRUD
+
+- **Why grouped:** Two unrelated standalone defects, each its own small fix —
+  bundled only because neither belongs to WS1 or WS2.
+- **`send-report`:** no-op that claims LP delivery. **GATE now** — disable the
+  "Send Report" button (trivial, honest). Wire later (~3–6h) by lifting the
+  `lp-portal-service` delivery path. A GP seeing a fake "sent" confirmation while
+  LPs receive nothing is a trust-destroying failure.
+- **`custom-types`:** non-persistent CRUD. **GATE now** — hide the Custom Types
+  management UI. Wire later (medium-large) — needs a real `rra_custom_types`
+  table; schedule alongside the WS2 rent-roll data-layer work, as the current
+  hardcoded default list becomes its seed.
+- **Effort:** Gating both ~1h total. Wiring: `send-report` ~3–6h; `custom-types`
+  medium-large (table + 4 handlers).
+- **Recommendation:** **GATE both now, wire post-friendly-batch-1.**
+- **Friendly-visibility:** rank **2 of 3** — both are action-specific (a GP doing
+  fund reporting; a user managing rent-roll types) rather than passively visible,
+  but both are outright trust failures when hit.
+
+### Recommended sequencing
+
+1. **WS1 first** — ~2–4h, fail-loud. Removes the undetectable landmine.
+2. **WS2 + WS3 gating** — ~2h total. Hide the rent-roll analytics surfaces, the
+   "Send Report" button, and the Custom Types UI before friendlies.
+3. **Post-friendly-batch-1:** schedule the real rent-roll analytics aggregation
+   service (WS2 wiring + `custom-types` table, ~1 week combined) and the
+   `send-report` delivery wiring (~3–6h) as deliberate workstreams.
+
+Net: **~4–6h of work de-risks all 8 blockers for friendlies** (WS1 wired +
+WS2/WS3 gated). The real wiring is ~1.5 weeks and is scheduled deliberately
+afterward, not rushed. This mirrors the gate-first approach already taken for
+the `pro-forma-charts` mock in Item 7b (commit `4e47c758`).
