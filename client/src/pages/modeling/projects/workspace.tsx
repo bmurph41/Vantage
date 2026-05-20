@@ -869,6 +869,13 @@ export default function ProjectWorkspace() {
           <div className="overflow-x-auto">
             <TabsList key={activeGroup} className="inline-flex h-8 bg-transparent gap-0.5 rounded-none p-0 py-0.5" data-testid="tabs-workspace">
               {currentGroup.tabs.filter((tab) => {
+                // Pro Forma Charts tab hidden 2026-05-20 (Phase 4a Item 7b gate-first).
+                // Endpoint /api/analytics/.../pro-forma-charts is 100% mock (marina
+                // literals, ignores projectId). Hidden until the engine-backed rewrite
+                // lands. See BETA_MVP_SPEC.md §3.5 + BETA_MVP_PHASE_1_5_AUDIT.md §6.A
+                // Item 7b. To restore: rewrite the endpoint to call proFormaEngineService,
+                // then un-hide here.
+                if (tab.value === "proforma-charts") return false;
                 if (tab.value === "storage-leases" && !tabOverrides.showStorageLeases) return false;
                 if (tab.value === "profit" && !tabOverrides.showProfitCenters) return false;
                 if (tab.value === "replacement-cost" && !tabOverrides.showReplacementCost) return false;
