@@ -415,10 +415,177 @@ Revenue-side keeps EGI, the fee base, and NOI consistent with multifamily.
 
 ---
 
+## Workstream 2 — `pnl_canonical_line_items` double-definition resolved (investigated 2026-05-21)
+
+**Headline.** The live DB's **column SET matches Def B exactly** (16/16 names); its column
+**attributes match neither** definition — the live table is the **union of both defs,
+accreted by `server/db-startup-migrations.ts`**. **Def B (`schema.ts:17008`) is the
+definition wired at runtime**; Def A's `pnlCanonicalLineItems` (`pnl-pipeline-schema.ts:79`)
+is **shadowed and dead**. Safe reconciliation = **pure code-dedup, NO DDL.**
+
+### The two code definitions
+
+**Def A — `shared/pnl-pipeline-schema.ts:79`** — the original (created `ba71d41d`,
+2025-12-24, "Add P&L pipeline…"). **11 columns:** `id` PK/uuid · `org_id` varchar **NOT NULL**
+· `canonical_key` text **NOT NULL** · `display_name` text NOT NULL · `department` text
+**NOT NULL** · `section` text **NOT NULL** · `parent_id` varchar · `sort_order` int NOT NULL
+dflt 0 · `is_active` bool NOT NULL dflt true · **`file_data` text** · `created_at` timestamp
+**with tz** NOT NULL. Constraints: PK(id); `unique('pnl_canonical_line_items_org_key_unique')`
+on (org_id, canonical_key); index `pnl_canonical_section_idx`.
+
+**Def B — `shared/schema.ts:17008`** — appeared 5 weeks later (`ff118239`, 2026-01-27,
+commit "Saved progress at the end of the loop"). **16 columns:** `id` PK/uuid · `coa_code`
+varchar(100) **NOT NULL UNIQUE** · `display_name` text NOT NULL · `major_group`
+**`pnlMajorGroupEnum`** NOT NULL · `subcategory_group` text NOT NULL · `description` text ·
+`sort_order` int dflt 0 (**nullable**) · `is_active` bool NOT NULL · `is_system_default`
+bool NOT NULL · `canonical_key` text · `department` text · `org_id` varchar FK→organizations ·
+`parent_id` varchar · `section` text · `created_at` timestamp **no tz** NOT NULL ·
+`updated_at` timestamp **no tz** NOT NULL. Indexes: coa_code, major_group, subcategory_group.
+
+**Column diff:** in **both** (10) — id, org_id, canonical_key, display_name, department,
+section, parent_id, sort_order, is_active, created_at. **Def B only** (6) — coa_code,
+major_group, subcategory_group, description, is_system_default, updated_at. **Def A only**
+(1) — **`file_data`**. **Attribute disagreements on shared columns:** Def A marks
+`org_id`/`canonical_key`/`department`/`section`/`sort_order` **NOT NULL**, Def B marks the
+first four **nullable** and `sort_order` nullable; Def A `created_at` is **with-tz**, Def B
+**no-tz**.
+
+### The live DB — source of truth (`public.pnl_canonical_line_items`, **282 rows**, read-only)
+
+16 columns:
+
+| col | live type | live nullable | faithful to |
+|---|---|---|---|
+| id | varchar (uuid dflt) | NO | A + B |
+| org_id | varchar | **YES** | B (A wrongly says NOT NULL) |
+| canonical_key | text | **YES** | B (A wrongly says NOT NULL) |
+| display_name | text | NO | A + B |
+| department | text | **YES** | B (A wrongly says NOT NULL) |
+| section | text | **YES** | B (A wrongly says NOT NULL) |
+| parent_id | varchar | YES | A + B |
+| sort_order | int (dflt 0) | **NO** | A (B has no NOT NULL) |
+| is_active | bool (dflt true) | NO | A + B |
+| created_at | **timestamptz** | NO | A (B wrongly says no-tz) |
+| coa_code | varchar(100) | **YES** | B-only (B wrongly says NOT NULL) |
+| major_group | **text** | YES | B-only (B wrongly declares it an **enum** + NOT NULL) |
+| subcategory_group | text | YES | B-only (B wrongly says NOT NULL) |
+| description | text | YES | B-only ✓ |
+| is_system_default | bool (dflt true) | YES | B-only (B wrongly says NOT NULL) |
+| updated_at | timestamp (no tz) | YES | B-only (B wrongly says NOT NULL) |
+
+**`file_data` (Def A) does NOT exist in the live table** — Def A declares a phantom column.
+
+Constraints (live): PK(id); `pnl_canonical_coa_code_unique` UNIQUE(coa_code);
+`pnl_canonical_line_items_org_key_unique` UNIQUE(org_id, canonical_key) — **both defs'
+unique constraints present**. Indexes (live, 8): pkey · `pnl_canonical_coa_code_idx` (B) ·
+`pnl_canonical_major_group_idx` (B) · `pnl_canonical_subcategory_idx` (B) ·
+`pnl_canonical_section_idx` (A) · `pnl_canonical_coa_code_unique` (B `.unique()`) ·
+`pnl_canonical_line_items_org_key_unique` (A) · **`pnl_canonical_coa_code_uniq_idx`** — a
+partial unique index `WHERE coa_code IS NOT NULL` declared by **neither** def (orphan).
+
+**Verdict — matches Def B's column set, neither def's attributes.** The live column set is
+exactly Def B's 16 names. But `major_group` is plain `text` (not the `pnlMajorGroupEnum` B
+declares), `created_at` is `timestamptz` (A's flavor, not B's), and 5 columns B marks
+NOT NULL (`coa_code`, `major_group`, `subcategory_group`, `is_system_default`, `updated_at`)
+are **nullable** live. The live table is the **union of A and B accreted incrementally**:
+`server/db-startup-migrations.ts` runs `ADD COLUMN IF NOT EXISTS` for Def-B columns
+(`:12465-12476`) **and** Def-A columns (`:18448-18453`) on boot — and `ADD COLUMN IF NOT
+EXISTS` adds columns **nullable**, which is exactly why every late-added column is nullable;
+`major_group` is `text` because the startup migration adds it as `text` (`:12469`), never as
+the enum; `created_at`'s `timestamptz` survives from Def A's original `CREATE`.
+
+### Which definition is wired at runtime — **Def B**
+
+`server/db.ts:4` `import * as schema from "@shared/schema"`; `:47` `drizzle({ client: pool,
+schema })`. `shared/schema.ts` **both** defines `pnlCanonicalLineItems` locally (`:17008`,
+Def B) **and** `export * from './pnl-pipeline-schema'` (`:21952`, repeated at `:25869` and
+`:25871`), which would re-export Def A. **ES-module rule: a local `export const` shadows a
+star-re-export of the same name** — so `@shared/schema.pnlCanonicalLineItems` resolves to
+**Def B**, deterministically, no error.
+
+**Every consumer imports from `@shared/schema`** — `pnl/mapping.ts`, `pnl/routes.ts`,
+`pnl/aggregationService.ts`, `promote-to-actuals.ts`, `seedMarinaCoa.ts`, `canonical-seed.ts`,
+`pnl-alias-matcher.ts`, `importPnlKeywordBank.ts`. **None imports the table from
+`pnl-pipeline-schema.ts` directly** (5 files import from that path, but only *types* —
+`ParsedRow`/`ParsedPeriod`). Corroboration: `pnl-alias-matcher.ts:102-104` reads
+`.majorGroup`/`.subcategoryGroup`/`.coaCode` — **Def-B-only fields** — and compiles, proving
+the resolved object is Def B.
+
+**Def A's `pnlCanonicalLineItems` is dead** — shadowed for queries, referenced only inside
+`pnl-pipeline-schema.ts` itself. Two latent landmines:
+- `pnlCanonicalLineItemsRelations` (`pnl-pipeline-schema.ts:189`) is bound to **Def A's**
+  table object; `db.query.pnlCanonicalLineItems` keys off **Def B's**. Object-identity
+  mismatch → relational `with:` queries silently don't resolve. No live bug (all consumers
+  use `findMany({ where })`, no `with:`).
+- `insertPnlCanonicalLineItemSchema` (`pnl-pipeline-schema.ts:348`) is `createInsertSchema`
+  of Def A — **zero consumers**, dead.
+
+### Drift history — accidental duplicate, not an intentional fork
+
+Def A is the original (`ba71d41d`, 2025-12-24). Def B appeared `ff118239`, 2026-01-27, in a
+commit titled **"Saved progress at the end of the loop"** — a generic Replit loop-checkpoint
+message, not a deliberate schema change. Def B was written as a *superset* of Def A's columns
+(it re-declares canonical_key/department/org_id/parent_id/section) plus 6 new ones — so its
+author had Def A's columns in view but **re-declared the table as a second `export const`
+inside the 25k-line `schema.ts` rather than editing Def A**. Reads as an **accidental
+duplicate** (likely an agent-loop edit). It has survived only because the ES shadowing rule
+makes Def B win deterministically and `db-startup-migrations.ts` patched the live table up
+to Def B's column set.
+
+### Reconciliation options
+
+**Option 1 — code-dedup: delete Def A's `pnlCanonicalLineItems`, keep Def B. NO DDL.** ✅ recommended
+- Delete the `pnlCanonicalLineItems` table (`pnl-pipeline-schema.ts:79-94`),
+  `pnlCanonicalLineItemsRelations` (`:189`), and `insertPnlCanonicalLineItemSchema` (`:348`)
+  from `pnl-pipeline-schema.ts`. Note `pnlLineItemAliases` (and likely `pnlKeywordRules`) in
+  that file are **also shadowed** (schema.ts re-declares them at `:17047`/`:17074`) — the
+  WS2-execute step must first **enumerate the full shadowed-dead subset** of
+  `pnl-pipeline-schema.ts` before deleting, and preserve its *live* exports
+  (`pnlParsedStatements`/`pnlReviewItems`/`pnlJobs` tables + the `ParsedRow`/`ParsedPeriod`
+  types that 5 files import).
+- **Blast radius: zero runtime change** — Def A's table is already shadowed/dead; no consumer
+  queries it; its relations object never attached to the live table anyway.
+- **Risk: low**, but it is careful surgery — `pnl-pipeline-schema.ts` interleaves
+  shadowed-dead and live exports. Watch for a `schema.ts ⇄ pnl-pipeline-schema.ts` import
+  cycle if FK references are repointed rather than deleted.
+- No DB change; tsc-verifiable.
+
+**Option 2 — correct Def B to match live truth. Code only, NO DDL.** (fold into Workstream 3)
+- Fix Def B's drifts so the surviving definition is *accurate*: `major_group` → `text` (not
+  `pnlMajorGroupEnum`); `created_at` → `withTimezone: true`; relax `.notNull()` on
+  `coa_code`/`major_group`/`subcategory_group`/`is_system_default`/`updated_at` to match the
+  nullable live columns; add `.notNull()` to `sort_order`.
+- Precondition for WS3 safely adding `treatment` — can't reason about a new column on a
+  definition that misdescribes 8 of its 16 columns.
+- No DDL. Risk low-medium — Drizzle's inferred types shift to reality, possibly surfacing
+  latent (desirable) call-site type errors.
+
+**Option 3 — do nothing.** The collision is currently benign (Def B wins deterministically),
+but it blocks WS3 and leaves the phantom-`file_data` / mismatched-relations landmines.
+Not recommended.
+
+**Recommendation:** **Option 1 now** (pure code-dedup, zero runtime risk → one definition),
+then **Option 2 folded into Workstream 3** (correct Def B to live truth as the foundation
+for the `treatment` column). **Neither requires a DB migration.** A migration is needed only
+if WS3 later *tightens* live nullable columns to NOT NULL or adds `treatment` — a separate
+go-ahead, and it would need a backfill for the 282 existing rows.
+
+### Out-of-scope items surfaced
+
+- Orphan partial unique index `pnl_canonical_coa_code_uniq_idx` (`WHERE coa_code IS NOT NULL`)
+  — declared by neither def, redundant with `pnl_canonical_coa_code_unique`. `coa_code` has
+  3 indexes total. Cleanup candidate.
+- `schema.ts` has `export * from './pnl-pipeline-schema'` **three times** (`:21952`, `:25869`,
+  `:25871`) — redundant; dedupe opportunistically.
+
+---
+
 ## Open items for the execution plan
 
 - Confirm `quickbooks-service.ts:609` as the 8th `inferDepartment` consumer (under-enumerated here).
-- Verify which `pnl_canonical_line_items` `pgTable` definition matches the live DB (`\d`).
+- ~~Verify which `pnl_canonical_line_items` `pgTable` definition matches the live DB~~ —
+  **RESOLVED 2026-05-21** (Workstream 2): live = Def B's column set; Def B (`schema.ts:17008`)
+  is wired; Def A is shadowed/dead. Recommended fix = code-dedup, no DDL.
 - ~~Decide the `badDebtPct` category convention~~ — **RESOLVED 2026-05-21**: revenue-side
   contra-revenue (see Workstream 1 above).
 - Decide whether the canonical entity needs global (org-agnostic) rows — drives the
@@ -426,4 +593,5 @@ Revenue-side keeps EGI, the fee base, and NOI consistent with multifamily.
 - Build the golden-number regression harness *before* Phase 4.
 
 **Filed:** 2026-05-21 · Phase 0 investigation. **Updated:** 2026-05-21 — Workstream 1
-executed (`badDebtPct` correction).
+executed (`badDebtPct` correction); Workstream 2 investigated (`pnl_canonical_line_items`
+double-definition — read-only, no DDL).
