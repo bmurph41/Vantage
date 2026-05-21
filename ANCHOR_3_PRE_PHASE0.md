@@ -570,6 +570,30 @@ for the `treatment` column). **Neither requires a DB migration.** A migration is
 if WS3 later *tightens* live nullable columns to NOT NULL or adds `treatment` — a separate
 go-ahead, and it would need a backfill for the 282 existing rows.
 
+### Workstream 2-execute — complete (executed 2026-05-21, commit `1487adb8`)
+
+**Done — Option 1 + repoint.** Def A's `pnlCanonicalLineItems`, `pnlLineItemAliases`,
+`pnlKeywordRules` (tables + their 3 relations + 3 insert schemas + select/insert types)
+deleted from `pnl-pipeline-schema.ts`. Pure code-dedup — **no DDL, no `db:push`, no migration.**
+
+The execute step's Step-1 inventory surfaced a blocker the investigation flagged only as a
+"watch for": the 3 shadowed-dead tables are **FK-referenced by LIVE exports in the same file** —
+`pnlFacts`, `pnlReviewItems`, `pnlDepartmentVerifications` and their relations (6 sites). A
+"delete cleanly, no repoint" was therefore impossible. Resolution: **repoint** —
+`pnlCanonicalLineItems` + `pnlKeywordRules` are now imported from `./schema` (Def B), so the 6
+live FK/relation sites resolve to the canonical Def B objects. No *new* import cycle (line 5
+already imported `organizations` from `./schema`).
+
+Also corrected vs the investigation: the full shadowed set is **6 names**, not 5 — 3 tables +
+3 `Pnl*` types (`PnlCanonicalLineItem`/`PnlLineItemAlias`/`PnlKeywordRule`, re-declared at
+`schema.ts:17099/17103/17105`; Def B also shadows the `InsertPnl*` types at `:17100/17104/17106`).
+The `*Relations` and `insertPnl*Schema` candidates are dead-by-zero-consumers, not
+dead-by-shadowing — still safely removed.
+
+**Verified:** `tsc -b shared` 0 · engine scoped check 0 in-scope · pnl consumers byte-identical
+pre/post (zero new errors) · no dangling refs · `@shared/schema` loads at runtime with
+`pnlCanonicalLineItems` resolving to Def B (`coaCode` present, phantom `file_data` gone).
+
 ### Out-of-scope items surfaced
 
 - Orphan partial unique index `pnl_canonical_coa_code_uniq_idx` (`WHERE coa_code IS NOT NULL`)
@@ -577,6 +601,12 @@ go-ahead, and it would need a backfill for the 282 existing rows.
   3 indexes total. Cleanup candidate.
 - `schema.ts` has `export * from './pnl-pipeline-schema'` **three times** (`:21952`, `:25869`,
   `:25871`) — redundant; dedupe opportunistically.
+- **`server/scripts/seedMarinaCoa.ts` — Def-A-shaped seed inserts → Workstream 3.** The seed
+  script inserts rows shaped to Def A (`canonicalKey`/`department`/`section`, no
+  `coaCode`/`majorGroup`/`subcategoryGroup`) into the Def B table it imports from
+  `@shared/schema` — 7 pre-existing `tsc` errors (`seedMarinaCoa.ts` lines 131/151/191/213-214).
+  Predates WS2-execute (identical with the WS2 change stashed); surfaced by its verification
+  sweep. Fix belongs with Option 2 — correct Def B / the seed path to live truth — in WS3.
 
 ---
 
@@ -593,5 +623,6 @@ go-ahead, and it would need a backfill for the 282 existing rows.
 - Build the golden-number regression harness *before* Phase 4.
 
 **Filed:** 2026-05-21 · Phase 0 investigation. **Updated:** 2026-05-21 — Workstream 1
-executed (`badDebtPct` correction); Workstream 2 investigated (`pnl_canonical_line_items`
-double-definition — read-only, no DDL).
+executed (`badDebtPct` correction); Workstream 2 investigated **and executed**
+(`pnl_canonical_line_items` double-definition — Def A deleted, live FKs repointed to Def B,
+commit `1487adb8`; no DDL).
