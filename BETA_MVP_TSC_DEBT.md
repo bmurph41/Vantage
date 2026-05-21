@@ -22,6 +22,11 @@ No errors are fixed here — this captures accurate scope so cleanup can be plan
 
 **v1.0 type-debt scope = `server/` 3,776 + `client/src` 2,448 ≈ 6,224 errors.**
 
+> **Current state (post engine-services cleanup, 2026-05-21):** engine set **0** ✅ ·
+> `server/` **3,566** · `client/src` **2,393** · `shared/` **0** ✅. The table above is the
+> frozen first-measurement baseline; see [Engine-services type cleanup](#engine-services-type-cleanup-2026-05-21)
+> for the batch-by-batch history that took `server/` from 3,803 → 3,566.
+
 Notes:
 - The `server/` run reports 3,803 lines total: **3,776 in `server/`**, 24 in `modules/dockit`
   (dragged in via one server-side import), 3 in `db/`, **0 in `shared/`**. `shared/` stays clean
@@ -325,15 +330,56 @@ files):
 | `server/services/rent-roll-v2/rentRollService.ts:4033` | TS2322 | `string \| null` assigned to `string \| undefined` — same loop | server |
 | `client/src/components/ratecomps/rate-comps/ViewCompModal.tsx:254` | TS2345 | `.map((type: string) ⇒ …)` over `unknown[]` — the array derives from a `Set<unknown>` whose iteration was `TS2802` at line 122 | client |
 
+### Batches 1–3 — engine-set fixes (commits `414f2e0f`, `26f039cf`, `8ec9e113`)
+
+Three batches cleared the remaining in-scope engine errors. Each re-measured the
+engine-scoped check (`tsconfig.diag-engine.json`):
+
+| Batch | Commit | Engine scoped | Fixes |
+|---|---|---:|---|
+| 1 | `414f2e0f` | 29 → 14 | **R1** DCF null-safety — `performDCFAnalysis` return widened to `DCFAnalysisResult \| null`, early-returns `null` on missing project so the route's existing `if (!result)` → 422 handler fires instead of an NPE; `computeQuickIRR` throws on the null case. **R2** `MonthlyBreakdown` consumer reconciliation — `multi-year-projection-engine` read `m.daysInMonth`/`m.isSeasonal` but `direct-input-engine` builds `m.days`/`m.isSeason` (`'in'\|'off'`); the projected fields were silently `undefined`. Fixed to read `m.days` + convert `m.isSeason → isSeasonal` boolean. **R3** `FinancialLine.key` + `DirectInputFinancials.monthlyBreakdown` made required (always populated at runtime). |
+| 2 | `26f039cf` | 14 → 9 | `cashflow-parity` import path → depth-independent `@shared/finance/xirr` alias; `debt-schedule-service` `tranche.seniority` → `.priority` (real column name); `dcf-calculator-service` `loadCapitalStackData` now maps `totalDebt`/`blendedDebtRate` (were dropped → every leveraged deal computed debt-free); `pro-forma-engine-service` metrics interface gained `linePositions` + `equityInvested` (emitted by the literal, consumed by UI). |
+| 3 | `8ec9e113` | 9 → 7 | `db.ts` pool `'error'`/`'connect'` handler params annotated (`Error` / `PoolClient`) — `@neondatabase/serverless` types `Pool.on()`'s listener as `any`. |
+
+**In-scope engine set: 0.** The 7 errors that remain are all `server/scripts/seedMarinaCoa.ts`
+— a seed script not in the engine `include` list, pulled into the engine program only
+transitively (imported by a COA loader). Never in the engine-cleanup scope; they are
+Drizzle insert-overload (`TS2769`) and null-index (`TS2538`/`TS18047`) errors, tracked
+under the `server/` set.
+
+Blast-radius verification (scoped checks, post-Batch-0 → post-Batch-3):
+
+| Check | Post-Batch-0 | Post-Batch-3 | Net |
+|---|---:|---:|---:|
+| Engine (`tsconfig.diag-engine.json`) | 29 | 7 *(all out-of-scope `seedMarinaCoa.ts`)* | −22 |
+| Server (`tsconfig.diag-server-only.json`) | 3,588 | 3,566 | −22 |
+| Client (`tsconfig.diag-client-only.json`) | 2,393 | 2,393 | 0 |
+| Shared (`tsc -b shared`) | exit 0 | exit 0 | — |
+
+The server net (−22) equals exactly the in-scope engine errors cleared — **no new errors
+introduced** anywhere in the server set, despite `performDCFAnalysis`'s return type widening
+to `… | null` and `FinancialLine.key` / `monthlyBreakdown` becoming required. Their consumers
+already null-checked (`dcf-routes.ts:55/184`) or always populated those fields. Client is
+unchanged — the engine return-type changes did not ripple into the UI layer.
+
+**The engine-services layer is now type-clean.** The 16-file `tsconfig.diag-engine.json` set
+(DCF / projection / pro-forma / returns / waterfall engines + canonical loaders +
+`debt-schedule-service` + `cashflow-parity` + `financial-calculations` + `modeling-periods`)
+type-checks at **0 errors**. This is the foundation for Anchor 3-pre.
+
 ---
 
 ## Implications for v1.0 planning
 
 - **The engine math is clean.** `shared/` (incl. `shared/finance/`, `shared/exit/`) is 0 errors.
-- **The backend is not clean.** `server/` carries 3,776 errors — this was the blind spot. The
-  server-side FM engine *wrappers* (`dcf-calculator-service.ts`, `multi-year-projection-engine.ts`,
-  `returns-service.ts`) have errors despite the underlying `shared/` math being clean.
-- **`client/src` is stable** at 2,448 — long-standing debt, not a regression.
+- **The engine-services layer is now clean too.** As of 2026-05-21 the server-side FM engine
+  *wrappers* (`dcf-calculator-service.ts`, `multi-year-projection-engine.ts`, `returns-service.ts`,
+  pro-forma / waterfall / canonical loaders — the 16-file engine set) type-check at 0 errors.
+  See [Engine-services type cleanup](#engine-services-type-cleanup-2026-05-21).
+- **The backend is not yet clean.** `server/` carries 3,566 errors (down from the 3,776
+  baseline). With the engine wrappers now clean, the remaining server debt is concentrated in
+  routes and non-engine services — schema-drift-dominated.
+- **`client/src` is stable** at 2,393 — long-standing debt, not a regression.
 - Real v1.0 type-debt scope is **~6,224 errors** (`server` + `client`), schema-drift-dominated
   (`TS2339` + `TS2304` are the bulk in both areas). This is a deliberate cleanup project, not a
   pre-commit blocker — sized against accurate numbers now, rather than an optimistic "server clean."
@@ -341,4 +387,4 @@ files):
 **Next step (not done here): triage `server/` and `client/src` by feature area against what
 ships in v1.0**, to separate must-fix from defer.
 
-**Filed:** 2026-05-21
+**Filed:** 2026-05-21 · **Updated:** 2026-05-21 (engine-services cleanup batches 1–3)
