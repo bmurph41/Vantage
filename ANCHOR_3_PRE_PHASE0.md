@@ -656,11 +656,24 @@ place, harmless; future-cleanup candidate.
   (its only caller was the unused endpoint). The 232 NULL-`coa_code` rows are ~206 doc-intel
   camelCase ingestion rows + ~21 legacy `org-1` rows; they remain in the DB, untouched —
   cleaning them is a separate, deliberate row-delete task, out of WS3-B scope.
-- **C — `pnlKeywordRules` double-definition.** `seedMarinaCoa.ts:151/191` insert Def-A-shaped
-  keyword rows (`keyword`/`bucket`/`department`) into Def B `pnlKeywordRules`, which expects
-  `keywords[]`/`canonicalCoaCode`. This is the **exact WS2 problem for `pnlKeywordRules`** — a
-  parallel double-definition reconciliation WS2 did not cover (it deduped only the schema side).
-  Own scoped task.
+- **C — `pnlKeywordRules` "double-definition" — investigated; there was NO double-definition.
+  Real defect (WS3-A-class drift) corrected (WS3-C, executed 2026-05-21, this commit).**
+  `pnlKeywordRules` / `pgTable('pnl_keyword_rules')` is defined **exactly once** (`schema.ts:17078`);
+  `pnl-pipeline-schema.ts` only *imports* it (one FK + one relation). There is no Def-A/Def-B
+  duplicate pair — nothing to dedup. The WS3-B note's "double-definition" was really **one table**
+  whose single declaration merges two column families: the scalar shape
+  (`keyword`/`bucket`/`department`/…) that every consumer uses, and the array shape
+  (`keywords[]`/`canonicalCoaCode`/`segmentCode`) that no consumer reads or writes.
+  The actual defect was schema-code-vs-live drift — `schema.ts:17078` marked
+  `keywords`/`canonicalCoaCode` `.notNull()` (live: nullable) and
+  `keyword`/`bucket`/`department`/`source`/`priority`/`timesMatched` nullable (live: NOT NULL),
+  plus `match_type` default `'contains'`→live `'phrase'` and `created_at`/`updated_at`
+  `timestamp`→live `timestamptz`. Corrected to live truth — **code-only, no DDL** (the live table
+  already holds these forms). Cleared **20** pre-existing `tsc` errors in the pnl consumers
+  (Phase-0 grep predicted 9; the 11 extras are the same drift bug-class — TS2538 index-type and
+  TS2322 assignment cascades the grep under-counted), **zero** new errors, **zero** call-site
+  changes. No FK entanglement: the lone FK (`pnl_department_verifications.keyword_rule_id`)
+  points at the single table; both tables 0 rows.
 
 ---
 
