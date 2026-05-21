@@ -298,7 +298,7 @@ const SELF_STORAGE_FIELDS: COAFieldDef[] = [
   { key: 'repairsMaintPerUnit', label: 'Repairs & Maint / Unit / Year', category: 'expense', inputType: 'currency', hint: 'Per-unit maintenance budget', group: 'Operating Expenses' },
   { key: 'securityMonitoringMonthly', label: 'Security Monitoring (monthly)', category: 'expense', inputType: 'currency', hint: 'Cameras, access control, monitoring', group: 'Operating Expenses' },
   { key: 'softwarePmsMonthly', label: 'PMS Software (monthly)', category: 'expense', inputType: 'currency', hint: 'Property management software', group: 'Operating Expenses' },
-  { key: 'badDebtPct', label: 'Bad Debt %', category: 'expense', inputType: 'percent', hint: 'Uncollectable as % of revenue', group: 'Operating Expenses', defaultValue: 2, pctOf: 'revenue' },
+  { key: 'badDebtPct', label: 'Bad Debt %', category: 'revenue', inputType: 'percent', hint: 'Uncollectable as % of revenue', group: 'Revenue Assumptions', defaultValue: 2, pctOf: 'revenue' },
   { key: 'capexPerSF', label: 'CapEx Reserve / SF / Year', category: 'expense', inputType: 'currency', hint: 'Capital reserve per SF', group: 'Reserves' },
 ];
 

@@ -360,13 +360,70 @@ Phase 4 carries financial-correctness risk.
 
 ---
 
+## Workstream 1 — category reconciliation (executed 2026-05-21)
+
+Workstream 1, scoped behind the engine accessor, reduced to a **single change**.
+Phase 0 §2 established the two `category` fields are different layers, not duplicates —
+`COALine.category` (engine P&L bucketing) is already module-private and singular;
+`COAFieldDef.category` (input-form section) is a separate concern. There is **no shared
+"canonical category source" to build** without crossing into Workstream 3 (DB-backed
+entity) or forcing cross-module coupling. So Workstream 1 = the `badDebtPct` correction,
+nothing more — there was no canonical-registry component to it.
+
+### Change shipped
+
+`shared/direct-input-coa.ts:301` — self_storage `badDebtPct` field:
+`category: 'expense' → 'revenue'`, `group: 'Operating Expenses' → 'Revenue Assumptions'`.
+
+**Canonical bad-debt decision:** bad debt is **revenue-side contra-revenue**
+(`category: 'revenue'`, `isSubtraction: true`). This matches the only treatment the
+engine actually executes — the `badDebt` COALine in `MULTIFAMILY_COA` at
+`server/services/direct-input-engine.ts:430` — and the projection engine's `VACANCY_KEYS`
+classification (`multi-year-projection-engine.ts:203`). Bad debt is a credit-loss
+adjustment above the NOI line, grouped with vacancy and concessions.
+
+**Zero financial-number movement — verified.** The engine never reads self_storage
+`badDebtPct` (`SELF_STORAGE_COA`, `direct-input-engine.ts:511-533`, has no bad-debt line).
+The canonical-seed consumer (`canonical-seed.ts:108`) dedups keys first-seen-wins and
+iterates `multifamily` before `self_storage` (`ALL_ASSET_CLASSES`), so `badDebtPct` is
+seeded from the multifamily entry (`:163`) — the self_storage entry at `:301` is never
+reached. Net effect is **UI form-section placement only**: on a self_storage project the
+"Bad Debt %" field now renders under Revenue instead of Expenses.
+
+### Future-wiring note — DO NOT LOSE
+
+`SELF_STORAGE_COA` has no bad-debt line today, so self_storage `badDebtPct` is a
+collected-but-unconsumed input (silent-drop field). **When a self-storage bad-debt COALine
+is eventually wired, it MUST use the revenue-side contra structure** (`category: 'revenue'`,
+`isSubtraction: true`, formula `storageRevenue × badDebtPct`) — mirroring
+`MULTIFAMILY_COA:430`. Modeling it as an expense line would compute a **different NOI for
+the same economic event**: NOI lower by `badDebt × propertyManagementPct` (the `X·p`
+divergence) — an expense-side bad-debt line leaves EGI un-reduced and so inflates the
+`pct_of_egi` management fee (`SELF_STORAGE_COA.propertyManagement`, `:525`, 6% of EGI).
+Revenue-side keeps EGI, the fee base, and NOI consistent with multifamily.
+
+### Out-of-scope latent items surfaced
+
+- **`shared/direct-input-coa.ts:163`** — the multifamily `badDebtPct` entry has
+  `category: 'revenue'` (correct) but **lacks `pctOf: 'revenue'`**, which the self_storage
+  entry has. Minor metadata inconsistency on the MF side; not corrected here (no behavioral
+  effect — MF bad debt is computed by the engine's own `MULTIFAMILY_COA:430` formula
+  regardless of `pctOf`). Fix opportunistically.
+- **Workstream 1 had no "canonical category source" component.** Establishing a single
+  canonical `key → {category, department, treatment}` entity is **Workstream 3**
+  (DB-backed), gated on the `pnl_canonical_line_items` double-definition collision (§3.2).
+
+---
+
 ## Open items for the execution plan
 
 - Confirm `quickbooks-service.ts:609` as the 8th `inferDepartment` consumer (under-enumerated here).
 - Verify which `pnl_canonical_line_items` `pgTable` definition matches the live DB (`\d`).
-- Decide the `badDebtPct` category convention (revenue contra vs expense).
+- ~~Decide the `badDebtPct` category convention~~ — **RESOLVED 2026-05-21**: revenue-side
+  contra-revenue (see Workstream 1 above).
 - Decide whether the canonical entity needs global (org-agnostic) rows — drives the
   `org_id`-nullable question.
 - Build the golden-number regression harness *before* Phase 4.
 
-**Filed:** 2026-05-21 · Phase 0 investigation only — no code changed, no commits.
+**Filed:** 2026-05-21 · Phase 0 investigation. **Updated:** 2026-05-21 — Workstream 1
+executed (`badDebtPct` correction).
