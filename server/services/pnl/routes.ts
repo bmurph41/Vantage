@@ -910,26 +910,6 @@ router.get('/documents/:documentId', async (req: any, res) => {
   }
 });
 
-router.post('/canonical-items/seed-marina', async (req: any, res) => {
-  try {
-    const __auth = getAuthContext(req, res); if (!__auth) return; const { orgId } = __auth;
-
-    const { seedMarinaCoa, getCoaStats } = await import('../../scripts/seedMarinaCoa');
-
-    const seedResult = await seedMarinaCoa(orgId);
-    const stats = await getCoaStats(orgId);
-
-    res.json({
-      message: 'Marina COA seeded successfully',
-      ...seedResult,
-      stats,
-    });
-  } catch (error: any) {
-    console.error('Seed marina COA error:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
 router.post('/statements/:statementId/approve', async (req: any, res) => {
   try {
     const __auth = getAuthContext(req, res); if (!__auth) return; const { orgId, userId } = __auth;

@@ -624,7 +624,8 @@ dropped.
 The correction surfaced **4** call-site errors (Phase 0 predicted ≈5, range 4-6); all fixed in
 the same commit. `pnl-alias-matcher.ts` `loadCoaCodeCache`/`loadCaches` now skip canonical rows
 lacking `coa_code`/`major_group`/`subcategory_group` — 232 of 282 live rows have NULL `coa_code`
-(the legacy `canonical_key` seed cohort) and previously collapsed under one null key in the
+(the NULL-`coa_code` cohort — **not** `seedMarinaCoa` output; provenance corrected in WS3-B
+below) and previously collapsed under one null key in the
 coa_code-keyed caches; they are unmatchable by `coa_code` (aliases reference non-null
 `canonicalCoaCode`) and served by a separate `canonicalLineItemId` path. `promote-to-actuals.ts:112`
 null-guarded; `majorGroupToCategory` param widened to `string | null` (its `switch` already
@@ -639,12 +640,22 @@ place, harmless; future-cleanup candidate.
 
 ### Open WS3 sub-items — need decisions before code
 
-- **B — legacy marina seed (`seedMarinaCoa.ts`).** Functional at runtime (232 of 282 live rows
-  are its output) but writes the deprecated `canonical_key` taxonomy with NULL `coa_code`/
-  `major_group`/`subcategory_group`. `canonical-seed.ts` (`ensurePnlCanonicalItemsSeeded`, wired
-  via `project-bridge.ts`) is the active coa_code-shaped seed. **Decision needed:** keep / retire /
-  align `seedMarinaCoa` (reachable only via the manual endpoint `POST /canonical-items/seed-marina`).
-  Its 6 remaining `tsc` errors (`:151`, `:191`, `:213-214`) are not addressed by WS3-A.
+- **B — dead `seedMarinaCoa` mechanism — REMOVED (WS3-B-narrow, executed 2026-05-21, this commit).**
+  WS3-B investigation found `seedMarinaCoa()` / `getCoaStats()` and the endpoint
+  `POST /canonical-items/seed-marina` **dead** — the endpoint had no client or server caller and
+  the functions ran via no other path. All three removed (code-only — **no DB write, no DDL,
+  no row delete**). The script's 6 remaining `tsc` errors (`:151`, `:191`, `:213-214`) were all
+  inside the deleted functions and are gone (engine scoped 6 → 0; pnl-consumer scoped 64 → 58;
+  zero new errors).
+  **`MARINA_COA_SEED` + `CoaSeedItem` preserved in place, untouched** — they are load-bearing
+  (`department-mapping.ts` builds `inferDepartment()`'s lookup tables from the array; also read
+  by `promote-to-actuals.ts`). `seedMarinaCoa.ts` now holds only the data constant + type.
+  Relocating that data to a proper data module is deferred to **WS4**.
+  **Provenance correction:** the WS3-A note's "232 ... legacy `canonical_key` seed cohort"
+  wording implied `seedMarinaCoa` produced those rows — **wrong**. `seedMarinaCoa` never ran
+  (its only caller was the unused endpoint). The 232 NULL-`coa_code` rows are ~206 doc-intel
+  camelCase ingestion rows + ~21 legacy `org-1` rows; they remain in the DB, untouched —
+  cleaning them is a separate, deliberate row-delete task, out of WS3-B scope.
 - **C — `pnlKeywordRules` double-definition.** `seedMarinaCoa.ts:151/191` insert Def-A-shaped
   keyword rows (`keyword`/`bucket`/`department`) into Def B `pnlKeywordRules`, which expects
   `keywords[]`/`canonicalCoaCode`. This is the **exact WS2 problem for `pnlKeywordRules`** — a

@@ -1,6 +1,15 @@
-import { db } from '../db';
-import { pnlCanonicalLineItems, pnlKeywordRules } from '@shared/schema';
-import { eq, and, or, isNull } from 'drizzle-orm';
+/**
+ * Marina Chart-of-Accounts seed data.
+ *
+ * MARINA_COA_SEED + CoaSeedItem are load-bearing: server/utils/department-mapping.ts
+ * builds inferDepartment()'s lookup tables from this array (also read by
+ * server/services/pnl/promote-to-actuals.ts). They are consumed as in-memory data
+ * only — this module performs no DB writes.
+ *
+ * The dead seed mechanism (seedMarinaCoa / getCoaStats + the unused endpoint
+ * POST /canonical-items/seed-marina) was removed in WS3-B. Relocating this data to a
+ * proper data module is deferred to WS4.
+ */
 
 export interface CoaSeedItem {
   canonicalKey: string;
@@ -117,106 +126,3 @@ export const MARINA_COA_SEED: CoaSeedItem[] = [
   { canonicalKey: 'expense.rent', displayName: 'Rent/Lease Expense', department: 'General', section: 'expense', sortOrder: 1720, keywords: ['rent', 'lease', 'land lease', 'ground rent'] },
   { canonicalKey: 'expense.bad_debt', displayName: 'Bad Debt Expense', department: 'General', section: 'expense', sortOrder: 1730, keywords: ['bad debt', 'write off', 'uncollectible'] },
 ];
-
-export async function seedMarinaCoa(orgId: string): Promise<{ coaCount: number; keywordCount: number }> {
-  const existingItems = await db.query.pnlCanonicalLineItems.findMany({
-    where: eq(pnlCanonicalLineItems.orgId, orgId),
-  });
-
-  const existingKeys = new Set(existingItems.map(item => item.canonicalKey));
-  const coaToInsert = MARINA_COA_SEED.filter(item => !existingKeys.has(item.canonicalKey));
-
-  if (coaToInsert.length > 0) {
-    await db.insert(pnlCanonicalLineItems).values(
-      coaToInsert.map(item => ({
-        orgId,
-        canonicalKey: item.canonicalKey,
-        displayName: item.displayName,
-        department: item.department,
-        section: item.section,
-        sortOrder: item.sortOrder,
-        isActive: true,
-      }))
-    );
-  }
-
-  const allItems = await db.query.pnlCanonicalLineItems.findMany({
-    where: eq(pnlCanonicalLineItems.orgId, orgId),
-  });
-  const keyMap = new Map(allItems.map(item => [item.canonicalKey, item.id]));
-
-  const existingRules = await db.query.pnlKeywordRules.findMany({
-    where: or(eq(pnlKeywordRules.orgId, orgId), isNull(pnlKeywordRules.orgId)),
-  });
-  const existingKeywords = new Set(existingRules.map(r => r.keyword.toLowerCase()));
-
-  const keywordsToInsert: Array<{
-    orgId: string | null;
-    department: string;
-    bucket: string;
-    keyword: string;
-    matchType: string;
-    priority: number;
-    canonicalLineItemId: string | null;
-    isActive: boolean;
-    source: string;
-  }> = [];
-
-  for (const item of MARINA_COA_SEED) {
-    if (!item.keywords) continue;
-    const canonicalId = keyMap.get(item.canonicalKey);
-    const bucket = item.section === 'cogs' ? 'COGS' :
-                   item.section === 'revenue' ? 'Revenue' :
-                   item.section === 'payroll' ? 'Expense' : 'Expense';
-
-    for (const keyword of item.keywords) {
-      if (existingKeywords.has(keyword.toLowerCase())) continue;
-      existingKeywords.add(keyword.toLowerCase());
-
-      keywordsToInsert.push({
-        orgId: null,
-        department: item.department,
-        bucket,
-        keyword: keyword.toLowerCase(),
-        matchType: keyword.includes(' ') ? 'phrase' : 'token',
-        priority: 100,
-        canonicalLineItemId: canonicalId ?? null,
-        isActive: true,
-        source: 'seed',
-      });
-    }
-  }
-
-  if (keywordsToInsert.length > 0) {
-    await db.insert(pnlKeywordRules).values(keywordsToInsert).onConflictDoNothing();
-  }
-
-  return {
-    coaCount: coaToInsert.length,
-    keywordCount: keywordsToInsert.length,
-  };
-}
-
-export async function getCoaStats(orgId: string): Promise<{
-  totalItems: number;
-  bySection: Record<string, number>;
-  byDepartment: Record<string, number>;
-}> {
-  const items = await db.query.pnlCanonicalLineItems.findMany({
-    where: eq(pnlCanonicalLineItems.orgId, orgId),
-  });
-
-  const bySection: Record<string, number> = {};
-  const byDepartment: Record<string, number> = {};
-
-  for (const item of items) {
-    bySection[item.section] = (bySection[item.section] || 0) + 1;
-    byDepartment[item.department] = (byDepartment[item.department] || 0) + 1;
-  }
-
-  return {
-    totalItems: items.length,
-    bySection,
-    byDepartment,
-  };
-}

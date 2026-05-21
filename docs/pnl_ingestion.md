@@ -56,7 +56,6 @@ Document Upload → OCR/Parsing → Period Detection → Line Item Classificatio
 ### Chart of Accounts
 - `GET /api/pnl/canonical-items` - List canonical line items
 - `POST /api/pnl/canonical-items/seed` - Seed basic canonical items
-- `POST /api/pnl/canonical-items/seed-marina` - Seed marina-specific COA
 
 ### Keyword Bank
 - `GET /api/pnl/keyword-bank` - List keyword rules
@@ -70,27 +69,6 @@ Document Upload → OCR/Parsing → Period Detection → Line Item Classificatio
 - `GET /api/pnl/facts` - Query stored P&L facts with filters
 
 ## Seeding COA and Aliases
-
-### Seed Marina-Specific Chart of Accounts
-
-```typescript
-// Via API
-POST /api/pnl/canonical-items/seed-marina
-
-// Programmatically
-import { seedMarinaCoa } from './server/scripts/seedMarinaCoa';
-await seedMarinaCoa(orgId);
-```
-
-This seeds 80+ marina-specific line items across departments:
-- **Storage**: Wet slips, dry storage, transient dockage, live-aboard
-- **Fuel**: Gas and diesel sales
-- **Service**: Repairs, labor, detailing, winterization
-- **Marina & Amenities**: Launch/haul, electric, water, pump-out
-- **Ship's Store**: Merchandise, parts, bait & tackle
-- **Boat Sales/Brokerage**: New/used boat sales, commissions
-- **Payroll**: By role (dock staff, technicians, admin)
-- **Expenses**: Insurance, taxes, utilities, R&M, marketing, professional fees
 
 ### Import Keyword Bank
 
