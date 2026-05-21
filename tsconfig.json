@@ -1,5 +1,5 @@
 {
-  "include": ["client/src/**/*", "server/**/*", "modules/dockit/**/*"],
+  "include": ["client/src/**/*", "server/**/*"],
   "exclude": ["node_modules", "build", "dist", "dist-types", "shared", "**/*.test.ts"],
   "references": [
     { "path": "./shared" }
