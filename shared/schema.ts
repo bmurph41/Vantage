@@ -17005,23 +17005,27 @@ export const pnlSegmentTypeEnum = pgEnum('pnl_segment_type', [
 ]);
 
 // Canonical Line Items (COA Master) - the "gold standard" categories
+// NOTE: attribute declarations corrected 2026-05-21 (WS3-A) to match the live
+// pnl_canonical_line_items table — major_group is plain text (not an enum),
+// created_at is timestamptz, sort_order is NOT NULL, and coa_code/major_group/
+// subcategory_group/is_system_default/updated_at are nullable. Code-only, no DDL.
 export const pnlCanonicalLineItems = pgTable('pnl_canonical_line_items', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
-  coaCode: varchar('coa_code', { length: 100 }).notNull().unique(),
+  coaCode: varchar('coa_code', { length: 100 }).unique(),
   displayName: text('display_name').notNull(),
-  majorGroup: pnlMajorGroupEnum('major_group').notNull(),
-  subcategoryGroup: text('subcategory_group').notNull(),
+  majorGroup: text('major_group'),
+  subcategoryGroup: text('subcategory_group'),
   description: text('description'),
-  sortOrder: integer('sort_order').default(0),
+  sortOrder: integer('sort_order').default(0).notNull(),
   isActive: boolean('is_active').default(true).notNull(),
-  isSystemDefault: boolean('is_system_default').default(true).notNull(),
+  isSystemDefault: boolean('is_system_default').default(true),
   canonicalKey: text('canonical_key'),
   department: text('department'),
   orgId: varchar('org_id').references(() => organizations.id),
   parentId: varchar('parent_id'),
   section: text('section'),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow(),
 }, (table) => ({
   coaCodeIdx: index('pnl_canonical_coa_code_idx').on(table.coaCode),
   majorGroupIdx: index('pnl_canonical_major_group_idx').on(table.majorGroup),

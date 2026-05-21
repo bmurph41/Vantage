@@ -106,6 +106,9 @@ async function loadCoaCodeCache() {
   
   coaCodeCache = new Map();
   for (const item of items) {
+    // Canonical rows without a coa_code (and its major/subcategory grouping)
+    // can't serve a coa_code lookup — skip rather than cache a null-keyed entry.
+    if (!item.coaCode || !item.majorGroup || !item.subcategoryGroup) continue;
     const key = `${item.majorGroup}:${item.subcategoryGroup}`;
     coaCodeCache.set(key, item.coaCode);
   }
@@ -177,6 +180,9 @@ async function loadCaches() {
   const canonicals = await db.select().from(pnlCanonicalLineItems).where(eq(pnlCanonicalLineItems.isActive, true));
   canonicalCache = new Map();
   for (const item of canonicals) {
+    // canonicalCache is keyed by coa_code; rows without one (legacy
+    // canonical_key-only seed rows) are unmatchable here — skip them.
+    if (!item.coaCode || !item.majorGroup || !item.subcategoryGroup) continue;
     canonicalCache.set(item.coaCode, { displayName: item.displayName, majorGroup: item.majorGroup, subcategoryGroup: item.subcategoryGroup });
   }
 

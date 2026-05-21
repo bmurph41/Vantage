@@ -421,7 +421,7 @@ export function sectionToCategory(section: string): string {
   }
 }
 
-export function majorGroupToCategory(majorGroup: string): string {
+export function majorGroupToCategory(majorGroup: string | null): string {
   switch (majorGroup) {
     case 'Revenue': return 'Revenue';
     case 'COGS': return 'COGS';

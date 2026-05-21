@@ -109,7 +109,7 @@ export async function promotePnlFactsToActuals(
           continue;
         }
 
-        const coaEntry = coaLookup[canonical.coaCode];
+        const coaEntry = canonical.coaCode ? coaLookup[canonical.coaCode] : undefined;
         
         // ========================================
         // FIX: User-confirmed bucket (resolvedBucket) is FIRST priority for category.
