@@ -274,6 +274,59 @@ grep 'error TS' /tmp/tsc.log | awk -F'(' '{print $1}' | sort | uniq -c | sort -r
 
 ---
 
+## Engine-services type cleanup (2026-05-21)
+
+Scoped cleanup of the FM engine service files — the `tsconfig.diag-engine.json` set
+(16 files: the DCF / projection / pro-forma / returns / waterfall engines plus the
+canonical loaders, `debt-schedule-service`, `cashflow-parity`, `financial-calculations`
+and `modeling-periods`). Executed in batches; each batch re-measured the engine-scoped
+check. Engine baseline at start: **40 errors**.
+
+### Batch 0 — `target: es2022`
+
+Root `tsconfig.json` `compilerOptions` had no `target`, so TypeScript defaulted to
+**ES3**. Every `for…of` / spread over a `Set` / `Map` / `MapIterator` therefore raised
+`TS2802` ("can only be iterated with `--downlevelIteration` or `--target es2015`+").
+Setting `"target": "es2022"` clears all of them. This is correct config, not a
+workaround — `lib` is already `esnext`, `module` is `ESNext`, and the runtime
+(`tsx` / `esbuild` / `vite`) already targets modern JS. The missing `target` was a
+latent misconfiguration.
+
+Blast-radius verification (scoped checks, before → after):
+
+| Check | Before | After | Net |
+|---|---:|---:|---:|
+| Engine (`tsconfig.diag-engine.json`) | 40 | 29 | −11 |
+| Server (`tsconfig.diag-server-only.json`) | 3,803 | 3,588 | −215 |
+| Client (`tsconfig.diag-client-only.json`) | 2,448 | 2,393 | −55 |
+| Shared (`tsc -b shared`) | exit 0 | exit 0 | — |
+
+Codebase-wide `TS2802` cleared: **196** (149 server + 47 client). The engine also shed
+5 `TS7006` (`implicit any`) in `modeling-periods.ts` — *cascade* errors: once the `Map`
+iteration type-checks, the loop variables are no longer `any`.
+
+### Latent bugs unmasked by es2022 target (were hidden behind TS2802 `any`-recovery)
+
+`TS2802` is a hard-stop diagnostic: when it fires on a loop header, TypeScript makes
+the loop variable `any` to recover, which silences **every** downstream type error in
+the loop body. Removing `TS2802` lets the loop type-check, the variable gets its true
+type, and pre-existing latent errors in the body surface. **14 such errors surfaced**
+(13 server + 1 client). None are regressions — every one traces to a baseline `TS2802`
+iteration site. They are real bugs that were masked, and remain to be fixed in the
+future server / client cleanup passes (**not** this engine batch — none are engine-set
+files):
+
+| File:line | Code | Real bug | Pass |
+|---|---|---|---|
+| `server/storage.ts:1186` | TS2488 | `any[] \| QueryResult<never>` iterated — not iterable. Was `TS2461` ("not an array type") at the *same* line/column; es2022 recodes the diagnostic. | server |
+| `server/routes/rra-routes.ts:4332,4333` | TS2345 ×2 | `{}` passed where `string` required — loop body over a `MapIterator` whose header was `TS2802` at line 4331. Identical `TS2345` already visible at 4315/4319/4321 *outside* the loop. | server |
+| `server/routes/rra-routes.ts:4341,4344,4350` | TS2322 ×7 | same `{}`→`string` bug, assignment positions in the same loop body | server |
+| `server/services/rent-roll-v2/rentRollService.ts:4019,4021` | TS2769 ×2 | `new Date(string \| null)` — `null` not accepted; loop over a `Map` whose header was `TS2802` at line 4008 | server |
+| `server/services/rent-roll-v2/rentRollService.ts:4033` | TS2322 | `string \| null` assigned to `string \| undefined` — same loop | server |
+| `client/src/components/ratecomps/rate-comps/ViewCompModal.tsx:254` | TS2345 | `.map((type: string) ⇒ …)` over `unknown[]` — the array derives from a `Set<unknown>` whose iteration was `TS2802` at line 122 | client |
+
+---
+
 ## Implications for v1.0 planning
 
 - **The engine math is clean.** `shared/` (incl. `shared/finance/`, `shared/exit/`) is 0 errors.

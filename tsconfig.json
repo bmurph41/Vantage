@@ -8,6 +8,7 @@
     "incremental": true,
     "tsBuildInfoFile": "./.tsbuildinfo",
     "noEmit": true,
+    "target": "es2022",
     "module": "ESNext",
     "strict": true,
     "lib": ["esnext", "dom", "dom.iterable"],
