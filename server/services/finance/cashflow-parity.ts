@@ -12,7 +12,7 @@
  *   - Decision support analytics (Layer 4)
  */
 
-import { DatedCashFlow } from '../../shared/finance/xirr';
+import { DatedCashFlow } from '@shared/finance/xirr';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 

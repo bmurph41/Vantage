@@ -229,7 +229,7 @@ export class DebtScheduleService {
         
         tranchePayments.push({
           trancheId: state.tranche.id,
-          trancheName: state.tranche.name || `Tranche ${state.tranche.seniority || 1}`,
+          trancheName: state.tranche.name || `Tranche ${state.tranche.priority || 1}`,
           payment: Math.round(payment * 100) / 100,
           principal: Math.round(principal * 100) / 100,
           interest: Math.round(interest * 100) / 100,

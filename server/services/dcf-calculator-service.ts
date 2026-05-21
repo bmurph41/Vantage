@@ -1471,6 +1471,12 @@ async function loadCapitalStackData(pool: any, modelingProjectId: string) {
     exitCapRate: Number(row.exit_cap_rate) || 0,
     totalEquity: Number(row.total_equity) || 0,
     purchasePrice: Number(row.purchase_price) || 0,
+    // total_debt / blended_debt_rate are SELECTed above and consumed by the
+    // debt-schedule step (performDCFAnalysis Step 5). They were missing from
+    // this mapping, so totalDebt/blendedDebtRate read undefined → every
+    // leveraged deal was silently computed debt-free.
+    totalDebt: Number(row.total_debt) || 0,
+    blendedDebtRate: Number(row.blended_debt_rate) || 0,
     debtTranches: [],
   };
 }

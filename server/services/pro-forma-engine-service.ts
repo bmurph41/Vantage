@@ -214,6 +214,14 @@ export interface ProFormaData {
     stabilizedNoi: number;
     stabilizedNoiYear: number;
     stabilizedNoiMode: StabilizedNoiMode;
+    // Line position configuration — whether the management fee / capex /
+    // reserves lines render above or below the NOI line. Consumed by the
+    // Pro Forma table UI (pro-forma.tsx reads metrics.linePositions).
+    linePositions: {
+      managementFee: 'above' | 'below';
+      capex: 'above' | 'below';
+      reserves: 'above' | 'below';
+    };
     // Exit waterfall
     netExitProceeds: number;
     sellingFees: number;
@@ -228,6 +236,7 @@ export interface ProFormaData {
     avgDscr?: number;
     debtYield?: number;
     ltv?: number;
+    equityInvested: number;  // Total equity invested = price − loan proceeds + working capital
     // Day 11b — STR-specific KPI metrics. Gated by assetClass === 'str' AND
     // avgNightlyRate present. Omitted entirely for other asset classes.
     adr?: number;                 // Year 1 average daily rate
