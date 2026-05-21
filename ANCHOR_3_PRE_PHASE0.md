@@ -610,6 +610,49 @@ pre/post (zero new errors) · no dangling refs · `@shared/schema` loads at runt
 
 ---
 
+## Workstream 3 — correct Def B to live truth + seed-path reconciliation
+
+### Workstream 3-A — complete (executed 2026-05-21, commit `747e2c83`)
+
+**Done.** Def B `pnlCanonicalLineItems` (`schema.ts:17008`) attribute declarations corrected to
+match the live table — code-only, **no DDL / `db:push` / migration** (the live columns already
+have these forms). 7 corrections, all re-confirmed against the live DB: `major_group` enum→`text`
++ nullable · `created_at` → `timestamptz` · `sort_order` → NOT NULL · `coa_code` `.notNull()`
+dropped (`.unique()` kept) · `subcategory_group` / `is_system_default` / `updated_at` `.notNull()`
+dropped.
+
+The correction surfaced **4** call-site errors (Phase 0 predicted ≈5, range 4-6); all fixed in
+the same commit. `pnl-alias-matcher.ts` `loadCoaCodeCache`/`loadCaches` now skip canonical rows
+lacking `coa_code`/`major_group`/`subcategory_group` — 232 of 282 live rows have NULL `coa_code`
+(the legacy `canonical_key` seed cohort) and previously collapsed under one null key in the
+coa_code-keyed caches; they are unmatchable by `coa_code` (aliases reference non-null
+`canonicalCoaCode`) and served by a separate `canonicalLineItemId` path. `promote-to-actuals.ts:112`
+null-guarded; `majorGroupToCategory` param widened to `string | null` (its `switch` already
+routes unknowns to `default: 'Expenses'`).
+
+**Verified:** `tsc -b shared` 0 · engine scoped 0 in-scope · pnl consumers **67 → 64** (net −3:
+`seedMarinaCoa:131` plus one pre-existing insert error each in `canonical-seed.ts` and
+`pnl/routes.ts`, all cleared by the Def B loosening; **zero new errors**) · runtime probe — Def B
+loads corrected, `canonicalCache` loads exactly the 50 coa-coded rows (null-key collision gone),
+`findAliasMatch` still matches. `pnlMajorGroupEnum` (`schema.ts:16992`) is now unused — left in
+place, harmless; future-cleanup candidate.
+
+### Open WS3 sub-items — need decisions before code
+
+- **B — legacy marina seed (`seedMarinaCoa.ts`).** Functional at runtime (232 of 282 live rows
+  are its output) but writes the deprecated `canonical_key` taxonomy with NULL `coa_code`/
+  `major_group`/`subcategory_group`. `canonical-seed.ts` (`ensurePnlCanonicalItemsSeeded`, wired
+  via `project-bridge.ts`) is the active coa_code-shaped seed. **Decision needed:** keep / retire /
+  align `seedMarinaCoa` (reachable only via the manual endpoint `POST /canonical-items/seed-marina`).
+  Its 6 remaining `tsc` errors (`:151`, `:191`, `:213-214`) are not addressed by WS3-A.
+- **C — `pnlKeywordRules` double-definition.** `seedMarinaCoa.ts:151/191` insert Def-A-shaped
+  keyword rows (`keyword`/`bucket`/`department`) into Def B `pnlKeywordRules`, which expects
+  `keywords[]`/`canonicalCoaCode`. This is the **exact WS2 problem for `pnlKeywordRules`** — a
+  parallel double-definition reconciliation WS2 did not cover (it deduped only the schema side).
+  Own scoped task.
+
+---
+
 ## Open items for the execution plan
 
 - Confirm `quickbooks-service.ts:609` as the 8th `inferDepartment` consumer (under-enumerated here).
@@ -625,4 +668,6 @@ pre/post (zero new errors) · no dangling refs · `@shared/schema` loads at runt
 **Filed:** 2026-05-21 · Phase 0 investigation. **Updated:** 2026-05-21 — Workstream 1
 executed (`badDebtPct` correction); Workstream 2 investigated **and executed**
 (`pnl_canonical_line_items` double-definition — Def A deleted, live FKs repointed to Def B,
-commit `1487adb8`; no DDL).
+commit `1487adb8`; no DDL); Workstream 3-A executed (Def B corrected to live truth + coa_code
+null-cache fix, commit `747e2c83`; no DDL) — WS3 sub-items B (legacy marina seed) and C
+(`pnlKeywordRules` double-definition) open, pending decisions.
