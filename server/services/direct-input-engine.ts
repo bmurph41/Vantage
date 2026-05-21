@@ -20,7 +20,7 @@ export interface DirectInputFinancials {
   expenseLines: FinancialLine[];
   computedFrom: 'direct_input';
   formulaBreakdowns: Record<string, string>;
-  monthlyBreakdown?: MonthlyBreakdown[];
+  monthlyBreakdown: MonthlyBreakdown[];
 }
 
 export interface FinancialLine {
@@ -28,7 +28,7 @@ export interface FinancialLine {
   amount: number;
   category: 'revenue' | 'expense';
   formula?: string;
-  key?: string;         // stable key for persistence (e.g. 'annualPropertyTax')
+  key: string;          // stable key for persistence (e.g. 'annualPropertyTax')
   isCustom?: boolean;   // user-added line
   isSubtraction?: boolean; // renders as negative (vacancy, concessions)
 }

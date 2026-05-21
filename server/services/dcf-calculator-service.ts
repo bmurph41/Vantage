@@ -238,12 +238,19 @@ export async function performDCFAnalysis(
     computeMultiYearProjection: (year1: any, config: any) => any;
     generateDebtSchedule?: (tranches: any[], holdPeriod: number) => any;
   }
-): Promise<DCFAnalysisResult> {
+): Promise<DCFAnalysisResult | null> {
   const { projectId, orgId, discountRate: userDiscountRate } = input;
   const { pool, computeDirectInputFinancials, computeMultiYearProjection } = deps;
 
   // ── Step 1: Load project data from DB (raw SQL) ─────────────────────────
   const projectData = await loadProjectData(pool, projectId);
+  if (!projectData) {
+    // No modeling_projects row — loadProjectData returns null by design
+    // ("client shows CTA"). Surface that as a null result so the route
+    // returns its 422 "complete the Inputs tab first" response instead of
+    // crashing on a null dereference below.
+    return null;
+  }
   const scenarioData = await loadScenarioData(pool, projectData.modelingProjectId);
   const capitalStackData = await loadCapitalStackData(pool, projectData.modelingProjectId);
 
@@ -569,6 +576,12 @@ export async function computeQuickIRR(
     { projectId: request.projectId, orgId: request.orgId, discountRate: request.discountRate },
     deps
   );
+  if (!result) {
+    // performDCFAnalysis returns null when the project has no inputs.
+    // QuickIRR has no meaningful zero-state — surface an explicit error
+    // rather than emitting a misleading 0% IRR.
+    throw new Error('No inputs — complete property assumptions on the Inputs tab first.');
+  }
 
   return {
     irr: result.leveredIrr,

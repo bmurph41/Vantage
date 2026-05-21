@@ -279,8 +279,8 @@ function scaleMonthlyBreakdown(
       revenue: scaledRevenue,
       expenses: scaledExpenses,
       noi: scaledNOI,
-      daysInMonth: m.daysInMonth,
-      isSeasonal: m.isSeasonal,
+      daysInMonth: m.days,
+      isSeasonal: m.isSeason === undefined ? undefined : m.isSeason === 'in',
     };
   });
 }
@@ -320,8 +320,8 @@ function buildYear1(
       revenue: round2(m.revenue),
       expenses: round2(m.expenses),
       noi: round2(m.noi ?? (m.revenue - m.expenses)),
-      daysInMonth: m.daysInMonth,
-      isSeasonal: m.isSeasonal,
+      daysInMonth: m.days,
+      isSeasonal: m.isSeason === undefined ? undefined : m.isSeason === 'in',
     })
   );
 
