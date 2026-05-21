@@ -1,0 +1,1867 @@
+{
+  "_meta": {
+    "harness": "tests/department-inference-golden.mjs",
+    "description": "WS4-prep golden baseline for department inference. Captures CURRENT behavior (bugs included). Regenerate with --update; any non-empty diff during WS4 must be reviewed.",
+    "inputCount": 107,
+    "projectionYears": 5
+  },
+  "inferences": [
+    {
+      "label": "Wet Slip Rentals",
+      "category": "revenue",
+      "scenario": "marina",
+      "department": {
+        "serverNative": "Storage",
+        "serverUndefined": "Storage",
+        "serverMarina": "Storage",
+        "client": "Storage"
+      },
+      "assumptionKey": {
+        "serverNative": "storage",
+        "serverUndefined": "storage",
+        "serverMarina": "storage",
+        "client": "storage"
+      }
+    },
+    {
+      "label": "Dry Storage",
+      "category": "revenue",
+      "scenario": "marina",
+      "department": {
+        "serverNative": "Storage",
+        "serverUndefined": "Storage",
+        "serverMarina": "Storage",
+        "client": "Storage"
+      },
+      "assumptionKey": {
+        "serverNative": "storage",
+        "serverUndefined": "storage",
+        "serverMarina": "storage",
+        "client": "storage"
+      }
+    },
+    {
+      "label": "Mooring Fees",
+      "category": "revenue",
+      "scenario": "marina",
+      "department": {
+        "serverNative": "Storage",
+        "serverUndefined": "Storage",
+        "serverMarina": "Storage",
+        "client": "Storage"
+      },
+      "assumptionKey": {
+        "serverNative": "storage",
+        "serverUndefined": "storage",
+        "serverMarina": "storage",
+        "client": "storage"
+      }
+    },
+    {
+      "label": "Transient Dockage",
+      "category": "revenue",
+      "scenario": "marina",
+      "department": {
+        "serverNative": "Storage",
+        "serverUndefined": "Storage",
+        "serverMarina": "Storage",
+        "client": "Storage"
+      },
+      "assumptionKey": {
+        "serverNative": "storage",
+        "serverUndefined": "storage",
+        "serverMarina": "storage",
+        "client": "storage"
+      }
+    },
+    {
+      "label": "Live Aboard Fees",
+      "category": "revenue",
+      "scenario": "marina",
+      "department": {
+        "serverNative": "Storage",
+        "serverUndefined": "Storage",
+        "serverMarina": "Storage",
+        "client": "General"
+      },
+      "assumptionKey": {
+        "serverNative": "storage",
+        "serverUndefined": "storage",
+        "serverMarina": "storage",
+        "client": "g_and_a"
+      }
+    },
+    {
+      "label": "Gasoline Sales",
+      "category": "revenue",
+      "scenario": "marina",
+      "department": {
+        "serverNative": "Fuel",
+        "serverUndefined": "Fuel",
+        "serverMarina": "Fuel",
+        "client": "Fuel"
+      },
+      "assumptionKey": {
+        "serverNative": "fuel_dock",
+        "serverUndefined": "fuel_dock",
+        "serverMarina": "fuel_dock",
+        "client": "fuel_dock"
+      }
+    },
+    {
+      "label": "Diesel Revenue",
+      "category": "revenue",
+      "scenario": "marina",
+      "department": {
+        "serverNative": "Fuel",
+        "serverUndefined": "Fuel",
+        "serverMarina": "Fuel",
+        "client": "Fuel"
+      },
+      "assumptionKey": {
+        "serverNative": "fuel_dock",
+        "serverUndefined": "fuel_dock",
+        "serverMarina": "fuel_dock",
+        "client": "fuel_dock"
+      }
+    },
+    {
+      "label": "Ship Store Merchandise",
+      "category": "revenue",
+      "scenario": "marina",
+      "department": {
+        "serverNative": "Ship's Store",
+        "serverUndefined": "Ship's Store",
+        "serverMarina": "Ship's Store",
+        "client": "Ship's Store"
+      },
+      "assumptionKey": {
+        "serverNative": "ship_store",
+        "serverUndefined": "ship_store",
+        "serverMarina": "ship_store",
+        "client": "ship_store"
+      }
+    },
+    {
+      "label": "Chandlery Income",
+      "category": "revenue",
+      "scenario": "marina",
+      "department": {
+        "serverNative": "Ship's Store",
+        "serverUndefined": "Ship's Store",
+        "serverMarina": "Ship's Store",
+        "client": "Ship's Store"
+      },
+      "assumptionKey": {
+        "serverNative": "ship_store",
+        "serverUndefined": "ship_store",
+        "serverMarina": "ship_store",
+        "client": "ship_store"
+      }
+    },
+    {
+      "label": "Service Labor",
+      "category": "revenue",
+      "scenario": "marina",
+      "department": {
+        "serverNative": "Service",
+        "serverUndefined": "Service",
+        "serverMarina": "Service",
+        "client": "Service"
+      },
+      "assumptionKey": {
+        "serverNative": "service",
+        "serverUndefined": "service",
+        "serverMarina": "service",
+        "client": "service"
+      }
+    },
+    {
+      "label": "Bottom Paint Service",
+      "category": "revenue",
+      "scenario": "marina",
+      "department": {
+        "serverNative": "Service",
+        "serverUndefined": "Service",
+        "serverMarina": "Service",
+        "client": "Service"
+      },
+      "assumptionKey": {
+        "serverNative": "service",
+        "serverUndefined": "service",
+        "serverMarina": "service",
+        "client": "service"
+      }
+    },
+    {
+      "label": "Boat Brokerage Commission",
+      "category": "revenue",
+      "scenario": "marina",
+      "department": {
+        "serverNative": "Boat Brokerage",
+        "serverUndefined": "Boat Brokerage",
+        "serverMarina": "Boat Brokerage",
+        "client": "Boat Brokerage"
+      },
+      "assumptionKey": {
+        "serverNative": "boat_brokerage",
+        "serverUndefined": "boat_brokerage",
+        "serverMarina": "boat_brokerage",
+        "client": "boat_brokerage"
+      }
+    },
+    {
+      "label": "New Boat Sales",
+      "category": "revenue",
+      "scenario": "marina",
+      "department": {
+        "serverNative": "Boat Sales",
+        "serverUndefined": "Boat Sales",
+        "serverMarina": "Boat Sales",
+        "client": "Boat Sales"
+      },
+      "assumptionKey": {
+        "serverNative": "boat_sales",
+        "serverUndefined": "boat_sales",
+        "serverMarina": "boat_sales",
+        "client": "boat_sales"
+      }
+    },
+    {
+      "label": "Used Boat Sales",
+      "category": "revenue",
+      "scenario": "marina",
+      "department": {
+        "serverNative": "Boat Sales",
+        "serverUndefined": "Boat Sales",
+        "serverMarina": "Boat Sales",
+        "client": "Boat Sales"
+      },
+      "assumptionKey": {
+        "serverNative": "boat_sales",
+        "serverUndefined": "boat_sales",
+        "serverMarina": "boat_sales",
+        "client": "boat_sales"
+      }
+    },
+    {
+      "label": "Launch & Haul Fees",
+      "category": "revenue",
+      "scenario": "marina",
+      "department": {
+        "serverNative": "Marina & Amenities",
+        "serverUndefined": "Marina & Amenities",
+        "serverMarina": "Marina & Amenities",
+        "client": "Marina & Amenities"
+      },
+      "assumptionKey": {
+        "serverNative": "marina_amenities",
+        "serverUndefined": "marina_amenities",
+        "serverMarina": "marina_amenities",
+        "client": "marina_amenities"
+      }
+    },
+    {
+      "label": "Power Pedestal Income",
+      "category": "revenue",
+      "scenario": "marina",
+      "department": {
+        "serverNative": "Marina & Amenities",
+        "serverUndefined": "Marina & Amenities",
+        "serverMarina": "Marina & Amenities",
+        "client": "Marina & Amenities"
+      },
+      "assumptionKey": {
+        "serverNative": "marina_amenities",
+        "serverUndefined": "marina_amenities",
+        "serverMarina": "marina_amenities",
+        "client": "marina_amenities"
+      }
+    },
+    {
+      "label": "Pump Out Fees",
+      "category": "revenue",
+      "scenario": "marina",
+      "department": {
+        "serverNative": "Marina & Amenities",
+        "serverUndefined": "Marina & Amenities",
+        "serverMarina": "Marina & Amenities",
+        "client": "General"
+      },
+      "assumptionKey": {
+        "serverNative": "marina_amenities",
+        "serverUndefined": "marina_amenities",
+        "serverMarina": "marina_amenities",
+        "client": "g_and_a"
+      }
+    },
+    {
+      "label": "Cost of Gas",
+      "category": "cogs",
+      "scenario": "marina",
+      "department": {
+        "serverNative": "Fuel",
+        "serverUndefined": "Fuel",
+        "serverMarina": "Fuel",
+        "client": "Fuel"
+      },
+      "assumptionKey": {
+        "serverNative": "fuel_dock",
+        "serverUndefined": "fuel_dock",
+        "serverMarina": "fuel_dock",
+        "client": "fuel_dock"
+      }
+    },
+    {
+      "label": "Cost of Diesel",
+      "category": "cogs",
+      "scenario": "marina",
+      "department": {
+        "serverNative": "Fuel",
+        "serverUndefined": "Fuel",
+        "serverMarina": "Fuel",
+        "client": "Fuel"
+      },
+      "assumptionKey": {
+        "serverNative": "fuel_dock",
+        "serverUndefined": "fuel_dock",
+        "serverMarina": "fuel_dock",
+        "client": "fuel_dock"
+      }
+    },
+    {
+      "label": "Store COGS",
+      "category": "cogs",
+      "scenario": "marina",
+      "department": {
+        "serverNative": "Ship's Store",
+        "serverUndefined": "Ship's Store",
+        "serverMarina": "Ship's Store",
+        "client": "Ship's Store"
+      },
+      "assumptionKey": {
+        "serverNative": "ship_store",
+        "serverUndefined": "ship_store",
+        "serverMarina": "ship_store",
+        "client": "ship_store"
+      }
+    },
+    {
+      "label": "Parts Cost",
+      "category": "cogs",
+      "scenario": "marina",
+      "department": {
+        "serverNative": "Service",
+        "serverUndefined": "Service",
+        "serverMarina": "Service",
+        "client": "Service"
+      },
+      "assumptionKey": {
+        "serverNative": "service",
+        "serverUndefined": "service",
+        "serverMarina": "service",
+        "client": "service"
+      }
+    },
+    {
+      "label": "Boat Sales COGS",
+      "category": "cogs",
+      "scenario": "marina",
+      "department": {
+        "serverNative": "Boat Sales",
+        "serverUndefined": "Boat Sales",
+        "serverMarina": "Boat Sales",
+        "client": "Boat Sales"
+      },
+      "assumptionKey": {
+        "serverNative": "boat_sales",
+        "serverUndefined": "boat_sales",
+        "serverMarina": "boat_sales",
+        "client": "boat_sales"
+      }
+    },
+    {
+      "label": "Payroll Wages",
+      "category": "expense",
+      "scenario": "marina",
+      "department": {
+        "serverNative": "Payroll",
+        "serverUndefined": "Payroll",
+        "serverMarina": "Payroll",
+        "client": "Payroll"
+      },
+      "assumptionKey": {
+        "serverNative": "payroll",
+        "serverUndefined": "payroll",
+        "serverMarina": "payroll",
+        "client": "payroll"
+      }
+    },
+    {
+      "label": "Workers Comp",
+      "category": "expense",
+      "scenario": "marina",
+      "department": {
+        "serverNative": "Payroll",
+        "serverUndefined": "Payroll",
+        "serverMarina": "Payroll",
+        "client": "Payroll"
+      },
+      "assumptionKey": {
+        "serverNative": "payroll",
+        "serverUndefined": "payroll",
+        "serverMarina": "payroll",
+        "client": "payroll"
+      }
+    },
+    {
+      "label": "Property Insurance",
+      "category": "expense",
+      "scenario": "marina",
+      "department": {
+        "serverNative": "General",
+        "serverUndefined": "General",
+        "serverMarina": "General",
+        "client": "General"
+      },
+      "assumptionKey": {
+        "serverNative": "g_and_a",
+        "serverUndefined": "g_and_a",
+        "serverMarina": "g_and_a",
+        "client": "g_and_a"
+      }
+    },
+    {
+      "label": "Property Tax",
+      "category": "expense",
+      "scenario": "marina",
+      "department": {
+        "serverNative": "General",
+        "serverUndefined": "General",
+        "serverMarina": "General",
+        "client": "General"
+      },
+      "assumptionKey": {
+        "serverNative": "g_and_a",
+        "serverUndefined": "g_and_a",
+        "serverMarina": "g_and_a",
+        "client": "g_and_a"
+      }
+    },
+    {
+      "label": "Electric Expense",
+      "category": "expense",
+      "scenario": "marina",
+      "department": {
+        "serverNative": "General",
+        "serverUndefined": "General",
+        "serverMarina": "General",
+        "client": "Marina & Amenities"
+      },
+      "assumptionKey": {
+        "serverNative": "g_and_a",
+        "serverUndefined": "g_and_a",
+        "serverMarina": "g_and_a",
+        "client": "marina_amenities"
+      }
+    },
+    {
+      "label": "Dock Repairs & Maintenance",
+      "category": "expense",
+      "scenario": "marina",
+      "department": {
+        "serverNative": "General",
+        "serverUndefined": "General",
+        "serverMarina": "General",
+        "client": "Service"
+      },
+      "assumptionKey": {
+        "serverNative": "g_and_a",
+        "serverUndefined": "g_and_a",
+        "serverMarina": "g_and_a",
+        "client": "service"
+      }
+    },
+    {
+      "label": "Advertising",
+      "category": "expense",
+      "scenario": "marina",
+      "department": {
+        "serverNative": "General",
+        "serverUndefined": "General",
+        "serverMarina": "General",
+        "client": "General"
+      },
+      "assumptionKey": {
+        "serverNative": "g_and_a",
+        "serverUndefined": "g_and_a",
+        "serverMarina": "g_and_a",
+        "client": "g_and_a"
+      }
+    },
+    {
+      "label": "Legal Fees",
+      "category": "expense",
+      "scenario": "marina",
+      "department": {
+        "serverNative": "General",
+        "serverUndefined": "General",
+        "serverMarina": "General",
+        "client": "General"
+      },
+      "assumptionKey": {
+        "serverNative": "g_and_a",
+        "serverUndefined": "g_and_a",
+        "serverMarina": "g_and_a",
+        "client": "g_and_a"
+      }
+    },
+    {
+      "label": "Bank & Credit Card Fees",
+      "category": "expense",
+      "scenario": "marina",
+      "department": {
+        "serverNative": "General",
+        "serverUndefined": "General",
+        "serverMarina": "General",
+        "client": "General"
+      },
+      "assumptionKey": {
+        "serverNative": "g_and_a",
+        "serverUndefined": "g_and_a",
+        "serverMarina": "g_and_a",
+        "client": "g_and_a"
+      }
+    },
+    {
+      "label": "Permit Fee",
+      "category": "expense",
+      "scenario": "marina",
+      "department": {
+        "serverNative": "General",
+        "serverUndefined": "General",
+        "serverMarina": "General",
+        "client": "General"
+      },
+      "assumptionKey": {
+        "serverNative": "g_and_a",
+        "serverUndefined": "g_and_a",
+        "serverMarina": "g_and_a",
+        "client": "g_and_a"
+      }
+    },
+    {
+      "label": "Security Service",
+      "category": "expense",
+      "scenario": "marina",
+      "department": {
+        "serverNative": "Marina & Amenities",
+        "serverUndefined": "Marina & Amenities",
+        "serverMarina": "Marina & Amenities",
+        "client": "Service"
+      },
+      "assumptionKey": {
+        "serverNative": "marina_amenities",
+        "serverUndefined": "marina_amenities",
+        "serverMarina": "marina_amenities",
+        "client": "service"
+      }
+    },
+    {
+      "label": "Mystery Line Item XYZ",
+      "category": "expense",
+      "scenario": "marina",
+      "department": {
+        "serverNative": "General",
+        "serverUndefined": "General",
+        "serverMarina": "General",
+        "client": "General"
+      },
+      "assumptionKey": {
+        "serverNative": "g_and_a",
+        "serverUndefined": "g_and_a",
+        "serverMarina": "g_and_a",
+        "client": "g_and_a"
+      }
+    },
+    {
+      "label": "Gross Potential Rent",
+      "category": "revenue",
+      "scenario": "multifamily",
+      "department": {
+        "serverNative": "Rental",
+        "serverUndefined": "General",
+        "serverMarina": "General",
+        "client": "General"
+      },
+      "assumptionKey": {
+        "serverNative": "g_and_a",
+        "serverUndefined": "g_and_a",
+        "serverMarina": "g_and_a",
+        "client": "g_and_a"
+      }
+    },
+    {
+      "label": "Scheduled Rent",
+      "category": "revenue",
+      "scenario": "multifamily",
+      "department": {
+        "serverNative": "Rental",
+        "serverUndefined": "General",
+        "serverMarina": "General",
+        "client": "General"
+      },
+      "assumptionKey": {
+        "serverNative": "g_and_a",
+        "serverUndefined": "g_and_a",
+        "serverMarina": "g_and_a",
+        "client": "g_and_a"
+      }
+    },
+    {
+      "label": "Vacancy Loss",
+      "category": "revenue",
+      "scenario": "multifamily",
+      "department": {
+        "serverNative": "Rental",
+        "serverUndefined": "General",
+        "serverMarina": "General",
+        "client": "General"
+      },
+      "assumptionKey": {
+        "serverNative": "g_and_a",
+        "serverUndefined": "g_and_a",
+        "serverMarina": "g_and_a",
+        "client": "g_and_a"
+      }
+    },
+    {
+      "label": "Concessions",
+      "category": "revenue",
+      "scenario": "multifamily",
+      "department": {
+        "serverNative": "Rental",
+        "serverUndefined": "General",
+        "serverMarina": "General",
+        "client": "General"
+      },
+      "assumptionKey": {
+        "serverNative": "g_and_a",
+        "serverUndefined": "g_and_a",
+        "serverMarina": "g_and_a",
+        "client": "g_and_a"
+      }
+    },
+    {
+      "label": "Bad Debt",
+      "category": "revenue",
+      "scenario": "multifamily",
+      "department": {
+        "serverNative": "Rental",
+        "serverUndefined": "General",
+        "serverMarina": "General",
+        "client": "General"
+      },
+      "assumptionKey": {
+        "serverNative": "g_and_a",
+        "serverUndefined": "g_and_a",
+        "serverMarina": "g_and_a",
+        "client": "g_and_a"
+      }
+    },
+    {
+      "label": "Loss to Lease",
+      "category": "revenue",
+      "scenario": "multifamily",
+      "department": {
+        "serverNative": "Rental",
+        "serverUndefined": "General",
+        "serverMarina": "General",
+        "client": "General"
+      },
+      "assumptionKey": {
+        "serverNative": "g_and_a",
+        "serverUndefined": "g_and_a",
+        "serverMarina": "g_and_a",
+        "client": "g_and_a"
+      }
+    },
+    {
+      "label": "Pet Rent",
+      "category": "revenue",
+      "scenario": "multifamily",
+      "department": {
+        "serverNative": "Other Income",
+        "serverUndefined": "General",
+        "serverMarina": "General",
+        "client": "General"
+      },
+      "assumptionKey": {
+        "serverNative": "g_and_a",
+        "serverUndefined": "g_and_a",
+        "serverMarina": "g_and_a",
+        "client": "g_and_a"
+      }
+    },
+    {
+      "label": "Parking Income",
+      "category": "revenue",
+      "scenario": "multifamily",
+      "department": {
+        "serverNative": "Other Income",
+        "serverUndefined": "Marina & Amenities",
+        "serverMarina": "Marina & Amenities",
+        "client": "General"
+      },
+      "assumptionKey": {
+        "serverNative": "g_and_a",
+        "serverUndefined": "marina_amenities",
+        "serverMarina": "marina_amenities",
+        "client": "g_and_a"
+      }
+    },
+    {
+      "label": "Laundry Revenue",
+      "category": "revenue",
+      "scenario": "multifamily",
+      "department": {
+        "serverNative": "Other Income",
+        "serverUndefined": "Marina & Amenities",
+        "serverMarina": "Marina & Amenities",
+        "client": "General"
+      },
+      "assumptionKey": {
+        "serverNative": "g_and_a",
+        "serverUndefined": "marina_amenities",
+        "serverMarina": "marina_amenities",
+        "client": "g_and_a"
+      }
+    },
+    {
+      "label": "RUBS Income",
+      "category": "revenue",
+      "scenario": "multifamily",
+      "department": {
+        "serverNative": "Other Income",
+        "serverUndefined": "General",
+        "serverMarina": "General",
+        "client": "General"
+      },
+      "assumptionKey": {
+        "serverNative": "g_and_a",
+        "serverUndefined": "g_and_a",
+        "serverMarina": "g_and_a",
+        "client": "g_and_a"
+      }
+    },
+    {
+      "label": "Utility Reimbursement",
+      "category": "revenue",
+      "scenario": "multifamily",
+      "department": {
+        "serverNative": "Other Income",
+        "serverUndefined": "Utilities",
+        "serverMarina": "Utilities",
+        "client": "General"
+      },
+      "assumptionKey": {
+        "serverNative": "g_and_a",
+        "serverUndefined": "g_and_a",
+        "serverMarina": "g_and_a",
+        "client": "g_and_a"
+      }
+    },
+    {
+      "label": "Property Management Fee",
+      "category": "expense",
+      "scenario": "multifamily",
+      "department": {
+        "serverNative": "Mgmt Fee",
+        "serverUndefined": "General",
+        "serverMarina": "General",
+        "client": "General"
+      },
+      "assumptionKey": {
+        "serverNative": "g_and_a",
+        "serverUndefined": "g_and_a",
+        "serverMarina": "g_and_a",
+        "client": "g_and_a"
+      }
+    },
+    {
+      "label": "On-site Manager Wages",
+      "category": "expense",
+      "scenario": "multifamily",
+      "department": {
+        "serverNative": "Payroll",
+        "serverUndefined": "Payroll",
+        "serverMarina": "Payroll",
+        "client": "Payroll"
+      },
+      "assumptionKey": {
+        "serverNative": "payroll",
+        "serverUndefined": "payroll",
+        "serverMarina": "payroll",
+        "client": "payroll"
+      }
+    },
+    {
+      "label": "Health Insurance",
+      "category": "expense",
+      "scenario": "multifamily",
+      "department": {
+        "serverNative": "Payroll",
+        "serverUndefined": "Payroll",
+        "serverMarina": "Payroll",
+        "client": "General"
+      },
+      "assumptionKey": {
+        "serverNative": "payroll",
+        "serverUndefined": "payroll",
+        "serverMarina": "payroll",
+        "client": "g_and_a"
+      }
+    },
+    {
+      "label": "Water/Sewer",
+      "category": "expense",
+      "scenario": "multifamily",
+      "department": {
+        "serverNative": "Utilities",
+        "serverUndefined": "Marina & Amenities",
+        "serverMarina": "Marina & Amenities",
+        "client": "General"
+      },
+      "assumptionKey": {
+        "serverNative": "g_and_a",
+        "serverUndefined": "marina_amenities",
+        "serverMarina": "marina_amenities",
+        "client": "g_and_a"
+      }
+    },
+    {
+      "label": "Electric",
+      "category": "expense",
+      "scenario": "multifamily",
+      "department": {
+        "serverNative": "Utilities",
+        "serverUndefined": "Marina & Amenities",
+        "serverMarina": "Marina & Amenities",
+        "client": "Marina & Amenities"
+      },
+      "assumptionKey": {
+        "serverNative": "g_and_a",
+        "serverUndefined": "marina_amenities",
+        "serverMarina": "marina_amenities",
+        "client": "marina_amenities"
+      }
+    },
+    {
+      "label": "Trash Removal",
+      "category": "expense",
+      "scenario": "multifamily",
+      "department": {
+        "serverNative": "Utilities",
+        "serverUndefined": "General",
+        "serverMarina": "General",
+        "client": "General"
+      },
+      "assumptionKey": {
+        "serverNative": "g_and_a",
+        "serverUndefined": "g_and_a",
+        "serverMarina": "g_and_a",
+        "client": "g_and_a"
+      }
+    },
+    {
+      "label": "R&M",
+      "category": "expense",
+      "scenario": "multifamily",
+      "department": {
+        "serverNative": "R&M",
+        "serverUndefined": "General",
+        "serverMarina": "General",
+        "client": "General"
+      },
+      "assumptionKey": {
+        "serverNative": "g_and_a",
+        "serverUndefined": "g_and_a",
+        "serverMarina": "g_and_a",
+        "client": "g_and_a"
+      }
+    },
+    {
+      "label": "Make-Ready",
+      "category": "expense",
+      "scenario": "multifamily",
+      "department": {
+        "serverNative": "R&M",
+        "serverUndefined": "General",
+        "serverMarina": "General",
+        "client": "General"
+      },
+      "assumptionKey": {
+        "serverNative": "g_and_a",
+        "serverUndefined": "g_and_a",
+        "serverMarina": "g_and_a",
+        "client": "g_and_a"
+      }
+    },
+    {
+      "label": "HVAC Repair",
+      "category": "expense",
+      "scenario": "multifamily",
+      "department": {
+        "serverNative": "R&M",
+        "serverUndefined": "Service",
+        "serverMarina": "Service",
+        "client": "Service"
+      },
+      "assumptionKey": {
+        "serverNative": "g_and_a",
+        "serverUndefined": "service",
+        "serverMarina": "service",
+        "client": "service"
+      }
+    },
+    {
+      "label": "Property Tax",
+      "category": "expense",
+      "scenario": "multifamily",
+      "department": {
+        "serverNative": "Operating",
+        "serverUndefined": "General",
+        "serverMarina": "General",
+        "client": "General"
+      },
+      "assumptionKey": {
+        "serverNative": "g_and_a",
+        "serverUndefined": "g_and_a",
+        "serverMarina": "g_and_a",
+        "client": "g_and_a"
+      }
+    },
+    {
+      "label": "Insurance",
+      "category": "expense",
+      "scenario": "multifamily",
+      "department": {
+        "serverNative": "Operating",
+        "serverUndefined": "Insurance",
+        "serverMarina": "Insurance",
+        "client": "General"
+      },
+      "assumptionKey": {
+        "serverNative": "g_and_a",
+        "serverUndefined": "g_and_a",
+        "serverMarina": "g_and_a",
+        "client": "g_and_a"
+      }
+    },
+    {
+      "label": "Marketing",
+      "category": "expense",
+      "scenario": "multifamily",
+      "department": {
+        "serverNative": "Operating",
+        "serverUndefined": "General",
+        "serverMarina": "General",
+        "client": "General"
+      },
+      "assumptionKey": {
+        "serverNative": "g_and_a",
+        "serverUndefined": "g_and_a",
+        "serverMarina": "g_and_a",
+        "client": "g_and_a"
+      }
+    },
+    {
+      "label": "Legal",
+      "category": "expense",
+      "scenario": "multifamily",
+      "department": {
+        "serverNative": "Operating",
+        "serverUndefined": "General",
+        "serverMarina": "General",
+        "client": "General"
+      },
+      "assumptionKey": {
+        "serverNative": "g_and_a",
+        "serverUndefined": "g_and_a",
+        "serverMarina": "g_and_a",
+        "client": "g_and_a"
+      }
+    },
+    {
+      "label": "Gross Rental Income",
+      "category": "revenue",
+      "scenario": "str",
+      "department": {
+        "serverNative": "Rental",
+        "serverUndefined": "General",
+        "serverMarina": "General",
+        "client": "General"
+      },
+      "assumptionKey": {
+        "serverNative": "g_and_a",
+        "serverUndefined": "g_and_a",
+        "serverMarina": "g_and_a",
+        "client": "g_and_a"
+      }
+    },
+    {
+      "label": "Booking Revenue",
+      "category": "revenue",
+      "scenario": "str",
+      "department": {
+        "serverNative": "Rental",
+        "serverUndefined": "General",
+        "serverMarina": "General",
+        "client": "General"
+      },
+      "assumptionKey": {
+        "serverNative": "g_and_a",
+        "serverUndefined": "g_and_a",
+        "serverMarina": "g_and_a",
+        "client": "g_and_a"
+      }
+    },
+    {
+      "label": "Reservation Income",
+      "category": "revenue",
+      "scenario": "str",
+      "department": {
+        "serverNative": "Rental",
+        "serverUndefined": "General",
+        "serverMarina": "General",
+        "client": "General"
+      },
+      "assumptionKey": {
+        "serverNative": "g_and_a",
+        "serverUndefined": "g_and_a",
+        "serverMarina": "g_and_a",
+        "client": "g_and_a"
+      }
+    },
+    {
+      "label": "Nightly Rate Revenue",
+      "category": "revenue",
+      "scenario": "str",
+      "department": {
+        "serverNative": "Rental",
+        "serverUndefined": "General",
+        "serverMarina": "General",
+        "client": "General"
+      },
+      "assumptionKey": {
+        "serverNative": "g_and_a",
+        "serverUndefined": "g_and_a",
+        "serverMarina": "g_and_a",
+        "client": "g_and_a"
+      }
+    },
+    {
+      "label": "Resort Fee",
+      "category": "revenue",
+      "scenario": "str",
+      "department": {
+        "serverNative": "Rental",
+        "serverUndefined": "General",
+        "serverMarina": "General",
+        "client": "General"
+      },
+      "assumptionKey": {
+        "serverNative": "g_and_a",
+        "serverUndefined": "g_and_a",
+        "serverMarina": "g_and_a",
+        "client": "g_and_a"
+      }
+    },
+    {
+      "label": "Cleaning Fee Income",
+      "category": "revenue",
+      "scenario": "str",
+      "department": {
+        "serverNative": "Cleaning",
+        "serverUndefined": "Service",
+        "serverMarina": "Service",
+        "client": "General"
+      },
+      "assumptionKey": {
+        "serverNative": "g_and_a",
+        "serverUndefined": "service",
+        "serverMarina": "service",
+        "client": "g_and_a"
+      }
+    },
+    {
+      "label": "Cleaning Service Cost",
+      "category": "expense",
+      "scenario": "str",
+      "department": {
+        "serverNative": "Cleaning",
+        "serverUndefined": "Service",
+        "serverMarina": "Service",
+        "client": "Service"
+      },
+      "assumptionKey": {
+        "serverNative": "g_and_a",
+        "serverUndefined": "service",
+        "serverMarina": "service",
+        "client": "service"
+      }
+    },
+    {
+      "label": "Housekeeping Expense",
+      "category": "expense",
+      "scenario": "str",
+      "department": {
+        "serverNative": "Cleaning",
+        "serverUndefined": "General",
+        "serverMarina": "General",
+        "client": "General"
+      },
+      "assumptionKey": {
+        "serverNative": "g_and_a",
+        "serverUndefined": "g_and_a",
+        "serverMarina": "g_and_a",
+        "client": "g_and_a"
+      }
+    },
+    {
+      "label": "Airbnb Host Service Fee",
+      "category": "expense",
+      "scenario": "str",
+      "department": {
+        "serverNative": "Platform Fees",
+        "serverUndefined": "Marina & Amenities",
+        "serverMarina": "Marina & Amenities",
+        "client": "Service"
+      },
+      "assumptionKey": {
+        "serverNative": "g_and_a",
+        "serverUndefined": "marina_amenities",
+        "serverMarina": "marina_amenities",
+        "client": "service"
+      }
+    },
+    {
+      "label": "VRBO Commission",
+      "category": "expense",
+      "scenario": "str",
+      "department": {
+        "serverNative": "Platform Fees",
+        "serverUndefined": "Boat Brokerage",
+        "serverMarina": "Boat Brokerage",
+        "client": "General"
+      },
+      "assumptionKey": {
+        "serverNative": "g_and_a",
+        "serverUndefined": "boat_brokerage",
+        "serverMarina": "boat_brokerage",
+        "client": "g_and_a"
+      }
+    },
+    {
+      "label": "Channel Manager Fee",
+      "category": "expense",
+      "scenario": "str",
+      "department": {
+        "serverNative": "Platform Fees",
+        "serverUndefined": "General",
+        "serverMarina": "General",
+        "client": "General"
+      },
+      "assumptionKey": {
+        "serverNative": "g_and_a",
+        "serverUndefined": "g_and_a",
+        "serverMarina": "g_and_a",
+        "client": "g_and_a"
+      }
+    },
+    {
+      "label": "Property Management Fee",
+      "category": "expense",
+      "scenario": "str",
+      "department": {
+        "serverNative": "Operating",
+        "serverUndefined": "General",
+        "serverMarina": "General",
+        "client": "General"
+      },
+      "assumptionKey": {
+        "serverNative": "g_and_a",
+        "serverUndefined": "g_and_a",
+        "serverMarina": "g_and_a",
+        "client": "g_and_a"
+      }
+    },
+    {
+      "label": "Utilities",
+      "category": "expense",
+      "scenario": "str",
+      "department": {
+        "serverNative": "Operating",
+        "serverUndefined": "Utilities",
+        "serverMarina": "Utilities",
+        "client": "General"
+      },
+      "assumptionKey": {
+        "serverNative": "g_and_a",
+        "serverUndefined": "g_and_a",
+        "serverMarina": "g_and_a",
+        "client": "g_and_a"
+      }
+    },
+    {
+      "label": "Property Tax",
+      "category": "expense",
+      "scenario": "str",
+      "department": {
+        "serverNative": "Operating",
+        "serverUndefined": "General",
+        "serverMarina": "General",
+        "client": "General"
+      },
+      "assumptionKey": {
+        "serverNative": "g_and_a",
+        "serverUndefined": "g_and_a",
+        "serverMarina": "g_and_a",
+        "client": "g_and_a"
+      }
+    },
+    {
+      "label": "Insurance",
+      "category": "expense",
+      "scenario": "str",
+      "department": {
+        "serverNative": "Operating",
+        "serverUndefined": "Insurance",
+        "serverMarina": "Insurance",
+        "client": "General"
+      },
+      "assumptionKey": {
+        "serverNative": "g_and_a",
+        "serverUndefined": "g_and_a",
+        "serverMarina": "g_and_a",
+        "client": "g_and_a"
+      }
+    },
+    {
+      "label": "Supplies",
+      "category": "expense",
+      "scenario": "str",
+      "department": {
+        "serverNative": "Operating",
+        "serverUndefined": "General",
+        "serverMarina": "General",
+        "client": "General"
+      },
+      "assumptionKey": {
+        "serverNative": "g_and_a",
+        "serverUndefined": "g_and_a",
+        "serverMarina": "g_and_a",
+        "client": "g_and_a"
+      }
+    },
+    {
+      "label": "Storage Unit Rent",
+      "category": "revenue",
+      "scenario": "self_storage",
+      "department": {
+        "serverNative": "General",
+        "serverUndefined": "General",
+        "serverMarina": "General",
+        "client": "Storage"
+      },
+      "assumptionKey": {
+        "serverNative": "g_and_a",
+        "serverUndefined": "g_and_a",
+        "serverMarina": "g_and_a",
+        "client": "storage"
+      }
+    },
+    {
+      "label": "Climate Controlled Unit Revenue",
+      "category": "revenue",
+      "scenario": "self_storage",
+      "department": {
+        "serverNative": "General",
+        "serverUndefined": "General",
+        "serverMarina": "General",
+        "client": "General"
+      },
+      "assumptionKey": {
+        "serverNative": "g_and_a",
+        "serverUndefined": "g_and_a",
+        "serverMarina": "g_and_a",
+        "client": "g_and_a"
+      }
+    },
+    {
+      "label": "Tenant Insurance Income",
+      "category": "revenue",
+      "scenario": "self_storage",
+      "department": {
+        "serverNative": "Insurance",
+        "serverUndefined": "Insurance",
+        "serverMarina": "Insurance",
+        "client": "General"
+      },
+      "assumptionKey": {
+        "serverNative": "g_and_a",
+        "serverUndefined": "g_and_a",
+        "serverMarina": "g_and_a",
+        "client": "g_and_a"
+      }
+    },
+    {
+      "label": "Late Fee Income",
+      "category": "revenue",
+      "scenario": "self_storage",
+      "department": {
+        "serverNative": "General",
+        "serverUndefined": "General",
+        "serverMarina": "General",
+        "client": "General"
+      },
+      "assumptionKey": {
+        "serverNative": "g_and_a",
+        "serverUndefined": "g_and_a",
+        "serverMarina": "g_and_a",
+        "client": "g_and_a"
+      }
+    },
+    {
+      "label": "Admin Fee",
+      "category": "revenue",
+      "scenario": "self_storage",
+      "department": {
+        "serverNative": "Payroll",
+        "serverUndefined": "Payroll",
+        "serverMarina": "Payroll",
+        "client": "General"
+      },
+      "assumptionKey": {
+        "serverNative": "payroll",
+        "serverUndefined": "payroll",
+        "serverMarina": "payroll",
+        "client": "g_and_a"
+      }
+    },
+    {
+      "label": "Property Management Fee",
+      "category": "expense",
+      "scenario": "self_storage",
+      "department": {
+        "serverNative": "General",
+        "serverUndefined": "General",
+        "serverMarina": "General",
+        "client": "General"
+      },
+      "assumptionKey": {
+        "serverNative": "g_and_a",
+        "serverUndefined": "g_and_a",
+        "serverMarina": "g_and_a",
+        "client": "g_and_a"
+      }
+    },
+    {
+      "label": "On-site Manager Wages",
+      "category": "expense",
+      "scenario": "self_storage",
+      "department": {
+        "serverNative": "Payroll",
+        "serverUndefined": "Payroll",
+        "serverMarina": "Payroll",
+        "client": "Payroll"
+      },
+      "assumptionKey": {
+        "serverNative": "payroll",
+        "serverUndefined": "payroll",
+        "serverMarina": "payroll",
+        "client": "payroll"
+      }
+    },
+    {
+      "label": "Property Insurance",
+      "category": "expense",
+      "scenario": "self_storage",
+      "department": {
+        "serverNative": "General",
+        "serverUndefined": "General",
+        "serverMarina": "General",
+        "client": "General"
+      },
+      "assumptionKey": {
+        "serverNative": "g_and_a",
+        "serverUndefined": "g_and_a",
+        "serverMarina": "g_and_a",
+        "client": "g_and_a"
+      }
+    },
+    {
+      "label": "Property Tax",
+      "category": "expense",
+      "scenario": "self_storage",
+      "department": {
+        "serverNative": "General",
+        "serverUndefined": "General",
+        "serverMarina": "General",
+        "client": "General"
+      },
+      "assumptionKey": {
+        "serverNative": "g_and_a",
+        "serverUndefined": "g_and_a",
+        "serverMarina": "g_and_a",
+        "client": "g_and_a"
+      }
+    },
+    {
+      "label": "Utilities",
+      "category": "expense",
+      "scenario": "self_storage",
+      "department": {
+        "serverNative": "Utilities",
+        "serverUndefined": "Utilities",
+        "serverMarina": "Utilities",
+        "client": "General"
+      },
+      "assumptionKey": {
+        "serverNative": "g_and_a",
+        "serverUndefined": "g_and_a",
+        "serverMarina": "g_and_a",
+        "client": "g_and_a"
+      }
+    },
+    {
+      "label": "Repairs & Maintenance",
+      "category": "expense",
+      "scenario": "self_storage",
+      "department": {
+        "serverNative": "Service",
+        "serverUndefined": "Service",
+        "serverMarina": "Service",
+        "client": "Service"
+      },
+      "assumptionKey": {
+        "serverNative": "service",
+        "serverUndefined": "service",
+        "serverMarina": "service",
+        "client": "service"
+      }
+    },
+    {
+      "label": "Advertising",
+      "category": "expense",
+      "scenario": "self_storage",
+      "department": {
+        "serverNative": "General",
+        "serverUndefined": "General",
+        "serverMarina": "General",
+        "client": "General"
+      },
+      "assumptionKey": {
+        "serverNative": "g_and_a",
+        "serverUndefined": "g_and_a",
+        "serverMarina": "g_and_a",
+        "client": "g_and_a"
+      }
+    },
+    {
+      "label": "Base Rent",
+      "category": "revenue",
+      "scenario": "office",
+      "department": {
+        "serverNative": "General",
+        "serverUndefined": "General",
+        "serverMarina": "General",
+        "client": "General"
+      },
+      "assumptionKey": {
+        "serverNative": "g_and_a",
+        "serverUndefined": "g_and_a",
+        "serverMarina": "g_and_a",
+        "client": "g_and_a"
+      }
+    },
+    {
+      "label": "Expense Reimbursements",
+      "category": "revenue",
+      "scenario": "office",
+      "department": {
+        "serverNative": "General",
+        "serverUndefined": "General",
+        "serverMarina": "General",
+        "client": "General"
+      },
+      "assumptionKey": {
+        "serverNative": "g_and_a",
+        "serverUndefined": "g_and_a",
+        "serverMarina": "g_and_a",
+        "client": "g_and_a"
+      }
+    },
+    {
+      "label": "Parking Income",
+      "category": "revenue",
+      "scenario": "office",
+      "department": {
+        "serverNative": "Marina & Amenities",
+        "serverUndefined": "Marina & Amenities",
+        "serverMarina": "Marina & Amenities",
+        "client": "General"
+      },
+      "assumptionKey": {
+        "serverNative": "marina_amenities",
+        "serverUndefined": "marina_amenities",
+        "serverMarina": "marina_amenities",
+        "client": "g_and_a"
+      }
+    },
+    {
+      "label": "CAM Recovery",
+      "category": "revenue",
+      "scenario": "office",
+      "department": {
+        "serverNative": "General",
+        "serverUndefined": "General",
+        "serverMarina": "General",
+        "client": "General"
+      },
+      "assumptionKey": {
+        "serverNative": "g_and_a",
+        "serverUndefined": "g_and_a",
+        "serverMarina": "g_and_a",
+        "client": "g_and_a"
+      }
+    },
+    {
+      "label": "Property Management Fee",
+      "category": "expense",
+      "scenario": "office",
+      "department": {
+        "serverNative": "General",
+        "serverUndefined": "General",
+        "serverMarina": "General",
+        "client": "General"
+      },
+      "assumptionKey": {
+        "serverNative": "g_and_a",
+        "serverUndefined": "g_and_a",
+        "serverMarina": "g_and_a",
+        "client": "g_and_a"
+      }
+    },
+    {
+      "label": "Janitorial Service",
+      "category": "expense",
+      "scenario": "office",
+      "department": {
+        "serverNative": "Marina & Amenities",
+        "serverUndefined": "Marina & Amenities",
+        "serverMarina": "Marina & Amenities",
+        "client": "Service"
+      },
+      "assumptionKey": {
+        "serverNative": "marina_amenities",
+        "serverUndefined": "marina_amenities",
+        "serverMarina": "marina_amenities",
+        "client": "service"
+      }
+    },
+    {
+      "label": "Property Insurance",
+      "category": "expense",
+      "scenario": "office",
+      "department": {
+        "serverNative": "General",
+        "serverUndefined": "General",
+        "serverMarina": "General",
+        "client": "General"
+      },
+      "assumptionKey": {
+        "serverNative": "g_and_a",
+        "serverUndefined": "g_and_a",
+        "serverMarina": "g_and_a",
+        "client": "g_and_a"
+      }
+    },
+    {
+      "label": "Property Tax",
+      "category": "expense",
+      "scenario": "office",
+      "department": {
+        "serverNative": "General",
+        "serverUndefined": "General",
+        "serverMarina": "General",
+        "client": "General"
+      },
+      "assumptionKey": {
+        "serverNative": "g_and_a",
+        "serverUndefined": "g_and_a",
+        "serverMarina": "g_and_a",
+        "client": "g_and_a"
+      }
+    },
+    {
+      "label": "Utilities",
+      "category": "expense",
+      "scenario": "office",
+      "department": {
+        "serverNative": "Utilities",
+        "serverUndefined": "Utilities",
+        "serverMarina": "Utilities",
+        "client": "General"
+      },
+      "assumptionKey": {
+        "serverNative": "g_and_a",
+        "serverUndefined": "g_and_a",
+        "serverMarina": "g_and_a",
+        "client": "g_and_a"
+      }
+    },
+    {
+      "label": "Repairs & Maintenance",
+      "category": "expense",
+      "scenario": "office",
+      "department": {
+        "serverNative": "Service",
+        "serverUndefined": "Service",
+        "serverMarina": "Service",
+        "client": "Service"
+      },
+      "assumptionKey": {
+        "serverNative": "service",
+        "serverUndefined": "service",
+        "serverMarina": "service",
+        "client": "service"
+      }
+    },
+    {
+      "label": "Leasing Commissions",
+      "category": "expense",
+      "scenario": "office",
+      "department": {
+        "serverNative": "Boat Brokerage",
+        "serverUndefined": "Boat Brokerage",
+        "serverMarina": "Boat Brokerage",
+        "client": "General"
+      },
+      "assumptionKey": {
+        "serverNative": "boat_brokerage",
+        "serverUndefined": "boat_brokerage",
+        "serverMarina": "boat_brokerage",
+        "client": "g_and_a"
+      }
+    },
+    {
+      "label": "Base Rent",
+      "category": "revenue",
+      "scenario": "retail",
+      "department": {
+        "serverNative": "General",
+        "serverUndefined": "General",
+        "serverMarina": "General",
+        "client": "General"
+      },
+      "assumptionKey": {
+        "serverNative": "g_and_a",
+        "serverUndefined": "g_and_a",
+        "serverMarina": "g_and_a",
+        "client": "g_and_a"
+      }
+    },
+    {
+      "label": "Percentage Rent",
+      "category": "revenue",
+      "scenario": "retail",
+      "department": {
+        "serverNative": "General",
+        "serverUndefined": "General",
+        "serverMarina": "General",
+        "client": "General"
+      },
+      "assumptionKey": {
+        "serverNative": "g_and_a",
+        "serverUndefined": "g_and_a",
+        "serverMarina": "g_and_a",
+        "client": "g_and_a"
+      }
+    },
+    {
+      "label": "CAM Recovery",
+      "category": "revenue",
+      "scenario": "retail",
+      "department": {
+        "serverNative": "General",
+        "serverUndefined": "General",
+        "serverMarina": "General",
+        "client": "General"
+      },
+      "assumptionKey": {
+        "serverNative": "g_and_a",
+        "serverUndefined": "g_and_a",
+        "serverMarina": "g_and_a",
+        "client": "g_and_a"
+      }
+    },
+    {
+      "label": "Pad Site Rent",
+      "category": "revenue",
+      "scenario": "retail",
+      "department": {
+        "serverNative": "General",
+        "serverUndefined": "General",
+        "serverMarina": "General",
+        "client": "General"
+      },
+      "assumptionKey": {
+        "serverNative": "g_and_a",
+        "serverUndefined": "g_and_a",
+        "serverMarina": "g_and_a",
+        "client": "g_and_a"
+      }
+    },
+    {
+      "label": "Property Management Fee",
+      "category": "expense",
+      "scenario": "retail",
+      "department": {
+        "serverNative": "General",
+        "serverUndefined": "General",
+        "serverMarina": "General",
+        "client": "General"
+      },
+      "assumptionKey": {
+        "serverNative": "g_and_a",
+        "serverUndefined": "g_and_a",
+        "serverMarina": "g_and_a",
+        "client": "g_and_a"
+      }
+    },
+    {
+      "label": "Property Insurance",
+      "category": "expense",
+      "scenario": "retail",
+      "department": {
+        "serverNative": "General",
+        "serverUndefined": "General",
+        "serverMarina": "General",
+        "client": "General"
+      },
+      "assumptionKey": {
+        "serverNative": "g_and_a",
+        "serverUndefined": "g_and_a",
+        "serverMarina": "g_and_a",
+        "client": "g_and_a"
+      }
+    },
+    {
+      "label": "Property Tax",
+      "category": "expense",
+      "scenario": "retail",
+      "department": {
+        "serverNative": "General",
+        "serverUndefined": "General",
+        "serverMarina": "General",
+        "client": "General"
+      },
+      "assumptionKey": {
+        "serverNative": "g_and_a",
+        "serverUndefined": "g_and_a",
+        "serverMarina": "g_and_a",
+        "client": "g_and_a"
+      }
+    },
+    {
+      "label": "Common Area Maintenance",
+      "category": "expense",
+      "scenario": "retail",
+      "department": {
+        "serverNative": "Repairs & Maintenance",
+        "serverUndefined": "Repairs & Maintenance",
+        "serverMarina": "Repairs & Maintenance",
+        "client": "General"
+      },
+      "assumptionKey": {
+        "serverNative": "g_and_a",
+        "serverUndefined": "g_and_a",
+        "serverMarina": "g_and_a",
+        "client": "g_and_a"
+      }
+    },
+    {
+      "label": "Marketing",
+      "category": "expense",
+      "scenario": "retail",
+      "department": {
+        "serverNative": "General",
+        "serverUndefined": "General",
+        "serverMarina": "General",
+        "client": "General"
+      },
+      "assumptionKey": {
+        "serverNative": "g_and_a",
+        "serverUndefined": "g_and_a",
+        "serverMarina": "g_and_a",
+        "client": "g_and_a"
+      }
+    },
+    {
+      "label": "Security Service",
+      "category": "expense",
+      "scenario": "retail",
+      "department": {
+        "serverNative": "Marina & Amenities",
+        "serverUndefined": "Marina & Amenities",
+        "serverMarina": "Marina & Amenities",
+        "client": "Service"
+      },
+      "assumptionKey": {
+        "serverNative": "marina_amenities",
+        "serverUndefined": "marina_amenities",
+        "serverMarina": "marina_amenities",
+        "client": "service"
+      }
+    }
+  ],
+  "syntheticProjections": {
+    "marina": {
+      "revenueLines": 17,
+      "expenseLines": 17,
+      "syntheticNOI_enginePath": 13493783,
+      "syntheticNOI_writerPath": 13493783
+    },
+    "multifamily": {
+      "revenueLines": 11,
+      "expenseLines": 13,
+      "syntheticNOI_enginePath": 8052083,
+      "syntheticNOI_writerPath": 8132142
+    },
+    "str": {
+      "revenueLines": 6,
+      "expenseLines": 10,
+      "syntheticNOI_enginePath": 3410818,
+      "syntheticNOI_writerPath": 3419221
+    },
+    "self_storage": {
+      "revenueLines": 5,
+      "expenseLines": 7,
+      "syntheticNOI_enginePath": 3305442,
+      "syntheticNOI_writerPath": 3305442
+    },
+    "office": {
+      "revenueLines": 4,
+      "expenseLines": 7,
+      "syntheticNOI_enginePath": 2185901,
+      "syntheticNOI_writerPath": 2185901
+    },
+    "retail": {
+      "revenueLines": 4,
+      "expenseLines": 6,
+      "syntheticNOI_enginePath": 2480847,
+      "syntheticNOI_writerPath": 2480847
+    }
+  }
+}
