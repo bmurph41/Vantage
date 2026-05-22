@@ -57,6 +57,7 @@ import { DashboardPersonaHeader } from "@/components/dashboard/DashboardPersonaH
 import { PageTour } from "@/components/onboarding/PageTour";
 import { TOUR_IDS, dashboardTourSteps } from "@/lib/tour-configs";
 import { QuickStartGuide } from "@/components/onboarding/QuickStartGuide";
+import { DemoBanner } from "@/components/onboarding/DemoBanner";
 
 type DashboardModule = {
   id: string;
@@ -1745,6 +1746,11 @@ export default function Dashboard() {
         {/* Fund Context Selector - Shows current fund and key metrics */}
         <div className="mb-6">
           <DashboardPersonaHeader />
+        </div>
+
+        {/* Demo data banner - shown until dismissed */}
+        <div className="mb-4">
+          <DemoBanner />
         </div>
 
         {/* Quick Start Guide - For new users */}

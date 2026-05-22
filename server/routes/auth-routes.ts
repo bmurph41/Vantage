@@ -7,6 +7,7 @@ import { db } from '../db';
 import { organizations, ssoConfigurations, users, userSessions, betaInviteCodes, betaInviteRedemptions } from '@shared/schema';
 import { eq, and, gt, sql } from 'drizzle-orm';
 import { logger } from '../lib/logger';
+import { seedDemoData } from '../services/demo-seed-service';
 import { z } from 'zod';
 import { sendEmailVerification, sendMagicLinkEmail, generateVerificationToken } from '../services/email-service';
 import { CONSENT_VERSION, TOS_VERSION } from '@shared/consent-constants';
@@ -419,6 +420,12 @@ router.post('/register', async (req: Request, res: Response) => {
         userId: newUser.id,
         orgId: organizationId,
       });
+    }
+
+    // Provision demo data for new org (fire-and-forget, non-blocking)
+    if (organizationId && !orgId) {
+      // orgId was absent from the request → this is a brand-new org
+      setImmediate(() => seedDemoData(organizationId!, newUser.id));
     }
 
     // Send welcome/verification email

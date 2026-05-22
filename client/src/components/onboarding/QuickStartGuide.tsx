@@ -25,6 +25,7 @@ import {
   ChevronDown,
   ChevronUp,
   RotateCcw,
+  FlaskConical,
 } from "lucide-react";
 
 interface QuickStartStep {
@@ -126,6 +127,37 @@ const CATEGORY_LABELS: Record<string, string> = {
   explore: "Explore Features",
   advanced: "Advanced Tools",
 };
+
+function ClearDemoDataButton() {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+
+  const clearMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("DELETE", "/api/onboarding/demo-data");
+    },
+    onSuccess: () => {
+      if (user?.orgId) {
+        localStorage.setItem(`vantage_demo_banner_dismissed_${user.orgId}`, "1");
+      }
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/contacts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm-v2/deals"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/modeling/projects"] });
+    },
+  });
+
+  return (
+    <button
+      onClick={() => clearMutation.mutate()}
+      disabled={clearMutation.isPending}
+      className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+      title="Remove all sample records from your account"
+    >
+      <FlaskConical className="h-3 w-3" />
+      {clearMutation.isPending ? "Clearing…" : "Clear sample data"}
+    </button>
+  );
+}
 
 export function QuickStartGuide() {
   const [, navigate] = useLocation();
@@ -333,12 +365,15 @@ export function QuickStartGuide() {
           </div>
 
           <div className="flex items-center justify-between mt-4 pt-3 border-t">
-            <button
-              onClick={() => dismissMutation.mutate()}
-              className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-            >
-              Dismiss guide
-            </button>
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => dismissMutation.mutate()}
+                className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Dismiss guide
+              </button>
+              <ClearDemoDataButton />
+            </div>
             {completedCount > 0 && (
               <button
                 onClick={() => resetGuideMutation.mutate()}

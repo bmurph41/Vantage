@@ -17,6 +17,7 @@ import {
   organizationPacks,
   adminAuditLog,
 } from "@shared/schema";
+import { clearDemoData } from "../services/demo-seed-service";
 import { eq, and, desc, sql, count } from "drizzle-orm";
 import { sendInviteEmail } from "../services/email-service";
 import { enterpriseAuthService } from "../services/enterprise-auth-service";
@@ -535,6 +536,17 @@ onboardingRouter.post("/notifications/dispatch", async (req: Request, res: Respo
     }
 
     res.json({ dispatched: created.length, event, notificationIds: created });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// DELETE /demo-data — bulk-delete all demo-seeded records for the org
+onboardingRouter.delete("/demo-data", async (req: Request, res: Response) => {
+  try {
+    const orgId = (req as any).user.orgId;
+    const result = await clearDemoData(orgId);
+    res.json(result);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
