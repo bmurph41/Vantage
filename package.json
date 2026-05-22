@@ -19,7 +19,8 @@
     "test:e2e": "playwright test",
     "test:e2e:install-browsers": "playwright install chromium",
     "test:dept-mapping": "tsx tests/department-mapping-baseline.mjs",
-    "test:dept-golden": "tsx tests/department-inference-golden.mjs"
+    "test:dept-golden": "tsx tests/department-inference-golden.mjs",
+    "test:isolation": "tsx scripts/test-tenant-isolation.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.68.0",

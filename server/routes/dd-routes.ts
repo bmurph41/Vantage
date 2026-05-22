@@ -400,6 +400,10 @@ export function registerDDRoutes(
         return res.status(404).json({ error: "Project not found" });
       }
 
+      if (project.orgId !== req.user.orgId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
       const settings = await storage.getProjectSettings(project.id);
       const tasks = await storage.getTasksForProject(project.id);
 
@@ -412,8 +416,17 @@ export function registerDDRoutes(
 
   app.patch("/api/dd/projects/:id", authenticateUser, async (req: any, res) => {
     try {
+      let project;
+      try {
+        project = await authorizeProjectAccess(req.params.id, req.user.orgId);
+      } catch (authErr: any) {
+        if (authErr.message === "Project not found") {
+          return res.status(404).json({ error: "Project not found" });
+        }
+        return res.status(403).json({ error: "Access denied" });
+      }
       const updates = insertProjectSchema.partial().parse(req.body);
-      const updated = await storage.updateProject(req.params.id, updates);
+      const updated = await storage.updateProject(project.id, updates);
 
       // Create audit log
       await storage.createAuditLog({
@@ -453,6 +466,12 @@ export function registerDDRoutes(
       
       res.json({ success: true });
     } catch (error: any) {
+      if (error.message === "Project not found") {
+        return res.status(404).json({ error: "Project not found" });
+      }
+      if (error.message === "Unauthorized access to project") {
+        return res.status(403).json({ error: "Access denied" });
+      }
       console.error("Error deleting project:", error);
       res.status(500).json({ error: "Failed to delete project" });
     }

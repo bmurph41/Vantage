@@ -250,6 +250,9 @@ export function registerCRMRoutes(
       if (!currentDeal) {
         return res.status(404).json({ error: "Deal not found" });
       }
+      if (currentDeal.orgId && currentDeal.orgId !== req.user.orgId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
       
       const oldStageId = currentDeal.stageId;
       const newStageId = updateData.stageId;
@@ -455,6 +458,11 @@ export function registerCRMRoutes(
 
   app.delete("/api/crm/deals/:id", async (req: any, res) => {
     try {
+      const deal = await storage.getCrmDeal(req.params.id);
+      if (!deal) return res.status(404).json({ error: "Deal not found" });
+      if (deal.orgId && deal.orgId !== req.user.orgId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
       await storage.deleteCrmDeal(req.params.id);
       res.json({ success: true });
     } catch (error: any) {
@@ -1053,6 +1061,11 @@ export function registerCRMRoutes(
 
   app.put("/api/crm/contacts/:id", async (req: any, res) => {
     try {
+      const existing = await storage.getCrmContact(req.params.id);
+      if (!existing) return res.status(404).json({ error: "Contact not found" });
+      if (existing.orgId !== req.user.orgId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
       // Ensure required fields have values if provided
       const updateData = { ...req.body };
       if ('firstName' in updateData && !updateData.firstName) updateData.firstName = '';
@@ -1068,6 +1081,11 @@ export function registerCRMRoutes(
 
   app.delete("/api/crm/contacts/:id", async (req: any, res) => {
     try {
+      const existing = await storage.getCrmContact(req.params.id);
+      if (!existing) return res.status(404).json({ error: "Contact not found" });
+      if (existing.orgId !== req.user.orgId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
       await storage.deleteCrmContact(req.params.id);
       res.json({ success: true });
     } catch (error: any) {
@@ -4804,6 +4822,9 @@ export function registerCRMRoutes(
       if (!deal) {
         return res.status(404).json({ error: "Deal not found" });
       }
+      if (deal.orgId && deal.orgId !== req.user.orgId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
       res.json(deal);
     } catch (error: any) {
       console.error("Failed to get deal:", error);
@@ -4894,6 +4915,11 @@ export function registerCRMRoutes(
   });
   app.put("/api/deals/:id", async (req: any, res) => {
     try {
+      const existing = await storage.getCrmDeal(req.params.id);
+      if (!existing) return res.status(404).json({ error: "Deal not found" });
+      if (existing.orgId && existing.orgId !== req.user.orgId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
       let updateData = { ...req.body };
       
       // Auto-close deal if stage name is "Closed"
@@ -4914,6 +4940,11 @@ export function registerCRMRoutes(
   });
   app.delete("/api/deals/:id", async (req: any, res) => {
     try {
+      const existing = await storage.getCrmDeal(req.params.id);
+      if (!existing) return res.status(404).json({ error: "Deal not found" });
+      if (existing.orgId && existing.orgId !== req.user.orgId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
       await storage.deleteCrmDeal(req.params.id);
       res.json({ success: true });
     } catch (error: any) {
@@ -5428,6 +5459,11 @@ export function registerCRMRoutes(
   });
   app.put("/api/contacts/:id", async (req: any, res) => {
     try {
+      const existing = await storage.getCrmContact(req.params.id);
+      if (!existing) return res.status(404).json({ error: "Contact not found" });
+      if (existing.orgId !== req.user.orgId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
       const contact = await storage.updateCrmContact(req.params.id, req.body);
       res.json(contact);
     } catch (error: any) {
@@ -5442,6 +5478,9 @@ export function registerCRMRoutes(
       if (!contact) {
         return res.status(404).json({ error: "Contact not found" });
       }
+      if (contact.orgId !== req.user.orgId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
       res.json(contact);
     } catch (error: any) {
       console.error("Failed to get contact:", error);
@@ -5450,6 +5489,11 @@ export function registerCRMRoutes(
   });
   app.delete("/api/contacts/:id", async (req: any, res) => {
     try {
+      const existing = await storage.getCrmContact(req.params.id);
+      if (!existing) return res.status(404).json({ error: "Contact not found" });
+      if (existing.orgId !== req.user.orgId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
       await storage.deleteCrmContact(req.params.id);
       res.json({ success: true });
     } catch (error: any) {
