@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { useQuery, useMutation, useQueryClient, useQueries } from "@tanstack/react-query";
-import { BarChart3, FolderPlus, Trash2, ChevronLeft, ChevronRight, Filter, ChevronUp } from "lucide-react";
+import { BarChart3, FolderPlus, Trash2, ChevronLeft, ChevronRight, Filter, ChevronUp, PlusCircle, Trophy, ShieldCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Link } from "wouter";
 import debounce from "lodash.debounce";
@@ -19,6 +19,7 @@ import CreateEditCompDialog from "@/components/salescomps/sales-comps/CreateEdit
 import ViewCompModal from "@/components/salescomps/sales-comps/ViewCompModal";
 import ColumnEditorDialog from "@/components/salescomps/sales-comps/ColumnEditorDialog";
 import PortfolioWizard from "@/components/salescomps/sales-comps/PortfolioWizard";
+import SubmitCompWizard from "@/components/salescomps/sales-comps/SubmitCompWizard";
 import BulkEdit from "./BulkEdit";
 import Upload from "./Upload";
 import ProjectAssignmentDialog from "@/components/salescomps/projects/ProjectAssignmentDialog";
@@ -88,6 +89,7 @@ export default function SalesCompsIndex() {
   
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [showSubmitWizard, setShowSubmitWizard] = useState(false);
   const [showPortfolioWizard, setShowPortfolioWizard] = useState(false);
   const [showColumnsDialog, setShowColumnsDialog] = useState(false);
   const [showUpload, setShowUpload] = useState(false);
@@ -399,6 +401,36 @@ export default function SalesCompsIndex() {
             </div>
           )}
 
+          {/* Network Effects Toolbar */}
+          <div className="px-3 md:px-6 py-2 border-b border-border bg-muted/30 flex items-center gap-2 flex-wrap">
+            {canCreate && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 gap-1.5 text-xs"
+                onClick={() => setShowSubmitWizard(true)}
+                data-testid="button-submit-comp"
+              >
+                <PlusCircle className="h-3.5 w-3.5" />
+                Submit a Comp
+              </Button>
+            )}
+            <Link href="/analysis/sales-comps/leaderboard">
+              <Button variant="ghost" size="sm" className="h-8 gap-1.5 text-xs">
+                <Trophy className="h-3.5 w-3.5 text-amber-500" />
+                Leaderboard
+              </Button>
+            </Link>
+            {user && ['owner', 'admin'].includes(user.role) && (
+              <Link href="/analysis/sales-comps/moderation">
+                <Button variant="ghost" size="sm" className="h-8 gap-1.5 text-xs">
+                  <ShieldCheck className="h-3.5 w-3.5 text-blue-500" />
+                  Moderation Queue
+                </Button>
+              </Link>
+            )}
+          </div>
+
           {/* Content Area */}
           <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
             {/* Collapsible Filters Panel */}
@@ -552,6 +584,15 @@ export default function SalesCompsIndex() {
       <PortfolioWizard
         open={showPortfolioWizard}
         onClose={() => setShowPortfolioWizard(false)}
+      />
+
+      <SubmitCompWizard
+        open={showSubmitWizard}
+        onClose={() => setShowSubmitWizard(false)}
+        onSuccess={() => {
+          setShowSubmitWizard(false);
+          queryClient.invalidateQueries({ queryKey: queryKeys.comps.all });
+        }}
       />
 
       {canManageColumns && (

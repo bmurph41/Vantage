@@ -34,6 +34,7 @@ import {
 import { z } from "zod";
 import multer from "multer";
 import { validateFileUpload } from "../middleware/file-upload-security";
+import { uploadToS3, getSignedDownloadUrl } from "../storage/s3-client";
 import path from "path";
 import fs from "fs-extra";
 import crypto from "crypto";
@@ -8687,6 +8688,275 @@ export function registerCRMRoutes(
     }
   });
 
+  // === COMP NETWORK EFFECTS ENGINE ===
+
+  // Contribution leaderboard — top contributors by verified comp count (opt-in via dataBenchmarkingConsent)
+  // Scoped to the caller's organization; only users who have opted in are shown.
+  app.get('/api/sales-comps/leaderboard', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+
+      const rows = await db
+        .select({
+          userId: salesComps.createdBy,
+          totalCount: sql<number>`count(${salesComps.id})::int`,
+          verifiedCount: sql<number>`count(case when ${salesComps.verificationStatus} = 'verified' then 1 end)::int`,
+          pendingCount: sql<number>`count(case when ${salesComps.verificationStatus} = 'pending' then 1 end)::int`,
+          userName: users.name,
+          orgName: organizations.name,
+          optedIn: users.dataBenchmarkingConsent,
+        })
+        .from(salesComps)
+        .innerJoin(users, eq(salesComps.createdBy, users.id))
+        .innerJoin(organizations, eq(users.orgId, organizations.id))
+        .where(and(
+          eq(salesComps.orgId, orgId),
+          isNull(salesComps.deletedAt),
+          eq(users.dataBenchmarkingConsent, true)
+        ))
+        .groupBy(salesComps.createdBy, users.name, organizations.name, users.dataBenchmarkingConsent)
+        .orderBy(sql`count(case when ${salesComps.verificationStatus} = 'verified' then 1 end) desc, count(${salesComps.id}) desc`)
+        .limit(50);
+
+      const leaderboard = rows.map((row, idx) => ({
+        userId: row.userId,
+        userName: row.userName,
+        orgName: row.orgName,
+        totalCount: row.totalCount,
+        verifiedCount: row.verifiedCount,
+        pendingCount: row.pendingCount,
+        rank: idx + 1,
+      }));
+
+      res.json(leaderboard);
+    } catch (error: any) {
+      console.error("Error fetching leaderboard:", error);
+      res.status(500).json({ message: "Failed to fetch leaderboard" });
+    }
+  });
+
+  // Comp submission document upload — accepts multi-file upload, stores to S3
+  const compDocUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 10 * 1024 * 1024, files: 10 },
+    fileFilter: (_req, file, cb) => {
+      const allowed = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg',
+        'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'];
+      if (allowed.includes(file.mimetype)) {
+        cb(null, true);
+      } else {
+        cb(new Error('Invalid file type. Allowed: PDF, images, Excel.'));
+      }
+    },
+  });
+
+  app.post('/api/sales-comps/submission-docs', compDocUpload.array('files', 10), async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const files = (req.files || []) as Express.Multer.File[];
+
+      if (!files.length) {
+        return res.status(400).json({ message: "No files provided" });
+      }
+
+      const uploaded = await Promise.all(
+        files.map(async (file) => {
+          const ext = path.extname(file.originalname).toLowerCase();
+          const key = `comp-docs/${orgId}/${userId}/${Date.now()}-${crypto.randomBytes(6).toString('hex')}${ext}`;
+          const result = await uploadToS3({
+            key,
+            body: file.buffer,
+            contentType: file.mimetype,
+            metadata: {
+              orgId,
+              userId,
+              originalName: file.originalname,
+            },
+          });
+          if (!result.success) {
+            throw new Error(`Failed to upload ${file.originalname}`);
+          }
+          return {
+            key,
+            name: file.originalname,
+            size: file.size,
+            type: file.mimetype,
+            url: result.url,
+          };
+        })
+      );
+
+      res.json({ files: uploaded });
+    } catch (error: any) {
+      console.error("Error uploading comp docs:", error);
+      res.status(500).json({ message: error.message || "Failed to upload documents" });
+    }
+  });
+
+  // Real-time duplicate detection for new comp submissions
+  app.post('/api/sales-comps/check-duplicates', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { marina, address, city, state, salePrice, saleYear } = req.body;
+
+      if (!marina) {
+        return res.json({ duplicates: [] });
+      }
+
+      const candidates = await db
+        .select({
+          id: salesComps.id,
+          marina: salesComps.marina,
+          address: salesComps.address,
+          city: salesComps.city,
+          state: salesComps.state,
+          salePrice: salesComps.salePrice,
+          saleYear: salesComps.saleYear,
+          verificationStatus: salesComps.verificationStatus,
+        })
+        .from(salesComps)
+        .where(and(
+          eq(salesComps.orgId, orgId),
+          isNull(salesComps.deletedAt),
+          state ? eq(salesComps.state, state) : sql`true`,
+          sql`lower(${salesComps.marina}) % lower(${marina})` // pg_trgm similarity
+        ))
+        .limit(20)
+        .catch(() => {
+          // Fallback without trigram if extension not available
+          return db
+            .select({
+              id: salesComps.id,
+              marina: salesComps.marina,
+              address: salesComps.address,
+              city: salesComps.city,
+              state: salesComps.state,
+              salePrice: salesComps.salePrice,
+              saleYear: salesComps.saleYear,
+              verificationStatus: salesComps.verificationStatus,
+            })
+            .from(salesComps)
+            .where(and(
+              eq(salesComps.orgId, orgId),
+              isNull(salesComps.deletedAt),
+              state ? eq(salesComps.state, state) : sql`true`,
+              ilike(salesComps.marina, `%${marina.split(' ')[0]}%`)
+            ))
+            .limit(20);
+        });
+
+      const duplicates = candidates
+        .map((c: any) => {
+          let confidence = 0;
+          const marinaA = marina.toLowerCase().trim();
+          const marinaB = (c.marina || '').toLowerCase().trim();
+
+          // Address-based matching (highest weight — same physical property)
+          if (address && c.address) {
+            const addrA = address.toLowerCase().replace(/[.,#]/g, '').trim();
+            const addrB = (c.address as string).toLowerCase().replace(/[.,#]/g, '').trim();
+            if (addrA === addrB) confidence += 50;
+            else if (addrA.length > 5 && addrB.length > 5 && (addrA.includes(addrB) || addrB.includes(addrA))) confidence += 30;
+          }
+
+          // Marina name matching
+          if (marinaA === marinaB) confidence += 40;
+          else if (marinaA.includes(marinaB) || marinaB.includes(marinaA)) confidence += 25;
+          else if (marinaA.split(' ').some((w: string) => w.length > 3 && marinaB.includes(w))) confidence += 15;
+
+          if (city && c.city && city.toLowerCase() === c.city.toLowerCase()) confidence += 15;
+          if (state && c.state && state === c.state) confidence += 10;
+
+          // Price within 10% tolerance
+          if (salePrice && c.salePrice) {
+            const priceDiff = Math.abs(Number(salePrice) - Number(c.salePrice)) / Math.max(Number(salePrice), Number(c.salePrice));
+            if (priceDiff <= 0.1) confidence += 15;
+          }
+
+          if (saleYear && c.saleYear && saleYear === c.saleYear) confidence += 5;
+
+          return { ...c, confidence };
+        })
+        .filter((c: any) => c.confidence >= 40)
+        .sort((a, b) => b.confidence - a.confidence)
+        .slice(0, 5);
+
+      res.json({ duplicates });
+    } catch (error: any) {
+      console.error("Error checking duplicates:", error);
+      res.json({ duplicates: [] });
+    }
+  });
+
+  // Admin moderation queue — unverified comps needing review
+  app.get('/api/sales-comps/moderation-queue', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userRole = req.user.role;
+
+      if (!['owner', 'admin'].includes(userRole)) {
+        return res.status(403).json({ message: "Admin or owner role required to access the moderation queue" });
+      }
+
+      const queue = await db
+        .select({
+          id: salesComps.id,
+          marina: salesComps.marina,
+          city: salesComps.city,
+          state: salesComps.state,
+          salePrice: salesComps.salePrice,
+          saleYear: salesComps.saleYear,
+          verificationStatus: salesComps.verificationStatus,
+          dataQualityScore: salesComps.dataQualityScore,
+          sourceConfidence: salesComps.sourceConfidence,
+          dataSource: salesComps.dataSource,
+          createdAt: salesComps.createdAt,
+          sourceNotes: salesComps.sourceNotes,
+          notes: salesComps.notes,
+          createdByName: users.name,
+        })
+        .from(salesComps)
+        .leftJoin(users, eq(salesComps.createdBy, users.id))
+        .where(and(
+          eq(salesComps.orgId, orgId),
+          isNull(salesComps.deletedAt),
+          or(
+            eq(salesComps.verificationStatus, 'unverified'),
+            eq(salesComps.verificationStatus, 'pending')
+          )
+        ))
+        .orderBy(desc(salesComps.salePrice), desc(salesComps.createdAt))
+        .limit(100);
+
+      const queueWithDupFlags = await Promise.all(
+        queue.map(async (comp) => {
+          try {
+            const dups = await db
+              .select({ id: salesComps.id })
+              .from(salesComps)
+              .where(and(
+                eq(salesComps.orgId, orgId),
+                isNull(salesComps.deletedAt),
+                comp.state ? eq(salesComps.state, comp.state) : sql`true`,
+                ilike(salesComps.marina, `%${(comp.marina || '').split(' ')[0]}%`),
+                sql`${salesComps.id} != ${comp.id}`
+              ))
+              .limit(5);
+            return { ...comp, duplicateFlags: dups.length };
+          } catch {
+            return { ...comp, duplicateFlags: 0 };
+          }
+        })
+      );
+
+      res.json(queueWithDupFlags);
+    } catch (error: any) {
+      console.error("Error fetching moderation queue:", error);
+      res.status(500).json({ message: "Failed to fetch moderation queue" });
+    }
+  });
+
   app.get('/api/sales-comps/:id', async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
@@ -10164,6 +10434,112 @@ export function registerCRMRoutes(
     } catch (error: any) {
       console.error("Update quality score error:", error);
       res.status(500).json({ message: "Failed to update quality score" });
+    }
+  });
+
+  // Admin moderation: verify or reject a comp submission
+  app.patch('/api/sales-comps/:id/verify', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const userRole = req.user.role;
+      const compId = req.params.id;
+      const { action, notes } = req.body;
+
+      if (!['owner', 'admin'].includes(userRole)) {
+        return res.status(403).json({ message: "Admin or owner role required to verify or reject comps" });
+      }
+
+      if (!action || !['verify', 'reject'].includes(action)) {
+        return res.status(400).json({ message: "action must be 'verify' or 'reject'" });
+      }
+
+      const comp = await storage.getComp(compId, orgId);
+      if (!comp) return res.status(404).json({ message: "Comp not found" });
+
+      const newStatus = action === 'verify' ? 'verified' : 'stale';
+      const updated = await storage.updateComp(compId, {
+        verificationStatus: newStatus,
+        verificationNotes: notes || null,
+        lastVerifiedAt: new Date(),
+        lastVerifiedBy: userId,
+        updatedBy: userId,
+        ...(action === 'verify' ? { dataQualityScore: Math.max((comp.dataQualityScore || 0), 75) } : {}),
+      }, orgId);
+
+      await storage.createAuditLog({
+        orgId,
+        userId,
+        entityType: 'sales_comp',
+        entityId: compId,
+        action: 'update',
+        before: comp,
+        after: updated,
+        metadata: { moderationAction: action, notes },
+      });
+
+      res.json(updated);
+    } catch (error: any) {
+      console.error("Error verifying comp:", error);
+      res.status(500).json({ message: "Failed to update comp verification" });
+    }
+  });
+
+  // Data enrichment panel: FEMA flood zone + assessor link
+  app.get('/api/sales-comps/:id/enrichment', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const comp = await storage.getComp(req.params.id, orgId);
+      if (!comp) return res.status(404).json({ message: "Comp not found" });
+
+      let floodZone = null;
+      let assessor = null;
+
+      if (comp.lat && comp.lng) {
+        try {
+          const femaUrl = `https://hazards.fema.gov/gis/nfhl/rest/services/public/NFHL/MapServer/28/query?geometry=${comp.lng},${comp.lat}&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=FLD_ZONE,ZONE_SUBTY,DFIRM_ID,COMMUNITY_ID&returnGeometry=false&f=json`;
+          const femaResponse = await fetch(femaUrl, { signal: AbortSignal.timeout(5000) });
+          if (femaResponse.ok) {
+            const femaData = await femaResponse.json();
+            if (femaData.features && femaData.features.length > 0) {
+              const attrs = femaData.features[0].attributes;
+              floodZone = {
+                zone: attrs.FLD_ZONE || 'Unknown',
+                subtype: attrs.ZONE_SUBTY || null,
+                firmPanel: attrs.DFIRM_ID || null,
+                communityId: attrs.COMMUNITY_ID || null,
+              };
+            }
+          }
+        } catch (femaErr) {
+          console.warn("[Enrichment] FEMA lookup failed:", femaErr);
+        }
+      }
+
+      if (comp.county && comp.state) {
+        const stateAssessorUrls: Record<string, string> = {
+          FL: `https://www.appraiser.org/`,
+          CA: `https://www.boe.ca.gov/assessors/`,
+          TX: `https://comptroller.texas.gov/taxes/property-tax/`,
+          NY: `https://www.tax.ny.gov/pit/property/default.htm`,
+          WA: `https://dor.wa.gov/taxes-rates/property-tax`,
+          NC: `https://www.ncdor.gov/taxes-forms/property-tax`,
+          SC: `https://www.scdor.gov/taxes/property-tax`,
+          GA: `https://dor.georgia.gov/property`,
+          MD: `https://sdat.dat.maryland.gov/RealProperty/`,
+          VA: `https://www.tax.virginia.gov/real-estate-tax`,
+        };
+        assessor = {
+          county: comp.county,
+          state: comp.state,
+          assessorUrl: stateAssessorUrls[comp.state] || null,
+        };
+      }
+
+      res.json({ floodZone, assessor });
+    } catch (error: any) {
+      console.error("Error fetching enrichment:", error);
+      res.status(500).json({ message: "Failed to fetch enrichment data" });
     }
   });
 

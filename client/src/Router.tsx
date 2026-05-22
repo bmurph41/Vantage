@@ -257,6 +257,8 @@ const SalesCompsBulkEdit = lazy(() => import("@/pages/analysis/sales-comps/BulkE
 const SalesCompsColumnManager = lazy(() => import("@/pages/analysis/sales-comps/ColumnManager"));
 const SalesCompsPendingProfiles = lazy(() => import("@/pages/analysis/sales-comps/PendingProfiles"));
 const SalesCompsPendingComps = lazy(() => import("@/pages/analysis/sales-comps/PendingComps"));
+const SalesCompsLeaderboard = lazy(() => import("@/pages/analysis/sales-comps/Leaderboard"));
+const SalesCompsModerationQueue = lazy(() => import("@/pages/analysis/sales-comps/ModerationQueue"));
 const ScProjectsIndex = lazy(() => import("@/pages/analysis/projects/Index"));
 const ScProjectsReport = lazy(() => import("@/pages/analysis/projects/Report"));
 const RateCompsIndex = lazy(() => import("@/pages/analysis/rate-comps/Index"));
@@ -2330,6 +2332,20 @@ function Router() {
         {() => (
           <GatedLayout pack="analysis">
             <SalesCompsPendingComps />
+          </GatedLayout>
+        )}
+      </Route>
+      <Route path="/analysis/sales-comps/leaderboard">
+        {() => (
+          <GatedLayout pack="analysis">
+            <SalesCompsLeaderboard />
+          </GatedLayout>
+        )}
+      </Route>
+      <Route path="/analysis/sales-comps/moderation">
+        {() => (
+          <GatedLayout pack="analysis">
+            <SalesCompsModerationQueue />
           </GatedLayout>
         )}
       </Route>

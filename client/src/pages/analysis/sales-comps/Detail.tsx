@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,11 +6,13 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
-import { ArrowLeft, Trash2, Building2, MapPin, DollarSign, Calendar, Anchor, Ship, Info, Edit } from "lucide-react";
+import { ArrowLeft, Trash2, Building2, MapPin, DollarSign, Calendar, Anchor, Ship, Info, Edit, Globe } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import CreateEditCompDialog from "@/components/salescomps/sales-comps/CreateEditCompDialog";
 import { ExportPdfButton } from "@/components/ui/export-pdf-button";
+import CompConfidenceBadge from "@/components/salescomps/sales-comps/CompConfidenceBadge";
+import DataEnrichmentPanel from "@/components/salescomps/sales-comps/DataEnrichmentPanel";
 import type { SalesComp } from "@shared/schema";
 
 interface DetailProps {
@@ -148,6 +150,8 @@ export default function Detail({ compId: propCompId, onClose, isModal = false }:
     );
   };
 
+  const typedComp = comp as SalesComp;
+
   return (
     <Container ref={reportRef} className={isModal ? 'h-full overflow-auto' : 'max-w-5xl mx-auto'}>
       <div className={`${isModal ? 'sticky top-0 bg-background z-10 ' : ''}p-6 border-b border-border`}>
@@ -201,7 +205,7 @@ export default function Detail({ compId: propCompId, onClose, isModal = false }:
         </div>
 
         {comp?.salePrice && (
-          <div className="flex items-center gap-3 mt-4">
+          <div className="flex items-center gap-3 mt-4 flex-wrap">
             <Badge variant="default" className="text-sm px-3 py-1">
               ${Number(comp.salePrice).toLocaleString()}
             </Badge>
@@ -215,6 +219,12 @@ export default function Detail({ compId: propCompId, onClose, isModal = false }:
                 {Number(comp.capRate).toFixed(2)}% Cap
               </Badge>
             )}
+            <CompConfidenceBadge
+              verificationStatus={typedComp?.verificationStatus}
+              dataQualityScore={typedComp?.dataQualityScore}
+              sourceConfidence={typedComp?.sourceConfidence}
+              dataSource={typedComp?.dataSource}
+            />
           </div>
         )}
       </div>
@@ -237,6 +247,10 @@ export default function Detail({ compId: propCompId, onClose, isModal = false }:
             <TabsTrigger value="transaction" data-testid="tab-transaction">
               <Info className="h-4 w-4 mr-1.5" />
               Transaction
+            </TabsTrigger>
+            <TabsTrigger value="enrichment" data-testid="tab-enrichment">
+              <Globe className="h-4 w-4 mr-1.5" />
+              Public Data
             </TabsTrigger>
           </TabsList>
         </div>
@@ -352,11 +366,26 @@ export default function Detail({ compId: propCompId, onClose, isModal = false }:
                 <CardTitle className="text-base">Data Source</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                {renderField('Source', 'source')}
+                {renderField('Source', 'dataSource')}
                 {renderField('Source URL', 'sourceUrl')}
+                <div className="space-y-1">
+                  <Label className="text-sm font-medium text-muted-foreground">Verification</Label>
+                  <div className="pt-0.5">
+                    <CompConfidenceBadge
+                      verificationStatus={typedComp?.verificationStatus}
+                      dataQualityScore={typedComp?.dataQualityScore}
+                      sourceConfidence={typedComp?.sourceConfidence}
+                      dataSource={typedComp?.dataSource}
+                    />
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        <TabsContent value="enrichment" className="p-6">
+          {typedComp && <DataEnrichmentPanel comp={typedComp} />}
         </TabsContent>
       </Tabs>
 
