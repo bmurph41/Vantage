@@ -5,8 +5,10 @@ import {
   BarChart3, Users, Building, Handshake, Calendar, 
   Bot, Bell, Mail, PieChart, TrendingUp, Settings, Activity,
   LayoutDashboard, Layers, UserCheck, Building2, FileText, Target, Home, Tag, Package, Webhook, GitMerge, ChevronDown, ChevronRight, ChevronLeft,
-  Briefcase, ListTodo, ClipboardList, Calculator, Anchor, Upload, History, Send, Menu, X, AlertCircle, Fuel, CreditCard, Box, Shield, MessageSquare, LayoutList, Megaphone, DollarSign, Link2, FolderLock, Receipt, RefreshCcw, Percent, Search, Wrench, Ship, ShoppingCart, PanelLeftClose, PanelLeft, Plug, BookOpen, Lock, Sparkles
+  Briefcase, ListTodo, ClipboardList, Calculator, Anchor, Upload, History, Send, Menu, X, AlertCircle, Fuel, CreditCard, Box, Shield, MessageSquare, LayoutList, Megaphone, DollarSign, Link2, FolderLock, Receipt, RefreshCcw, Percent, Search, Wrench, Ship, ShoppingCart, PanelLeftClose, PanelLeft, Plug, BookOpen, Lock, Sparkles, HelpCircle
 } from "lucide-react";
+import { ChangelogPanel, getUnreadCount } from "@/components/ChangelogPanel";
+import { HelpPanel } from "@/components/HelpPanel";
 import { cn } from "@/lib/utils";
 import { OPS_MODULE_SUBCATEGORY, OPS_SUBCATEGORY_META, type OpsSubcategory } from '@shared/asset-class-ops-modules';
 import { ASSET_CLASS_CATALOGS } from '@shared/asset-class-catalog';
@@ -269,6 +271,17 @@ export default function UnifiedSidebar() {
   const [paywallPackType, setPaywallPackType] = useState<PackType>('crm_pipeline');
   const [paywallFeatureName, setPaywallFeatureName] = useState<string>('');
   const [supportOpen, setSupportOpen] = useState(false);
+  const [changelogOpen, setChangelogOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(() => getUnreadCount(user?.id));
+
+  useEffect(() => {
+    setUnreadCount(getUnreadCount(user?.id));
+  }, [user?.id]);
+
+  const openChangelog = () => {
+    setChangelogOpen(true);
+    setUnreadCount(0);
+  };
 
   const showPaywall = (packType: PackType, featureName: string) => {
     setPaywallPackType(packType);
@@ -661,6 +674,26 @@ export default function UnifiedSidebar() {
                   {!sidebarCollapsed && <h1 className="text-lg font-bold text-sidebar-foreground truncate">Vantage</h1>}
                 </div>
               </Link>
+              {!sidebarCollapsed && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={openChangelog}
+                      className="relative p-1.5 text-sidebar-foreground/50 hover:text-sidebar-foreground hover:bg-sidebar-accent rounded transition-colors"
+                      aria-label="What's New"
+                      data-testid="changelog-bell"
+                    >
+                      <Bell className="w-4 h-4" />
+                      {unreadCount > 0 && (
+                        <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-blue-500 rounded-full border-2 border-sidebar" />
+                      )}
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" sideOffset={6}>
+                    <p>{unreadCount > 0 ? `${unreadCount} new update${unreadCount > 1 ? "s" : ""}` : "What's New"}</p>
+                  </TooltipContent>
+                </Tooltip>
+              )}
             </div>
             {/* Command Palette Trigger */}
             {!sidebarCollapsed ? (
@@ -1348,29 +1381,55 @@ export default function UnifiedSidebar() {
               <a href="/terms" target="_blank" className="hover:text-foreground transition-colors">Terms</a>
               <a href="/privacy" target="_blank" className="hover:text-foreground transition-colors">Privacy</a>
               <a href="/benchmarking" target="_blank" className="hover:text-foreground transition-colors">Benchmarking</a>
-              <button
-                onClick={() => setSupportOpen(true)}
-                className="ml-auto flex items-center gap-1 hover:text-foreground transition-colors"
-              >
-                <HeadphonesIcon className="w-3 h-3" />
-                Help
-              </button>
+              <div className="ml-auto flex items-center gap-2">
+                <HelpPanel onOpenChangelog={() => { setSupportOpen(false); openChangelog(); }}>
+                  <button className="flex items-center gap-1 hover:text-foreground transition-colors">
+                    <HelpCircle className="w-3 h-3" />
+                    Help
+                  </button>
+                </HelpPanel>
+                <button
+                  onClick={() => setSupportOpen(true)}
+                  className="flex items-center gap-1 hover:text-foreground transition-colors"
+                >
+                  <HeadphonesIcon className="w-3 h-3" />
+                  Support
+                </button>
+              </div>
             </div>
           )}
           {sidebarCollapsed && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  onClick={() => setSupportOpen(true)}
-                  className="flex items-center justify-center py-2.5 px-2 w-full hover:bg-sidebar-accent transition-colors border-t border-sidebar-border"
-                >
-                  <HeadphonesIcon className="w-4 h-4 text-sidebar-foreground/50" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="right" sideOffset={10}>
-                <p>Help & Support</p>
-              </TooltipContent>
-            </Tooltip>
+            <>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={openChangelog}
+                    className="relative flex items-center justify-center py-2.5 px-2 w-full hover:bg-sidebar-accent transition-colors border-t border-sidebar-border"
+                  >
+                    <Bell className="w-4 h-4 text-sidebar-foreground/50" />
+                    {unreadCount > 0 && (
+                      <span className="absolute top-2 right-2.5 w-2 h-2 bg-blue-500 rounded-full" />
+                    )}
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="right" sideOffset={10}>
+                  <p>{unreadCount > 0 ? `${unreadCount} new update${unreadCount > 1 ? "s" : ""}` : "What's New"}</p>
+                </TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => setSupportOpen(true)}
+                    className="flex items-center justify-center py-2.5 px-2 w-full hover:bg-sidebar-accent transition-colors border-t border-sidebar-border"
+                  >
+                    <HeadphonesIcon className="w-4 h-4 text-sidebar-foreground/50" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="right" sideOffset={10}>
+                  <p>Help & Support</p>
+                </TooltipContent>
+              </Tooltip>
+            </>
           )}
           <div className={cn(
             "border-t border-sidebar-border bg-sidebar flex-shrink-0 safe-area-bottom",
@@ -1410,6 +1469,13 @@ export default function UnifiedSidebar() {
           onOpenChange={setSupportOpen}
           userName={user?.name || user?.email?.split('@')[0] || ''}
           userEmail={user?.email || ''}
+        />
+
+        {/* Changelog Panel */}
+        <ChangelogPanel
+          open={changelogOpen}
+          onOpenChange={setChangelogOpen}
+          userId={user?.id}
         />
 
         {/* Paywall Modal — triggered when clicking locked sidebar sections */}

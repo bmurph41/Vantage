@@ -1,0 +1,38 @@
+[
+  {
+    "id": "2026-05-22-quick-add-fab",
+    "date": "2026-05-22",
+    "title": "Quick Add button & ⌘N shortcut",
+    "description": "A floating + button now lives in the bottom-right corner so you can create a deal, contact, or company from anywhere in the app. Press ⌘N (Ctrl+N on Windows) for the same result."
+  },
+  {
+    "id": "2026-05-10-market-intelligence",
+    "date": "2026-05-10",
+    "title": "Market Intelligence Hub",
+    "description": "The new Market Intelligence section consolidates Sales Comps, Rate Comps, Demographics, and Capital Markets data into a single research workspace. Access it from the sidebar under Analysis."
+  },
+  {
+    "id": "2026-04-28-doc-intel-v2",
+    "date": "2026-04-28",
+    "title": "Document Intelligence V2",
+    "description": "Dual-pipeline document processing now supports P&L, Cash Flow, and Rent Roll extraction with confidence scoring and a human-in-the-loop review wizard. Drag files straight onto the upload dropzone."
+  },
+  {
+    "id": "2026-04-14-onboarding-role-picker",
+    "date": "2026-04-14",
+    "title": "Role-based onboarding",
+    "description": "New users now pick their role (Investor, Broker, Operator, GP, Analyst) on first login. The sidebar, quick-start checklist, and default views all adapt to match how you work."
+  },
+  {
+    "id": "2026-03-31-portfolio-dashboard",
+    "date": "2026-03-31",
+    "title": "Portfolio Dashboard",
+    "description": "The Portfolio Dashboard aggregates returns, utilization, and key metrics across all your modeled assets in one view. Drill into any asset directly from the summary cards."
+  },
+  {
+    "id": "2026-03-15-pnl-anomaly",
+    "date": "2026-03-15",
+    "title": "P&L Anomaly Intelligence",
+    "description": "AI-powered anomaly detection now flags unusual line items in uploaded P&L statements, highlights seasonal outliers, and surfaces potential misclassifications before you finalize underwriting."
+  }
+]
