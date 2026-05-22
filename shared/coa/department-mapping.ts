@@ -247,10 +247,31 @@ const LEGACY_DEPARTMENT_MAP: Record<string, string> = {
   'commercial tenants': 'Commercial Leases',
 };
 
+// VALID_DEPARTMENTS is the UNION of every department string each inferDepartment
+// branch (marina cascade / multifamily / str) can produce. normalizeDepartment
+// uses it as the fast-path allowlist: a label in this set passes through
+// verbatim. WS5 Step A widened it from a flat 10-entry marina-only set to the
+// full 27-entry union so class-correct departments stop flattening to 'General'.
+//
+// Step A is NOI-NEUTRAL: it only changes which label persists in
+// modeling_actuals.department. departmentToAssumptionKey still maps every
+// non-marina label to the 'g_and_a' catch-all (re-keyed in WS5 Step B), and no
+// newly-surviving label collides with an engine `department === '...'` check.
 const VALID_DEPARTMENTS = new Set([
+  // ── Marina cascade (inferDepartmentMarina) ──
   'Storage', 'Fuel', "Ship's Store", 'Service', 'Boat Sales',
   'Boat Brokerage', 'Payroll', 'Marina & Amenities', 'General',
   'Commercial Leases',
+  // Marina extended-expense departments — previously flattened (5 of these
+  // could not survive the broken snake_case-key roundtrip; the other 5
+  // survived only via EXPENSE_DEPT_KEY_TO_LABEL — now all pass through directly)
+  'Insurance', 'Taxes', 'Utilities', 'Advertising', 'Leases',
+  'Professional Services', 'Bank & Credit Card Fees', 'Licenses & Permits',
+  'Security & Contract Services', 'Repairs & Maintenance',
+  // ── Multifamily (inferDepartmentMultifamily) — 'Payroll'/'Utilities' shared above ──
+  'Rental', 'Other Income', 'Mgmt Fee', 'R&M', 'Operating',
+  // ── Short-term rental (inferDepartmentSTR) — 'Rental'/'Operating' shared above ──
+  'Cleaning', 'Platform Fees',
 ]);
 
 // ─── Expense department key → display label (from EXPENSE_DEPT_LABELS) ─────────
