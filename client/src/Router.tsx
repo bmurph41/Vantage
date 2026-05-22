@@ -460,9 +460,10 @@ function UnifiedLayout({ children }: { children: React.ReactNode }) {
       </div>
       <CommandPalette />
       <AIAssistant />
-      {/* Role picker — shown once per user (per-user localStorage key) */}
+      {/* Role picker — shown once per user (per-user localStorage key).
+          Onboarding wizard is gated behind this: new users pick role first. */}
       <RolePickerModal
-        open={showRolePicker && !showOnboarding}
+        open={showRolePicker}
         onComplete={() => { completeRolePicker(user?.id); completeOnboarding(user?.id); }}
         userId={user?.id}
         userName={user?.name?.split(' ')[0] || user?.email?.split('@')[0]}
@@ -481,9 +482,9 @@ function UnifiedLayout({ children }: { children: React.ReactNode }) {
       <EntitlementsProvider>
         <Suspense fallback={null}>
           <OnboardingWizard 
-            open={showOnboarding} 
+            open={showOnboarding && !showRolePicker}
             onOpenChange={(open) => {
-              if (!open) completeOnboarding();
+              if (!open) completeOnboarding(user?.id);
               setShowOnboarding(open);
             }}
             userName={user?.name?.split(' ')[0] || user?.email?.split('@')[0]}
