@@ -114,11 +114,22 @@ const SCENARIO_ASSET_CLASS = {
 // departmentToAssumptionKey() in pro-forma-engine-service.ts. g_and_a is the
 // catch-all (departmentToAssumptionKey's `default`).
 const SYNTHETIC_GROWTH = {
+  // marina (unchanged)
   storage: 4.0, fuel_dock: 1.5, ship_store: 2.5, service: 3.5,
   boat_sales: 2.0, boat_brokerage: 3.0, rental_boats: 4.5, boat_club: 5.0,
   boat_finance: 2.2, marina_amenities: 3.8, commercial_tenants: 2.8,
   commercial_leases: 2.9, restaurant: 3.3, rv_sites: 4.1, hospitality: 3.6,
   parts: 2.7, misc_revenue: 1.0, payroll: 3.2, g_and_a: 2.6,
+  // WS5 Step B — the 3 reused marina keys that EXIST in
+  // assumptions.tsx's granularExpenseGrowth defaults today
+  // (payroll is already populated above). Distinct rates so the harness
+  // surfaces MF-expense differentiation. The new-only keys
+  // (residential_rental, other_income, operating_expenses, nightly_rate,
+  // cleaning_revenue/cleaning_expense, platform_fees) are deliberately
+  // NOT added — they don't exist in production lookup tables until Step
+  // C, so they should fall back here too (→ SYNTHETIC_GROWTH.g_and_a),
+  // mirroring the engine's flat-fallback behavior post-B/pre-C.
+  repairs_maintenance: 7.0, utilities: 7.5, management_fees: 8.0,
 };
 const PROJECTION_YEARS = 5;
 // Fixed base amounts by category — deterministic, no DB.
@@ -251,6 +262,12 @@ const INPUTS = [
 function computeSnapshot() {
   const inferences = INPUTS.map(({ label, category, scenario }) => {
     const ac = SCENARIO_ASSET_CLASS[scenario];
+    // WS5 Step B: departmentToAssumptionKey is now asset-class-aware and the
+    // engine passes a `side` derived from the line's category. Revenue lines
+    // resolve via `getRevenueGrowthForDept` (side='revenue'); cogs + expense
+    // lines via `getExpenseGrowthForCategory` (side='expense'). Disambiguates
+    // STR `Cleaning` only.
+    const side = category === 'revenue' ? 'revenue' : 'expense';
     const dNative = inferDepartment(label, category, ac);
     const dUndef = inferDepartment(label, category, undefined);
     const dMarina = inferDepartment(label, category, 'marina');
@@ -264,10 +281,12 @@ function computeSnapshot() {
         client: dClient,
       },
       assumptionKey: {
-        serverNative: departmentToAssumptionKey(dNative),
-        serverUndefined: departmentToAssumptionKey(dUndef),
-        serverMarina: departmentToAssumptionKey(dMarina),
-        client: departmentToAssumptionKey(dClient),
+        serverNative: departmentToAssumptionKey(dNative, ac, side),
+        // writerPath_undefined: pre-C2 actuals-writer mode — neither inference
+        // nor key-map sees the asset class; marina-default both ways.
+        serverUndefined: departmentToAssumptionKey(dUndef, undefined, side),
+        serverMarina: departmentToAssumptionKey(dMarina, 'marina', side),
+        client: departmentToAssumptionKey(dClient, ac, side),
       },
     };
   });

@@ -595,10 +595,10 @@
         "client": "Rental"
       },
       "assumptionKey": {
-        "serverNative": "g_and_a",
+        "serverNative": "residential_rental",
         "serverUndefined": "g_and_a",
         "serverMarina": "g_and_a",
-        "client": "g_and_a"
+        "client": "residential_rental"
       }
     },
     {
@@ -612,10 +612,10 @@
         "client": "Rental"
       },
       "assumptionKey": {
-        "serverNative": "g_and_a",
+        "serverNative": "residential_rental",
         "serverUndefined": "g_and_a",
         "serverMarina": "g_and_a",
-        "client": "g_and_a"
+        "client": "residential_rental"
       }
     },
     {
@@ -629,10 +629,10 @@
         "client": "Rental"
       },
       "assumptionKey": {
-        "serverNative": "g_and_a",
+        "serverNative": "residential_rental",
         "serverUndefined": "g_and_a",
         "serverMarina": "g_and_a",
-        "client": "g_and_a"
+        "client": "residential_rental"
       }
     },
     {
@@ -646,10 +646,10 @@
         "client": "Rental"
       },
       "assumptionKey": {
-        "serverNative": "g_and_a",
+        "serverNative": "residential_rental",
         "serverUndefined": "g_and_a",
         "serverMarina": "g_and_a",
-        "client": "g_and_a"
+        "client": "residential_rental"
       }
     },
     {
@@ -663,10 +663,10 @@
         "client": "Rental"
       },
       "assumptionKey": {
-        "serverNative": "g_and_a",
+        "serverNative": "residential_rental",
         "serverUndefined": "g_and_a",
         "serverMarina": "g_and_a",
-        "client": "g_and_a"
+        "client": "residential_rental"
       }
     },
     {
@@ -680,10 +680,10 @@
         "client": "Rental"
       },
       "assumptionKey": {
-        "serverNative": "g_and_a",
+        "serverNative": "residential_rental",
         "serverUndefined": "g_and_a",
         "serverMarina": "g_and_a",
-        "client": "g_and_a"
+        "client": "residential_rental"
       }
     },
     {
@@ -697,10 +697,10 @@
         "client": "Other Income"
       },
       "assumptionKey": {
-        "serverNative": "g_and_a",
+        "serverNative": "other_income",
         "serverUndefined": "g_and_a",
         "serverMarina": "g_and_a",
-        "client": "g_and_a"
+        "client": "other_income"
       }
     },
     {
@@ -714,10 +714,10 @@
         "client": "Other Income"
       },
       "assumptionKey": {
-        "serverNative": "g_and_a",
+        "serverNative": "other_income",
         "serverUndefined": "marina_amenities",
         "serverMarina": "marina_amenities",
-        "client": "g_and_a"
+        "client": "other_income"
       }
     },
     {
@@ -731,10 +731,10 @@
         "client": "Other Income"
       },
       "assumptionKey": {
-        "serverNative": "g_and_a",
+        "serverNative": "other_income",
         "serverUndefined": "marina_amenities",
         "serverMarina": "marina_amenities",
-        "client": "g_and_a"
+        "client": "other_income"
       }
     },
     {
@@ -748,10 +748,10 @@
         "client": "Other Income"
       },
       "assumptionKey": {
-        "serverNative": "g_and_a",
+        "serverNative": "other_income",
         "serverUndefined": "g_and_a",
         "serverMarina": "g_and_a",
-        "client": "g_and_a"
+        "client": "other_income"
       }
     },
     {
@@ -765,10 +765,10 @@
         "client": "Other Income"
       },
       "assumptionKey": {
-        "serverNative": "g_and_a",
+        "serverNative": "other_income",
         "serverUndefined": "g_and_a",
         "serverMarina": "g_and_a",
-        "client": "g_and_a"
+        "client": "other_income"
       }
     },
     {
@@ -782,10 +782,10 @@
         "client": "Mgmt Fee"
       },
       "assumptionKey": {
-        "serverNative": "g_and_a",
+        "serverNative": "management_fees",
         "serverUndefined": "g_and_a",
         "serverMarina": "g_and_a",
-        "client": "g_and_a"
+        "client": "management_fees"
       }
     },
     {
@@ -833,10 +833,10 @@
         "client": "Utilities"
       },
       "assumptionKey": {
-        "serverNative": "g_and_a",
+        "serverNative": "utilities",
         "serverUndefined": "marina_amenities",
         "serverMarina": "marina_amenities",
-        "client": "g_and_a"
+        "client": "utilities"
       }
     },
     {
@@ -850,10 +850,10 @@
         "client": "Utilities"
       },
       "assumptionKey": {
-        "serverNative": "g_and_a",
+        "serverNative": "utilities",
         "serverUndefined": "marina_amenities",
         "serverMarina": "marina_amenities",
-        "client": "g_and_a"
+        "client": "utilities"
       }
     },
     {
@@ -867,10 +867,10 @@
         "client": "Utilities"
       },
       "assumptionKey": {
-        "serverNative": "g_and_a",
+        "serverNative": "utilities",
         "serverUndefined": "g_and_a",
         "serverMarina": "g_and_a",
-        "client": "g_and_a"
+        "client": "utilities"
       }
     },
     {
@@ -884,10 +884,10 @@
         "client": "R&M"
       },
       "assumptionKey": {
-        "serverNative": "g_and_a",
+        "serverNative": "repairs_maintenance",
         "serverUndefined": "g_and_a",
         "serverMarina": "g_and_a",
-        "client": "g_and_a"
+        "client": "repairs_maintenance"
       }
     },
     {
@@ -901,10 +901,10 @@
         "client": "R&M"
       },
       "assumptionKey": {
-        "serverNative": "g_and_a",
+        "serverNative": "repairs_maintenance",
         "serverUndefined": "g_and_a",
         "serverMarina": "g_and_a",
-        "client": "g_and_a"
+        "client": "repairs_maintenance"
       }
     },
     {
@@ -918,10 +918,10 @@
         "client": "R&M"
       },
       "assumptionKey": {
-        "serverNative": "g_and_a",
+        "serverNative": "repairs_maintenance",
         "serverUndefined": "service",
         "serverMarina": "service",
-        "client": "g_and_a"
+        "client": "repairs_maintenance"
       }
     },
     {
@@ -935,10 +935,10 @@
         "client": "Operating"
       },
       "assumptionKey": {
-        "serverNative": "g_and_a",
+        "serverNative": "operating_expenses",
         "serverUndefined": "g_and_a",
         "serverMarina": "g_and_a",
-        "client": "g_and_a"
+        "client": "operating_expenses"
       }
     },
     {
@@ -952,10 +952,10 @@
         "client": "Operating"
       },
       "assumptionKey": {
-        "serverNative": "g_and_a",
+        "serverNative": "operating_expenses",
         "serverUndefined": "g_and_a",
         "serverMarina": "g_and_a",
-        "client": "g_and_a"
+        "client": "operating_expenses"
       }
     },
     {
@@ -969,10 +969,10 @@
         "client": "Operating"
       },
       "assumptionKey": {
-        "serverNative": "g_and_a",
+        "serverNative": "operating_expenses",
         "serverUndefined": "g_and_a",
         "serverMarina": "g_and_a",
-        "client": "g_and_a"
+        "client": "operating_expenses"
       }
     },
     {
@@ -986,10 +986,10 @@
         "client": "Operating"
       },
       "assumptionKey": {
-        "serverNative": "g_and_a",
+        "serverNative": "operating_expenses",
         "serverUndefined": "g_and_a",
         "serverMarina": "g_and_a",
-        "client": "g_and_a"
+        "client": "operating_expenses"
       }
     },
     {
@@ -1003,10 +1003,10 @@
         "client": "Rental"
       },
       "assumptionKey": {
-        "serverNative": "g_and_a",
+        "serverNative": "nightly_rate",
         "serverUndefined": "g_and_a",
         "serverMarina": "g_and_a",
-        "client": "g_and_a"
+        "client": "nightly_rate"
       }
     },
     {
@@ -1020,10 +1020,10 @@
         "client": "Rental"
       },
       "assumptionKey": {
-        "serverNative": "g_and_a",
+        "serverNative": "nightly_rate",
         "serverUndefined": "g_and_a",
         "serverMarina": "g_and_a",
-        "client": "g_and_a"
+        "client": "nightly_rate"
       }
     },
     {
@@ -1037,10 +1037,10 @@
         "client": "Rental"
       },
       "assumptionKey": {
-        "serverNative": "g_and_a",
+        "serverNative": "nightly_rate",
         "serverUndefined": "g_and_a",
         "serverMarina": "g_and_a",
-        "client": "g_and_a"
+        "client": "nightly_rate"
       }
     },
     {
@@ -1054,10 +1054,10 @@
         "client": "Rental"
       },
       "assumptionKey": {
-        "serverNative": "g_and_a",
+        "serverNative": "nightly_rate",
         "serverUndefined": "g_and_a",
         "serverMarina": "g_and_a",
-        "client": "g_and_a"
+        "client": "nightly_rate"
       }
     },
     {
@@ -1071,10 +1071,10 @@
         "client": "Rental"
       },
       "assumptionKey": {
-        "serverNative": "g_and_a",
+        "serverNative": "nightly_rate",
         "serverUndefined": "g_and_a",
         "serverMarina": "g_and_a",
-        "client": "g_and_a"
+        "client": "nightly_rate"
       }
     },
     {
@@ -1088,10 +1088,10 @@
         "client": "Cleaning"
       },
       "assumptionKey": {
-        "serverNative": "g_and_a",
+        "serverNative": "cleaning_revenue",
         "serverUndefined": "service",
         "serverMarina": "service",
-        "client": "g_and_a"
+        "client": "cleaning_revenue"
       }
     },
     {
@@ -1105,10 +1105,10 @@
         "client": "Cleaning"
       },
       "assumptionKey": {
-        "serverNative": "g_and_a",
+        "serverNative": "cleaning_expense",
         "serverUndefined": "service",
         "serverMarina": "service",
-        "client": "g_and_a"
+        "client": "cleaning_expense"
       }
     },
     {
@@ -1122,10 +1122,10 @@
         "client": "Cleaning"
       },
       "assumptionKey": {
-        "serverNative": "g_and_a",
+        "serverNative": "cleaning_expense",
         "serverUndefined": "g_and_a",
         "serverMarina": "g_and_a",
-        "client": "g_and_a"
+        "client": "cleaning_expense"
       }
     },
     {
@@ -1139,10 +1139,10 @@
         "client": "Platform Fees"
       },
       "assumptionKey": {
-        "serverNative": "g_and_a",
+        "serverNative": "platform_fees",
         "serverUndefined": "marina_amenities",
         "serverMarina": "marina_amenities",
-        "client": "g_and_a"
+        "client": "platform_fees"
       }
     },
     {
@@ -1156,10 +1156,10 @@
         "client": "Platform Fees"
       },
       "assumptionKey": {
-        "serverNative": "g_and_a",
+        "serverNative": "platform_fees",
         "serverUndefined": "boat_brokerage",
         "serverMarina": "boat_brokerage",
-        "client": "g_and_a"
+        "client": "platform_fees"
       }
     },
     {
@@ -1173,10 +1173,10 @@
         "client": "Platform Fees"
       },
       "assumptionKey": {
-        "serverNative": "g_and_a",
+        "serverNative": "platform_fees",
         "serverUndefined": "g_and_a",
         "serverMarina": "g_and_a",
-        "client": "g_and_a"
+        "client": "platform_fees"
       }
     },
     {
@@ -1190,10 +1190,10 @@
         "client": "Operating"
       },
       "assumptionKey": {
-        "serverNative": "g_and_a",
+        "serverNative": "operating_expenses",
         "serverUndefined": "g_and_a",
         "serverMarina": "g_and_a",
-        "client": "g_and_a"
+        "client": "operating_expenses"
       }
     },
     {
@@ -1207,10 +1207,10 @@
         "client": "Operating"
       },
       "assumptionKey": {
-        "serverNative": "g_and_a",
+        "serverNative": "operating_expenses",
         "serverUndefined": "g_and_a",
         "serverMarina": "g_and_a",
-        "client": "g_and_a"
+        "client": "operating_expenses"
       }
     },
     {
@@ -1224,10 +1224,10 @@
         "client": "Operating"
       },
       "assumptionKey": {
-        "serverNative": "g_and_a",
+        "serverNative": "operating_expenses",
         "serverUndefined": "g_and_a",
         "serverMarina": "g_and_a",
-        "client": "g_and_a"
+        "client": "operating_expenses"
       }
     },
     {
@@ -1241,10 +1241,10 @@
         "client": "Operating"
       },
       "assumptionKey": {
-        "serverNative": "g_and_a",
+        "serverNative": "operating_expenses",
         "serverUndefined": "g_and_a",
         "serverMarina": "g_and_a",
-        "client": "g_and_a"
+        "client": "operating_expenses"
       }
     },
     {
@@ -1258,10 +1258,10 @@
         "client": "Operating"
       },
       "assumptionKey": {
-        "serverNative": "g_and_a",
+        "serverNative": "operating_expenses",
         "serverUndefined": "g_and_a",
         "serverMarina": "g_and_a",
-        "client": "g_and_a"
+        "client": "operating_expenses"
       }
     },
     {
@@ -1838,10 +1838,10 @@
     "multifamily": {
       "revenueLines": 11,
       "expenseLines": 13,
-      "syntheticNOI_enginePath": 8052083,
+      "syntheticNOI_enginePath": 7444487,
       "syntheticNOI_writerPath_undefined": 8132142,
-      "syntheticNOI_writerPath_threaded": 8052083,
-      "writerPathGap": -80059
+      "syntheticNOI_writerPath_threaded": 7444487,
+      "writerPathGap": -687655
     },
     "str": {
       "revenueLines": 6,

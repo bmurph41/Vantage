@@ -365,7 +365,52 @@ export function normalizeBucket(bucket: string): string {
   return 'Expense';
 }
 
-export function departmentToAssumptionKey(department: string): string {
+/**
+ * Map an inferDepartment output to the engine's growth-rate / margin lookup key.
+ *
+ * WS5 Step B re-key (against the frozen Step 0 vocabulary contract in
+ * ANCHOR_3_PRE_PHASE0.md, commit bd007667):
+ *   - assetClass disambiguates the one same-string/different-key revenue case —
+ *     `Rental` → `residential_rental` (multifamily) vs `nightly_rate` (str).
+ *   - side disambiguates STR's one dual-sided department — `Cleaning` →
+ *     `cleaning_revenue` (revenue side) vs `cleaning_expense` (expense side).
+ *     Every other department is single-sided; `side` is inert for them.
+ *   - Both params optional → marina branch byte-identical (marina switch
+ *     ignores them; an MF/STR department not in the per-class branch falls
+ *     through to the marina switch, which terminates at 'g_and_a').
+ *
+ * Reused marina keys (identical meaning for multifamily): `payroll`,
+ * `repairs_maintenance`, `utilities`, `management_fees`. New keys:
+ * `residential_rental`, `other_income`, `operating_expenses`, `nightly_rate`,
+ * `cleaning_revenue`, `cleaning_expense`, `platform_fees`.
+ */
+export function departmentToAssumptionKey(
+  department: string,
+  assetClass?: string,
+  side?: 'revenue' | 'expense',
+): string {
+  if (assetClass === 'multifamily') {
+    switch (department) {
+      case 'Rental':       return 'residential_rental';   // revenue   (NEW)
+      case 'Other Income': return 'other_income';          // revenue   (NEW)
+      case 'Payroll':      return 'payroll';               // expense   (reuse)
+      case 'R&M':          return 'repairs_maintenance';   // expense   (reuse)
+      case 'Utilities':    return 'utilities';             // expense   (reuse)
+      case 'Mgmt Fee':     return 'management_fees';       // expense   (reuse)
+      case 'Operating':    return 'operating_expenses';    // expense   (NEW)
+      // fall through to marina switch for shared labels (Storage/General/etc.)
+    }
+  }
+  if (assetClass === 'str') {
+    switch (department) {
+      case 'Rental':        return 'nightly_rate';         // revenue   (NEW)
+      case 'Cleaning':      return side === 'expense' ? 'cleaning_expense' : 'cleaning_revenue';
+      case 'Platform Fees': return 'platform_fees';        // expense   (NEW)
+      case 'Operating':     return 'operating_expenses';   // expense   (NEW, shared w/ MF)
+      // fall through
+    }
+  }
+  // ── Marina cascade (byte-identical to pre-WS5-Step-B) ──
   switch (department) {
     case 'Storage': return 'storage';
     case 'Fuel': return 'fuel_dock';

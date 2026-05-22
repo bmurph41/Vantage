@@ -723,7 +723,7 @@ export class ProFormaEngineService {
     // ========================================
     
     const getRevenueGrowthForDept = (department: string, subcategory: string, year?: number): Decimal => {
-      const assumptionKey = departmentToAssumptionKey(department);
+      const assumptionKey = departmentToAssumptionKey(department, assetClass, 'revenue');
 
       if (year !== undefined && lineItemOverrides[subcategory]?.[String(year)] !== undefined) {
         return new Decimal(lineItemOverrides[subcategory][String(year)]).dividedBy(100);
@@ -756,7 +756,7 @@ export class ProFormaEngineService {
     };
     
     const getExpenseGrowthForCategory = (subcategory: string, department: string, year?: number): Decimal => {
-      const key = departmentToAssumptionKey(department);
+      const key = departmentToAssumptionKey(department, assetClass, 'expense');
 
       if (year !== undefined && lineItemOverrides[subcategory]?.[String(year)] !== undefined) {
         return new Decimal(lineItemOverrides[subcategory][String(year)]).dividedBy(100);
@@ -915,15 +915,16 @@ export class ProFormaEngineService {
         }
       }
 
-      if (granularMargins[departmentToAssumptionKey(department)]) {
-        const marginData = granularMargins[departmentToAssumptionKey(department)];
+      if (granularMargins[departmentToAssumptionKey(department, assetClass, 'revenue')]) {
+        const marginData = granularMargins[departmentToAssumptionKey(department, assetClass, 'revenue')];
         const projectedMarginPct = new Decimal(marginData.projected).dividedBy(100);
         // Day 6 of engine unification: previously ternary
         //   department === 'Fuel' ? 'fuel_dock' : departmentToAssumptionKey(department)
         // Both branches produced 'fuel_dock' for Fuel — dead code. Simplified.
-        const revenueKey = departmentToAssumptionKey(department);
+        // WS5 Step B: margin lookup keyed by the revenue-side assumption key.
+        const revenueKey = departmentToAssumptionKey(department, assetClass, 'revenue');
         const matchingRevenue = Object.entries(revenueBySubcat).find(([_, rd]) =>
-          departmentToAssumptionKey(rd.department || inferDepartment(rd.subcategory, undefined, (project as any).assetClass)) === revenueKey
+          departmentToAssumptionKey(rd.department || inferDepartment(rd.subcategory, undefined, assetClass), assetClass, 'revenue') === revenueKey
         );
 
         if (matchingRevenue) {
@@ -1051,8 +1052,8 @@ export class ProFormaEngineService {
             projectionsMonthly[period.key] = baseMonthly.round().toNumber();
           }
         }
-      } else if (granularMargins[departmentToAssumptionKey(department)]) {
-        const marginData = granularMargins[departmentToAssumptionKey(department)];
+      } else if (granularMargins[departmentToAssumptionKey(department, assetClass, 'revenue')]) {
+        const marginData = granularMargins[departmentToAssumptionKey(department, assetClass, 'revenue')];
         const projectedMarginPct = new Decimal(marginData.projected).dividedBy(100);
         // Day 6 of engine unification: was buggy
         //   department === 'Fuel' ? 'fuel_dock' : 'ship_store'
@@ -1060,9 +1061,10 @@ export class ProFormaEngineService {
         // expense to Ship's Store revenue regardless of its actual
         // department (Service expense was projected against Ship's Store
         // revenue × Service margin, etc). Now uses dept's own assumption key.
-        const revenueKey = departmentToAssumptionKey(department);
+        // WS5 Step B: margin lookup keyed by the revenue-side assumption key.
+        const revenueKey = departmentToAssumptionKey(department, assetClass, 'revenue');
         const matchingRevenue = Object.entries(revenueBySubcat).find(([_, rd]) =>
-          departmentToAssumptionKey(rd.department || inferDepartment(rd.subcategory, undefined, (project as any).assetClass)) === revenueKey
+          departmentToAssumptionKey(rd.department || inferDepartment(rd.subcategory, undefined, assetClass), assetClass, 'revenue') === revenueKey
         );
 
         if (matchingRevenue) {
