@@ -121,7 +121,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (user) {
-      identifyUser({ id: user.id, orgId: user.orgId, role: user.role, orgName: user.orgName });
+      identifyUser({ userId: user.id, orgId: user.orgId, role: user.role });
     } else if (!isLoading) {
       resetUser();
     }

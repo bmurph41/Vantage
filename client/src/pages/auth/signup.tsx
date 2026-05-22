@@ -22,6 +22,7 @@ import {
   TreePine, Tent, Bed, Coffee, Scissors, Shirt, Dog, Dumbbell, Database, LayoutGrid, Package,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { trackEvent } from "@/lib/analytics";
 import { MiniSidebar } from "@/components/MiniSidebar";
 import { getAllTiers, TIER_PACK_MAP } from "@/lib/tierSectionMap";
 
@@ -515,6 +516,7 @@ export default function SignupPage() {
       return response.json();
     },
     onSuccess: async () => {
+      trackEvent('signup_completed', { role: selectedRole, assetCount: selectedAssets.length });
       queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
       queryClient.invalidateQueries({ queryKey: ["/api/bootstrap"] });
 

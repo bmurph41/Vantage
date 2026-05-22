@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { trackEvent } from "@/lib/analytics";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { Button } from "@/components/ui/button";
@@ -82,6 +83,7 @@ export function RolePickerModal({ open, onComplete, userId, userName }: RolePick
     setSaving(true);
     try {
       await saveMutation.mutateAsync(selected);
+      trackEvent('role_selected', { role: selected });
       // Write legacy key (read by sidebar role-defaults) and user-scoped key (read by useRolePickerCheck)
       // Only written after successful server save so future sessions re-prompt if save failed.
       localStorage.setItem("vantage_primary_role", selected);

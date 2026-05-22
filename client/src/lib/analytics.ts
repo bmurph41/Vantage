@@ -29,17 +29,24 @@ export function initPostHog() {
 }
 
 export function identifyUser(user: {
-  id: string;
+  userId: string;
   orgId: string;
   role: string;
-  orgName?: string;
+  tier?: string;
+  createdAt?: string;
 }) {
   if (!initialized) return;
-  posthog.identify(user.id, {
+  posthog.identify(user.userId, {
     orgId: user.orgId,
     role: user.role,
-    orgName: user.orgName,
+    ...(user.tier !== undefined && { tier: user.tier }),
+    ...(user.createdAt !== undefined && { createdAt: user.createdAt }),
   });
+}
+
+export function setUserProperties(properties: Record<string, unknown>) {
+  if (!initialized) return;
+  posthog.setPersonProperties(properties);
 }
 
 export function resetUser() {

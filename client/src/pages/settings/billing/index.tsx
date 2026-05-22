@@ -61,7 +61,7 @@ import {
 } from "lucide-react";
 import { ASSET_CLASS_TIERS } from "@shared/billing-constants";
 import { cn } from "@/lib/utils";
-import { trackEvent } from "@/lib/analytics";
+import { trackEvent, setUserProperties } from "@/lib/analytics";
 
 interface OrgEntitlements {
   assetClasses: string[];
@@ -423,6 +423,13 @@ export default function BillingSettingsPage() {
   const { data: entitlements, isLoading: entitlementsLoading } = useQuery<OrgEntitlements>({
     queryKey: ["/api/orgs/me/entitlements"],
   });
+
+  useEffect(() => {
+    const tier = subData?.subscription?.tier;
+    if (tier) {
+      setUserProperties({ tier });
+    }
+  }, [subData?.subscription?.tier]);
 
   const { data: plans, isLoading: plansLoading } = useQuery<Record<string, TierDef>>({
     queryKey: ["/api/billing/plans"],
