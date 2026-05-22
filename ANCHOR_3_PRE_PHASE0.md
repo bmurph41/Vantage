@@ -864,6 +864,141 @@ number-changing for every non-marina line.
 
 ---
 
+### Step A — executed 2026-05-22 (commit `7d08530f`)
+
+`normalizeDepartment` widened: `VALID_DEPARTMENTS` extended from a 10-entry marina-only
+allowlist to the 27-entry union of every department string every `inferDepartment` branch
+(marina / multifamily / str) can produce. Pre-Step-A, any label outside the marina-10 was
+flattened to `'General'` at persist time, including every MF/STR department and 5 marina
+extended-expense departments. Post-Step-A, class-correct departments persist verbatim in
+`modeling_actuals.department`. NOI-neutral by construction (no newly-surviving label
+collides with an engine `department === '...'` check).
+
+Verified: golden harness GREEN (zero diff), live re-promotion test persists correct MF
++ marina departments, pro-forma NOI identical for an MF deal under `'General'` vs real MF
+labels (still keys to `g_and_a` pre-Step-B; Step A is persistence-only, Step B is the
+number-changing re-key).
+
+### Step B — executed 2026-05-22 (commit `583d0601`)
+
+`departmentToAssumptionKey(department, assetClass?, side?)` — re-keyed per the Step 0
+table verbatim. Marina cascade byte-identical when `assetClass` is omitted or `'marina'`.
+8 engine call sites in `pro-forma-engine-service.ts` threaded with `assetClass` + revenue/
+expense `side`. Re-baselined `tests/department-inference-golden.json` captures the
+79-field re-key (marina / self_storage / office / retail byte-identical at gap=0; MF
+synthetic engine NOI 8,052,083 → 7,444,487; STR 3,419,221 → 3,410,818; writer-threaded
+mirrors engine path).
+
+**Live actuals-fed MF proof** (fixture `c3a1eebc-…`, mode temporarily flipped to
+`'upload'` + `inputAssumptions` zeroed, restored in `finally`):
+
+| Year | BEFORE Step B | AFTER Step B |
+|---|---|---|
+| 1 | $1,931,267 | $1,858,302 |
+| 2 | $1,847,902 | $1,525,872 |
+| 3 | $1,696,006 | $902,803 |
+| 4 | $1,438,374 | -$229,650 |
+| 5 | $1,017,466 | -$2,258,992 |
+
+Step B re-keyed 4 MF expense departments (Mgmt Fee/Payroll/Utilities/R&M) off
+`g_and_a` to canonical keys with adversarial decoy rates (66/55/77/88%); revenue side
+(Rental, Other Income) + `operating_expenses` stayed on flat fallback because those keys
+deferred to Step C. Marina branch byte-identical at the golden-harness level (regression
+shield held).
+
+`tsc -b shared` clean; `tsc -p tsconfig.diag-engine.json` 0 errors.
+
+---
+
+## Chokepoint #5 — direct-input bypass emits generic departments (filed 2026-05-22)
+
+**Surfaced during Step B verification.** WS5 A+B+C operates on the engine's actuals-fed
+path (uploaded P&L → `getConsolidatedPnL` → Layer A/B seed → `inferDepartment(assetClass)`
+or persisted `li.department` → `departmentToAssumptionKey` → growth-rate / margin
+lookup). For projects on that path, WS5 delivers MF/STR correctness as designed.
+
+But the engine has a parallel direct-input path that **bypasses `inferDepartment`
+entirely** and hardcodes generic department labels outside the WS5 vocabulary:
+
+**Where:**
+- `pro-forma-engine-service.ts:625-644` — direct_input + hybrid main branch
+- `pro-forma-engine-service.ts:663-685` — hybrid overlay branch
+
+```ts
+revenueBySubcat[line.label] = {
+  ...
+  department: 'Revenue',           // ← generic; falls to g_and_a regardless of WS5
+};
+expensesBySubcat[line.label] = {
+  ...
+  department: 'Operating Expenses', // ← generic; falls to g_and_a regardless of WS5
+};
+```
+
+**When taken** (`pro-forma-engine-service.ts:594-687`):
+- `inputMode === 'direct_input' && hasInputAssumptions` → bypass
+- `inputMode === 'auto' && !hasUploadedActuals && hasInputAssumptions` → bypass
+- `inputMode === 'hybrid' && hasInputAssumptions` → hybrid bypass (overlay-only on
+  missing labels)
+- `inputMode === 'upload'` or `inputMode === 'auto' + hasUploadedActuals` → actuals-fed
+  (Layer A/B from `getConsolidatedPnL`) — WS5's path
+
+**Default mode by asset class** (`client/src/components/modeling/pl-mode-toggle.tsx:96-101`):
+- `direct_input` defaults: `str`, `sfr`, `duplex`, `triplex`, `quad`, `laundromat`,
+  `business`
+- `upload` defaults: **multifamily**, marina, office, retail, self_storage, others
+- Auto-promotes `'auto' → 'upload'` once any P&L doc uploads
+  (`pl-mode-toggle.tsx:131-148`).
+
+**Production state (2026-05-22, 17 projects with `asset_class` set):**
+
+| Asset class | Mode | Has inputAssumptions | N | Hits bypass? |
+|---|---|---|---|---|
+| business | upload | false | 1 | no (has actuals) |
+| laundromat | upload | false | 1 | no path engaged |
+| marina | auto | false | 1 | empty result |
+| marina | auto | true | 10 | **yes** |
+| marina | upload | false | 1 | no path engaged |
+| multifamily | auto | false | 1 | empty result |
+| multifamily | direct_input | true | 1 | **yes** |
+| str | upload | true | 1 | no path engaged (no actuals → would 400) |
+
+Only 1 project (business) has any `modeling_actuals` rows today. **Zero current MF or
+STR deals are on the actuals-fed path.** All live MF/STR deals are pre-upload, hitting
+either the bypass or the empty-result branch.
+
+**Implication for WS5 scope:** Step B + Step C as designed reach **only** the actuals-fed
+path. They do NOT improve compute for direct-input / pre-upload deals. The way MF/STR
+deals are entered today (wizard → unit-mix + annual op-ex inputs → look at Pro Forma
+before any P&L upload) routes through the bypass and keys every line to `g_and_a`
+regardless of WS5.
+
+**Sizing the bypass fix (~30-45 min, code-only):**
+- `assetClass` already in scope at `pro-forma-engine-service.ts:608` and `:648`.
+- Each `directResult.revenueLines` / `expenseLines` entry has a `label`. Route through
+  `inferDepartment(label, category, assetClass)` instead of hardcoding `'Revenue'` /
+  `'Operating Expenses'`. Same pattern in the hybrid overlay.
+- Verification: live BEFORE/AFTER on a direct-input MF fixture (mirror the Step B
+  actuals-fed harness; `modeling_input_mode='direct_input'` path).
+
+**Sequencing question (DELIBERATE — not auto-decided):**
+
+The Step B verification surfaced the bypass *after* the WS5 A→B→C plan was filed. Two
+options:
+
+1. **A→B→C→#5** (filed order): finish Step C first (GrowthRatesTab UI + seeders against
+   the frozen vocab), then fix the bypass. Rationale: keep the locked sequence;
+   #5 doesn't change Step C's correctness.
+2. **A→B→#5→C** (re-sequence): fix the bypass before Step C. Rationale: today 0 MF/STR
+   deals are on the actuals-fed path; Step C ships UI + defaults that nobody can
+   exercise until either (a) someone uploads P&L *or* (b) the bypass is fixed. Doing
+   #5 first means Step C lands on a path that's already reaching live deals.
+
+Option 2 is the higher-value-now choice if pre-upload MF/STR correctness is what beta
+needs. Held for explicit decision; not auto-proceeded.
+
+---
+
 ## Open items for the execution plan
 
 - Confirm `quickbooks-service.ts:609` as the 8th `inferDepartment` consumer (under-enumerated here).
@@ -897,3 +1032,11 @@ vocabulary is **FROZEN** (see the WS5 Step 0 table above). 7 new keys + 4 reused
 keys; STR `Cleaning` split into `cleaning_revenue`/`cleaning_expense`;
 `departmentToAssumptionKey` gains `assetClass` + `side` params; engine "same-table-by-side"
 mechanism verified. Build A → B → C against the frozen table.
+**Updated:** 2026-05-22 — WS5 **Step A** executed (commit `7d08530f` —
+`normalizeDepartment` widened to 27-entry union, NOI-neutral) and **Step B** executed
+(commit `583d0601` — `departmentToAssumptionKey` 3-arg + MF/STR branches; live
+actuals-fed MF NOI verified — see Step B section above). **Chokepoint #5 filed** —
+the direct-input bypass at `pro-forma-engine-service.ts:625-644` (+ hybrid mirror
+663-685) emits `department='Revenue'/'Operating Expenses'` outside WS5 vocab; today
+0 MF/STR deals are on the actuals-fed path. ~30-45 min, code-only. Sequencing decision
+(A→B→C→#5 vs A→B→#5→C) **HELD** for deliberate choice; Step C not auto-proceeded.
