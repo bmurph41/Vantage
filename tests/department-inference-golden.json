@@ -1,7 +1,7 @@
 {
   "_meta": {
     "harness": "tests/department-inference-golden.mjs",
-    "description": "WS4-prep golden baseline for department inference. Captures CURRENT behavior (bugs included). Regenerate with --update; any non-empty diff during WS4 must be reviewed.",
+    "description": "WS4-prep golden baseline for department inference — a pure reference oracle. Captures CURRENT behavior (bugs included) plus the post-C2 writerPath_threaded reference and writerPathGap. Regenerate with --update; any inferDepartment diff during WS4 must be reviewed. C2 call-site changes leave this harness GREEN and are verified by the live re-promotion test, not here.",
     "inputCount": 107,
     "projectionYears": 5
   },
@@ -1831,37 +1831,49 @@
       "revenueLines": 17,
       "expenseLines": 17,
       "syntheticNOI_enginePath": 13493783,
-      "syntheticNOI_writerPath": 13493783
+      "syntheticNOI_writerPath_undefined": 13493783,
+      "syntheticNOI_writerPath_threaded": 13493783,
+      "writerPathGap": 0
     },
     "multifamily": {
       "revenueLines": 11,
       "expenseLines": 13,
       "syntheticNOI_enginePath": 8052083,
-      "syntheticNOI_writerPath": 8132142
+      "syntheticNOI_writerPath_undefined": 8132142,
+      "syntheticNOI_writerPath_threaded": 8052083,
+      "writerPathGap": -80059
     },
     "str": {
       "revenueLines": 6,
       "expenseLines": 10,
       "syntheticNOI_enginePath": 3410818,
-      "syntheticNOI_writerPath": 3419221
+      "syntheticNOI_writerPath_undefined": 3419221,
+      "syntheticNOI_writerPath_threaded": 3410818,
+      "writerPathGap": -8403
     },
     "self_storage": {
       "revenueLines": 5,
       "expenseLines": 7,
       "syntheticNOI_enginePath": 3305442,
-      "syntheticNOI_writerPath": 3305442
+      "syntheticNOI_writerPath_undefined": 3305442,
+      "syntheticNOI_writerPath_threaded": 3305442,
+      "writerPathGap": 0
     },
     "office": {
       "revenueLines": 4,
       "expenseLines": 7,
       "syntheticNOI_enginePath": 2185901,
-      "syntheticNOI_writerPath": 2185901
+      "syntheticNOI_writerPath_undefined": 2185901,
+      "syntheticNOI_writerPath_threaded": 2185901,
+      "writerPathGap": 0
     },
     "retail": {
       "revenueLines": 4,
       "expenseLines": 6,
       "syntheticNOI_enginePath": 2480847,
-      "syntheticNOI_writerPath": 2480847
+      "syntheticNOI_writerPath_undefined": 2480847,
+      "syntheticNOI_writerPath_threaded": 2480847,
+      "writerPathGap": 0
     }
   }
 }
