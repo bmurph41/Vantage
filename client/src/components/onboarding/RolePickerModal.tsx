@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { Button } from "@/components/ui/button";
@@ -66,6 +67,7 @@ export function RolePickerModal({ open, onComplete, userId, userName }: RolePick
   const [selected, setSelected] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const queryClient = useQueryClient();
+  const { toast } = useToast();
 
   const saveMutation = useMutation({
     mutationFn: (role: string) =>
@@ -80,12 +82,21 @@ export function RolePickerModal({ open, onComplete, userId, userName }: RolePick
     setSaving(true);
     try {
       await saveMutation.mutateAsync(selected);
-    } catch {
-      // Non-fatal — role stored in localStorage as fallback
-    } finally {
       // Write legacy key (read by sidebar role-defaults) and user-scoped key (read by useRolePickerCheck)
+      // Only written after successful server save so future sessions re-prompt if save failed.
       localStorage.setItem("vantage_primary_role", selected);
       if (userId) localStorage.setItem(`vantage_role_picked_${userId}`, 'true');
+    } catch {
+      // Server save failed — show a warning. Do NOT write the user-scoped "picked" flag
+      // so the user will be re-prompted next session when the server is available.
+      toast({
+        title: "Role saved locally",
+        description: "We couldn't save your role to the server right now. You may be asked to select it again next time.",
+        variant: "destructive",
+      });
+      // Still write the legacy display-only key for sidebar personalisation this session.
+      localStorage.setItem("vantage_primary_role", selected);
+    } finally {
       setSaving(false);
       onComplete();
     }

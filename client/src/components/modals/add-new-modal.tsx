@@ -1,21 +1,77 @@
 import { useState } from "react";
+import { useLocation } from "wouter";
 import { StandardDialogShell } from "@/components/ui/standard-dialog-shell";
 import { Button } from "@/components/ui/button";
-import { User, Building, Handshake, Calendar, PlusCircle } from "lucide-react";
+import { User, Handshake, MapPin, FileText, PlusCircle } from "lucide-react";
+import { useAuth } from "@/hooks/use-auth";
 import ContactFormModal from "./contact-form-modal";
-import CompanyFormModal from "./company-form-modal";
 import DealFormModal from "./deal-form-modal";
-import TaskFormModal from "./task-form-modal";
+import PropertyFormModal from "./property-form-modal";
 
 interface AddNewModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
+// Role-aware option ordering: deal/contact/property/document
+// Operators and GPs lead with Property; analysts lead with Document; others lead with Deal.
+const ROLE_OPTION_ORDER: Record<string, string[]> = {
+  operator: ['property', 'deal', 'contact', 'document'],
+  gp:       ['deal', 'property', 'contact', 'document'],
+  broker:   ['contact', 'deal', 'property', 'document'],
+  analyst:  ['document', 'deal', 'contact', 'property'],
+  investor: ['deal', 'property', 'contact', 'document'],
+  default:  ['deal', 'contact', 'property', 'document'],
+};
+
+const ALL_OPTIONS = [
+  {
+    id: 'deal',
+    title: 'Deal',
+    description: 'Create a new acquisition opportunity',
+    icon: Handshake,
+    color: 'text-primary',
+  },
+  {
+    id: 'contact',
+    title: 'Contact',
+    description: 'Add a new contact to your CRM',
+    icon: User,
+    color: 'text-blue-500',
+  },
+  {
+    id: 'property',
+    title: 'Property',
+    description: 'Add a marina or CRE property listing',
+    icon: MapPin,
+    color: 'text-green-500',
+  },
+  {
+    id: 'document',
+    title: 'Document',
+    description: 'Upload to your virtual data room',
+    icon: FileText,
+    color: 'text-purple-500',
+  },
+];
+
 export default function AddNewModal({ isOpen, onClose }: AddNewModalProps) {
   const [activeModal, setActiveModal] = useState<string | null>(null);
+  const { user } = useAuth();
+  const [, setLocation] = useLocation();
+
+  const role = (user as { userPrimaryRole?: string | null } | null)?.userPrimaryRole
+    ?? localStorage.getItem('vantage_primary_role')
+    ?? 'default';
+  const order = ROLE_OPTION_ORDER[role] ?? ROLE_OPTION_ORDER.default;
+  const options = order.map((id) => ALL_OPTIONS.find((o) => o.id === id)!);
 
   const handleModalOpen = (modalType: string) => {
+    if (modalType === 'document') {
+      onClose();
+      setLocation('/vdr');
+      return;
+    }
     setActiveModal(modalType);
     onClose();
   };
@@ -23,37 +79,6 @@ export default function AddNewModal({ isOpen, onClose }: AddNewModalProps) {
   const handleModalClose = () => {
     setActiveModal(null);
   };
-
-  const options = [
-    {
-      id: 'contact',
-      title: 'Contact',
-      description: 'Add a new contact to your CRM',
-      icon: User,
-      color: 'text-blue-500',
-    },
-    {
-      id: 'company',
-      title: 'Company',
-      description: 'Add a new company',
-      icon: Building,
-      color: 'text-green-500',
-    },
-    {
-      id: 'deal',
-      title: 'Deal',
-      description: 'Create a new sales opportunity',
-      icon: Handshake,
-      color: 'text-primary',
-    },
-    {
-      id: 'task',
-      title: 'Task',
-      description: 'Create a new task or reminder',
-      icon: Calendar,
-      color: 'text-purple-500',
-    },
-  ];
 
   return (
     <>
@@ -90,23 +115,17 @@ export default function AddNewModal({ isOpen, onClose }: AddNewModalProps) {
         onClose={handleModalClose}
         contact={null}
       />
-      
-      <CompanyFormModal
-        isOpen={activeModal === 'company'}
-        onClose={handleModalClose}
-        company={null}
-      />
-      
+
       <DealFormModal
         isOpen={activeModal === 'deal'}
         onClose={handleModalClose}
         deal={null}
       />
-      
-      <TaskFormModal
-        isOpen={activeModal === 'task'}
+
+      <PropertyFormModal
+        isOpen={activeModal === 'property'}
         onClose={handleModalClose}
-        task={null}
+        property={null}
       />
     </>
   );

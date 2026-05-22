@@ -354,27 +354,26 @@ function SidebarLoader() {
   );
 }
 
-// Module-level guard: only trigger the onboarding check once per browser session,
-// regardless of how many times UnifiedLayout mounts (i.e. across navigations).
-let _onboardingSessionChecked = false;
-
-// Hook to check if user should see onboarding
-function useOnboardingCheck() {
+// Hook to check if user should see onboarding.
+// Uses a user-ID-scoped localStorage key so different users on the same browser
+// each get their own onboarding flag (not a shared global key).
+function useOnboardingCheck(user: { id?: number } | null) {
   const [showOnboarding, setShowOnboarding] = useState(false);
-  
-  useEffect(() => {
-    if (_onboardingSessionChecked) return;
-    _onboardingSessionChecked = true;
+  const [checkedUserId, setCheckedUserId] = useState<number | null>(null);
 
-    const hasSeenOnboarding = localStorage.getItem('vantage_onboarding_complete');
+  useEffect(() => {
+    if (!user?.id || checkedUserId === user.id) return;
+    setCheckedUserId(user.id);
+    const storageKey = `vantage_onboarding_complete_${user.id}`;
+    const hasSeenOnboarding = localStorage.getItem(storageKey);
     if (!hasSeenOnboarding) {
       const timer = setTimeout(() => setShowOnboarding(true), 1000);
       return () => clearTimeout(timer);
     }
-  }, []);
+  }, [user?.id, checkedUserId]);
 
-  const completeOnboarding = () => {
-    localStorage.setItem('vantage_onboarding_complete', 'true');
+  const completeOnboarding = (userId?: number) => {
+    if (userId) localStorage.setItem(`vantage_onboarding_complete_${userId}`, 'true');
     setShowOnboarding(false);
   };
 
@@ -410,7 +409,7 @@ function useRolePickerCheck(user: { id?: number; userPrimaryRole?: string | null
 // Unified Layout wrapper with sidebar for both DD Tracker and CRM
 function UnifiedLayout({ children }: { children: React.ReactNode }) {
   const { isLoading, user } = useAuth();
-  const { showOnboarding, setShowOnboarding, completeOnboarding } = useOnboardingCheck();
+  const { showOnboarding, setShowOnboarding, completeOnboarding } = useOnboardingCheck(user);
   const { showRolePicker, completeRolePicker } = useRolePickerCheck(user);
   const [quickAddOpen, setQuickAddOpen] = useState(false);
 
@@ -464,7 +463,7 @@ function UnifiedLayout({ children }: { children: React.ReactNode }) {
       {/* Role picker — shown once per user (per-user localStorage key) */}
       <RolePickerModal
         open={showRolePicker && !showOnboarding}
-        onComplete={() => completeRolePicker(user?.id)}
+        onComplete={() => { completeRolePicker(user?.id); completeOnboarding(user?.id); }}
         userId={user?.id}
         userName={user?.name?.split(' ')[0] || user?.email?.split('@')[0]}
       />

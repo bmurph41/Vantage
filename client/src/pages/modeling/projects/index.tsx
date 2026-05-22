@@ -363,10 +363,10 @@ export default function ModelingProjectsPage() {
           <Card>
             {isLoading ? (
               <div className="p-8 text-center text-muted-foreground">Loading projects...</div>
+            ) : !searchTerm && projects.length === 0 ? (
+              <ModelingEmptyState onCreateProject={handleCreate} />
             ) : filteredProjects.length === 0 ? (
-              <div className="p-8 text-center text-muted-foreground">
-                {searchTerm ? 'No projects match your search.' : 'No projects yet. Create your first project to get started!'}
-              </div>
+              <div className="p-8 text-center text-muted-foreground">No projects match your search.</div>
             ) : (
               <div>
                 <div className="overflow-x-auto w-full">
