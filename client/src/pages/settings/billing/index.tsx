@@ -61,6 +61,7 @@ import {
 } from "lucide-react";
 import { ASSET_CLASS_TIERS } from "@shared/billing-constants";
 import { cn } from "@/lib/utils";
+import { trackEvent } from "@/lib/analytics";
 
 interface OrgEntitlements {
   assetClasses: string[];
@@ -486,6 +487,10 @@ export default function BillingSettingsPage() {
       const prev = previousPlanTier.current;
       const isDowngrade = !wasUndo && prev !== undefined && getTierIndex(newTier) < getTierIndex(prev);
 
+      if (!wasUndo && !isDowngrade) {
+        trackEvent('plan_upgraded', { fromTier: prev ?? 'none', toTier: newTier });
+      }
+
       if (isDowngrade && prev) {
         const restoredTier = prev;
         const undoBlocked = !!data?.paymentProcessed || !!data?.paymentCheckFailed;
@@ -605,8 +610,13 @@ export default function BillingSettingsPage() {
 
   function handlePlanAction(tier: string) {
     if (!sub) {
+      trackEvent('upgrade_clicked', { targetTier: tier, currentTier: currentTier ?? 'none' });
       checkout.mutate({ tier, billingCycle: "monthly" });
       return;
+    }
+    const isUpgradeAction = getTierIndex(tier) > getTierIndex(currentTier);
+    if (isUpgradeAction) {
+      trackEvent('upgrade_clicked', { targetTier: tier, currentTier: currentTier ?? 'none' });
     }
     setPendingTier(tier);
     setShowChangePlanDialog(true);

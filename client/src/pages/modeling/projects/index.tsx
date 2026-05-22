@@ -1,6 +1,7 @@
 import { useState, Fragment } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { queryClient, apiRequest } from '@/lib/queryClient';
+import { trackEvent } from '@/lib/analytics';
 import { formatCurrency, formatPercent, formatNumber } from '@/lib/utils';
 import { useDisplayPreferences } from '@/hooks/use-display-preferences';
 import { Card } from '@/components/ui/card';
@@ -125,6 +126,7 @@ export default function ModelingProjectsPage() {
   };
 
   const handleProjectCreated = (projectId: string) => {
+    trackEvent('first_model_created', { projectId });
     setLocation(`/modeling/projects/${projectId}?tab=inputs`);
   };
 

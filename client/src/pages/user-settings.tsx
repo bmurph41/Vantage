@@ -1380,6 +1380,7 @@ export default function UserSettingsPage() {
 
   function renderPrivacy() {
     return (
+      <>
       <Card data-testid="card-privacy-settings">
         <CardHeader>
           <CardTitle className="flex items-center gap-2" data-testid="text-privacy-title">
@@ -1489,6 +1490,7 @@ export default function UserSettingsPage() {
           </div>
         </CardContent>
       </Card>
+      </>
     );
   }
 

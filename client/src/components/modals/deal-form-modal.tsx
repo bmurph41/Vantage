@@ -30,6 +30,7 @@ import { format, addDays, parseISO } from "date-fns";
 import { addBusinessDays } from "@/lib/business-days";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { trackEvent } from "@/lib/analytics";
 import { z } from "zod";
 import { insertDealSchema, type Deal, type Contact, type Company, type PipelineStage } from "@shared/schema";
 import { cn } from "@/lib/utils";
@@ -761,6 +762,7 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/deals'] });
+      trackEvent('first_deal_created', { stage: form.getValues('stage'), assetClass: form.getValues('propertyType') });
       toast({ title: "Deal created successfully" });
       onClose();
       form.reset();

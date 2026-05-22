@@ -8,6 +8,7 @@ Vantage is a full-stack platform for managing the entire lifecycle of marina acq
 - **DB Push**: `drizzle-kit push:pg` (for schema migrations)
 - **Check Schema Drift**: `npm run check:schema`
 - **Required Env Vars**: `STRIPE_SECRET_KEY`, `RESEND_API_KEY` (warning if missing but app runs)
+- **Optional Env Vars**: `VITE_POSTHOG_KEY` (PostHog project API key — analytics silently disabled if absent), `VITE_POSTHOG_HOST` (defaults to `https://us.i.posthog.com`)
 
 ## Stack
 - **Frontend**: React 18, TypeScript, Wouter, TanStack Query, React Hook Form, Zod, shadcn/ui (Radix UI), Tailwind CSS, Lucide-React

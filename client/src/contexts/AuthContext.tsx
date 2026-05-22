@@ -1,5 +1,6 @@
-import { createContext, useContext, useCallback, useMemo } from 'react';
+import { createContext, useContext, useCallback, useMemo, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { identifyUser, resetUser } from '@/lib/analytics';
 
 export type Role = 'admin' | 'owner' | 'investor' | 'broker' | 'appraiser' | 'editor' | 'viewer' | 'auditor';
 
@@ -117,6 +118,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     retry: false,
     staleTime: 5 * 60 * 1000,
   });
+
+  useEffect(() => {
+    if (user) {
+      identifyUser({ id: user.id, orgId: user.orgId, role: user.role, orgName: user.orgName });
+    } else if (!isLoading) {
+      resetUser();
+    }
+  }, [user, isLoading]);
 
   const hasRole = useCallback((roles: Role | Role[]): boolean => {
     if (!user) return false;
