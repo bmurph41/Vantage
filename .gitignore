@@ -53,3 +53,7 @@ tsconfig.4files-check.json
 
 # Scratch verification harnesses (synthetic test fixtures, one-shot scripts)
 .scratch/
+
+# Large PDF binaries auto-committed into attached_assets/ (e.g. public filings) —
+# block re-addition. Existing tracked PDFs are unaffected; gitignore does not untrack.
+attached_assets/*.pdf
