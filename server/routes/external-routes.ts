@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { storage } from "../storage";
 import { db } from "../db";
-import { eq, and, or, desc, sql, inArray } from "drizzle-orm";
+import { eq, and, or, desc, sql, inArray, isNull } from "drizzle-orm";
 import { geocodingService } from "../services/geocodingService";
 import { ownedAssetsService } from "../services/owned-assets-service";
 import { dashboardService } from "../services/dashboard-service";
@@ -40,6 +40,7 @@ import {
   scProjectProfileSchema,
   scWeightOverridesSchema,
   industryStandards,
+  benchmarkAggregates,
 } from "@shared/schema";
 import {
   salesCompUpdateSchema,
@@ -4487,6 +4488,394 @@ export function registerExternalRoutes(
   // Google Maps API key endpoint
   app.get("/api/config/google-maps-key", (req, res) => {
     res.json({ apiKey: process.env.GOOGLE_MAPS_API_KEY || process.env.VITE_GOOGLE_MAPS_API_KEY || "" });
+  });
+
+  // ========================================================================
+  // MARKET INTELLIGENCE HUB
+  // ========================================================================
+
+  function getMarketIntelCutoff(timeRange: string): Date | null {
+    const months: Record<string, number> = { '3m': 3, '6m': 6, '12m': 12, '24m': 24 };
+    const m = months[timeRange];
+    if (!m) return null;
+    const d = new Date();
+    d.setMonth(d.getMonth() - m);
+    return d;
+  }
+
+  function buildSalesCompsConditions(opts: {
+    cutoff: Date | null;
+    state?: string;
+    region?: string;
+    waterType?: string;
+  }) {
+    const conds: any[] = [isNull(salesComps.deletedAt)];
+    if (opts.cutoff) {
+      const yr = opts.cutoff.getFullYear();
+      const mo = opts.cutoff.getMonth() + 1;
+      conds.push(sql`(${salesComps.saleYear} > ${yr} OR (${salesComps.saleYear} = ${yr} AND ${salesComps.saleMonth} >= ${mo}))`);
+    }
+    if (opts.state) conds.push(eq(salesComps.state, opts.state));
+    if (opts.region) conds.push(eq(salesComps.region, opts.region));
+    if (opts.waterType) conds.push(eq(salesComps.waterType, opts.waterType));
+    return conds;
+  }
+
+  function computeCompAggregates(comps: Array<{
+    salePrice: number | null;
+    capRate: number | null;
+    wetSlips: number | null;
+    dryRacks: number | null;
+    occupancy: number | null;
+    saleYear: number | null;
+    saleMonth: number | null;
+    state?: string | null;
+    waterType?: string | null;
+  }>) {
+    const withPrice = comps.filter(c => c.salePrice && c.salePrice > 0);
+    const withCapRate = comps.filter(c => c.capRate && c.capRate > 0);
+    const withOccupancy = comps.filter(c => c.occupancy && c.occupancy > 0);
+    const withSlips = comps.filter(c => c.salePrice && c.salePrice > 0 && (Number(c.wetSlips || 0) + Number(c.dryRacks || 0)) > 0);
+
+    const avgCapRate = withCapRate.length > 0
+      ? withCapRate.reduce((s, c) => s + Number(c.capRate), 0) / withCapRate.length
+      : null;
+    const medianCapRate = withCapRate.length > 0
+      ? Number([...withCapRate].sort((a, b) => Number(a.capRate) - Number(b.capRate))[Math.floor(withCapRate.length / 2)]?.capRate)
+      : null;
+    const totalVolume = withPrice.reduce((s, c) => s + Number(c.salePrice), 0);
+    const avgPricePerSlip = withSlips.length > 0
+      ? withSlips.reduce((s, c) => {
+          const slips = Number(c.wetSlips || 0) + Number(c.dryRacks || 0);
+          return s + (slips > 0 ? Number(c.salePrice) / slips : 0);
+        }, 0) / withSlips.length
+      : null;
+    const avgOccupancy = withOccupancy.length > 0
+      ? withOccupancy.reduce((s, c) => s + Number(c.occupancy), 0) / withOccupancy.length
+      : null;
+
+    return { avgCapRate, medianCapRate, totalVolume, avgPricePerSlip, avgOccupancy, dealCount: comps.length };
+  }
+
+  // Market Pulse — 3-5 key indicators (lightweight, shown on every page)
+  app.get('/api/market-intelligence/pulse', authenticateUser, async (req: any, res) => {
+    try {
+      const now = new Date();
+      const currentYear = now.getFullYear();
+      const currentMonth = now.getMonth() + 1;
+
+      const [recentComps, rateCompsData, benchmarkRows] = await Promise.all([
+        db.select({
+          salePrice: salesComps.salePrice,
+          capRate: salesComps.capRate,
+          wetSlips: salesComps.wetSlips,
+          dryRacks: salesComps.dryRacks,
+          occupancy: salesComps.occupancy,
+          saleYear: salesComps.saleYear,
+          saleMonth: salesComps.saleMonth,
+        }).from(salesComps).where(and(
+          isNull(salesComps.deletedAt),
+          sql`(${salesComps.saleYear} > ${currentYear - 1} OR (${salesComps.saleYear} = ${currentYear - 1} AND ${salesComps.saleMonth} >= ${currentMonth}))`
+        )),
+        db.select({ rateAmount: rateComps.rateAmount, rateType: rateComps.rateType })
+          .from(rateComps)
+          .where(and(isNull(rateComps.deletedAt), sql`${rateComps.rateAmount} > 0`))
+          .limit(500),
+        db.select({ metricKey: benchmarkAggregates.metricKey, p50: benchmarkAggregates.p50, mean: benchmarkAggregates.mean })
+          .from(benchmarkAggregates)
+          .where(sql`${benchmarkAggregates.metricKey} IN ('occupancy_rate', 'cap_rate', 'noi_per_slip')`)
+          .orderBy(desc(benchmarkAggregates.createdAt))
+          .limit(20),
+      ]);
+
+      const { avgCapRate, totalVolume, avgPricePerSlip, avgOccupancy } = computeCompAggregates(recentComps);
+
+      // Platform-wide benchmark medians (de-identified aggregate data)
+      const benchmarkByMetric: Record<string, number | null> = {};
+      for (const row of benchmarkRows) {
+        if (!benchmarkByMetric[row.metricKey]) {
+          benchmarkByMetric[row.metricKey] = row.p50 ? Number(row.p50) : (row.mean ? Number(row.mean) : null);
+        }
+      }
+
+      // Avg monthly slip rate from rate comps
+      const monthlyRates = rateCompsData.filter(r => r.rateType && r.rateType.toLowerCase().includes('month') && r.rateAmount && r.rateAmount > 0);
+      const avgMonthlyRate = monthlyRates.length > 0
+        ? monthlyRates.reduce((s, r) => s + Number(r.rateAmount), 0) / monthlyRates.length
+        : null;
+
+      // Prior period cap rate for trend
+      const priorStart = new Date(now);
+      priorStart.setMonth(priorStart.getMonth() - 24);
+      const priorEnd = new Date(now);
+      priorEnd.setMonth(priorEnd.getMonth() - 12);
+      const priorComps = await db.select({ capRate: salesComps.capRate }).from(salesComps).where(and(
+        isNull(salesComps.deletedAt),
+        sql`(${salesComps.saleYear} > ${priorStart.getFullYear()} OR (${salesComps.saleYear} = ${priorStart.getFullYear()} AND ${salesComps.saleMonth} >= ${priorStart.getMonth() + 1}))`,
+        sql`(${salesComps.saleYear} < ${priorEnd.getFullYear()} OR (${salesComps.saleYear} = ${priorEnd.getFullYear()} AND ${salesComps.saleMonth} < ${priorEnd.getMonth() + 1}))`
+      ));
+      const priorWithCR = priorComps.filter(c => c.capRate && c.capRate > 0);
+      const priorAvgCapRate = priorWithCR.length > 0 ? priorWithCR.reduce((s, c) => s + Number(c.capRate), 0) / priorWithCR.length : null;
+
+      res.json({
+        avgCapRate,
+        capRateTrend: avgCapRate !== null && priorAvgCapRate !== null ? avgCapRate - priorAvgCapRate : null,
+        dealCount: recentComps.length,
+        totalVolume,
+        avgPricePerSlip,
+        avgOccupancy,
+        avgMonthlyRate,
+        platformBenchmarks: benchmarkByMetric,
+        dataPoints: recentComps.length,
+        asOf: now.toISOString(),
+      });
+    } catch (error: any) {
+      console.error('Market intelligence pulse error:', error);
+      res.status(500).json({ error: 'Failed to fetch market pulse' });
+    }
+  });
+
+  // Market Intelligence Summary — filterable by timeRange, state, region, waterType (asset class)
+  app.get('/api/market-intelligence/summary', authenticateUser, async (req: any, res) => {
+    try {
+      const { timeRange = '12m', state, region, waterType } = req.query as Record<string, string>;
+      const cutoff = getMarketIntelCutoff(timeRange);
+      const conds = buildSalesCompsConditions({ cutoff, state, region, waterType });
+
+      // Sales comps for the filtered period
+      const [comps, rateCompsRows, benchmarkRows] = await Promise.all([
+        db.select({
+          id: salesComps.id,
+          salePrice: salesComps.salePrice,
+          capRate: salesComps.capRate,
+          noi: salesComps.noi,
+          wetSlips: salesComps.wetSlips,
+          dryRacks: salesComps.dryRacks,
+          occupancy: salesComps.occupancy,
+          saleYear: salesComps.saleYear,
+          saleMonth: salesComps.saleMonth,
+          state: salesComps.state,
+          region: salesComps.region,
+          waterType: salesComps.waterType,
+          marina: salesComps.marina,
+        }).from(salesComps).where(and(...conds)).orderBy(desc(salesComps.saleYear), desc(salesComps.saleMonth)),
+        db.select({
+          rateAmount: rateComps.rateAmount,
+          rateType: rateComps.rateType,
+          state: rateComps.state,
+          region: rateComps.region,
+          occupancy: rateComps.occupancy,
+          saleYear: rateComps.saleYear,
+          saleMonth: rateComps.saleMonth,
+        }).from(rateComps).where(and(
+          isNull(rateComps.deletedAt),
+          sql`${rateComps.rateAmount} > 0`,
+          ...(state ? [eq(rateComps.state, state)] : []),
+          ...(region ? [eq(rateComps.region, region)] : []),
+          ...(cutoff ? [sql`(${rateComps.saleYear} > ${cutoff.getFullYear()} OR (${rateComps.saleYear} = ${cutoff.getFullYear()} AND ${rateComps.saleMonth} >= ${cutoff.getMonth() + 1}))`] : []),
+        )).limit(500),
+        db.select({
+          metricKey: benchmarkAggregates.metricKey,
+          cohortKey: benchmarkAggregates.cohortKey,
+          p25: benchmarkAggregates.p25,
+          p50: benchmarkAggregates.p50,
+          p75: benchmarkAggregates.p75,
+          mean: benchmarkAggregates.mean,
+          cohortSize: benchmarkAggregates.cohortSize,
+        }).from(benchmarkAggregates)
+          .orderBy(desc(benchmarkAggregates.createdAt))
+          .limit(100),
+      ]);
+
+      const agg = computeCompAggregates(comps);
+
+      // Cap rate trend by quarter
+      const byQuarter: Record<string, number[]> = {};
+      for (const c of comps.filter(c => c.capRate && c.capRate > 0)) {
+        if (!c.saleYear) continue;
+        const q = Math.ceil(Number(c.saleMonth || 1) / 3);
+        const key = `${c.saleYear} Q${q}`;
+        if (!byQuarter[key]) byQuarter[key] = [];
+        byQuarter[key].push(Number(c.capRate));
+      }
+      const capRateTrend = Object.entries(byQuarter).sort().map(([period, rates]) => ({
+        period,
+        avgCapRate: rates.reduce((a, b) => a + b, 0) / rates.length,
+        count: rates.length,
+      }));
+
+      // Cap rate trend by asset class (waterType)
+      const byAssetClass: Record<string, { capRates: number[]; prices: number[]; count: number }> = {};
+      for (const c of comps) {
+        const ac = c.waterType || 'Unknown';
+        if (!byAssetClass[ac]) byAssetClass[ac] = { capRates: [], prices: [], count: 0 };
+        byAssetClass[ac].count++;
+        if (c.capRate && c.capRate > 0) byAssetClass[ac].capRates.push(Number(c.capRate));
+        if (c.salePrice && c.salePrice > 0) byAssetClass[ac].prices.push(Number(c.salePrice));
+      }
+      const assetClassBreakdown = Object.entries(byAssetClass).map(([assetClass, data]) => ({
+        assetClass,
+        dealCount: data.count,
+        avgCapRate: data.capRates.length > 0 ? data.capRates.reduce((a, b) => a + b, 0) / data.capRates.length : null,
+        totalVolume: data.prices.reduce((a, b) => a + b, 0),
+      })).sort((a, b) => b.dealCount - a.dealCount);
+
+      // Volume trend by month
+      const byMonth: Record<string, { count: number; vol: number }> = {};
+      for (const c of comps) {
+        if (!c.saleYear) continue;
+        const key = `${c.saleYear}-${String(c.saleMonth || 1).padStart(2, '0')}`;
+        if (!byMonth[key]) byMonth[key] = { count: 0, vol: 0 };
+        byMonth[key].count++;
+        byMonth[key].vol += Number(c.salePrice || 0);
+      }
+      const volumeTrend = Object.entries(byMonth).sort().map(([period, data]) => ({
+        period, count: data.count, totalVolume: data.vol,
+      }));
+
+      // By state breakdown
+      const byStateMap: Record<string, { count: number; totalVolume: number; capRates: number[] }> = {};
+      for (const c of comps) {
+        const s = c.state || 'Unknown';
+        if (!byStateMap[s]) byStateMap[s] = { count: 0, totalVolume: 0, capRates: [] };
+        byStateMap[s].count++;
+        if (c.salePrice && c.salePrice > 0) byStateMap[s].totalVolume += Number(c.salePrice);
+        if (c.capRate && c.capRate > 0) byStateMap[s].capRates.push(Number(c.capRate));
+      }
+      const byState = Object.entries(byStateMap)
+        .sort((a, b) => b[1].count - a[1].count)
+        .slice(0, 15)
+        .map(([st, data]) => ({
+          state: st,
+          count: data.count,
+          totalVolume: data.totalVolume,
+          avgCapRate: data.capRates.length > 0 ? data.capRates.reduce((a, b) => a + b, 0) / data.capRates.length : null,
+        }));
+
+      // Rate comps: avg monthly slip rate
+      const monthlyRates = rateCompsRows.filter(r => r.rateType && r.rateType.toLowerCase().includes('month') && r.rateAmount && r.rateAmount > 0);
+      const avgMonthlySlipRate = monthlyRates.length > 0
+        ? monthlyRates.reduce((s, r) => s + Number(r.rateAmount), 0) / monthlyRates.length
+        : null;
+      const avgRateCompOccupancy = rateCompsRows.filter(r => r.occupancy && r.occupancy > 0).length > 0
+        ? rateCompsRows.filter(r => r.occupancy && r.occupancy > 0).reduce((s, r) => s + Number(r.occupancy), 0) / rateCompsRows.filter(r => r.occupancy && r.occupancy > 0).length
+        : null;
+
+      // Platform benchmarks — de-identified industry aggregates
+      const benchmarks: Record<string, { p25: number | null; p50: number | null; p75: number | null; mean: number | null; cohortSize: number }> = {};
+      for (const row of benchmarkRows) {
+        if (!benchmarks[row.metricKey]) {
+          benchmarks[row.metricKey] = {
+            p25: row.p25 ? Number(row.p25) : null,
+            p50: row.p50 ? Number(row.p50) : null,
+            p75: row.p75 ? Number(row.p75) : null,
+            mean: row.mean ? Number(row.mean) : null,
+            cohortSize: row.cohortSize,
+          };
+        }
+      }
+
+      // Benchmark comparison: subject period vs platform median
+      const occupancyBenchmark = benchmarks['occupancy_rate']?.p50 ?? null;
+      const capRateBenchmark = benchmarks['cap_rate']?.p50 ?? null;
+      const benchmarkComparisons = {
+        occupancy: {
+          subject: agg.avgOccupancy,
+          platformMedian: occupancyBenchmark,
+          delta: agg.avgOccupancy !== null && occupancyBenchmark !== null ? agg.avgOccupancy - occupancyBenchmark : null,
+        },
+        capRate: {
+          subject: agg.avgCapRate,
+          platformMedian: capRateBenchmark,
+          delta: agg.avgCapRate !== null && capRateBenchmark !== null ? agg.avgCapRate - capRateBenchmark : null,
+        },
+      };
+
+      res.json({
+        summary: { ...agg },
+        capRateTrend,
+        volumeTrend,
+        assetClassBreakdown,
+        byState,
+        rateComps: { avgMonthlySlipRate, avgOccupancy: avgRateCompOccupancy, count: rateCompsRows.length },
+        benchmarkComparisons,
+        platformBenchmarks: benchmarks,
+        timeRange,
+        generatedAt: new Date().toISOString(),
+      });
+    } catch (error: any) {
+      console.error('Market intelligence summary error:', error);
+      res.status(500).json({ error: 'Failed to fetch market intelligence summary' });
+    }
+  });
+
+  // Recent Transactions Feed — filterable by timeRange, state, region, waterType (asset class)
+  app.get('/api/market-intelligence/recent-transactions', authenticateUser, async (req: any, res) => {
+    try {
+      const { timeRange = '12m', state, region, waterType, limit: limitParam = '20' } = req.query as Record<string, string>;
+      const cutoff = getMarketIntelCutoff(timeRange);
+      const limitN = Math.min(50, Math.max(1, parseInt(limitParam) || 20));
+      const conds = buildSalesCompsConditions({ cutoff, state, region, waterType });
+
+      const transactions = await db.select({
+        id: salesComps.id,
+        marina: salesComps.marina,
+        city: salesComps.city,
+        state: salesComps.state,
+        region: salesComps.region,
+        waterType: salesComps.waterType,
+        salePrice: salesComps.salePrice,
+        capRate: salesComps.capRate,
+        noi: salesComps.noi,
+        wetSlips: salesComps.wetSlips,
+        dryRacks: salesComps.dryRacks,
+        occupancy: salesComps.occupancy,
+        saleYear: salesComps.saleYear,
+        saleMonth: salesComps.saleMonth,
+        isPriceDisclosed: salesComps.isPriceDisclosed,
+        isCapRateDisclosed: salesComps.isCapRateDisclosed,
+        dataSource: salesComps.dataSource,
+        brokerage: salesComps.brokerage,
+      }).from(salesComps)
+        .where(and(...conds))
+        .orderBy(desc(salesComps.saleYear), desc(salesComps.saleMonth))
+        .limit(limitN);
+
+      res.json(transactions.map(t => ({
+        ...t,
+        pricePerSlip: t.salePrice && (Number(t.wetSlips || 0) + Number(t.dryRacks || 0)) > 0
+          ? Math.round(Number(t.salePrice) / (Number(t.wetSlips || 0) + Number(t.dryRacks || 0)))
+          : null,
+      })));
+    } catch (error: any) {
+      console.error('Market intelligence recent transactions error:', error);
+      res.status(500).json({ error: 'Failed to fetch recent transactions' });
+    }
+  });
+
+  // Filter options — states, regions, and waterTypes (asset classes) available in comps
+  app.get('/api/market-intelligence/filter-options', authenticateUser, async (req: any, res) => {
+    try {
+      const [states, regions, waterTypes] = await Promise.all([
+        db.selectDistinct({ state: salesComps.state }).from(salesComps)
+          .where(and(isNull(salesComps.deletedAt), sql`${salesComps.state} IS NOT NULL AND ${salesComps.state} != ''`))
+          .orderBy(salesComps.state),
+        db.selectDistinct({ region: salesComps.region }).from(salesComps)
+          .where(and(isNull(salesComps.deletedAt), sql`${salesComps.region} IS NOT NULL AND ${salesComps.region} != ''`))
+          .orderBy(salesComps.region),
+        db.selectDistinct({ waterType: salesComps.waterType }).from(salesComps)
+          .where(and(isNull(salesComps.deletedAt), sql`${salesComps.waterType} IS NOT NULL AND ${salesComps.waterType} != ''`))
+          .orderBy(salesComps.waterType),
+      ]);
+      res.json({
+        states: states.map(s => s.state).filter(Boolean),
+        regions: regions.map(r => r.region).filter(Boolean),
+        waterTypes: waterTypes.map(w => w.waterType).filter(Boolean),
+      });
+    } catch (error: any) {
+      console.error('Market intelligence filter options error:', error);
+      res.status(500).json({ error: 'Failed to fetch filter options' });
+    }
   });
 
 }

@@ -16,6 +16,7 @@ import { MobileShell } from "@/components/layout/MobileBottomNav";
 import { DesktopOnlyGate } from "@/components/DesktopOnlyGate";
 import { RolePickerModal } from "@/components/onboarding/RolePickerModal";
 import AddNewModal from "@/components/modals/add-new-modal";
+import { MarketPulseBar } from "@/components/MarketPulseBar";
 
 const Dashboard = lazy(() => import("@/pages/dashboard"));
 const CRMDashboard = lazy(() => import("@/pages/crm-dashboard"));
@@ -258,6 +259,7 @@ const DemographicsIndex = lazy(() => import("@/pages/analysis/demographics/Index
 const BenchmarksIndex = lazy(() => import("@/pages/analysis/benchmarks/Index"));
 const CapitalMarketsIndex = lazy(() => import("@/pages/analysis/capital-markets"));
 const AnalysisHub = lazy(() => import("@/pages/analysis/AnalysisHub"));
+const MarketIntelligenceHub = lazy(() => import("@/pages/analysis/market-intelligence"));
 const DebtScenariosIndex = lazy(() => import("@/pages/modeling/debt-scenarios/Index"));
 const ExitStrategiesIndex = lazy(() => import("@/pages/modeling/exit-strategies"));
 const ScenariosIndex = lazy(() => import("@/pages/modeling/scenarios"));
@@ -449,6 +451,7 @@ function UnifiedLayout({ children }: { children: React.ReactNode }) {
         <Suspense fallback={<div className="h-10" />}>
           <PendingNotificationsBanner />
         </Suspense>
+        <MarketPulseBar />
         <div className="hidden md:block"><Breadcrumb /></div>
         <main className="flex-1 overflow-auto mobile-main-content min-w-0 pb-16 md:pb-0">
           <PageErrorBoundary>
@@ -2455,6 +2458,15 @@ function Router() {
           <GatedLayout pack="analysis">
             <DesktopOnlyGate featureName="Capital Markets Analysis">
               <CapitalMarketsIndex />
+            </DesktopOnlyGate>
+          </GatedLayout>
+        )}
+      </Route>
+      <Route path="/analysis/market-intelligence">
+        {() => (
+          <GatedLayout pack="analysis">
+            <DesktopOnlyGate featureName="Market Intelligence">
+              <MarketIntelligenceHub />
             </DesktopOnlyGate>
           </GatedLayout>
         )}
