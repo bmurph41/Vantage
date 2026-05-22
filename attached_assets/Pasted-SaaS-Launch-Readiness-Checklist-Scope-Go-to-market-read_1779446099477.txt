@@ -1,0 +1,221 @@
+SaaS Launch-Readiness Checklist
+
+Scope: Go-to-market readiness for a multi-tenant B2B SaaS handling sensitive financial/PII data.
+Stack assumed: React + TypeScript/Vite frontend · Express (ESM) backend · PostgreSQL + Drizzle ORM · Stripe billing · Postgres RLS for tenant isolation.
+How to use: Treat unchecked items as open risks. Anything under 🔴 Launch Blocker must be done before a single paying or beta customer touches production. 🟡 Should-Have can ship within the first 2–4 weeks post-launch. 🟢 Nice-to-Have is fast-follow.
+
+
+1. Core Product Readiness
+
+ 🔴 Critical user journeys work end-to-end in production (not just dev/Replit): sign up → onboard → create first deal/model → see value → invite teammate → upgrade.
+ 🔴 No dummy/seed/placeholder data visible to real users in any production-facing screen.
+ 🔴 Empty states designed for every list/table/dashboard (no blank white screens, no "undefined", no console errors on first load).
+ 🔴 Loading states + skeletons for all async data fetches; no infinite spinners on failure.
+ 🔴 Error states are handled gracefully — every API call has a catch path with a user-facing message, never a raw stack trace.
+ 🔴 Destructive actions (delete deal, remove user, cancel subscription) require confirmation and are reversible or clearly warned.
+ 🟡 Feature gating wired to subscription tier (Analyst/Professional/Team/Institutional) — locked features show an upgrade prompt, not a broken page.
+ 🟡 Mobile/responsive behavior verified on the screens users will actually open on phones (at minimum: login, dashboard, key read views).
+ 🟡 Browser matrix tested: Chrome, Safari, Edge, Firefox (latest 2 versions each).
+ 🟢 Keyboard shortcuts / power-user affordances for high-frequency workflows.
+ 🟢 "What's new" / changelog surface for returning users.
+
+
+2. Onboarding & Activation
+
+ 🔴 New-account flow gets a user to first value with zero hand-holding (the "aha moment" is reachable in one session).
+ 🔴 Sample/demo data or a guided template available so empty accounts aren't intimidating (especially important for a modeling tool — give them something to play with).
+ 🟡 Welcome email fires on signup (verifies email is wired and deliverable).
+ 🟡 Product tour, tooltips, or checklist widget for first-run.
+ 🟡 Org/workspace creation + team invite flow tested with multiple seats.
+ 🟡 Role/permission model (owner, admin, member, viewer) enforced in UI and API.
+ 🟢 In-app contextual help / docs links on complex screens.
+
+
+3. Authentication & Account Management
+
+ 🔴 Secure session handling: httpOnly + Secure + SameSite cookies, or properly scoped tokens; no JWTs in localStorage if avoidable.
+ 🔴 Password requirements + secure hashing (bcrypt/argon2, never plaintext or fast hashes).
+ 🔴 Email verification on signup.
+ 🔴 Password reset flow works and tokens expire.
+ 🔴 Session expiry / logout actually invalidates the session server-side.
+ 🔴 Rate limiting on auth endpoints (login, reset, signup) to stop credential stuffing.
+ 🟡 SSO / Google OAuth (table stakes for institutional buyers — your Team/Institutional tiers will expect it).
+ 🟡 2FA / MFA option (often a procurement checkbox for PE/institutional clients).
+ 🟡 Account lockout or backoff after repeated failed logins.
+ 🟡 Self-serve user management: add/remove/deactivate seats, change roles.
+ 🟢 Audit log of auth events (login, password change, role change) — also helps with compliance.
+
+
+4. Multi-Tenancy & Data Isolation (your highest-risk area for institutional data)
+
+ 🔴 RLS verified by test, not by assumption — automated test that User A from Org X literally cannot read/write Org Y's rows, at the DB layer.
+ 🔴 Every RLS-protected table accessed via the correct pattern (raw pool.query() per your codebase rules) — audit that no Drizzle helper accidentally bypasses RLS.
+ 🔴 Tenant context (org_id) set on every request before any data access; fail closed if missing.
+ 🔴 No endpoint returns cross-tenant data via a guessable ID (test IDOR: change an ID in a request and confirm 403/404, not data).
+ 🔴 File/document storage scoped per tenant (uploaded P&Ls, VDR docs cannot leak across orgs).
+ 🟡 Tenant data export and deletion supported (needed for offboarding and privacy requests).
+ 🟡 Per-tenant usage metering accurate (ties to billing).
+
+
+5. Billing & Subscriptions (Stripe)
+
+ 🔴 Live Stripe keys in production secrets; test keys nowhere near prod.
+ 🔴 Webhook signature verification enabled — reject unsigned/forged webhooks.
+ 🔴 Webhook idempotency (you've done this in Bookd — confirm Vantage too): replayed events don't double-provision or double-charge.
+ 🔴 provisionTier() (or equivalent) runs atomically on checkout.session.completed / subscription events — tier and entitlements update reliably.
+ 🔴 Failed payment / dunning handling: card decline → grace period → downgrade/suspend logic defined, not silent.
+ 🔴 Subscription state in your DB stays in sync with Stripe as source of truth (handle customer.subscription.updated/deleted).
+ 🟡 Upgrade/downgrade flows with proration tested.
+ 🟡 Self-serve cancellation + Stripe Customer Portal wired.
+ 🟡 Invoices/receipts auto-sent; tax handling (Stripe Tax) configured if you owe sales tax.
+ 🟡 Free trial logic (if offered): trial start, trial-end conversion, trial-end-without-card behavior.
+ 🟡 Annual vs monthly pricing both work; currency handling correct.
+ 🟢 Usage-based / overage billing if any tier needs it.
+ 🟢 Internal MRR/churn dashboard or Stripe reporting set up.
+
+
+6. Security (Technical)
+
+ 🔴 HTTPS everywhere; HSTS header set; no mixed content.
+ 🔴 All secrets in environment/secret manager — none committed to the repo (scan git history).
+ 🔴 Input validation + output encoding on every endpoint (prevent XSS, injection). Use a schema validator (Zod) at API boundaries.
+ 🔴 Parameterized queries everywhere — confirm no string-concatenated SQL even in raw pool.query() calls.
+ 🔴 Authorization checked on every endpoint server-side — never trust the frontend to hide a button.
+ 🔴 CORS locked to your known origins, not *.
+ 🔴 Security headers: CSP, X-Content-Type-Options, X-Frame-Options/frame-ancestors, Referrer-Policy.
+ 🔴 File upload validation: type/size limits, no executable content, scanned/sandboxed, served from non-executable path.
+ 🔴 Dependency audit clean (npm audit, Dependabot/Renovate enabled); no known critical CVEs.
+ 🟡 Rate limiting / abuse protection on expensive endpoints (PDF parsing, modeling runs).
+ 🟡 Secrets rotation plan; API keys scoped to least privilege.
+ 🟡 Logging excludes PII/secrets; no full request bodies with sensitive data in logs.
+ 🟡 A penetration test or at least a structured security review before institutional sales.
+ 🟢 Bug bounty / responsible disclosure email (security@) and policy page.
+ 🟢 Path toward SOC 2 Type II scoping (institutional buyers will ask — start the trail early even if cert comes later).
+
+
+7. Legal & Compliance
+
+ 🔴 Terms of Service published and linked (signup must reference acceptance).
+ 🔴 Privacy Policy published — what data you collect, why, how long, who you share with (Stripe, hosting, analytics, sub-processors).
+ 🔴 Cookie consent / banner if you use analytics or tracking (required for EU visitors; advisable broadly).
+ 🔴 Acceptance mechanism on signup (checkbox or clickwrap with timestamp record).
+ 🟡 Data Processing Agreement (DPA) template ready — institutional/PE clients will request one.
+ 🟡 Subscription / Master Services Agreement for higher tiers (Team/Institutional often sign a real contract, not just clickwrap).
+ 🟡 Sub-processor list maintained (Stripe, Replit/host, email provider, analytics).
+ 🟡 GDPR/CCPA basics: data access, correction, deletion request process — even a manual one to start.
+ 🟡 Refund policy stated.
+ 🟡 Business entity formed (LLC/C-corp), and the entity name appears on legal docs and Stripe.
+ 🟢 Have a lawyer review ToS/Privacy/DPA before institutional contracts (templates are fine to launch beta, not to sign $30K/yr deals).
+ 🟢 Trademark check on the names "Vantage" / "Bookd" (Vantage especially is a crowded mark — confirm you can use it).
+ 🟢 Insurance: tech E&O / cyber liability quote (institutional procurement may require proof).
+
+
+8. Landing / Marketing Site
+
+ 🔴 Clear above-the-fold value proposition: what it is, who it's for, the outcome — in one sentence.
+ 🔴 Primary CTA obvious and working (Start free / Book demo / Sign up).
+ 🔴 Pricing page live and accurate (Analyst $99 / Professional $349 / Team $899 / Institutional $2,500) with what's included per tier.
+ 🔴 All links work; no 404s; forms submit and you receive the lead.
+ 🔴 Legal links in footer (ToS, Privacy, Contact).
+ 🔴 Custom domain + SSL; www and apex both resolve.
+ 🟡 Demo request / contact form routes to your inbox or CRM and auto-replies.
+ 🟡 Social proof: logos, testimonials, or "trusted by" — even one beta quote helps. Avoid fake logos.
+ 🟡 Feature/benefit sections speak to your verticals (lead with marina beachhead, show multi-asset-class breadth).
+ 🟡 Screenshots/demo video of the actual product (not stock imagery).
+ 🟡 SEO basics: title tags, meta descriptions, Open Graph/Twitter cards, sitemap.xml, robots.txt, favicon.
+ 🟡 Fast load (LCP < 2.5s); compressed images; Lighthouse pass.
+ 🟡 Mobile layout clean.
+ 🟢 Blog / resources for SEO and credibility (CRE underwriting content fits your audience).
+ 🟢 FAQ section to deflect pre-sales questions.
+ 🟢 Analytics on the marketing site separate from product analytics.
+
+
+9. Infrastructure, Reliability & DevOps
+
+ 🔴 Automated database backups with a tested restore (a backup you've never restored is not a backup).
+ 🔴 Production environment separate from dev; no shared DB.
+ 🔴 Schema migrations run safely in prod via your migration tooling — never npm run db:push against production (your own rule).
+ 🔴 Health check endpoint + uptime monitoring with alerts to you.
+ 🔴 Deploy process repeatable; ability to roll back a bad deploy quickly.
+ 🟡 Staging environment that mirrors prod for pre-release testing.
+ 🟡 Environment variable parity documented; missing-secret checks fail loudly at boot.
+ 🟡 Database connection pooling tuned; no connection exhaustion under load.
+ 🟡 Background jobs/queues (PDF parsing, modeling, emails) survive restarts and retry on failure.
+ 🟡 Basic load test on the heaviest endpoints (DCF/Monte Carlo runs, document parsing).
+ 🟢 Status page for customers.
+ 🟢 Infrastructure-as-code or at least documented setup so you can rebuild.
+ 🟢 Consider migration path off Replit for production if you outgrow it (note dependency for institutional uptime expectations).
+
+
+10. Observability & Monitoring
+
+ 🔴 Error tracking (Sentry or equivalent) on frontend and backend — you get alerted to exceptions before users report them.
+ 🔴 Server logs centralized and searchable.
+ 🟡 Uptime/availability monitoring with downtime alerts.
+ 🟡 Performance monitoring (slow queries, slow endpoints, p95 latency).
+ 🟡 Stripe webhook failure alerts (a silently failing webhook = silently broken billing).
+ 🟢 Real-user monitoring (Core Web Vitals from actual users).
+
+
+11. Analytics & Product Insight
+
+ 🟡 Product analytics installed (PostHog/Amplitude/Mixpanel) — track signup, activation, key actions, upgrade.
+ 🟡 Conversion funnel defined: visit → signup → activate → paid.
+ 🟡 Key activation metric defined and measurable (e.g., "completed first model" or "uploaded first P&L").
+ 🟢 Session replay (PostHog/FullStory) to watch where beta users get stuck.
+ 🟢 Feature-usage tracking to inform the 90-day roadmap.
+
+
+12. Email & Transactional Comms
+
+ 🔴 Transactional email provider configured (Postmark/SendGrid/SES) with verified sending domain.
+ 🔴 SPF, DKIM, DMARC records set — or your verification, reset, and receipt emails land in spam.
+ 🔴 Critical emails tested for actual delivery: verification, password reset, payment receipt, invite.
+ 🟡 Consistent from-address and branded template.
+ 🟡 Unsubscribe handling for any non-transactional/marketing email (legal requirement).
+ 🟢 Lifecycle/onboarding email sequence.
+
+
+13. Support & Customer Success
+
+ 🔴 A way for users to reach you that you actually monitor (support email at minimum).
+ 🟡 In-app support widget or contact link.
+ 🟡 Help/docs/knowledge base for common questions.
+ 🟡 Response-time expectation set (and an SLA for Institutional tier).
+ 🟡 Bug-report path that captures enough context to reproduce.
+ 🟢 Onboarding call/white-glove option for high-tier accounts.
+ 🟢 Feedback collection loop (especially for your imminent marina beta users).
+
+
+14. Pre-Launch QA Pass (do this fresh, in production, as a brand-new user)
+
+ 🔴 Sign up with a real email on a clean browser — go all the way through with no insider knowledge.
+ 🔴 Complete a full paid checkout with a real card (use Stripe test mode first, then one real live transaction you refund).
+ 🔴 Open dev console during the whole flow — zero unhandled errors, zero failed network calls, zero CORS errors.
+ 🔴 Try to break tenant isolation: create two orgs, confirm neither sees the other's data.
+ 🔴 Test on a phone, on a different OS, on a slow connection.
+ 🟡 Have one outside person attempt the core workflow with zero guidance and watch silently.
+ 🟡 Verify every email in the lifecycle actually arrives.
+ 🟡 Confirm cancellation and downgrade behave correctly and don't leave orphaned access.
+
+
+15. Launch Logistics
+
+ 🟡 Beta cohort identified and contacted (your marina test vertical first).
+ 🟡 Onboarding plan for first beta users — who, when, what success looks like.
+ 🟡 Feedback channel and cadence set with beta users.
+ 🟡 Internal runbook for "what to do when X breaks at launch."
+ 🟢 Launch announcement assets (email, LinkedIn, relevant CRE communities).
+ 🟢 Pricing/positioning A-B plan or willingness-to-pay validation with first cohort.
+
+
+Suggested order of attack
+
+Section 4 (tenant isolation) + Section 6 (security) — this is where institutional financial data makes the cost of a mistake highest.
+Section 5 (billing) — broken billing is either lost revenue or angry customers.
+Sections 3, 9, 12 — auth, backups/restore, email deliverability are the silent launch-killers.
+Section 7 (legal) — ToS/Privacy/acceptance are non-negotiable gates.
+Section 14 (fresh QA pass) — do this last, in prod, as if you'd never seen the app.
+
+
+Note on tiers in this doc: 🔴/🟡/🟢 are general SaaS guidance. For your specific situation — institutional buyers, sensitive financials, $2,500/mo top tier — some 🟡 items (SSO, MFA, DPA, SOC 2 trail) effectively become blockers for closing those accounts even if a self-serve Analyst-tier launch can go without them.
