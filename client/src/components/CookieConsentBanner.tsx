@@ -2,18 +2,22 @@ import { useState, useEffect } from "react";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
+import { useAuth } from "@/contexts/AuthContext";
 
 const STORAGE_KEY = "vantage_cookie_consent";
 
 export function CookieConsentBanner() {
+  const { user, isLoading } = useAuth();
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
+    if (isLoading) return;
+    if (user) return;
     const stored = localStorage.getItem(STORAGE_KEY);
     if (!stored) {
       setVisible(true);
     }
-  }, []);
+  }, [user, isLoading]);
 
   const dismiss = (accepted: boolean) => {
     localStorage.setItem(STORAGE_KEY, accepted ? "accepted" : "declined");

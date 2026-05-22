@@ -76,7 +76,7 @@ const registerSchema = z.object({
   orgId: z.string().optional(),
   orgName: z.string().optional(),
   dataBenchmarkingConsent: z.boolean(),
-  tosAccepted: z.boolean().optional(),
+  tosAccepted: z.boolean().refine((val) => val === true, { message: 'You must accept the Terms of Service to register.' }),
   referralSource: z.string().optional(),
   referralSourceOther: z.string().optional(),
   inviteCode: z.string().optional(),
@@ -322,6 +322,9 @@ router.post('/register', async (req: Request, res: Response) => {
     if (!dataBenchmarkingConsent) {
       return res.status(400).json({ error: 'Data use consent is required to create an account.' });
     }
+    if (!tosAccepted) {
+      return res.status(400).json({ error: 'You must accept the Terms of Service to create an account.' });
+    }
 
     // Beta invite-code gate. When required, the code must exist, not be
     // expired, and have remaining uses. Validation happens BEFORE any user/org
@@ -382,8 +385,8 @@ router.post('/register', async (req: Request, res: Response) => {
         dataBenchmarkingConsent: true,
         consentTimestamp: new Date(),
         consentVersion: CONSENT_VERSION,
-        tosAcceptedAt: tosAccepted ? new Date() : null,
-        tosVersion: tosAccepted ? TOS_VERSION : null,
+        tosAcceptedAt: new Date(),
+        tosVersion: TOS_VERSION,
         benchmarkingOptOut: false,
         optOutTimestamp: null,
         referralSource: referralSource || null,
