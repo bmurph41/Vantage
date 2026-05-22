@@ -677,6 +677,51 @@ place, harmless; future-cleanup candidate.
 
 ---
 
+## WS4 Piece C1 — golden-harness threaded-writer reference (executed 2026-05-22)
+
+**Done.** The department-inference golden harness (`tests/department-inference-golden.mjs`
++ `.json`) gained a second writer-path reference so WS4 Piece C2's call-site fix has an
+authoritative figure to verify against:
+
+- `syntheticNOI_writerPath` renamed → `syntheticNOI_writerPath_undefined` — the actuals
+  writer **today** (all four call sites pass `undefined`, so non-marina P&L runs the marina
+  cascade).
+- `syntheticNOI_writerPath_threaded` added — the writer **post-C2**, threading the real
+  asset class (`== enginePath` by construction).
+- `writerPathGap` added as a first-class golden field — `threaded − undefined`, the measure
+  of the marina-cascade bug: **multifamily −80,059 · str −8,403**, zero for marina and the
+  branch-less classes. Re-baselined GREEN; `enginePath` and `inferences[]` unmoved.
+
+**Design — the C1/C2 split.** The harness is a **pure reference oracle**: DB-free, reads no
+source, no false-green failure mode. It does **not** detect C2's call-site change — under C1,
+C2 correctly produces **zero harness diff** (`inferDepartment` itself is untouched). Detection
+is **relocated** to the C2 **live re-promotion test** (seed a real project, run the writer,
+assert the persisted `modeling_actuals.department` label). A source-text-reading auto-detector
+was considered and **rejected** — it would couple the gate to C2's textual form and risk a
+silent false-green.
+
+**C2 contract (locked).** C2 = **atomic** flip of all four call sites
+(`canonical-actuals-loader.ts:293`, `promote-to-actuals.ts:147`, `quickbooks-service.ts:609`,
+`doc-intel-service.ts:2560`) in one commit. The live re-promotion test asserts the persisted
+department **label** as ground truth and uses `writerPath_threaded` NOI as a **corroborating**
+reference, not strict equality — the real writer post-processes (`normalizeDepartment`,
+`deptKeyToLabel`, `correctCategoryForDepartment`) and the synthetic oracle does not.
+
+**Content location — read before trusting commit labels.** C1's content is **verified correct**
+(harness GREEN, gaps −80,059 / −8,403, `enginePath` unmoved, `inferences[]` byte-identical) but
+its **packaging is cosmetically wrong** — the Replit Agent's parallel auto-commit scattered it:
+
+- `e41a1f25` — holds the harness `.mjs` (four edits). **Mislabeled** "Task #442: Vantage public
+  landing & pricing page" and bundled with genuine Task #442 files (`PricingPage.tsx`,
+  `billing-service.ts`).
+- `07c7d7e5` — holds the harness `.json` re-baseline (clean — that file only).
+
+Disentangling into one clean `test:`-prefixed commit was **declined**: it would require a
+rebase of ~15+ commits racing the still-active Agent — higher-risk than the cosmetic benefit.
+The content is sound; the labels lie. This note is the record.
+
+---
+
 ## Open items for the execution plan
 
 - Confirm `quickbooks-service.ts:609` as the 8th `inferDepartment` consumer (under-enumerated here).
@@ -687,7 +732,8 @@ place, harmless; future-cleanup candidate.
   contra-revenue (see Workstream 1 above).
 - Decide whether the canonical entity needs global (org-agnostic) rows — drives the
   `org_id`-nullable question.
-- Build the golden-number regression harness *before* Phase 4.
+- ~~Build the golden-number regression harness *before* Phase 4.~~ — **DONE**; extended by
+  WS4 Piece C1 with the threaded-writer reference (see the WS4 C1 section above).
 
 **Filed:** 2026-05-21 · Phase 0 investigation. **Updated:** 2026-05-21 — Workstream 1
 executed (`badDebtPct` correction); Workstream 2 investigated **and executed**
@@ -695,3 +741,5 @@ executed (`badDebtPct` correction); Workstream 2 investigated **and executed**
 commit `1487adb8`; no DDL); Workstream 3-A executed (Def B corrected to live truth + coa_code
 null-cache fix, commit `747e2c83`; no DDL) — WS3 sub-items B (legacy marina seed) and C
 (`pnlKeywordRules` double-definition) open, pending decisions.
+**Updated:** 2026-05-22 — WS4 Piece C1 executed (golden-harness threaded-writer reference;
+content in commits `e41a1f25` + `07c7d7e5`, packaging cosmetic — see the WS4 C1 section).
