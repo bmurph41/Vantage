@@ -17,7 +17,7 @@ import {
   organizationPacks,
   adminAuditLog,
 } from "@shared/schema";
-import { clearDemoData } from "../services/demo-seed-service";
+import { clearDemoData, checkDemoData } from "../services/demo-seed-service";
 import { eq, and, desc, sql, count } from "drizzle-orm";
 import { sendInviteEmail } from "../services/email-service";
 import { enterpriseAuthService } from "../services/enterprise-auth-service";
@@ -536,6 +536,17 @@ onboardingRouter.post("/notifications/dispatch", async (req: Request, res: Respo
     }
 
     res.json({ dispatched: created.length, event, notificationIds: created });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /demo-data/status — check if this org has seeded demo records
+onboardingRouter.get("/demo-data/status", async (req: Request, res: Response) => {
+  try {
+    const orgId = (req as any).user.orgId;
+    const result = await checkDemoData(orgId);
+    res.json(result);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }

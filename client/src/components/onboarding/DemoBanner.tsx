@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { X, FlaskConical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { apiRequest } from "@/lib/queryClient";
@@ -14,23 +14,24 @@ export function DemoBanner() {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [visible, setVisible] = useState(false);
+  const [dismissed, setDismissed] = useState(() => {
+    if (!user?.orgId) return true;
+    return !!localStorage.getItem(getDismissKey(user.orgId));
+  });
 
-  useEffect(() => {
-    if (!user?.orgId) return;
-    const dismissed = localStorage.getItem(getDismissKey(user.orgId));
-    if (!dismissed) setVisible(true);
-  }, [user?.orgId]);
+  const { data } = useQuery<{ hasDemoData: boolean }>({
+    queryKey: ["/api/onboarding/demo-data/status"],
+    staleTime: 1000 * 60 * 5,
+    enabled: !!user?.orgId && !dismissed,
+  });
 
   const clearMutation = useMutation({
     mutationFn: async () => {
       return apiRequest("DELETE", "/api/onboarding/demo-data");
     },
     onSuccess: () => {
-      if (user?.orgId) {
-        localStorage.setItem(getDismissKey(user.orgId), "1");
-      }
-      setVisible(false);
+      dismiss();
+      queryClient.invalidateQueries({ queryKey: ["/api/onboarding/demo-data/status"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/contacts"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm-v2/deals"] });
       queryClient.invalidateQueries({ queryKey: ["/api/modeling/projects"] });
@@ -45,10 +46,10 @@ export function DemoBanner() {
     if (user?.orgId) {
       localStorage.setItem(getDismissKey(user.orgId), "1");
     }
-    setVisible(false);
+    setDismissed(true);
   }
 
-  if (!visible) return null;
+  if (dismissed || !data?.hasDemoData) return null;
 
   return (
     <div className="flex items-center gap-3 px-4 py-2.5 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg text-sm">

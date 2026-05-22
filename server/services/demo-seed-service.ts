@@ -71,6 +71,15 @@ export async function seedDemoData(orgId: string, userId: string): Promise<void>
   }
 }
 
+export async function checkDemoData(orgId: string): Promise<{ hasDemoData: boolean }> {
+  const marker = `%${DEMO_MARKER}%`;
+  const result = await db.select({ id: crmDeals.id })
+    .from(crmDeals)
+    .where(and(eq(crmDeals.orgId, orgId), like(crmDeals.title, marker)))
+    .limit(1);
+  return { hasDemoData: result.length > 0 };
+}
+
 export async function clearDemoData(orgId: string): Promise<{ deleted: number }> {
   let deleted = 0;
 
