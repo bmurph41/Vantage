@@ -75,7 +75,7 @@ export default function LandingPage() {
           <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight leading-tight mb-6">
             Institutional-grade acquisition
             <br />
-            <span className="text-blue-300">platform for marina investors</span>
+            <span className="text-blue-300">platform for marina and CRE investors</span>
           </h1>
           <p className="text-lg md:text-xl text-blue-100 max-w-3xl mx-auto mb-10 leading-relaxed">
             From lead to close — CRM, AI due diligence, financial modeling, and portfolio

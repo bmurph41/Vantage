@@ -2,129 +2,74 @@ import { useState } from "react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { PublicLayout } from "@/components/layout/PublicLayout";
-import { Check, Minus } from "lucide-react";
-import { TIER_LIMITS, type SubscriptionTierSlug } from "@shared/tier-packs";
+import { Check } from "lucide-react";
+import { TIER_PACKS, TIER_LIMITS, type SubscriptionTierSlug } from "@shared/tier-packs";
 
-interface TierData {
-  slug: SubscriptionTierSlug;
-  name: string;
-  priceMonthly: number;
-  priceAnnual: number;
-  tagline: string;
-  cta: string;
-  ctaVariant: "default" | "outline";
-  highlighted: boolean;
-  features: string[];
-}
+const TIER_TAGLINES: Record<SubscriptionTierSlug, string> = {
+  starter: "For solo investors getting started.",
+  investor: "For active investors running multiple deals.",
+  broker: "For brokers and advisory teams.",
+  "owner-operator": "For operators managing acquired assets.",
+  institutional: "For institutional funds and large platforms.",
+};
 
-const TIERS: TierData[] = [
-  {
-    slug: "starter",
-    name: "Starter",
-    priceMonthly: 0,
-    priceAnnual: 0,
-    tagline: "For solo investors getting started.",
-    cta: "Start free",
-    ctaVariant: "outline",
-    highlighted: false,
-    features: [
-      "1 active deal",
-      "Basic CRM",
-      "Document vault",
-      "DD checklist",
-      "1 seat",
-    ],
-  },
-  {
-    slug: "investor",
-    name: "Investor",
-    priceMonthly: 89,
-    priceAnnual: 890,
-    tagline: "For active investors running multiple deals.",
-    cta: "Get started",
-    ctaVariant: "default",
-    highlighted: false,
-    features: [
-      "Unlimited deals",
-      "Financial modeling & DCF",
-      "AI underwriting",
-      "Deal analysis & narratives",
-      "25 GB storage",
-      "200 AI queries / mo",
-      "Up to 3 seats",
-    ],
-  },
-  {
-    slug: "broker",
-    name: "Broker",
-    priceMonthly: 179,
-    priceAnnual: 1790,
-    tagline: "For brokers and advisory teams.",
-    cta: "Get started",
-    ctaVariant: "default",
-    highlighted: true,
-    features: [
-      "Everything in Investor",
-      "Full CRM pipeline",
-      "Custom deal stages & automation",
-      "Prospecting & email integration",
-      "SMS alerts",
-      "100 GB storage",
-      "1,000 AI queries / mo",
-      "Up to 10 seats",
-    ],
-  },
-  {
-    slug: "owner-operator",
-    name: "Owner / Operator",
-    priceMonthly: 249,
-    priceAnnual: 2490,
-    tagline: "For operators managing acquired assets.",
-    cta: "Get started",
-    ctaVariant: "default",
-    highlighted: false,
-    features: [
-      "Everything in Broker",
-      "Operations management",
-      "Vendor management & work orders",
-      "Lease abstractor",
-      "AI document intelligence",
-      "Waitlist & utilization tools",
-      "500 GB storage",
-      "2,500 AI queries / mo",
-      "Up to 25 seats",
-      "25 LP investors",
-    ],
-  },
-  {
-    slug: "institutional",
-    name: "Institutional",
-    priceMonthly: 1999,
-    priceAnnual: 1649,
-    tagline: "For institutional funds and large platforms.",
-    cta: "Contact sales",
-    ctaVariant: "default",
-    highlighted: false,
-    features: [
-      "Everything in Owner / Operator",
-      "Fund management & LP portal",
-      "Capital calls & distributions",
-      "Waterfall engine",
-      "Advanced portfolio analytics",
-      "API access",
-      "SSO & audit trail",
-      "1 TB storage",
-      "Unlimited AI queries",
-      "Unlimited seats",
-      "Unlimited LP investors",
-    ],
-  },
-];
+const TIER_FEATURES: Record<SubscriptionTierSlug, string[]> = {
+  starter: [
+    "1 active deal",
+    "Basic CRM",
+    "Document vault",
+    "DD checklist",
+    "1 seat",
+  ],
+  investor: [
+    "Everything in Starter",
+    "Unlimited deals",
+    "Financial modeling & DCF",
+    "AI underwriting",
+    "Deal analysis & narratives",
+    "25 GB storage",
+    "200 AI queries / mo",
+    "Up to 3 seats",
+  ],
+  broker: [
+    "Everything in Investor",
+    "Full CRM pipeline",
+    "Custom deal stages & automation",
+    "Prospecting & email integration",
+    "SMS alerts",
+    "100 GB storage",
+    "1,000 AI queries / mo",
+    "Up to 10 seats",
+  ],
+  "owner-operator": [
+    "Everything in Broker",
+    "Operations management",
+    "Vendor management & work orders",
+    "Lease abstractor",
+    "AI document intelligence",
+    "Waitlist & utilization tools",
+    "500 GB storage",
+    "2,500 AI queries / mo",
+    "Up to 25 seats",
+    "25 LP investors",
+  ],
+  institutional: [
+    "Everything in Owner / Operator",
+    "Fund management & LP portal",
+    "Capital calls & distributions",
+    "Waterfall engine",
+    "Advanced portfolio analytics",
+    "API access",
+    "SSO & audit trail",
+    "1 TB storage",
+    "Unlimited AI queries",
+    "Unlimited seats",
+    "Unlimited LP investors",
+  ],
+};
 
-function formatPrice(cents: number) {
-  if (cents === 0) return "Free";
-  return `$${cents.toLocaleString()}`;
-}
+const HIGHLIGHTED: SubscriptionTierSlug = "broker";
+const CONTACT_EMAIL = "hello@vantage.com";
 
 export default function PricingPage() {
   const [annual, setAnnual] = useState(false);
@@ -140,7 +85,7 @@ export default function PricingPage() {
         </p>
 
         {/* Toggle */}
-        <div className="inline-flex items-center gap-3 bg-white/10 border border-white/20 rounded-full p-1.5">
+        <div className="inline-flex items-center gap-0 bg-white/10 border border-white/20 rounded-full p-1.5">
           <button
             onClick={() => setAnnual(false)}
             className={`px-5 py-1.5 rounded-full text-sm font-medium transition-all ${
@@ -163,35 +108,33 @@ export default function PricingPage() {
         </div>
       </section>
 
-      {/* Pricing cards */}
+      {/* Pricing cards — sourced from shared/tier-packs.ts */}
       <section className="py-16 px-4 sm:px-6 lg:px-8 bg-gray-50">
         <div className="max-w-7xl mx-auto">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
-            {TIERS.map((tier) => {
-              const price = annual ? tier.priceAnnual : tier.priceMonthly;
-              const monthlyEquiv =
-                annual && tier.priceAnnual > 0
-                  ? Math.round(tier.priceAnnual / 12)
-                  : tier.priceMonthly;
+            {TIER_PACKS.map((tier) => {
+              const isHighlighted = tier.slug === HIGHLIGHTED;
+              const isInstitutional = tier.slug === "institutional";
+              const displayMonthly = annual ? tier.priceAnnualMonthly : tier.priceMonthly;
+              const annualTotal = tier.priceAnnualMonthly * 12;
               const savePct =
                 annual && tier.priceMonthly > 0
                   ? Math.round(
-                      ((tier.priceMonthly * 12 - tier.priceAnnual) /
-                        (tier.priceMonthly * 12)) *
-                        100
+                      (1 - tier.priceAnnualMonthly / tier.priceMonthly) * 100
                     )
                   : 0;
+              const limits = TIER_LIMITS[tier.slug];
 
               return (
                 <div
                   key={tier.slug}
                   className={`relative rounded-2xl flex flex-col p-6 ${
-                    tier.highlighted
+                    isHighlighted
                       ? "bg-[hsl(221,83%,35%)] text-white shadow-2xl ring-2 ring-[hsl(221,83%,35%)] scale-[1.02]"
                       : "bg-white border border-gray-200 shadow-sm"
                   }`}
                 >
-                  {tier.highlighted && (
+                  {isHighlighted && (
                     <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-amber-400 text-amber-900 text-xs font-bold px-3 py-1 rounded-full whitespace-nowrap">
                       Most popular
                     </div>
@@ -200,23 +143,23 @@ export default function PricingPage() {
                   <div className="mb-6">
                     <h3
                       className={`text-lg font-bold mb-1 ${
-                        tier.highlighted ? "text-white" : "text-gray-900"
+                        isHighlighted ? "text-white" : "text-gray-900"
                       }`}
                     >
                       {tier.name}
                     </h3>
                     <p
                       className={`text-sm mb-4 ${
-                        tier.highlighted ? "text-blue-100" : "text-gray-500"
+                        isHighlighted ? "text-blue-100" : "text-gray-500"
                       }`}
                     >
-                      {tier.tagline}
+                      {TIER_TAGLINES[tier.slug]}
                     </p>
 
                     {tier.priceMonthly === 0 ? (
                       <div
                         className={`text-3xl font-bold ${
-                          tier.highlighted ? "text-white" : "text-gray-900"
+                          isHighlighted ? "text-white" : "text-gray-900"
                         }`}
                       >
                         Free
@@ -225,36 +168,35 @@ export default function PricingPage() {
                       <>
                         <div
                           className={`text-3xl font-bold ${
-                            tier.highlighted ? "text-white" : "text-gray-900"
+                            isHighlighted ? "text-white" : "text-gray-900"
                           }`}
                         >
-                          ${monthlyEquiv}
+                          ${displayMonthly.toLocaleString()}
                           <span
                             className={`text-base font-normal ${
-                              tier.highlighted ? "text-blue-100" : "text-gray-500"
+                              isHighlighted ? "text-blue-100" : "text-gray-500"
                             }`}
                           >
                             /mo
                           </span>
                         </div>
-                        {annual && (
+                        {annual ? (
                           <div
                             className={`text-xs mt-1 ${
-                              tier.highlighted ? "text-blue-200" : "text-gray-500"
+                              isHighlighted ? "text-blue-200" : "text-gray-500"
                             }`}
                           >
-                            ${price.toLocaleString()} billed annually
+                            ${annualTotal.toLocaleString()} billed annually
                             {savePct > 0 && (
                               <span className="ml-1 text-green-500 font-semibold">
                                 (save {savePct}%)
                               </span>
                             )}
                           </div>
-                        )}
-                        {!annual && (
+                        ) : (
                           <div
                             className={`text-xs mt-1 ${
-                              tier.highlighted ? "text-blue-200" : "text-gray-400"
+                              isHighlighted ? "text-blue-200" : "text-gray-400"
                             }`}
                           >
                             billed monthly
@@ -264,32 +206,45 @@ export default function PricingPage() {
                     )}
                   </div>
 
-                  <Link
-                    href={tier.slug === "institutional" ? "mailto:hello@vantage.com" : "/signup"}
-                  >
-                    <Button
-                      className={`w-full mb-6 font-semibold ${
-                        tier.highlighted
-                          ? "bg-white text-[hsl(221,83%,30%)] hover:bg-blue-50"
-                          : ""
-                      }`}
-                      variant={tier.highlighted ? "default" : tier.ctaVariant}
-                    >
-                      {tier.cta}
-                    </Button>
-                  </Link>
+                  {isInstitutional ? (
+                    <a href={`mailto:${CONTACT_EMAIL}`}>
+                      <Button
+                        className={`w-full mb-6 font-semibold ${
+                          isHighlighted
+                            ? "bg-white text-[hsl(221,83%,30%)] hover:bg-blue-50"
+                            : ""
+                        }`}
+                        variant="default"
+                      >
+                        Contact sales
+                      </Button>
+                    </a>
+                  ) : (
+                    <Link href="/signup">
+                      <Button
+                        className={`w-full mb-6 font-semibold ${
+                          isHighlighted
+                            ? "bg-white text-[hsl(221,83%,30%)] hover:bg-blue-50"
+                            : ""
+                        }`}
+                        variant={tier.priceMonthly === 0 ? "outline" : "default"}
+                      >
+                        {tier.priceMonthly === 0 ? "Start free" : "Get started"}
+                      </Button>
+                    </Link>
+                  )}
 
                   <ul className="space-y-2.5 flex-1">
-                    {tier.features.map((f) => (
+                    {TIER_FEATURES[tier.slug].map((f) => (
                       <li key={f} className="flex items-start gap-2">
                         <Check
                           className={`h-4 w-4 mt-0.5 shrink-0 ${
-                            tier.highlighted ? "text-blue-200" : "text-[hsl(221,83%,35%)]"
+                            isHighlighted ? "text-blue-200" : "text-[hsl(221,83%,35%)]"
                           }`}
                         />
                         <span
                           className={`text-sm ${
-                            tier.highlighted ? "text-blue-50" : "text-gray-600"
+                            isHighlighted ? "text-blue-50" : "text-gray-600"
                           }`}
                         >
                           {f}
@@ -302,17 +257,16 @@ export default function PricingPage() {
             })}
           </div>
 
-          {/* Limits comparison callout */}
           <p className="text-center text-sm text-gray-500 mt-8">
             All paid plans include a 14-day free trial. No credit card required for Starter.{" "}
-            <a href="mailto:hello@vantage.com" className="text-[hsl(221,83%,35%)] hover:underline">
+            <a href={`mailto:${CONTACT_EMAIL}`} className="text-[hsl(221,83%,35%)] hover:underline">
               Questions? Talk to us.
             </a>
           </p>
         </div>
       </section>
 
-      {/* FAQ / trust strip */}
+      {/* FAQ */}
       <section className="py-16 px-4 sm:px-6 lg:px-8 max-w-4xl mx-auto">
         <h2 className="text-2xl font-bold text-gray-900 text-center mb-10">
           Frequently asked questions

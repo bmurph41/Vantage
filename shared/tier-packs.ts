@@ -31,27 +31,44 @@ export interface TierPackMapping {
   slug: SubscriptionTierSlug;
   name: string; // canonical display name
   packs: PackType[];
+  /** Monthly price in USD. 0 = free tier. */
+  priceMonthly: number;
+  /**
+   * Monthly-equivalent price in USD when billed annually.
+   * 0 = free. Multiply by 12 to get the annual total charged.
+   * Matches billing-service.ts semantics exactly.
+   */
+  priceAnnualMonthly: number;
 }
 
 /**
- * Authoritative tier → packs mapping. Marketing bullets, prices, and Stripe
- * ids are layered on top in `pack-service.ts SUBSCRIPTION_TIERS`.
+ * Authoritative tier → packs mapping. Marketing bullets and Stripe ids are
+ * layered on top in `pack-service.ts SUBSCRIPTION_TIERS`.
+ * Prices here are canonical; billing-service.ts SUBSCRIPTION_TIERS must stay
+ * in sync (priceAnnual there = priceAnnualMonthly * 12 for standard tiers;
+ * Institutional uses priceAnnualMonthly directly as its billing-service priceAnnual).
  */
 export const TIER_PACKS: TierPackMapping[] = [
   {
     slug: "starter",
     name: "Starter",
     packs: [],
+    priceMonthly: 0,
+    priceAnnualMonthly: 0,
   },
   {
     slug: "investor",
     name: "Investor",
     packs: ["modeling_tools", "analysis", "investor"],
+    priceMonthly: 89,
+    priceAnnualMonthly: 74, // $890/yr ÷ 12
   },
   {
     slug: "broker",
     name: "Broker",
     packs: ["modeling_tools", "analysis", "crm_pipeline", "prospecting", "investor", "broker"],
+    priceMonthly: 179,
+    priceAnnualMonthly: 149, // $1,790/yr ÷ 12
   },
   {
     slug: "owner-operator",
@@ -66,6 +83,8 @@ export const TIER_PACKS: TierPackMapping[] = [
       "broker",
       "owner",
     ],
+    priceMonthly: 249,
+    priceAnnualMonthly: 208, // $2,490/yr ÷ 12
   },
   {
     slug: "institutional",
@@ -83,6 +102,8 @@ export const TIER_PACKS: TierPackMapping[] = [
       "broker",
       "owner",
     ],
+    priceMonthly: 1999,
+    priceAnnualMonthly: 1649, // $19,788/yr — billing-service priceAnnual matches this value
   },
 ];
 
