@@ -443,7 +443,10 @@ function buildAllRevenueCategories(assetClass: string | null | undefined) {
 }
 
 
-const expenseCategories = [
+// Marina baseline — preserved as the default expense vocabulary so all
+// non-MF/STR classes (marina, office, retail, self_storage, etc.) see the same
+// categories they saw pre-WS5-Step-C.
+const MARINA_EXPENSE_CATEGORIES = [
   { id: 'payroll', name: 'Payroll & Benefits' },
   { id: 'utilities', name: 'Utilities' },
   { id: 'insurance', name: 'Insurance' },
@@ -460,6 +463,24 @@ const expenseCategories = [
   { id: 'other_expenses', name: 'Other Expenses' },
 ];
 
+// WS5 Step C — buildExpenseCategories(assetClass) replaces the module-scope
+// const so MF/STR see the frozen Step 0 expense vocabulary. Marina (and
+// unrecognized classes) get the byte-identical pre-WS5-Step-C list.
+function buildExpenseCategories(assetClass: string | null | undefined) {
+  if (assetClass === 'multifamily') {
+    return [...MARINA_EXPENSE_CATEGORIES, { id: 'operating_expenses', name: 'Operating Expenses' }];
+  }
+  if (assetClass === 'str') {
+    return [
+      ...MARINA_EXPENSE_CATEGORIES,
+      { id: 'operating_expenses', name: 'Operating Expenses' },
+      { id: 'cleaning_expense', name: 'Cleaning / Turnover' },
+      { id: 'platform_fees', name: 'Platform Fees' },
+    ];
+  }
+  return MARINA_EXPENSE_CATEGORIES;
+}
+
 const segmentExpenseCategories = [
   { id: 'f_and_b', name: 'F&B', segment: true },
   { id: 'service', name: 'Service', segment: true },
@@ -468,7 +489,46 @@ const segmentExpenseCategories = [
   { id: 'hospitality', name: 'Hospitality', segment: true },
 ];
 
-const allExpenseCategories = [...expenseCategories, ...segmentExpenseCategories];
+// WS5 Step C — per-asset-class Step 0 vocabulary force-seed list. Keys must
+// match departmentToAssumptionKey outputs verbatim. Marina returns [] — the
+// existing marina seed paths cover its keys unchanged.
+function getStep0RevenueKeys(assetClass: string | null | undefined): string[] {
+  if (assetClass === 'multifamily') return ['residential_rental', 'other_income'];
+  if (assetClass === 'str') return ['nightly_rate', 'cleaning_revenue'];
+  return [];
+}
+function getStep0ExpenseKeys(assetClass: string | null | undefined): string[] {
+  if (assetClass === 'multifamily') return ['operating_expenses'];
+  if (assetClass === 'str') return ['operating_expenses', 'cleaning_expense', 'platform_fees'];
+  return [];
+}
+
+// WS5 Step C — ratified default growth rates for the Step 0 vocabulary keys,
+// per scenario type. Returns undefined if the key isn't in the Step 0 table
+// (caller falls back to scenario-wide default). Per-scenario tables ratified
+// 2026-05-22 (see ANCHOR_3_PRE_PHASE0.md WS5 Step C section).
+function getStepCDefaultForKey(key: string, scenarioType: ScenarioType, side: 'revenue' | 'expense'): number | undefined {
+  if (side === 'revenue') {
+    const table: Record<string, Record<ScenarioType, number>> = {
+      residential_rental: { base: 3,   aggressive: 5, conservative: 1.5, custom: 3 },
+      other_income:       { base: 2.5, aggressive: 4, conservative: 1,   custom: 2.5 },
+      nightly_rate:       { base: 3,   aggressive: 5, conservative: 1.5, custom: 3 },
+      cleaning_revenue:   { base: 3,   aggressive: 4, conservative: 2,   custom: 3 },
+    };
+    return table[key]?.[scenarioType];
+  }
+  const table: Record<string, Record<ScenarioType, number>> = {
+    // platform_fees mirrors the revenue table (3/5/1.5/3) — see §0 finding;
+    // it's a flat-projected line, the closest approximation to "tracks revenue
+    // at the default growth rate" without a derived-line feature.
+    platform_fees:      { base: 3,   aggressive: 5, conservative: 1.5, custom: 3 },
+    operating_expenses: { base: 2.5, aggressive: 2, conservative: 3,   custom: 2.5 },
+    cleaning_expense:   { base: 3.5, aggressive: 3, conservative: 4,   custom: 3.5 },
+  };
+  return table[key]?.[scenarioType];
+}
+
+const allExpenseCategories = [...MARINA_EXPENSE_CATEGORIES, ...segmentExpenseCategories];
 
 const storageOptions = [
   { id: 'wet_slips', name: 'Wet Slips', totalUnits: 150 },
@@ -524,6 +584,15 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
   const storageTypeCategories = useMemo(() => buildStorageTypeCategories(assetClass), [assetClass]);
   const designatedSpaceCategories = useMemo(() => buildDesignatedSpaceCategories(assetClass), [assetClass]);
   const allRevenueCategories = useMemo(() => buildAllRevenueCategories(assetClass), [assetClass]);
+  // WS5 Step C — asset-class-aware expense vocabulary. Marina + unknown classes
+  // get the original 14 categories byte-identical to pre-Step-C; MF adds
+  // operating_expenses; STR adds operating_expenses + cleaning_expense +
+  // platform_fees. Replaces the prior module-scope `expenseCategories` const.
+  const expenseCategories = useMemo(() => buildExpenseCategories(assetClass), [assetClass]);
+  // WS5 Step C — hide the Storage Revenue section for MF/STR (per-unit-type
+  // knobs are engine-orphaned post-B; engine keys MF/STR revenue to flat
+  // residential_rental / nightly_rate, not per bedroom type or per unit).
+  const hideStorageSection = assetClass === 'multifamily' || assetClass === 'str';
 
   
   const { getLabel, getCaseColor } = useCaseLabels(project);
@@ -622,6 +691,17 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
   const storageTypeIds = useMemo(() => storageTypeCategories.map(s => s.id), []);
 
   const nonStorageRevenueCategories = useMemo(() => {
+    // WS5 Step C — for MF/STR, surface ONLY the frozen Step 0 revenue keys
+    // (residential_rental + other_income for MF; nightly_rate + cleaning_revenue
+    // for STR). The engine reads these post-Step-B; everything else falls to
+    // flat revenueGrowthRate. Marina path returns the original 15 categories
+    // byte-identical to pre-Step-C.
+    if (assetClass === 'multifamily' || assetClass === 'str') {
+      const wantIds = new Set<string>(getStep0RevenueKeys(assetClass));
+      return REVENUE_CATEGORIES.residentialAndStr
+        .filter((cat: any) => wantIds.has(cat.id))
+        .map((cat: any) => ({ id: cat.id, name: cat.label, icon: <cat.icon className="h-4 w-4" /> }));
+    }
     const allRevCats = [
       ...REVENUE_CATEGORIES.coreMarineRevenue,
       ...REVENUE_CATEGORIES.retailAndService,
@@ -629,7 +709,7 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
       ...REVENUE_CATEGORIES.leasesAndHospitality,
     ];
     return allRevCats.map(cat => ({ id: cat.id, name: cat.label, icon: <cat.icon className="h-4 w-4" /> }));
-  }, []);
+  }, [assetClass]);
 
   // Storage revenue categories only
   const storageRevenueCategories = useMemo(() => {
@@ -884,15 +964,40 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
       allRevCatIds.forEach(cat => {
         if (!parsedGrowth[cat.id]) parsedGrowth[cat.id] = Array(holdPeriod).fill(defaultRate);
       });
+      // WS5 Step C — force-seed the Step 0 vocabulary revenue keys for MF/STR.
+      // Engine reads granularGrowthRates[<frozen-key>] post-Step-B; without this
+      // seed the key is undefined and revenue falls to flat fallback. Per-key
+      // rate from the ratified Step C table; falls back to scenario-wide rate.
+      for (const key of getStep0RevenueKeys(assetClass)) {
+        if (!parsedGrowth[key]) {
+          const perKeyDefault = getStepCDefaultForKey(key, activeScenarioType, 'revenue') ?? defaultRate;
+          parsedGrowth[key] = Array(holdPeriod).fill(perKeyDefault);
+        }
+      }
       setGrowthRates(parsedGrowth);
 
       if (loadedExpense && typeof Object.values(loadedExpense)[0] === 'number') {
-        setExpenseGrowth(convertFlatToYearly(loadedExpense as Record<string, number>, holdPeriod, getDefaultExpenseRateValue(activeScenarioType)));
+        const normalized = convertFlatToYearly(loadedExpense as Record<string, number>, holdPeriod, getDefaultExpenseRateValue(activeScenarioType));
+        // WS5 Step C — force-seed the Step 0 expense keys (operating_expenses
+        // for MF/STR; cleaning_expense + platform_fees for STR).
+        for (const key of getStep0ExpenseKeys(assetClass)) {
+          if (!normalized[key]) {
+            const perKey = getStepCDefaultForKey(key, activeScenarioType, 'expense') ?? getDefaultExpenseRateValue(activeScenarioType);
+            normalized[key] = Array(holdPeriod).fill(perKey);
+          }
+        }
+        setExpenseGrowth(normalized);
       } else {
         const yearly = loadedExpense as YearlyGrowthRates;
         const normalized: YearlyGrowthRates = {};
         for (const [key, val] of Object.entries(yearly)) {
           normalized[key] = normalizeToYearlyArray(val, holdPeriod, getDefaultExpenseRateValue(activeScenarioType));
+        }
+        for (const key of getStep0ExpenseKeys(assetClass)) {
+          if (!normalized[key]) {
+            const perKey = getStepCDefaultForKey(key, activeScenarioType, 'expense') ?? getDefaultExpenseRateValue(activeScenarioType);
+            normalized[key] = Array(holdPeriod).fill(perKey);
+          }
         }
         setExpenseGrowth(normalized);
       }
@@ -971,6 +1076,14 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
     allRevCatIds.forEach(cat => {
       if (!defaultGrowth[cat.id]) defaultGrowth[cat.id] = Array(holdPeriod).fill(rate);
     });
+    // WS5 Step C — seed the frozen Step 0 revenue keys for MF/STR with per-key
+    // defaults from the ratified table (residential_rental 3%, other_income 2.5%,
+    // nightly_rate 3%, cleaning_revenue 3% — per base; full per-scenario tables
+    // in getStepCDefaultForKey).
+    for (const key of getStep0RevenueKeys(assetClass)) {
+      const perKey = getStepCDefaultForKey(key, scenarioType, 'revenue') ?? rate;
+      defaultGrowth[key] = Array(holdPeriod).fill(perKey);
+    }
     return defaultGrowth;
   }
 
@@ -978,6 +1091,15 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
     const rate = getDefaultExpenseRateValue(scenarioType);
     const defaultExpenseGrowth: YearlyGrowthRates = {};
     expenseCategories.forEach(cat => { defaultExpenseGrowth[cat.id] = Array(holdPeriod).fill(rate); });
+    // WS5 Step C — seed Step 0 expense keys for MF/STR with per-key defaults
+    // (operating_expenses 2.5%, cleaning_expense 3.5%, platform_fees 3% — per
+    // base; platform_fees mirrors revenue table per §0 finding). The base
+    // expenseCategories.forEach above already populates these keys at the
+    // scenario-wide rate; this overrides them with the per-key defaults.
+    for (const key of getStep0ExpenseKeys(assetClass)) {
+      const perKey = getStepCDefaultForKey(key, scenarioType, 'expense') ?? rate;
+      defaultExpenseGrowth[key] = Array(holdPeriod).fill(perKey);
+    }
     return defaultExpenseGrowth;
   }
 
@@ -2147,6 +2269,8 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
             margins={margins}
             updateMargin={(categoryId, field, value) => updateMargin(categoryId, field, String(value))}
             enabledDepartments={enabledProfitCenters.map(p => p.id)}
+            hideStorageSection={hideStorageSection}
+            getDefaultRateForKey={(id, side) => getStepCDefaultForKey(id, activeScenarioType, side)}
           />
         </TabsContent>
 

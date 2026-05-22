@@ -64,6 +64,15 @@ interface GrowthRatesTabProps {
   margins: Record<string, { historical: number; projected: number }>;
   updateMargin: (categoryId: string, field: 'historical' | 'projected', value: number) => void;
   enabledDepartments: string[];
+  /** WS5 Step C — when true, skip the Storage Revenue section. Set by the
+   *  parent for MF/STR (the per-unit-type knobs are engine-orphaned post-B —
+   *  the engine keys MF revenue to flat residential_rental, not per bedroom
+   *  type). Marina parent leaves this false → section renders as today. */
+  hideStorageSection?: boolean;
+  /** WS5 Step C — per-key default growth rate. Lets the parent override
+   *  defaultRevenueRate/defaultExpenseRate per individual key (residential_rental,
+   *  operating_expenses, etc.) without changing the scenario-wide defaults. */
+  getDefaultRateForKey?: (categoryId: string, side: 'revenue' | 'expense') => number | undefined;
 }
 
 function CogsMarginRow({
@@ -195,6 +204,8 @@ export function GrowthRatesTab({
   margins,
   updateMargin,
   enabledDepartments,
+  hideStorageSection = false,
+  getDefaultRateForKey,
 }: GrowthRatesTabProps) {
   const defaultRevenueRate = getDefaultGrowthRate();
   const defaultExpenseRate = getDefaultExpenseRate();
@@ -216,6 +227,10 @@ export function GrowthRatesTab({
       ...REVENUE_CATEGORIES.retailAndService,
       ...REVENUE_CATEGORIES.boats,
       ...REVENUE_CATEGORIES.leasesAndHospitality,
+      // WS5 Step C — MF/STR frozen-vocab revenue keys (residential_rental,
+      // other_income, nightly_rate, cleaning_revenue). Gated by the intersection
+      // with nonStorageRevenueCategories — marina parent doesn't pass these IDs.
+      ...REVENUE_CATEGORIES.residentialAndStr,
     ];
     return allRevCats.filter(cat => REVENUE_ONLY_IDS.has(cat.id) && nonStorageRevenueCategories.some(c => c.id === cat.id));
   }, [nonStorageRevenueCategories]);
@@ -319,6 +334,23 @@ export function GrowthRatesTab({
   const revenueOtherItemCount = revenueOnlyCategories.length || 1;
   const opexItemCount = expenseCategories.length || 1;
 
+  // WS5 Step C — resolve the effective default for a given key. Order of
+  // precedence: parent-supplied per-key default (per-asset-class system
+  // default) → static OPEX_CATEGORIES.defaultValue (e.g., payroll 4.0) →
+  // scenario-wide default. Centralized so revenue + opex rows share the
+  // same lookup shape.
+  const resolveExpenseDefault = (id: string, staticDefault?: number): number => {
+    const perKey = getDefaultRateForKey?.(id, 'expense');
+    if (perKey !== undefined) return perKey;
+    if (staticDefault !== undefined) return staticDefault;
+    return defaultExpenseRate;
+  };
+  const resolveRevenueDefault = (id: string): number => {
+    const perKey = getDefaultRateForKey?.(id, 'revenue');
+    if (perKey !== undefined) return perKey;
+    return defaultRevenueRate;
+  };
+
   const getDeptCardItemCount = (dept: typeof DEPARTMENT_CARDS[0]) => {
     if (dept.hasCogs && dept.deptExpenseId) return 6;
     if (dept.hasCogs) return 4;
@@ -327,7 +359,10 @@ export function GrowthRatesTab({
   };
 
   const sections = useMemo(() => {
-    const revenueSections: string[] = ['storage'];
+    // WS5 Step C — hide the Storage Revenue section for MF/STR. The
+    // per-unit-type knobs are engine-orphaned post-Step-B; the engine keys
+    // MF revenue to flat residential_rental, not per bedroom type.
+    const revenueSections: string[] = hideStorageSection ? [] : ['storage'];
     enabledDeptCards.forEach(dept => {
       revenueSections.push(`dept_${dept.id}`);
     });
@@ -342,7 +377,7 @@ export function GrowthRatesTab({
       col2: revenueSections,
       layout: 'columns' as const,
     };
-  }, [enabledDeptCards, useWideLayout]);
+  }, [enabledDeptCards, useWideLayout, hideStorageSection]);
 
   const renderDeptCard = (dept: typeof DEPARTMENT_CARDS[0]) => {
     const DeptIcon = dept.icon;
@@ -507,24 +542,27 @@ export function GrowthRatesTab({
           >
             <YearHeaders years={years} />
             <div className="space-y-0.5">
-              {revenueOnlyCategories.map((cat) => (
-                <YearlyRateRow
-                  key={cat.id}
-                  label={cat.label}
-                  icon={cat.icon}
-                  years={years}
-                  rates={getRatesArray(growthRates[cat.id], defaultRevenueRate)}
-                  defaultRate={defaultRevenueRate}
-                  onChangeYear={(idx, val) => {
-                    updateGrowthRate(cat.id, idx, val);
-                    triggerAutosave();
-                  }}
-                  onApplyToAll={(val) => {
-                    updateGrowthRateAllYears(cat.id, val);
-                    triggerAutosave();
-                  }}
-                />
-              ))}
+              {revenueOnlyCategories.map((cat) => {
+                const def = resolveRevenueDefault(cat.id);
+                return (
+                  <YearlyRateRow
+                    key={cat.id}
+                    label={cat.label}
+                    icon={cat.icon}
+                    years={years}
+                    rates={getRatesArray(growthRates[cat.id], def)}
+                    defaultRate={def}
+                    onChangeYear={(idx, val) => {
+                      updateGrowthRate(cat.id, idx, val);
+                      triggerAutosave();
+                    }}
+                    onApplyToAll={(val) => {
+                      updateGrowthRateAllYears(cat.id, val);
+                      triggerAutosave();
+                    }}
+                  />
+                );
+              })}
               {revenueOnlyCategories.length === 0 && (
                 <p className="text-xs text-slate-500 dark:text-slate-400 py-2">
                   No additional revenue categories enabled.
@@ -551,14 +589,16 @@ export function GrowthRatesTab({
               {OPEX_CATEGORIES.laborAndAdmin.map((cat) => {
                 const isEnabled = expenseCategories.some(c => c.id === cat.id);
                 if (!isEnabled) return null;
+                const def = resolveExpenseDefault(cat.id, cat.defaultValue);
                 return (
                   <YearlyRateRow
                     key={cat.id}
                     label={cat.label}
                     icon={cat.icon}
                     years={years}
-                    rates={getRatesArray(expenseGrowth[cat.id], cat.defaultValue || defaultExpenseRate)}
-                    defaultRate={cat.defaultValue || defaultExpenseRate}
+                    rates={getRatesArray(expenseGrowth[cat.id], def)}
+                    defaultRate={def}
+                    note={cat.note}
                     onChangeYear={(idx, val) => {
                       updateExpenseGrowth(cat.id, idx, val);
                       triggerAutosave();
@@ -576,14 +616,16 @@ export function GrowthRatesTab({
               {OPEX_CATEGORIES.marketing.map((cat) => {
                 const isEnabled = expenseCategories.some(c => c.id === cat.id);
                 if (!isEnabled) return null;
+                const def = resolveExpenseDefault(cat.id, cat.defaultValue);
                 return (
                   <YearlyRateRow
                     key={cat.id}
                     label={cat.label}
                     icon={cat.icon}
                     years={years}
-                    rates={getRatesArray(expenseGrowth[cat.id], defaultExpenseRate)}
-                    defaultRate={defaultExpenseRate}
+                    rates={getRatesArray(expenseGrowth[cat.id], def)}
+                    defaultRate={def}
+                    note={cat.note}
                     onChangeYear={(idx, val) => {
                       updateExpenseGrowth(cat.id, idx, val);
                       triggerAutosave();
@@ -601,14 +643,16 @@ export function GrowthRatesTab({
               {OPEX_CATEGORIES.operations.map((cat) => {
                 const isEnabled = expenseCategories.some(c => c.id === cat.id);
                 if (!isEnabled) return null;
+                const def = resolveExpenseDefault(cat.id, cat.defaultValue);
                 return (
                   <YearlyRateRow
                     key={cat.id}
                     label={cat.label}
                     icon={cat.icon}
                     years={years}
-                    rates={getRatesArray(expenseGrowth[cat.id], defaultExpenseRate)}
-                    defaultRate={defaultExpenseRate}
+                    rates={getRatesArray(expenseGrowth[cat.id], def)}
+                    defaultRate={def}
+                    note={cat.note}
                     onChangeYear={(idx, val) => {
                       updateExpenseGrowth(cat.id, idx, val);
                       triggerAutosave();
@@ -626,14 +670,16 @@ export function GrowthRatesTab({
               {OPEX_CATEGORIES.financial.map((cat) => {
                 const isEnabled = expenseCategories.some(c => c.id === cat.id);
                 if (!isEnabled) return null;
+                const def = resolveExpenseDefault(cat.id, cat.defaultValue);
                 return (
                   <YearlyRateRow
                     key={cat.id}
                     label={cat.label}
                     icon={cat.icon}
                     years={years}
-                    rates={getRatesArray(expenseGrowth[cat.id], defaultExpenseRate)}
-                    defaultRate={defaultExpenseRate}
+                    rates={getRatesArray(expenseGrowth[cat.id], def)}
+                    defaultRate={def}
+                    note={cat.note}
                     onChangeYear={(idx, val) => {
                       updateExpenseGrowth(cat.id, idx, val);
                       triggerAutosave();

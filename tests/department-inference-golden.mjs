@@ -123,13 +123,17 @@ const SYNTHETIC_GROWTH = {
   // WS5 Step B — the 3 reused marina keys that EXIST in
   // assumptions.tsx's granularExpenseGrowth defaults today
   // (payroll is already populated above). Distinct rates so the harness
-  // surfaces MF-expense differentiation. The new-only keys
-  // (residential_rental, other_income, operating_expenses, nightly_rate,
-  // cleaning_revenue/cleaning_expense, platform_fees) are deliberately
-  // NOT added — they don't exist in production lookup tables until Step
-  // C, so they should fall back here too (→ SYNTHETIC_GROWTH.g_and_a),
-  // mirroring the engine's flat-fallback behavior post-B/pre-C.
+  // surfaces MF-expense differentiation.
   repairs_maintenance: 7.0, utilities: 7.5, management_fees: 8.0,
+  // WS5 Step C — the 7 new keys are now seeded by buildExpenseCategories +
+  // getStep0RevenueKeys/ExpenseKeys + getStepCDefaultForKey in
+  // assumptions.tsx. Adding them here with distinct rates keeps this harness
+  // a complete consistency oracle through Step C: any key the engine actually
+  // reads has a non-fallback rate in the synthetic table, so the
+  // syntheticNOI numbers exercise every code path Step B + Step C wired.
+  residential_rental: 6.0, other_income: 1.0, nightly_rate: 5.5,
+  cleaning_revenue: 4.0, cleaning_expense: 6.5, platform_fees: 5.2,
+  operating_expenses: 7.8,
 };
 const PROJECTION_YEARS = 5;
 // Fixed base amounts by category — deterministic, no DB.

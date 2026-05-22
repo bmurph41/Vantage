@@ -1838,18 +1838,18 @@
     "multifamily": {
       "revenueLines": 11,
       "expenseLines": 13,
-      "syntheticNOI_enginePath": 7444487,
+      "syntheticNOI_enginePath": 7839971,
       "syntheticNOI_writerPath_undefined": 8132142,
-      "syntheticNOI_writerPath_threaded": 7444487,
-      "writerPathGap": -687655
+      "syntheticNOI_writerPath_threaded": 7839971,
+      "writerPathGap": -292171
     },
     "str": {
       "revenueLines": 6,
       "expenseLines": 10,
-      "syntheticNOI_enginePath": 3410818,
+      "syntheticNOI_enginePath": 3586106,
       "syntheticNOI_writerPath_undefined": 3419221,
-      "syntheticNOI_writerPath_threaded": 3410818,
-      "writerPathGap": -8403
+      "syntheticNOI_writerPath_threaded": 3586106,
+      "writerPathGap": 166885
     },
     "self_storage": {
       "revenueLines": 5,

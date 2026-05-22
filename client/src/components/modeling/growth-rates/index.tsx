@@ -4,9 +4,9 @@ import {
   Anchor, Warehouse, Fuel, Waves, ShoppingCart, Wrench, Package, Ship,
   DollarSign, Calculator, Handshake, Users, FileSignature, UtensilsCrossed,
   Caravan, Hotel, MoreHorizontal, Briefcase, Scale, Zap, Shield, Building,
-  CreditCard, Key, Megaphone, RotateCcw, ChevronDown, ChevronUp, TrendingUp, 
+  CreditCard, Key, Megaphone, RotateCcw, ChevronDown, ChevronUp, TrendingUp,
   Receipt, PieChart, Globe, Layers, Sparkles, LucideIcon, Container, MapPin,
-  Minus, Plus, Copy, ArrowRight, Home, Car
+  Minus, Plus, Copy, ArrowRight, Home, Car, Info,
 } from 'lucide-react';
 import { getModelConfig } from "@shared/asset-class-model-config";
 import {
@@ -248,6 +248,9 @@ interface YearlyRateRowProps {
   defaultRate: number;
   onChangeYear: (yearIndex: number, value: number) => void;
   onApplyToAll: (value: number) => void;
+  /** WS5 Step C — optional hover note on the label. Used today on platform_fees
+   *  to surface the flat-projection limitation honestly. */
+  note?: string;
 }
 
 export function YearlyRateRow({
@@ -258,6 +261,7 @@ export function YearlyRateRow({
   defaultRate,
   onChangeYear,
   onApplyToAll,
+  note,
 }: YearlyRateRowProps) {
   const allSame = rates.every(r => Math.abs(r - rates[0]) < 0.001);
   const anyModified = rates.some(r => Math.abs(r - defaultRate) > 0.001);
@@ -281,6 +285,20 @@ export function YearlyRateRow({
         <span className="text-[11px] font-medium text-slate-700 dark:text-slate-300 truncate" title={label}>
           {label}
         </span>
+        {note && (
+          <TooltipProvider delayDuration={150}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="flex-shrink-0 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300" tabIndex={-1}>
+                  <Info className="w-3 h-3" />
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="text-xs max-w-[280px]">
+                {note}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
       </div>
 
       <div className="flex items-center gap-1 flex-1 min-w-0 overflow-x-auto">
@@ -599,7 +617,23 @@ export const COA_CODES = {
     rvPark: 'OPEX_RV_PARK',
     hospitalityLodging: 'OPEX_HOSPITALITY_LODGING',
     miscellaneous: 'OPEX_MISCELLANEOUS',
-  }
+  },
+  // WS5 Step C — Step 0 frozen vocabulary for MF/STR. The keys here match the
+  // engine's departmentToAssumptionKey(dept, assetClass, side) outputs verbatim,
+  // so the granular-assumptions payload the UI writes is the payload the engine
+  // reads. Not consumed by marina projects (parent gates by assetClass).
+  residentialAndStr: {
+    residentialRental: 'REV_RESIDENTIAL_RENTAL',
+    otherIncome: 'REV_OTHER_INCOME',
+    nightlyRate: 'REV_NIGHTLY_RATE',
+    cleaningRevenue: 'REV_CLEANING_REVENUE',
+  },
+  mfStrOpex: {
+    managementFees: 'OPEX_MANAGEMENT_FEES',
+    operatingExpenses: 'OPEX_OPERATING_EXPENSES',
+    cleaningExpense: 'OPEX_CLEANING',
+    platformFees: 'OPEX_PLATFORM_FEES',
+  },
 };
 
 export const REVENUE_CATEGORIES = {
@@ -626,13 +660,41 @@ export const REVENUE_CATEGORIES = {
     { id: 'hospitality', key: 'hospitalityLodging', label: 'Hospitality/Lodging', icon: Hotel, coaCode: COA_CODES.revenue.hospitalityLodging },
     { id: 'misc_revenue', key: 'miscellaneous', label: 'Miscellaneous', icon: MoreHorizontal, coaCode: COA_CODES.revenue.miscellaneous },
   ],
+  // WS5 Step C — MF/STR revenue categories keyed to the frozen Step 0 vocabulary.
+  // IDs match departmentToAssumptionKey outputs so the persisted payload is
+  // engine-readable. Surfaced only when the parent passes them in
+  // nonStorageRevenueCategories (assetClass='multifamily' or 'str').
+  residentialAndStr: [
+    { id: 'residential_rental', key: 'residentialRental', label: 'Residential Rental', icon: Home, coaCode: COA_CODES.residentialAndStr.residentialRental },
+    { id: 'other_income', key: 'otherIncome', label: 'Other Income', icon: MoreHorizontal, coaCode: COA_CODES.residentialAndStr.otherIncome },
+    { id: 'nightly_rate', key: 'nightlyRate', label: 'Nightly Rate', icon: Hotel, coaCode: COA_CODES.residentialAndStr.nightlyRate },
+    { id: 'cleaning_revenue', key: 'cleaningRevenue', label: 'Cleaning Fee Income', icon: Sparkles, coaCode: COA_CODES.residentialAndStr.cleaningRevenue },
+  ],
 };
 
-export const OPEX_CATEGORIES = {
+// WS5 Step C — `note` field surfaces a hover-tooltip on the row when set.
+// Used today only for platform_fees, which is projected as a flat growth rate
+// (not auto-recomputed as % of revenue each year — see direct-input-engine.ts
+// vs pro-forma-engine-service.ts). Surfacing the limitation honestly.
+export interface OpexCategoryItem {
+  id: string;
+  key: string;
+  label: string;
+  icon: LucideIcon;
+  coaCode: string;
+  defaultValue?: number;
+  note?: string;
+}
+
+export const OPEX_CATEGORIES: Record<string, OpexCategoryItem[]> = {
   laborAndAdmin: [
     { id: 'payroll', key: 'payroll', label: 'Payroll', icon: Users, coaCode: COA_CODES.operatingExpenses.payroll, defaultValue: 4.0 },
     { id: 'g_and_a', key: 'generalAdmin', label: 'General & Admin', icon: Briefcase, coaCode: COA_CODES.operatingExpenses.generalAdmin },
     { id: 'professional_fees', key: 'professionalServices', label: 'Professional Svcs', icon: Scale, coaCode: COA_CODES.operatingExpenses.professionalServices },
+    // WS5 Step C — management_fees: previously seeded into expenseCategories
+    // but missing from OPEX_CATEGORIES, so it never rendered. Surface it now so
+    // marina + MF users can actually edit the value the engine reads.
+    { id: 'management_fees', key: 'managementFees', label: 'Management Fees', icon: Handshake, coaCode: COA_CODES.mfStrOpex.managementFees },
   ],
   marketing: [
     { id: 'marketing', key: 'advertising', label: 'Advertising & Marketing', icon: Megaphone, coaCode: COA_CODES.operatingExpenses.advertising },
@@ -642,12 +704,20 @@ export const OPEX_CATEGORIES = {
     { id: 'utilities', key: 'utilities', label: 'Utilities', icon: Zap, coaCode: COA_CODES.operatingExpenses.utilities },
     { id: 'licenses_permits', key: 'licensesPermits', label: 'Licenses & Permits', icon: Key, coaCode: COA_CODES.operatingExpenses.licensesPermits },
     { id: 'contract_services', key: 'securityContractServices', label: 'Security & Contract', icon: Shield, coaCode: COA_CODES.operatingExpenses.securityContractServices },
+    // WS5 Step C — STR-only expense categories. Marina/MF parent doesn't pass
+    // these through expenseCategories, so they don't render for those classes.
+    { id: 'cleaning_expense', key: 'cleaningExpense', label: 'Cleaning / Turnover', icon: Sparkles, coaCode: COA_CODES.mfStrOpex.cleaningExpense },
+    { id: 'platform_fees', key: 'platformFees', label: 'Platform Fees', icon: Globe, coaCode: COA_CODES.mfStrOpex.platformFees,
+      note: 'Projected as a flat growth rate, not auto-recomputed as % of revenue each year. Set manually if you need exact revenue-tracking.' },
   ],
   financial: [
     { id: 'bank_cc_fees', key: 'bankCreditCardFees', label: 'Bank/CC Fees', icon: CreditCard, coaCode: COA_CODES.operatingExpenses.bankCreditCardFees },
     { id: 'insurance', key: 'insurance', label: 'Insurance', icon: Shield, coaCode: COA_CODES.operatingExpenses.insurance },
     { id: 'property_taxes', key: 'propertyTaxes', label: 'Property Taxes', icon: Building, coaCode: COA_CODES.operatingExpenses.propertyTaxes },
     { id: 'leases', key: 'leases', label: 'Leases', icon: FileSignature, coaCode: COA_CODES.operatingExpenses.leases },
+    // WS5 Step C — MF/STR broad opex catch-all. Marina parent doesn't include
+    // operating_expenses in expenseCategories, so it doesn't render for marina.
+    { id: 'operating_expenses', key: 'operatingExpenses', label: 'Operating Expenses', icon: Receipt, coaCode: COA_CODES.mfStrOpex.operatingExpenses },
   ],
 };
 
@@ -680,7 +750,11 @@ export const DEPARTMENT_CARDS: Array<{
 ];
 
 export const REVENUE_ONLY_IDS = new Set([
-  'marina_amenities', 'boat_sales', 'boat_finance', 'boat_brokerage', 'boat_club', 'commercial_tenants'
+  'marina_amenities', 'boat_sales', 'boat_finance', 'boat_brokerage', 'boat_club', 'commercial_tenants',
+  // WS5 Step C — MF/STR revenue keys. Marina parent doesn't pass these IDs in
+  // nonStorageRevenueCategories, so they don't render for marina (the
+  // intersection filter at GrowthRatesTab:213-221 rejects them).
+  'residential_rental', 'other_income', 'nightly_rate', 'cleaning_revenue',
 ]);
 
 // Dynamic: reads from asset class config, falls back to marina defaults
