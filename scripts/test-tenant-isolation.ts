@@ -6,6 +6,9 @@
  * authenticated session.  Any 2xx response is reported as a LEAK and causes
  * the process to exit with code 1.
  *
+ * Setup failures are treated as hard errors — the run exits non-zero
+ * immediately rather than skipping probes that would mask coverage gaps.
+ *
  * Usage:
  *   npm run test:isolation
  *
@@ -16,11 +19,12 @@ import { db } from "../server/db.js";
 import {
   organizations,
   users,
-  crmContacts,
+  cddDocuments,
+  rentRolls,
   projects,
   modelingProjects,
 } from "../shared/schema.js";
-import { eq, inArray, ilike, sql as sqlTag } from "drizzle-orm";
+import { inArray, ilike, sql as sqlTag } from "drizzle-orm";
 import bcrypt from "bcrypt";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -31,6 +35,12 @@ const BASE_URL = `http://localhost:${process.env.PORT ?? 5000}`;
 const TEST_PASSWORD = "IsolationTest#9!";
 const CSRF_COOKIE_NAME = "csrf_token";
 const CSRF_HEADER_NAME = "x-csrf-token";
+
+/**
+ * Minimum number of probes that must execute before we trust the results.
+ * Raising this forces the test to fail if large chunks of setup silently skipped.
+ */
+const MIN_EXPECTED_PROBES = 18;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Result tracking
@@ -142,6 +152,25 @@ async function probe(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Strict setup helper — creation failure exits immediately
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function mustCreate(
+  label: string,
+  session: Session,
+  path: string,
+  body: Record<string, unknown>,
+): Promise<any> {
+  const result = await apiPost(session, path, body);
+  if (result.status >= 300) {
+    throw new Error(
+      `[setup] FATAL: ${label} creation failed (${result.status}): ${JSON.stringify(result.json)}`
+    );
+  }
+  return result.json;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // DB helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -182,8 +211,12 @@ async function createTestUser(orgId: string, suffix: string) {
 async function purgeTestOrgs(testOrgIds: string[]) {
   if (testOrgIds.length === 0) return;
 
+  await db.delete(cddDocuments).where(
+    sqlTag`project_id IN (SELECT id FROM projects WHERE org_id = ANY(ARRAY[${sqlTag.join(testOrgIds.map(id => sqlTag`${id}::text`), sqlTag`, `)}]))`
+  );
   await db.delete(modelingProjects).where(inArray(modelingProjects.orgId, testOrgIds));
   await db.delete(projects).where(inArray(projects.orgId, testOrgIds));
+  await db.delete(rentRolls).where(inArray(rentRolls.orgId, testOrgIds));
 
   for (const oid of testOrgIds) {
     await db.execute(sqlTag`DELETE FROM crm_deals WHERE org_id = ${oid}`);
@@ -255,40 +288,43 @@ async function main() {
   await initCsrf(sessionA);
   await initCsrf(sessionB);
 
-  // ── 3. Create Org A records ───────────────────────────────────────────────
+  // ── 3. Create Org A records (strict — any failure aborts the run) ─────────
   console.log("[setup] creating Org A records…\n");
 
   // CRM Deal
-  const dealResult = await apiPost(sessionA, "/api/crm/deals", {
+  const deal = await mustCreate("CRM deal", sessionA, "/api/crm/deals", {
     title: "__test_isolation_deal",
     orgId: orgA.id,
     stage: "lead",
   });
-  if (dealResult.status >= 300) {
-    console.warn(`  [warn] CRM deal creation failed (${dealResult.status}):`, JSON.stringify(dealResult.json));
-  }
-  const deal = dealResult.status < 300 ? dealResult.json : null;
 
   // CRM Contact
-  const contactResult = await apiPost(sessionA, "/api/crm/contacts", {
+  const contact = await mustCreate("CRM contact", sessionA, "/api/crm/contacts", {
     firstName: "__test",
     lastName: "isolation_contact",
     orgId: orgA.id,
   });
-  if (contactResult.status >= 300) {
-    console.warn(`  [warn] CRM contact creation failed (${contactResult.status}):`, JSON.stringify(contactResult.json));
-  }
-  const contact = contactResult.status < 300 ? contactResult.json : null;
 
   // DD Project
-  const ddResult = await apiPost(sessionA, "/api/dd/projects", {
+  const ddProjectRaw = await mustCreate("DD project", sessionA, "/api/dd/projects", {
     name: "__test_isolation_dd_project",
   });
-  if (ddResult.status >= 300) {
-    console.warn(`  [warn] DD project creation failed (${ddResult.status}):`, JSON.stringify(ddResult.json));
-  }
-  const ddProjectRaw = ddResult.status < 300 ? ddResult.json : null;
-  const ddProjectId = ddProjectRaw?.project?.id ?? ddProjectRaw?.id ?? null;
+  const ddProjectId = ddProjectRaw?.project?.id ?? ddProjectRaw?.id;
+  if (!ddProjectId) throw new Error("[setup] FATAL: DD project response missing id field");
+
+  // DD Document — inserted directly (avoids multipart file-upload requirement)
+  const [cddDoc] = await db
+    .insert(cddDocuments)
+    .values({
+      projectId: ddProjectId,
+      filename: "__test_isolation_document.pdf",
+      mimeType: "application/pdf",
+      size: 0,
+      storagePath: "/dev/null",
+      uploadedBy: userA.id,
+    })
+    .returning();
+  if (!cddDoc?.id) throw new Error("[setup] FATAL: CDD document insert failed");
 
   // Modeling Project — inserted directly (avoids asset-class entitlement check)
   const [modelingProject] = await db
@@ -301,58 +337,64 @@ async function main() {
       assetClass: "marina",
     })
     .returning();
+  if (!modelingProject?.id) throw new Error("[setup] FATAL: Modeling project insert failed");
+
+  // Rent Roll — inserted directly (avoids pack-guard middleware)
+  const [rentRoll] = await db
+    .insert(rentRolls)
+    .values({
+      orgId: orgA.id,
+      name: "__test_isolation_rent_roll",
+      effectiveDate: "2024-01-01",
+    })
+    .returning();
+  if (!rentRoll?.id) throw new Error("[setup] FATAL: Rent roll insert failed");
 
   // ── 4. Cross-tenant probes from Org B ────────────────────────────────────
   console.log("[probes] cross-tenant access from Org B:\n");
 
-  // ── CRM Deals (/api/crm/deals/:id)
-  if (deal?.id) {
-    console.log("  ── CRM Deals (/api/crm/deals)");
-    record("crm-deal PUT", "PUT", `/api/crm/deals/${deal.id}`, await probe("PUT", `/api/crm/deals/${deal.id}`, sessionB, { name: "INJECTED" }));
-    record("crm-deal DELETE", "DELETE", `/api/crm/deals/${deal.id}`, await probe("DELETE", `/api/crm/deals/${deal.id}`, sessionB));
+  // ── CRM Deals
+  console.log("  ── CRM Deals (/api/crm/deals)");
+  record("crm-deal PUT", "PUT", `/api/crm/deals/${deal.id}`, await probe("PUT", `/api/crm/deals/${deal.id}`, sessionB, { title: "INJECTED" }));
+  record("crm-deal DELETE", "DELETE", `/api/crm/deals/${deal.id}`, await probe("DELETE", `/api/crm/deals/${deal.id}`, sessionB));
 
-    console.log("  ── Deals (/api/deals)");
-    record("deal GET", "GET", `/api/deals/${deal.id}`, await probe("GET", `/api/deals/${deal.id}`, sessionB));
-    record("deal PUT", "PUT", `/api/deals/${deal.id}`, await probe("PUT", `/api/deals/${deal.id}`, sessionB, { name: "INJECTED" }));
-    record("deal DELETE", "DELETE", `/api/deals/${deal.id}`, await probe("DELETE", `/api/deals/${deal.id}`, sessionB));
-  } else {
-    console.log("  [skip] CRM deal probes — creation failed");
-  }
+  console.log("  ── Deals (/api/deals)");
+  record("deal GET", "GET", `/api/deals/${deal.id}`, await probe("GET", `/api/deals/${deal.id}`, sessionB));
+  record("deal PUT", "PUT", `/api/deals/${deal.id}`, await probe("PUT", `/api/deals/${deal.id}`, sessionB, { title: "INJECTED" }));
+  record("deal DELETE", "DELETE", `/api/deals/${deal.id}`, await probe("DELETE", `/api/deals/${deal.id}`, sessionB));
 
-  // ── CRM Contacts (/api/crm/contacts/:id & /api/contacts/:id)
-  if (contact?.id) {
-    console.log("  ── CRM Contacts (/api/crm/contacts)");
-    record("crm-contact PUT", "PUT", `/api/crm/contacts/${contact.id}`, await probe("PUT", `/api/crm/contacts/${contact.id}`, sessionB, { firstName: "INJECTED" }));
-    record("crm-contact DELETE", "DELETE", `/api/crm/contacts/${contact.id}`, await probe("DELETE", `/api/crm/contacts/${contact.id}`, sessionB));
+  // ── CRM Contacts
+  console.log("  ── CRM Contacts (/api/crm/contacts)");
+  record("crm-contact PUT", "PUT", `/api/crm/contacts/${contact.id}`, await probe("PUT", `/api/crm/contacts/${contact.id}`, sessionB, { firstName: "INJECTED" }));
+  record("crm-contact DELETE", "DELETE", `/api/crm/contacts/${contact.id}`, await probe("DELETE", `/api/crm/contacts/${contact.id}`, sessionB));
 
-    console.log("  ── Contacts (/api/contacts)");
-    record("contact GET", "GET", `/api/contacts/${contact.id}`, await probe("GET", `/api/contacts/${contact.id}`, sessionB));
-    record("contact PUT", "PUT", `/api/contacts/${contact.id}`, await probe("PUT", `/api/contacts/${contact.id}`, sessionB, { firstName: "INJECTED" }));
-    record("contact DELETE", "DELETE", `/api/contacts/${contact.id}`, await probe("DELETE", `/api/contacts/${contact.id}`, sessionB));
-  } else {
-    console.log("  [skip] CRM contact probes — creation failed");
-  }
+  console.log("  ── Contacts (/api/contacts)");
+  record("contact GET", "GET", `/api/contacts/${contact.id}`, await probe("GET", `/api/contacts/${contact.id}`, sessionB));
+  record("contact PUT", "PUT", `/api/contacts/${contact.id}`, await probe("PUT", `/api/contacts/${contact.id}`, sessionB, { firstName: "INJECTED" }));
+  record("contact DELETE", "DELETE", `/api/contacts/${contact.id}`, await probe("DELETE", `/api/contacts/${contact.id}`, sessionB));
 
-  // ── DD Projects (/api/dd/projects/:id)
-  if (ddProjectId) {
-    console.log("  ── DD Projects (/api/dd/projects)");
-    record("dd-project GET", "GET", `/api/dd/projects/${ddProjectId}`, await probe("GET", `/api/dd/projects/${ddProjectId}`, sessionB));
-    record("dd-project PATCH", "PATCH", `/api/dd/projects/${ddProjectId}`, await probe("PATCH", `/api/dd/projects/${ddProjectId}`, sessionB, { name: "INJECTED" }));
-    record("dd-project DELETE", "DELETE", `/api/dd/projects/${ddProjectId}`, await probe("DELETE", `/api/dd/projects/${ddProjectId}`, sessionB));
-  } else {
-    console.log("  [skip] DD project probes — creation failed");
-  }
+  // ── DD Projects
+  console.log("  ── DD Projects (/api/dd/projects)");
+  record("dd-project GET", "GET", `/api/dd/projects/${ddProjectId}`, await probe("GET", `/api/dd/projects/${ddProjectId}`, sessionB));
+  record("dd-project PATCH", "PATCH", `/api/dd/projects/${ddProjectId}`, await probe("PATCH", `/api/dd/projects/${ddProjectId}`, sessionB, { name: "INJECTED" }));
+  record("dd-project DELETE", "DELETE", `/api/dd/projects/${ddProjectId}`, await probe("DELETE", `/api/dd/projects/${ddProjectId}`, sessionB));
 
-  // ── Modeling Projects (/api/modeling/projects/:id)
-  if (modelingProject?.id) {
-    const mpId = modelingProject.id;
-    console.log("  ── Modeling Projects (/api/modeling/projects)");
-    record("modeling-project GET", "GET", `/api/modeling/projects/${mpId}`, await probe("GET", `/api/modeling/projects/${mpId}`, sessionB));
-    record("modeling-project PATCH", "PATCH", `/api/modeling/projects/${mpId}`, await probe("PATCH", `/api/modeling/projects/${mpId}`, sessionB, { name: "INJECTED" }));
-    record("modeling-project DELETE", "DELETE", `/api/modeling/projects/${mpId}`, await probe("DELETE", `/api/modeling/projects/${mpId}`, sessionB));
-  } else {
-    console.log("  [skip] Modeling project probes — creation failed");
-  }
+  // ── DD Documents
+  console.log("  ── DD Documents (/api/dd/documents)");
+  record("dd-document GET", "GET", `/api/dd/documents/${cddDoc.id}`, await probe("GET", `/api/dd/documents/${cddDoc.id}`, sessionB));
+  record("dd-document DELETE", "DELETE", `/api/dd/documents/${cddDoc.id}`, await probe("DELETE", `/api/dd/documents/${cddDoc.id}`, sessionB));
+
+  // ── Modeling Projects
+  console.log("  ── Modeling Projects (/api/modeling/projects)");
+  record("modeling-project GET", "GET", `/api/modeling/projects/${modelingProject.id}`, await probe("GET", `/api/modeling/projects/${modelingProject.id}`, sessionB));
+  record("modeling-project PATCH", "PATCH", `/api/modeling/projects/${modelingProject.id}`, await probe("PATCH", `/api/modeling/projects/${modelingProject.id}`, sessionB, { name: "INJECTED" }));
+  record("modeling-project DELETE", "DELETE", `/api/modeling/projects/${modelingProject.id}`, await probe("DELETE", `/api/modeling/projects/${modelingProject.id}`, sessionB));
+
+  // ── Rent Rolls
+  console.log("  ── Rent Rolls (/api/operations/rent-rolls)");
+  record("rent-roll GET", "GET", `/api/operations/rent-rolls/${rentRoll.id}`, await probe("GET", `/api/operations/rent-rolls/${rentRoll.id}`, sessionB));
+  record("rent-roll PATCH", "PATCH", `/api/operations/rent-rolls/${rentRoll.id}`, await probe("PATCH", `/api/operations/rent-rolls/${rentRoll.id}`, sessionB, { name: "INJECTED" }));
+  record("rent-roll DELETE", "DELETE", `/api/operations/rent-rolls/${rentRoll.id}`, await probe("DELETE", `/api/operations/rent-rolls/${rentRoll.id}`, sessionB));
 
   // ── 5. Cleanup ────────────────────────────────────────────────────────────
   await cleanup(orgA.id, orgB.id);
@@ -363,6 +405,14 @@ async function main() {
 
   console.log("=".repeat(60));
   console.log(`  Results: ${passed} / ${results.length} passed`);
+
+  if (results.length < MIN_EXPECTED_PROBES) {
+    console.log(`  FAILED — only ${results.length} probes ran (expected ≥ ${MIN_EXPECTED_PROBES}).`);
+    console.log("  This likely means setup fixtures were created but probes were skipped.");
+    console.log("=".repeat(60));
+    process.exit(1);
+  }
+
   if (leaks.length === 0) {
     console.log("  ALL CROSS-TENANT PROBES BLOCKED — no IDOR leaks found.");
   } else {

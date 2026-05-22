@@ -12571,6 +12571,10 @@ export function registerCRMRoutes(
   app.patch('/api/operations/rent-rolls/:id', authenticateUser, requireRentRoll(), async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
+      const existing = await rentRollService.getRentRollById(req.params.id, orgId);
+      if (!existing) {
+        return res.status(404).json({ error: 'Rent roll not found' });
+      }
       const data = updateRentRollSchema.parse(req.body);
       const roll = await rentRollService.updateRentRoll(req.params.id, orgId, data);
       

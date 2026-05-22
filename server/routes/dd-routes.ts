@@ -4588,6 +4588,12 @@ export function registerDDRoutes(
       await authorizeProjectAccess(document.projectId, req.user.orgId);
       res.json(document);
     } catch (error: any) {
+      if (error.message === "Project not found") {
+        return res.status(404).json({ error: "Document not found" });
+      }
+      if (error.message === "Unauthorized access to project") {
+        return res.status(403).json({ error: "Access denied" });
+      }
       console.error("Error fetching CDD document:", error);
       res.status(500).json({ error: "Failed to fetch document" });
     }
@@ -4626,6 +4632,12 @@ export function registerDDRoutes(
 
       res.json({ success: true });
     } catch (error: any) {
+      if (error.message === "Project not found") {
+        return res.status(404).json({ error: "Document not found" });
+      }
+      if (error.message === "Unauthorized access to project") {
+        return res.status(403).json({ error: "Access denied" });
+      }
       console.error("Error deleting CDD document:", error);
       res.status(500).json({ error: "Failed to delete document" });
     }
