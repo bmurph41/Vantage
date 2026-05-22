@@ -28,7 +28,7 @@ const VALUATOR_FILES = {
   // ============================================
   // SERVER — Utilities
   // ============================================
-  'server/utils/department-mapping.ts': 'server/utils/department-mapping.ts',
+  'shared/coa/department-mapping.ts': 'shared/coa/department-mapping.ts',
   'server/utils/financial-calculations.ts': 'server/utils/financial-calculations.ts',
   'server/utils/modeling-periods.ts': 'server/utils/modeling-periods.ts',
   'server/utils/normalizeLineItemLabel.ts': 'server/utils/normalizeLineItemLabel.ts',
@@ -37,7 +37,7 @@ const VALUATOR_FILES = {
   // ============================================
   // SERVER — Seed Data
   // ============================================
-  'server/scripts/seedMarinaCoa.ts': 'server/scripts/seedMarinaCoa.ts',
+  'shared/coa/marina-coa-seed.ts': 'shared/coa/marina-coa-seed.ts',
 
   // ============================================
   // SERVER — Operations Services

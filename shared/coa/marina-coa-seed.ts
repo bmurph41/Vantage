@@ -1,14 +1,14 @@
 /**
  * Marina Chart-of-Accounts seed data.
  *
- * MARINA_COA_SEED + CoaSeedItem are load-bearing: server/utils/department-mapping.ts
+ * MARINA_COA_SEED + CoaSeedItem are load-bearing: shared/coa/department-mapping.ts
  * builds inferDepartment()'s lookup tables from this array (also read by
  * server/services/pnl/promote-to-actuals.ts). They are consumed as in-memory data
  * only — this module performs no DB writes.
  *
+ * Relocated to shared/coa/ in WS4 Piece A (from server/scripts/seedMarinaCoa.ts).
  * The dead seed mechanism (seedMarinaCoa / getCoaStats + the unused endpoint
- * POST /canonical-items/seed-marina) was removed in WS3-B. Relocating this data to a
- * proper data module is deferred to WS4.
+ * POST /canonical-items/seed-marina) was removed earlier in WS3-B.
  */
 
 export interface CoaSeedItem {

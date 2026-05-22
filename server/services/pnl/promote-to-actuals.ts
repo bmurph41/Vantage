@@ -6,7 +6,7 @@ import {
 } from '@shared/pnl-pipeline-schema';
 import { modelingActuals, pnlCanonicalLineItems, pnlJobs } from '@shared/schema';
 import { eq, sql } from 'drizzle-orm';
-import { MARINA_COA_SEED } from '../../scripts/seedMarinaCoa';
+import { MARINA_COA_SEED } from '@shared/coa/marina-coa-seed';
 import { sectionToCategory, majorGroupToCategory, inferDepartment, normalizeDepartment } from '../../utils/department-mapping';
 
 const coaLookup: Record<string, typeof MARINA_COA_SEED[0]> = {};
