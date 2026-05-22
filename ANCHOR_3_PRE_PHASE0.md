@@ -999,6 +999,208 @@ needs. Held for explicit decision; not auto-proceeded.
 
 ---
 
+### Step C — executed 2026-05-22 (commit `6317d3f4`)
+
+Final WS5 step. Makes the Step 0 vocabulary keys EXIST in
+`granularGrowthRates` / `granularExpenseGrowth` by default for MF/STR. Step B's
+engine code already reads them; Step C is the seeder side. **MF/STR revenue
+now computes on real keyed rates, not flat fallback.**
+
+**UI (Option C — additive, `growth-rates/index.tsx` + `GrowthRatesTab.tsx`):**
+- `REVENUE_CATEGORIES.residentialAndStr` group: `residential_rental`,
+  `other_income`, `nightly_rate`, `cleaning_revenue`
+- `OPEX_CATEGORIES` gains `management_fees`, `operating_expenses`,
+  `cleaning_expense`, `platform_fees` (the last with an Info-icon tooltip note)
+- `REVENUE_ONLY_IDS` extended with the 4 MF/STR revenue IDs
+- `YearlyRateRow` gains optional `note` → Info-icon hover tooltip
+- Tab gains `hideStorageSection?: boolean` + `getDefaultRateForKey?` props.
+  Marina parent leaves both at defaults — UI byte-identical for marina layout.
+  MF/STR parent sets `hideStorageSection=true` (per-unit-type knobs are
+  engine-orphaned post-Step-B; the engine keys MF revenue to flat
+  `residential_rental`, not per bedroom type).
+
+**Seeders (`assumptions.tsx`):**
+- Module-scope `expenseCategories` const → `buildExpenseCategories(assetClass)`.
+  Marina + unknown classes return the original 14 categories byte-identical;
+  MF adds `operating_expenses`; STR adds `operating_expenses` +
+  `cleaning_expense` + `platform_fees`.
+- `nonStorageRevenueCategories` becomes asset-class-aware. Marina unchanged;
+  MF/STR return only the Step 0 vocab subset.
+- Force-seed at load + `getDefaultGrowthRates` + `getDefaultExpenseGrowth`
+  extend with `getStep0RevenueKeys(assetClass)` + `getStep0ExpenseKeys(assetClass)`
+  loops. Per-key default values from the ratified Step C table in
+  `getStepCDefaultForKey` (per-scenario base/aggressive/conservative/custom).
+- `getDefaultMargins` UNCHANGED (all MF/STR depts are `hasCOGS:false`).
+
+**Two latent items called out in the commit:**
+- **management_fees now renders in OPEX UI for ALL classes.** Pre-Step-C it
+  was in marina's `expenseCategories` (so seeded into `granularExpenseGrowth`
+  and read by the engine) but missing from `OPEX_CATEGORIES` (so the row
+  never rendered). Latent bug-fix: marina users can now actually edit the
+  rate they were implicitly setting. UI change (new editable row appears
+  for marina); NOT a marina-NOI change.
+- **`getStepCDefaultForKey` returns undefined for every non-Step-0 key.**
+  So for marina + existing classes, `resolveExpenseDefault` /
+  `resolveRevenueDefault` fall through staticDefault → scenario-wide default,
+  byte-identical to pre-Step-C. The per-key precedence hook is inert for
+  current classes — it's the seam for the deferred user-configurable-defaults
+  feature (see Deferred features below).
+
+**Live verification (gate that proved revenue moved):**
+
+Live actuals-fed MF revenue-key gate on fixture `c3a1eebc-…` (mode flipped to
+`'upload'`, `inputAssumptions` zeroed, restored in `finally`):
+
+| Year | PAYLOAD A (no MF revenue keys, flat fallback) | PAYLOAD B (Step C keyed: residential_rental:6, other_income:1, operating_expenses:8) | Delta |
+|---|---|---|---|
+| 1 | $1,858,302 | $1,887,985 | +$29,683 |
+| 2 | $1,525,872 | $1,624,045 | +$98,173 |
+| 3 | $902,803 | $1,075,607 | +$172,804 |
+| 4 | -$229,650 | $24,333 | +$253,983 |
+| 5 | -$2,258,992 | -$1,916,825 | +$342,167 |
+
+Delta monotonic — revenue compounding at keyed 6% (residential_rental) vs flat
+3% creates a widening positive gap, partially offset by other_income (keyed
+1% vs flat 3%) and operating_expenses (keyed 8% vs flat 2.5%). Net Y5: +$342K.
+**Step C completes the upload-fed pro-forma compute for MF revenue (the gap
+Step B couldn't close alone).**
+
+**Marina byte-identical** by construction: `getStep0RevenueKeys('marina')=[]`,
+`getStep0ExpenseKeys('marina')=[]`, `getStepCDefaultForKey` returns undefined
+for marina keys, `nonStorageRevenueCategories` returns the original 15-entry
+marina list, `expenseCategories` returns the original 14-entry MARINA list,
+`hideStorageSection=false`. No write-path diff → no engine-side diff. Golden
+harness confirms: marina engine NOI 13,493,783 unchanged (gap=0); same for
+self_storage / office / retail.
+
+**Golden harness** re-baselined with 7 new keys in `SYNTHETIC_GROWTH` at
+distinct rates (residential_rental 6.0, other_income 1.0, nightly_rate 5.5,
+cleaning_revenue 4.0, cleaning_expense 6.5, platform_fees 5.2,
+operating_expenses 7.8). 6 fields shifted: MF synthetic NOI 7,444,487 →
+7,839,971 (+5.3%); STR 3,410,818 → 3,586,106 (+5.1%); writer_threaded
+mirrors engine path. `inferences[]` map unchanged. Harness is now a complete
+consistency oracle through Step C.
+
+### §0 platform_fees mechanism finding (informs default + UI note)
+
+Read-only audit performed before Step C build. Findings:
+- **Year 1 base IS computed as % of revenue**
+  (`direct-input-engine.ts:125-158`): annualPlatformFees direct →
+  legacy platformFeePct × gross → blended Airbnb/VRBO/direct mix × gross →
+  3% × gross default.
+- **Years 2-5 are FLAT-PROJECTED**: `pro-forma-engine-service.ts:758-783`
+  treats `platform_fees` identically to every other expense via
+  `getExpenseGrowthForCategory` → `departmentToAssumptionKey` →
+  `granularExpenseGrowth['platform_fees']` as a flat % growth rate. **No
+  auto-recompute-as-%-of-revenue projection logic** (`grep platform_fees`
+  across pro-forma + dcf + multi-year-projection: 0 hits beyond
+  direct-input).
+
+0% growth default would systematically understate platform_fees as revenue
+grows (~14% understatement by Y5 at 3% revenue growth). Default set to **3%
+per-scenario** (base 3 / aggressive 5 / conservative 1.5 / custom 3) mirroring
+the revenue table — closest flat approximation to "tracks revenue at default
+growth rate." UI surfaces the limitation honestly via Info-icon tooltip:
+
+> Projected as a flat growth rate, not auto-recomputed as % of revenue each
+> year. Set manually if you need exact revenue-tracking.
+
+Real fix (derived-line projection) filed as deferred feature (b) below.
+
+---
+
+## WS5 — DONE (Steps A + B + C executed)
+
+Steps A + B + C all shipped (2026-05-22). MF/STR doc-upload → pro-forma path
+now computes on the frozen Step 0 vocabulary keys, end-to-end. Marina path
+preserved byte-identical at every step (verified at golden harness in all
+three commits). Engine + UI + seeders + tests all aligned to the same
+vocabulary.
+
+### Deferred features — post-WS5, post-demo (filed 2026-05-22)
+
+These are real items that build on top of WS5 but are not demo-critical.
+Sequence against the demo roadmap, not against each other.
+
+#### (a) User-configurable assumption defaults — by-class / across-all-classes
+
+Today's assumption defaults are **system-wide constants** (`getDefaultRateForKey`
++ scenario tables). Different orgs / users may want different starting
+defaults (e.g., an MF-focused fund may want residential_rental=4 instead of 3).
+
+**Sketch:**
+- New table `org_assumption_defaults` (org_id + key + asset_class + scenario_type
+  + rate). Asset_class nullable → null means "across all classes."
+- Optional `user_assumption_defaults` table for per-user overrides.
+- Settings UI: per-key default editor, with a toggle "apply to this asset class
+  only" vs "apply across all asset classes."
+- Precedence: **scenario value > user-default > org-default > system-default**.
+  Scenario value is what the user explicitly set on this scenario; everything
+  below it is the seed.
+- The `getDefaultRateForKey` prop in `GrowthRatesTab` is the seam — Step C
+  threads it inert. The feature plugs into that seam without further UI
+  refactor: parent's `getDefaultRateForKey` consults the precedence chain
+  instead of just `getStepCDefaultForKey`.
+- ~3-5 hours: table + settings UI + precedence helper + plug-in. No engine
+  changes; the engine reads the saved scenario value either way.
+
+#### (b) Platform fees as a derived %-of-revenue projection line
+
+The §0 finding above. Year 1 already computes platform_fees as % of revenue
+via `direct-input-engine.ts:125-158`. The gap is years 2-5: the pro-forma
+projection engine treats platform_fees as a flat-projected expense like any
+other (`pro-forma-engine-service.ts:758-783`).
+
+**Sketch:**
+- Identify "derived-line" expense keys (platform_fees today; potentially
+  management_fees as a % of revenue too in a separate feature). Engine reads
+  them differently from flat-projected lines.
+- For derived lines, compute each year's amount as:
+    `revenuePctBase × thisYearRevenue` instead of
+    `lastYearAmount × (1 + growth)`.
+- `revenuePctBase` could be derived from Year 1's ratio (back-solved from the
+  direct-input-engine output) or persisted as a separate assumption (e.g.,
+  `platformFeePct` saved on the scenario payload).
+- UI: replace the flat growth-rate knob with a "% of revenue" knob for
+  derived lines. Or keep both modes and toggle.
+- Related but DISTINCT from chokepoint #5 — both are projection-engine
+  correctness, but #5 is about the direct-input bypass emitting generic
+  department labels; this is about derived-line projection logic for an
+  already-routed line.
+- ~3-4 hours including UI mode-toggle. Engine work in `pro-forma-engine-service.ts`
+  around lines 758-783 (gate the flat-growth path on a `isDerivedLine` check).
+
+#### (c) Chokepoint #5 — direct-input bypass
+
+Already filed in the Chokepoint #5 section above (cross-referenced here for
+completeness). The direct-input bypass at
+`pro-forma-engine-service.ts:625-644` (+ hybrid mirror 663-685) hardcodes
+`department='Revenue' / 'Operating Expenses'` outside WS5 vocab. ~30-45 min,
+code-only. Pre-upload MF/STR deals (today, all of them) route through this
+bypass and remain on flat fallback even after Step A + B + C ship. The
+A→B→C→#5 sequence (which actually happened) puts this last; A→B→#5→C was
+also viable. Sequencing call HELD at Step B; Step C shipped on the A→B→C path
+because it doesn't depend on #5.
+
+### Sequencing thoughts (demo roadmap)
+
+For the demo path (MF deal uploads a P&L → Pro Forma shows correct compute):
+- WS5 A + B + C delivers the actuals-fed path. ✅
+- Chokepoint #5 (deferred feature c) closes the pre-upload path. **Highest
+  beta-relevance** of the three deferred items because it reaches MF/STR
+  deals as currently entered.
+- Deferred (a) is product/UX work — useful but not demo-critical; system
+  defaults will satisfy most users until orgs start expressing strong
+  per-org preferences.
+- Deferred (b) is correctness work for STR pro-formas — important once
+  STR deals start moving past wizard stage with actual P&L uploads (i.e.,
+  becomes more important AFTER #5 unblocks STR direct-input projects, and
+  AFTER the first STR upload-fed deal lands).
+
+Suggested order: **#5 → (b) → (a)**.
+
+---
+
 ## Open items for the execution plan
 
 - Confirm `quickbooks-service.ts:609` as the 8th `inferDepartment` consumer (under-enumerated here).
@@ -1040,3 +1242,12 @@ the direct-input bypass at `pro-forma-engine-service.ts:625-644` (+ hybrid mirro
 663-685) emits `department='Revenue'/'Operating Expenses'` outside WS5 vocab; today
 0 MF/STR deals are on the actuals-fed path. ~30-45 min, code-only. Sequencing decision
 (A→B→C→#5 vs A→B→#5→C) **HELD** for deliberate choice; Step C not auto-proceeded.
+**Updated:** 2026-05-22 — WS5 **Step C** executed on the A→B→C path (commit `6317d3f4`
+— asset-class-aware growth-rate UI + seeders; MF/STR revenue now computes on real
+keyed rates, not flat fallback; live PAYLOAD A/B gate confirmed monotonic +$342K Y5
+delta; marina byte-identical at golden harness; golden re-baselined with 7 new keys;
+inert per-key default hook in place for deferred user-configurable-defaults feature).
+**WS5 — DONE.** Three deferred features filed for post-demo: (a) user-configurable
+assumption defaults, (b) platform_fees derived-line projection, (c) chokepoint #5
+direct-input bypass. Suggested order: #5 → (b) → (a). See "Deferred features" + "WS5
+— DONE" sections above.
