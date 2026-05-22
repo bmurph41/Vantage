@@ -1,6 +1,7 @@
 import { useState, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
+import { useAuth } from "@/contexts/AuthContext";
 import { apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -35,6 +36,16 @@ interface QuickStartStep {
   tourId?: string;
   category: "essential" | "explore" | "advanced";
 }
+
+// 5 role-specific step IDs per role
+const ROLE_STEP_IDS: Record<string, string[]> = {
+  investor:  ['create-deal', 'explore-pipeline', 'financial-model', 'sales-comps', 'due-diligence'],
+  broker:    ['create-deal', 'add-contacts', 'explore-pipeline', 'upload-documents', 'explore-docket'],
+  operator:  ['add-contacts', 'upload-documents', 'due-diligence', 'explore-docket', 'sales-comps'],
+  gp:        ['financial-model', 'create-deal', 'explore-pipeline', 'due-diligence', 'upload-documents'],
+  analyst:   ['financial-model', 'sales-comps', 'due-diligence', 'upload-documents', 'explore-docket'],
+};
+const DEFAULT_STEP_IDS = ['create-deal', 'add-contacts', 'explore-pipeline', 'financial-model', 'due-diligence'];
 
 const QUICK_START_STEPS: QuickStartStep[] = [
   {
@@ -120,6 +131,14 @@ export function QuickStartGuide() {
   const [, navigate] = useLocation();
   const queryClient = useQueryClient();
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const { user } = useAuth();
+
+  // Derive role-specific 5-step checklist
+  const primaryRole = user?.userPrimaryRole ?? localStorage.getItem('vantage_primary_role') ?? '';
+  const stepIds = ROLE_STEP_IDS[primaryRole] ?? DEFAULT_STEP_IDS;
+  const activeSteps = stepIds
+    .map((id) => QUICK_START_STEPS.find((s) => s.id === id))
+    .filter(Boolean) as QuickStartStep[];
 
   const { data: allTourProgress } = useQuery<{ tours: Record<string, boolean> }>({
     queryKey: ["/api/tour-progress"],
@@ -137,7 +156,7 @@ export function QuickStartGuide() {
         tourId: "quick-start-guide",
         status: "completed",
         lastStepIndex: 0,
-        totalSteps: QUICK_START_STEPS.length,
+        totalSteps: activeSteps.length,
       });
     },
     onSuccess: () => {
@@ -164,7 +183,7 @@ export function QuickStartGuide() {
     mutationFn: async () => {
       const deletePromises = [
         apiRequest("DELETE", "/api/tour-progress/quick-start-guide"),
-        ...QUICK_START_STEPS.map(step =>
+        ...activeSteps.map(step =>
           apiRequest("DELETE", `/api/tour-progress/quickstart-${step.id}`)
         ),
       ];
@@ -185,15 +204,15 @@ export function QuickStartGuide() {
     [allTourProgress]
   );
 
-  const completedCount = QUICK_START_STEPS.filter(isStepCompleted).length;
-  const progressPercent = Math.round((completedCount / QUICK_START_STEPS.length) * 100);
+  const completedCount = activeSteps.filter(isStepCompleted).length;
+  const progressPercent = Math.round((completedCount / activeSteps.length) * 100);
   const isDismissed = quickStartState?.dismissed || (quickStartState as any)?.completed;
 
-  if (isDismissed && completedCount < QUICK_START_STEPS.length) {
+  if (isDismissed && completedCount < activeSteps.length) {
     return null;
   }
 
-  if (completedCount === QUICK_START_STEPS.length) {
+  if (completedCount === activeSteps.length) {
     return null;
   }
 
@@ -216,8 +235,8 @@ export function QuickStartGuide() {
               <CardTitle className="text-lg">Quick Start Guide</CardTitle>
               <p className="text-sm text-muted-foreground mt-0.5">
                 {completedCount === 0
-                  ? "Get started with the key features of the platform"
-                  : `${completedCount} of ${QUICK_START_STEPS.length} steps completed`}
+                  ? "Complete these steps to get the most from Vantage"
+                  : `${completedCount} of ${activeSteps.length} steps completed`}
               </p>
             </div>
           </div>
@@ -253,79 +272,62 @@ export function QuickStartGuide() {
 
       {!isCollapsed && (
         <CardContent className="pt-0 pb-4">
-          <div className="space-y-4">
-            {categories.map((category) => {
-              const stepsInCategory = QUICK_START_STEPS.filter(
-                (s) => s.category === category
-              );
-              if (stepsInCategory.length === 0) return null;
-
+          <div className="space-y-1">
+            {activeSteps.map((step) => {
+              const completed = isStepCompleted(step);
+              const StepIcon = step.icon;
               return (
-                <div key={category}>
-                  <h4 className="ws-section-label ws-section-label--compact mb-2">
-                    {CATEGORY_LABELS[category]}
-                  </h4>
-                  <div className="space-y-1">
-                    {stepsInCategory.map((step) => {
-                      const completed = isStepCompleted(step);
-                      const StepIcon = step.icon;
-
-                      return (
-                        <button
-                          key={step.id}
-                          onClick={() => handleStepClick(step)}
-                          className={cn(
-                            "flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-left transition-all group",
-                            completed
-                              ? "bg-green-50 dark:bg-green-950/20 hover:bg-green-100 dark:hover:bg-green-950/30"
-                              : "hover:bg-blue-50 dark:hover:bg-blue-950/20"
-                          )}
-                        >
-                          <div className="flex-shrink-0">
-                            {completed ? (
-                              <CheckCircle2 className="h-5 w-5 text-green-600" />
-                            ) : (
-                              <Circle className="h-5 w-5 text-gray-300 group-hover:text-blue-400 transition-colors" />
-                            )}
-                          </div>
-                          <StepIcon
-                            className={cn(
-                              "h-4 w-4 flex-shrink-0",
-                              completed
-                                ? "text-green-600/60"
-                                : "text-gray-400 group-hover:text-blue-500 transition-colors"
-                            )}
-                          />
-                          <div className="flex-1 min-w-0">
-                            <p
-                              className={cn(
-                                "text-sm font-medium",
-                                completed
-                                  ? "text-green-800 dark:text-green-400 line-through opacity-60"
-                                  : "text-foreground"
-                              )}
-                            >
-                              {step.title}
-                            </p>
-                            <p
-                              className={cn(
-                                "text-xs mt-0.5",
-                                completed
-                                  ? "text-green-600/50 dark:text-green-500/50"
-                                  : "text-muted-foreground"
-                              )}
-                            >
-                              {step.description}
-                            </p>
-                          </div>
-                          {!completed && (
-                            <ChevronRight className="h-4 w-4 text-gray-300 group-hover:text-blue-500 transition-colors flex-shrink-0" />
-                          )}
-                        </button>
-                      );
-                    })}
+                <button
+                  key={step.id}
+                  onClick={() => handleStepClick(step)}
+                  className={cn(
+                    "flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-left transition-all group",
+                    completed
+                      ? "bg-green-50 dark:bg-green-950/20 hover:bg-green-100 dark:hover:bg-green-950/30"
+                      : "hover:bg-blue-50 dark:hover:bg-blue-950/20"
+                  )}
+                >
+                  <div className="flex-shrink-0">
+                    {completed ? (
+                      <CheckCircle2 className="h-5 w-5 text-green-600" />
+                    ) : (
+                      <Circle className="h-5 w-5 text-gray-300 group-hover:text-blue-400 transition-colors" />
+                    )}
                   </div>
-                </div>
+                  <StepIcon
+                    className={cn(
+                      "h-4 w-4 flex-shrink-0",
+                      completed
+                        ? "text-green-600/60"
+                        : "text-gray-400 group-hover:text-blue-500 transition-colors"
+                    )}
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p
+                      className={cn(
+                        "text-sm font-medium",
+                        completed
+                          ? "text-green-800 dark:text-green-400 line-through opacity-60"
+                          : "text-foreground"
+                      )}
+                    >
+                      {step.title}
+                    </p>
+                    <p
+                      className={cn(
+                        "text-xs mt-0.5",
+                        completed
+                          ? "text-green-600/50 dark:text-green-500/50"
+                          : "text-muted-foreground"
+                      )}
+                    >
+                      {step.description}
+                    </p>
+                  </div>
+                  {!completed && (
+                    <ChevronRight className="h-4 w-4 text-gray-300 group-hover:text-blue-500 transition-colors flex-shrink-0" />
+                  )}
+                </button>
               );
             })}
           </div>
@@ -354,6 +356,7 @@ export function QuickStartGuide() {
 }
 
 export function useQuickStartVisible() {
+  const { user } = useAuth();
   const { data: quickStartState } = useQuery<{ completed: boolean }>({
     queryKey: ["/api/tour-progress", "quick-start-guide"],
     staleTime: 1000 * 60 * 5,
@@ -364,15 +367,21 @@ export function useQuickStartVisible() {
     staleTime: 1000 * 60 * 2,
   });
 
+  const primaryRole = user?.userPrimaryRole ?? localStorage.getItem('vantage_primary_role') ?? '';
+  const stepIds = ROLE_STEP_IDS[primaryRole] ?? DEFAULT_STEP_IDS;
+  const activeSteps = stepIds
+    .map((id) => QUICK_START_STEPS.find((s) => s.id === id))
+    .filter(Boolean) as QuickStartStep[];
+
   const isDismissed = quickStartState?.completed;
-  const completedCount = QUICK_START_STEPS.filter((step) => {
+  const completedCount = activeSteps.filter((step) => {
     if (!allTourProgress?.tours) return false;
     if (allTourProgress.tours[`quickstart-${step.id}`]) return true;
     if (step.tourId && allTourProgress.tours[step.tourId]) return true;
     return false;
   }).length;
 
-  const allComplete = completedCount === QUICK_START_STEPS.length;
+  const allComplete = completedCount === activeSteps.length;
 
-  return { isDismissed, allComplete, completedCount, totalSteps: QUICK_START_STEPS.length };
+  return { isDismissed, allComplete, completedCount, totalSteps: activeSteps.length };
 }

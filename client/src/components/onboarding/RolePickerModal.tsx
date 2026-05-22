@@ -58,10 +58,11 @@ const ROLES = [
 interface RolePickerModalProps {
   open: boolean;
   onComplete: () => void;
+  userId?: number;
   userName?: string;
 }
 
-export function RolePickerModal({ open, onComplete, userName }: RolePickerModalProps) {
+export function RolePickerModal({ open, onComplete, userId, userName }: RolePickerModalProps) {
   const [selected, setSelected] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const queryClient = useQueryClient();
@@ -82,7 +83,9 @@ export function RolePickerModal({ open, onComplete, userName }: RolePickerModalP
     } catch {
       // Non-fatal — role stored in localStorage as fallback
     } finally {
+      // Write legacy key (read by sidebar role-defaults) and user-scoped key (read by useRolePickerCheck)
       localStorage.setItem("vantage_primary_role", selected);
+      if (userId) localStorage.setItem(`vantage_role_picked_${userId}`, 'true');
       setSaving(false);
       onComplete();
     }

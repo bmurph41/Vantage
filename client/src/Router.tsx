@@ -1,6 +1,6 @@
 import { lazy, Suspense, useState, useEffect } from "react";
 import { Switch, Route, useLocation, Redirect } from "wouter";
-import { Loader2, Anchor } from "lucide-react";
+import { Loader2, Anchor, Plus } from "lucide-react";
 import { CommandPalette } from "@/components/CommandPalette";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { useAuth, RequireRole } from "@/contexts/AuthContext";
@@ -357,7 +357,6 @@ function SidebarLoader() {
 // Module-level guard: only trigger the onboarding check once per browser session,
 // regardless of how many times UnifiedLayout mounts (i.e. across navigations).
 let _onboardingSessionChecked = false;
-let _rolePickerSessionChecked = false;
 
 // Hook to check if user should see onboarding
 function useOnboardingCheck() {
@@ -382,22 +381,28 @@ function useOnboardingCheck() {
   return { showOnboarding, setShowOnboarding, completeOnboarding };
 }
 
-// Hook to check if user needs to pick their primary role
-function useRolePickerCheck(user: { userPrimaryRole?: string | null } | null) {
+// Hook to check if user needs to pick their primary role.
+// Uses a user-ID-scoped localStorage key so different users on the same
+// browser each see the picker exactly once (not gated by a module-level flag).
+function useRolePickerCheck(user: { id?: number; userPrimaryRole?: string | null } | null) {
   const [showRolePicker, setShowRolePicker] = useState(false);
+  const [checkedUserId, setCheckedUserId] = useState<number | null>(null);
 
   useEffect(() => {
-    if (_rolePickerSessionChecked || !user) return;
-    _rolePickerSessionChecked = true;
-
-    const hasPickedRole = localStorage.getItem('vantage_primary_role') || user.userPrimaryRole;
+    if (!user?.id || checkedUserId === user.id) return;
+    setCheckedUserId(user.id);
+    const storageKey = `vantage_role_picked_${user.id}`;
+    const hasPickedRole = localStorage.getItem(storageKey) || user.userPrimaryRole;
     if (!hasPickedRole) {
       const timer = setTimeout(() => setShowRolePicker(true), 400);
       return () => clearTimeout(timer);
     }
-  }, [user]);
+  }, [user?.id, checkedUserId]);
 
-  const completeRolePicker = () => setShowRolePicker(false);
+  const completeRolePicker = (userId?: number) => {
+    if (userId) localStorage.setItem(`vantage_role_picked_${userId}`, 'true');
+    setShowRolePicker(false);
+  };
 
   return { showRolePicker, completeRolePicker };
 }
@@ -456,12 +461,22 @@ function UnifiedLayout({ children }: { children: React.ReactNode }) {
       </div>
       <CommandPalette />
       <AIAssistant />
-      {/* Role picker — shown once for new users before the property wizard */}
+      {/* Role picker — shown once per user (per-user localStorage key) */}
       <RolePickerModal
         open={showRolePicker && !showOnboarding}
-        onComplete={completeRolePicker}
+        onComplete={() => completeRolePicker(user?.id)}
+        userId={user?.id}
         userName={user?.name?.split(' ')[0] || user?.email?.split('@')[0]}
       />
+      {/* Floating Quick Add button — always visible, opens the Quick Add modal */}
+      <button
+        onClick={() => setQuickAddOpen(true)}
+        className="fixed bottom-20 right-4 md:bottom-8 md:right-6 z-40 w-12 h-12 bg-primary text-white rounded-full shadow-lg hover:bg-primary/90 active:scale-95 transition-all flex items-center justify-center"
+        title="Quick Add (⌘N)"
+        aria-label="Quick Add"
+      >
+        <Plus className="w-5 h-5" />
+      </button>
       {/* Global Quick Add modal (Cmd+N shortcut) */}
       <AddNewModal isOpen={quickAddOpen} onClose={() => setQuickAddOpen(false)} />
       <EntitlementsProvider>

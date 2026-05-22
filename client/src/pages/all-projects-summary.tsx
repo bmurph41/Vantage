@@ -229,6 +229,26 @@ export default function AllProjectsSummaryPage() {
     );
   }
 
+  if (!projectsLoading && projects.length === 0) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-6">
+        <div className="max-w-sm text-center">
+          <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Building2 className="w-8 h-8 text-blue-600" />
+          </div>
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">No due diligence projects yet</h2>
+          <p className="text-sm text-gray-500 mb-6">
+            Create your first project to start tracking checklists, tasks, deadlines, and deal costs in one place.
+          </p>
+          <CreateProjectDialog />
+          <p className="text-xs text-gray-400 mt-4">
+            You can also create a project from any deal in the Pipeline board.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header - No print */}

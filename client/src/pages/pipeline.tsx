@@ -1125,6 +1125,32 @@ export default function Pipeline() {
     );
   }
 
+  if (!isLoading && deals.length === 0) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center h-screen bg-gray-50 px-6">
+        <div className="max-w-sm text-center">
+          <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <TrendingUp className="w-8 h-8 text-blue-600" />
+          </div>
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Your pipeline is empty</h2>
+          <p className="text-sm text-gray-500 mb-6">
+            Add your first deal to start tracking prospects, managing stages, and forecasting revenue.
+          </p>
+          <button
+            onClick={handleAddNewDeal}
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors shadow-sm"
+          >
+            <Plus className="w-4 h-4" />
+            Add Your First Deal
+          </button>
+          <p className="text-xs text-gray-400 mt-4">
+            Tip: Use <kbd className="px-1 py-0.5 bg-gray-100 border border-gray-200 rounded text-[10px] font-mono">⌘N</kbd> anywhere to quickly add a new deal
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-gray-50">
       {/* ── Header ── */}

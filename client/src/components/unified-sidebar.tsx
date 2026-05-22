@@ -197,6 +197,18 @@ export default function UnifiedSidebar() {
   const [adminExpanded, setAdminExpanded] = useState(false);
   const [pendingExpanded, setPendingExpanded] = useState(false);
   const [expandedSubcats, setExpandedSubcats] = useState<Set<string>>(new Set()); // all start collapsed
+  // "Show all modules" — persisted per-user so different users get independent scope preferences
+  const [showAllModules, setShowAllModules] = useState(false);
+  useEffect(() => {
+    if (!user?.id) return;
+    const saved = localStorage.getItem(`sidebar-show-all-${user.id}`);
+    if (saved === 'true') setShowAllModules(true);
+  }, [user?.id]);
+  const toggleShowAllModules = () => {
+    const next = !showAllModules;
+    setShowAllModules(next);
+    if (user?.id) localStorage.setItem(`sidebar-show-all-${user.id}`, String(next));
+  };
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedEntity, setSelectedEntity] = useState<{type: 'contact' | 'company' | 'deal', id: string} | null>(null);
   const { selectedAssetId: selectedOpsAssetId, setSelectedAsset: setSelectedOpsAsset } = useOpsAssetStore();
@@ -923,8 +935,8 @@ export default function UnifiedSidebar() {
           </div>
         )}
 
-        {/* Marketing Section */}
-        {canViewSection('prospecting') && (
+        {/* Marketing Section — secondary; hidden until "Show all modules" or active */}
+        {canViewSection('prospecting') && (showAllModules || location.startsWith('/marketing') || location.startsWith('/prospecting/campaigns')) && (
           <div className={cn("mb-2", isHighlighted('marketing') && "sidebar-glow")}>
             <SectionHeader
               title="Marketing"
@@ -1036,7 +1048,8 @@ export default function UnifiedSidebar() {
           </div>
         )}
         
-        {/* Document Studio - Collapsible section with sub-navigation */}
+        {/* Document Studio — secondary; hidden until "Show all modules" or active */}
+        {(showAllModules || location.startsWith('/document-studio') || location.startsWith('/om') || location.startsWith('/simple-report')) && (
         <div className="mb-2">
           <SectionHeader
             title="Document Studio"
@@ -1053,6 +1066,7 @@ export default function UnifiedSidebar() {
             </div>
           )}
         </div>
+        )}
         
         {/* Investor Services Section - Fund Management, LP Portal */}
         <div className={cn("mb-2", (isHighlighted('fund-management') || isHighlighted('lp-portal')) && "sidebar-glow")}>
@@ -1154,8 +1168,8 @@ export default function UnifiedSidebar() {
           )}
         </div>
         
-        {/* Market Intelligence Section — always visible (free users see preview items) */}
-        {canViewSection('market_intelligence') && (
+        {/* Market Intelligence Section — secondary; hidden until "Show all modules" or active */}
+        {canViewSection('market_intelligence') && (showAllModules || location.startsWith('/analysis/')) && (
           <div className={cn("mb-2", isHighlighted('marinalytics') && "sidebar-glow")}>
             <SectionHeader
               title="Market Intelligence"
@@ -1307,6 +1321,27 @@ export default function UnifiedSidebar() {
         </Tooltip>
       </div>
       
+          {!sidebarCollapsed && (
+            <div className="border-t border-sidebar-border px-4 py-1.5">
+              <button
+                onClick={toggleShowAllModules}
+                className="w-full flex items-center justify-center gap-1.5 py-1 text-[10px] text-sidebar-foreground/50 hover:text-sidebar-foreground transition-colors rounded"
+                title={showAllModules ? "Show only core modules" : "Show all available modules"}
+              >
+                {showAllModules ? (
+                  <>
+                    <ChevronLeft className="w-3 h-3" />
+                    Show fewer modules
+                  </>
+                ) : (
+                  <>
+                    <ChevronRight className="w-3 h-3" />
+                    Show all modules
+                  </>
+                )}
+              </button>
+            </div>
+          )}
           {!sidebarCollapsed && (
             <div className="border-t border-sidebar-border px-4 py-2 flex items-center gap-3 text-[10px] text-muted-foreground">
               <a href="/terms" target="_blank" className="hover:text-foreground transition-colors">Terms</a>
