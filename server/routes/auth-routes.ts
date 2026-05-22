@@ -4,7 +4,7 @@ import type { RequestWithUser, AuthenticateOptions } from '@node-saml/passport-s
 import { enterpriseAuthService, type DeviceInfo } from '../services/enterprise-auth-service';
 import { samlPassportService } from '../services/saml-passport-service';
 import { db } from '../db';
-import { organizations, ssoConfigurations, users, userSessions, betaInviteCodes, betaInviteRedemptions } from '@shared/schema';
+import { organizations, ssoConfigurations, users, userSessions, betaInviteCodes, betaInviteRedemptions, billingSubscriptions } from '@shared/schema';
 import { eq, and, gt, sql } from 'drizzle-orm';
 import { logger } from '../lib/logger';
 import { seedDemoData } from '../services/demo-seed-service';
@@ -671,9 +671,14 @@ router.get('/me', async (req: Request, res: Response) => {
           .limit(1);
 
         if (user) {
-          const org = await db.query.organizations.findFirst({
-            where: eq(organizations.id, user.orgId)
-          });
+          const [org, billing] = await Promise.all([
+            db.query.organizations.findFirst({ where: eq(organizations.id, user.orgId) }),
+            db.select({ tier: billingSubscriptions.tier })
+              .from(billingSubscriptions)
+              .where(eq(billingSubscriptions.orgId, user.orgId))
+              .limit(1)
+              .then(rows => rows[0] ?? null),
+          ]);
 
           return res.json({
             id: user.id,
@@ -684,6 +689,7 @@ router.get('/me', async (req: Request, res: Response) => {
             orgName: org?.name || 'Unknown Organization',
             ssoProvider: user.ssoProvider || null,
             createdAt: user.createdAt?.toISOString() || null,
+            tier: billing?.tier ?? null,
           });
         }
       }

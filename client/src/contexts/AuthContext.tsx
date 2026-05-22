@@ -97,6 +97,7 @@ interface User {
   ssoProvider?: string | null;
   userPrimaryRole?: string | null;
   createdAt?: string | null;
+  tier?: string | null;
 }
 
 interface AuthContextValue {
@@ -126,6 +127,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         userId: user.id,
         orgId: user.orgId,
         role: user.role,
+        ...(user.tier ? { tier: user.tier } : {}),
         ...(user.createdAt ? { createdAt: user.createdAt } : {}),
       });
     } else if (!isLoading) {
