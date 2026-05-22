@@ -3,7 +3,28 @@
 // PURPOSE
 //   Before WS4 (department-inference consolidation) touches inferDepartment,
 //   this harness snapshots the department-driven outputs into a golden baseline
-//   so any WS4 change is a CAUGHT DIFF, never a silent number shift.
+//   so any change to inferDepartment ITSELF is a CAUGHT DIFF, never a silent
+//   number shift.
+//
+// ROLE — pure reference oracle, NOT a behavioral detector (WS4 Piece C1)
+//   This harness is a PURE ORACLE: deterministic, DB-free, and it reads no
+//   source code. It computes inferDepartment outputs for a fixed input set and
+//   publishes them as golden numbers. It catches regressions in inferDepartment
+//   — the pure function it calls — and nothing else. It has no false-green
+//   failure mode because it makes no judgment about code it does not execute.
+//
+//   It does NOT, and is not meant to, detect changes in the four actuals-writer
+//   CALL SITES (canonical-actuals-loader.ts:293, promote-to-actuals.ts:147,
+//   quickbooks-service.ts:609, doc-intel-service.ts:2560). Those call sites
+//   currently pass `undefined` as the assetClass argument; WS4 Piece C2 changes
+//   them to thread the real asset class. Because this harness neither imports
+//   nor observes those call sites, C2 correctly produces ZERO diff here — by
+//   design. Detection of C2's behavioral change is RELOCATED to the C2 live
+//   re-promotion test (seed a real project, run the writer, assert the
+//   persisted modeling_actuals.department label). That live test is the
+//   behavioral gate. This harness's only job for C2 is to PUBLISH the two
+//   possible writer behaviors as named reference numbers (see WHAT IT CAPTURES)
+//   so the live test has an authoritative figure to corroborate against.
 //
 // WHAT IT CAPTURES (per the WS4-prep Phase 0 design)
 //   Primary  — the inferred `department` for a fixed input set, across four
@@ -11,11 +32,21 @@
 //              downstream consumer (growth-rate lookup, granular-margin lookup,
 //              getOccupancyAdjustment, ...) is unchanged by definition.
 //   Secondary— `assumptionKey` (departmentToAssumptionKey — the engine's lookup
-//              pivot) and a `syntheticNOI` per asset-class scenario, computed
-//              with a fixed synthetic assumption table that mirrors the
-//              pro-forma engine's department -> key -> growth-rate arithmetic.
+//              pivot) and, per asset-class scenario, a set of `syntheticNOI`
+//              reference figures computed with a fixed synthetic assumption
+//              table that mirrors the pro-forma engine's
+//              department -> key -> growth-rate arithmetic:
+//                • syntheticNOI_enginePath           — engine threads the real class
+//                • syntheticNOI_writerPath_undefined — actuals-writer TODAY: passes
+//                                                      undefined -> marina cascade
+//                • syntheticNOI_writerPath_threaded  — actuals-writer POST-C2: threads
+//                                                      the real class (== enginePath
+//                                                      by construction here)
+//                • writerPathGap                     — threaded minus undefined; the
+//                                                      first-class measure of the
+//                                                      current marina-cascade bug
 //
-// SEAM — pure functions only, no DB, no engine change:
+// SEAM — pure functions only, no DB, no engine change, no source-text reading:
 //   • server inferDepartment           (server/utils/department-mapping.ts shim → shared/coa/)
 //   • server departmentToAssumptionKey (same file)
 //   • client inferDepartment           (client imports @shared/coa/department-mapping — WS4 Piece B)
@@ -24,8 +55,9 @@
 //   serverNative    — inferDepartment(label, category, <scenario asset class>)
 //                     the class the pro-forma engine threads when present.
 //   serverUndefined — inferDepartment(label, category, undefined)
-//                     the WRITER path: canonical-actuals-loader.ts:293 and
-//                     promote-to-actuals.ts:147 pass undefined, so this is what
+//                     the WRITER path AS IT IS TODAY: canonical-actuals-loader.ts:293,
+//                     promote-to-actuals.ts:147, quickbooks-service.ts:609 and
+//                     doc-intel-service.ts:2560 all pass undefined, so this is what
 //                     gets written onto modeling_actuals.department. The bug
 //                     surface — non-marina deals run the marina cascade here.
 //   serverMarina    — inferDepartment(label, category, 'marina')
@@ -35,9 +67,22 @@
 //                     and threads the project's asset class — identical to serverNative.
 //                     The drifted marina-only client copy was retired.
 //
-// The golden captures CURRENT behavior INCLUDING current bugs (the marina
-// cascade running on non-marina deals). That is intentional: WS4 fixing that
-// bug must produce a VISIBLE, reviewed diff — not a silent change.
+// CURRENT-BEHAVIOR BASELINE
+//   The golden captures CURRENT behavior INCLUDING current bugs — the marina
+//   cascade running on non-marina deals, visible as syntheticNOI_writerPath_undefined
+//   and the non-zero writerPathGap for multifamily and str. Any diff in
+//   inferDepartment's OWN output during WS4 must be reviewed. C2's call-site
+//   fix, by contrast, leaves this harness GREEN and is verified by the live
+//   re-promotion test — see ROLE above.
+//
+//   syntheticNOI_writerPath_threaded equals syntheticNOI_enginePath by
+//   construction (both dispatch inferDepartment with the real assetClass). It is
+//   named separately because it is the ACTUALS-WRITER's reference value: the C2
+//   live re-promotion test asserts the persisted department LABEL as ground
+//   truth and uses this NOI figure only as a CORROBORATING reference — not a
+//   strict equality, because the real writer post-processes departments
+//   (normalizeDepartment, deptKeyToLabel, correctCategoryForDepartment) and this
+//   synthetic oracle does not.
 //
 // USAGE
 //   npx tsx tests/department-inference-golden.mjs            # diff vs golden, exit 1 on any diff
@@ -227,12 +272,21 @@ function computeSnapshot() {
     };
   });
 
-  // Synthetic NOI per scenario — two paths:
-  //   enginePath = serverNative dispatch (pro-forma engine's threaded class)
-  //   writerPath = serverUndefined dispatch (the actuals-writer path; this is
-  //               what actually lands on modeling_actuals today). For marina
-  //               the two are identical; for non-marina the gap quantifies the
-  //               marina-cascade bug's effect on projected NOI.
+  // Synthetic NOI per scenario — three reference figures (WS4 Piece C1):
+  //   enginePath           = serverNative dispatch — the pro-forma engine's
+  //                          threaded-class result.
+  //   writerPath_undefined = serverUndefined dispatch — the actuals-writer path
+  //                          AS IT IS TODAY (all four call sites pass undefined,
+  //                          so non-marina deals run the marina cascade). This
+  //                          is what actually lands on modeling_actuals now.
+  //   writerPath_threaded  = serverNative dispatch — the actuals-writer path
+  //                          POST-C2, once the call sites thread the real class.
+  //                          Equal to enginePath by construction here; named
+  //                          separately as the writer's reference figure for the
+  //                          C2 live re-promotion test to corroborate against.
+  // writerPathGap = threaded - undefined: the first-class measure of the
+  // marina-cascade bug — 0 for marina and for branch-less classes that already
+  // fall through to the marina default; non-zero for multifamily and str.
   const projectLine = (rec, mode) => {
     const key = rec.assumptionKey[mode];
     const rate = (SYNTHETIC_GROWTH[key] ?? SYNTHETIC_GROWTH.g_and_a) / 100;
@@ -246,18 +300,23 @@ function computeSnapshot() {
       const projected = projectLine(r, mode);
       return sum + (r.category === 'revenue' ? projected : -projected);
     }, 0);
+    const enginePath = noi('serverNative');
+    const writerPathUndefined = noi('serverUndefined');
+    const writerPathThreaded = noi('serverNative'); // == enginePath by construction
     syntheticProjections[scenario] = {
       revenueLines: rows.filter(r => r.category === 'revenue').length,
       expenseLines: rows.filter(r => r.category !== 'revenue').length,
-      syntheticNOI_enginePath: noi('serverNative'),
-      syntheticNOI_writerPath: noi('serverUndefined'),
+      syntheticNOI_enginePath: enginePath,
+      syntheticNOI_writerPath_undefined: writerPathUndefined,
+      syntheticNOI_writerPath_threaded: writerPathThreaded,
+      writerPathGap: writerPathThreaded - writerPathUndefined,
     };
   }
 
   return {
     _meta: {
       harness: 'tests/department-inference-golden.mjs',
-      description: 'WS4-prep golden baseline for department inference. Captures CURRENT behavior (bugs included). Regenerate with --update; any non-empty diff during WS4 must be reviewed.',
+      description: 'WS4-prep golden baseline for department inference — a pure reference oracle. Captures CURRENT behavior (bugs included) plus the post-C2 writerPath_threaded reference and writerPathGap. Regenerate with --update; any inferDepartment diff during WS4 must be reviewed. C2 call-site changes leave this harness GREEN and are verified by the live re-promotion test, not here.',
       inputCount: INPUTS.length,
       projectionYears: PROJECTION_YEARS,
     },
@@ -305,8 +364,12 @@ diff(golden.syntheticProjections, snapshot.syntheticProjections, 'syntheticProje
 console.log(`=== Department-inference golden harness ===`);
 console.log(`Inputs: ${snapshot.inferences.length}  ·  Scenarios: ${Object.keys(snapshot.syntheticProjections).length}`);
 for (const [scenario, p] of Object.entries(snapshot.syntheticProjections)) {
-  const gap = p.syntheticNOI_enginePath - p.syntheticNOI_writerPath;
-  console.log(`  ${scenario.padEnd(13)} syntheticNOI engine=${p.syntheticNOI_enginePath}  writer=${p.syntheticNOI_writerPath}  gap=${gap}`);
+  console.log(
+    `  ${scenario.padEnd(13)} engine=${p.syntheticNOI_enginePath}` +
+    `  writer[undefined]=${p.syntheticNOI_writerPath_undefined}` +
+    `  writer[threaded]=${p.syntheticNOI_writerPath_threaded}` +
+    `  gap=${p.writerPathGap}`
+  );
 }
 
 if (out.length === 0) {

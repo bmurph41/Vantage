@@ -84,7 +84,7 @@ export const SUBSCRIPTION_TIERS: Record<SubscriptionTier, TierDefinition> = {
   institutional: {
     name: 'Institutional',
     priceMonthly: 1999,
-    priceAnnual: 1649,
+    priceAnnual: 19788, // $1,649/mo × 12 — normalized to annual total like all other tiers
     features: getFeaturesForTier('institutional'),
     limits: getLimitsForTier('institutional'),
   },
