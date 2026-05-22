@@ -18,6 +18,8 @@ import { RolePickerModal } from "@/components/onboarding/RolePickerModal";
 import AddNewModal from "@/components/modals/add-new-modal";
 import { MarketPulseBar } from "@/components/MarketPulseBar";
 
+const LandingPage = lazy(() => import("@/pages/public/LandingPage"));
+const PublicPricingPage = lazy(() => import("@/pages/public/PricingPage"));
 const Dashboard = lazy(() => import("@/pages/dashboard"));
 const CRMDashboard = lazy(() => import("@/pages/crm-dashboard"));
 const CrmSettings = lazy(() => import("@/pages/crm-settings"));
@@ -46,9 +48,22 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-// Always redirect to dashboard
+// Show landing page to unauthenticated users; redirect authenticated users to dashboard
 function LandingOrDashboard() {
-  return <Redirect to="/dashboard" />;
+  const { user, isLoading } = useAuth();
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+  if (user) return <Redirect to="/dashboard" />;
+  return (
+    <Suspense fallback={<PageLoader />}>
+      <LandingPage />
+    </Suspense>
+  );
 }
 
 // Shown when a non-broker/admin user navigates directly to the Forecast page
@@ -679,20 +694,9 @@ function Router() {
       </Route>
       <Route path="/pricing">
         {() => (
-          <EntitlementsProvider>
-            <div className="min-h-screen bg-background">
-              <div className="border-b bg-card px-6 py-3 flex items-center justify-between">
-                <div className="flex items-center gap-2 font-semibold text-lg">
-                  <Anchor className="h-5 w-5 text-primary" />
-                  Vantage
-                </div>
-                <Button variant="ghost" size="sm" onClick={() => window.history.back()}>
-                  ← Back
-                </Button>
-              </div>
-              <SubscriptionPage />
-            </div>
-          </EntitlementsProvider>
+          <Suspense fallback={<PageLoader />}>
+            <PublicPricingPage />
+          </Suspense>
         )}
       </Route>
       <Route path="/settings/integrations">
