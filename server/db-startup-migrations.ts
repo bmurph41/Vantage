@@ -19987,6 +19987,10 @@ const MIGRATIONS: Migration[] = [
     `,
   },
   { name: "organization_brand_settings: idx_org_id", sql: `CREATE INDEX IF NOT EXISTS idx_brand_settings_org_id ON organization_brand_settings (org_id)` },
+
+  // users — uncovered columns
+  { name: "users: add tos_accepted_at", sql: `ALTER TABLE users ADD COLUMN IF NOT EXISTS tos_accepted_at timestamptz` },
+  { name: "users: add tos_version", sql: `ALTER TABLE users ADD COLUMN IF NOT EXISTS tos_version varchar(32)` },
 ];
 
 /**

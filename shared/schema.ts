@@ -459,6 +459,9 @@ export const users = pgTable("users", {
   referralSourceOther: text("referral_source_other"), // Free text when source = "other"
   // UX personalization
   userPrimaryRole: text("user_primary_role"), // investor | broker | operator | gp | analyst
+  // Terms of Service acceptance
+  tosAcceptedAt: timestamp("tos_accepted_at"),
+  tosVersion: varchar("tos_version", { length: 32 }),
 });
 
 // User Sessions - Track active sessions with device info

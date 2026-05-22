@@ -1439,6 +1439,56 @@ export default function UserSettingsPage() {
           </div>
         </CardContent>
       </Card>
+
+      <Card data-testid="card-legal-agreements">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2" data-testid="text-legal-title">
+            <Shield className="h-5 w-5" />
+            Legal Agreements
+          </CardTitle>
+          <CardDescription>
+            Your accepted terms and legal documents
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between p-3 border border-border rounded-lg">
+              <div>
+                <p className="text-sm font-medium text-foreground">Terms of Service</p>
+                {(authUser as any)?.tosAcceptedAt ? (
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Accepted on {new Date((authUser as any).tosAcceptedAt).toLocaleDateString()}
+                    {(authUser as any)?.tosVersion && <> &middot; Version {(authUser as any).tosVersion}</>}
+                  </p>
+                ) : (
+                  <p className="text-xs text-muted-foreground mt-0.5">Not yet accepted</p>
+                )}
+              </div>
+              <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline shrink-0 ml-4">
+                View
+              </a>
+            </div>
+            <div className="flex items-center justify-between p-3 border border-border rounded-lg">
+              <div>
+                <p className="text-sm font-medium text-foreground">Privacy Policy</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Governs how your data is collected and used</p>
+              </div>
+              <a href="/privacy" target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline shrink-0 ml-4">
+                View
+              </a>
+            </div>
+            <div className="flex items-center justify-between p-3 border border-border rounded-lg">
+              <div>
+                <p className="text-sm font-medium text-foreground">Benchmarking Policy</p>
+                <p className="text-xs text-muted-foreground mt-0.5">How anonymized data is used for industry benchmarks</p>
+              </div>
+              <a href="/benchmarking" target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline shrink-0 ml-4">
+                View
+              </a>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     );
   }
 

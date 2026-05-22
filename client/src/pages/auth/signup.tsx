@@ -79,6 +79,9 @@ const signupSchema = z.object({
   orgName: z.string().min(2, "Company name must be at least 2 characters"),
   inviteCode: z.string().optional(),
   dataBenchmarkingConsent: z.boolean().default(true),
+  tosAccepted: z.boolean().refine((val) => val === true, {
+    message: "You must accept the Terms of Service and Privacy Policy to continue",
+  }),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords do not match",
   path: ["confirmPassword"],
@@ -482,6 +485,7 @@ export default function SignupPage() {
       orgName: "",
       inviteCode: "",
       dataBenchmarkingConsent: true,
+      tosAccepted: false,
     },
   });
 
@@ -501,6 +505,7 @@ export default function SignupPage() {
         password: values.password,
         orgName: values.orgName,
         dataBenchmarkingConsent: values.dataBenchmarkingConsent,
+        tosAccepted: values.tosAccepted,
         role: values.role,
         assetClassInterests: values.assetClassInterests,
         referralSource: values.referralSource || undefined,
@@ -907,9 +912,31 @@ export default function SignupPage() {
                       <a href="/benchmarking" target="_blank" rel="noopener noreferrer" className="text-xs text-cyan-600 hover:underline inline-flex items-center gap-1">
                         Learn how benchmarking works
                       </a>
-                      <p className="text-xs text-slate-400 mt-1">
-                        By continuing, you agree to our <a href="/terms" target="_blank" className="text-cyan-600 hover:underline">Terms of Service</a> and <a href="/privacy" target="_blank" className="text-cyan-600 hover:underline">Privacy Policy</a>.
-                      </p>
+                        <FormField
+                        control={form.control}
+                        name="tosAccepted"
+                        render={({ field }) => (
+                          <FormItem className="mt-1">
+                            <div className="flex items-start gap-2">
+                              <FormControl>
+                                <Checkbox
+                                  checked={field.value}
+                                  onCheckedChange={field.onChange}
+                                  data-testid="checkbox-tos"
+                                  className="mt-0.5 border-slate-300"
+                                />
+                              </FormControl>
+                              <div className="text-xs text-slate-500 leading-relaxed">
+                                I agree to the{" "}
+                                <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-cyan-600 hover:underline">Terms of Service</a>
+                                {" "}and{" "}
+                                <a href="/privacy" target="_blank" rel="noopener noreferrer" className="text-cyan-600 hover:underline">Privacy Policy</a>
+                              </div>
+                            </div>
+                            <FormMessage className="text-xs" />
+                          </FormItem>
+                        )}
+                      />
                     </div>
                     <Button
                       type="submit"

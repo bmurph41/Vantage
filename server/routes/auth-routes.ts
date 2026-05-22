@@ -9,7 +9,7 @@ import { eq, and, gt, sql } from 'drizzle-orm';
 import { logger } from '../lib/logger';
 import { z } from 'zod';
 import { sendEmailVerification, sendMagicLinkEmail, generateVerificationToken } from '../services/email-service';
-import { CONSENT_VERSION } from '@shared/consent-constants';
+import { CONSENT_VERSION, TOS_VERSION } from '@shared/consent-constants';
 import { getAllUserPermissions } from '../middleware/authorization';
 import { isLocalhostRequest } from '../utils/auth-helpers';
 
@@ -76,6 +76,7 @@ const registerSchema = z.object({
   orgId: z.string().optional(),
   orgName: z.string().optional(),
   dataBenchmarkingConsent: z.boolean(),
+  tosAccepted: z.boolean().optional(),
   referralSource: z.string().optional(),
   referralSourceOther: z.string().optional(),
   inviteCode: z.string().optional(),
@@ -315,7 +316,7 @@ router.post('/register', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Invalid request', details: parsed.error.errors });
     }
 
-    const { email, password, name, orgId, orgName, dataBenchmarkingConsent, referralSource, referralSourceOther, inviteCode } = parsed.data;
+    const { email, password, name, orgId, orgName, dataBenchmarkingConsent, tosAccepted, referralSource, referralSourceOther, inviteCode } = parsed.data;
 
     // Validate consent - required for account creation
     if (!dataBenchmarkingConsent) {
@@ -381,6 +382,8 @@ router.post('/register', async (req: Request, res: Response) => {
         dataBenchmarkingConsent: true,
         consentTimestamp: new Date(),
         consentVersion: CONSENT_VERSION,
+        tosAcceptedAt: tosAccepted ? new Date() : null,
+        tosVersion: tosAccepted ? TOS_VERSION : null,
         benchmarkingOptOut: false,
         optOutTimestamp: null,
         referralSource: referralSource || null,

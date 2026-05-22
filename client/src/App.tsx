@@ -13,6 +13,7 @@ import { ProspectingActivityProvider } from "@/contexts/ProspectingActivityConte
 import { SidebarHighlightProvider } from "@/contexts/SidebarHighlightContext";
 import { GoogleMapsProvider } from "@/lib/google-maps-provider";
 import Router from "./Router";
+import { CookieConsentBanner } from "@/components/CookieConsentBanner";
 
 function PageLoader() {
   return (
@@ -57,6 +58,7 @@ function App() {
                     <TooltipProvider>
                       <Toaster />
                       <GlobalQueryErrorHandler />
+                      <CookieConsentBanner />
                       <Suspense fallback={<PageLoader />}>
                         <Router />
                       </Suspense>
