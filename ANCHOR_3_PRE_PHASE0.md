@@ -722,6 +722,67 @@ The content is sound; the labels lie. This note is the record.
 
 ---
 
+## WS4 Piece C2 — actuals-writer inference threaded by asset class (executed 2026-05-22)
+
+**Done — commit `a2a4c580`.** The four actuals-writer call sites
+(`canonical-actuals-loader.ts`, `promote-to-actuals.ts`, `quickbooks-service.ts`,
+`doc-intel-service.ts`) passed `undefined` as `assetClass` to `inferDepartment()`,
+so every deal — marina or not — ran the marina department cascade. Each site now
+fetches the project's real `asset_class` (a local query; `projectId` was already in
+scope) and threads it.
+
+**Step 0 re-check:** 12 non-marina `modeling_actuals` rows exist (one `business`
+project, `doc_intel`) — but `business` is branch-less in `inferDepartment` (only
+`str`/`multifamily` branch), so threading it is a proven no-op; **no backfill.**
+
+**Verified:** golden harness GREEN (C2 doesn't touch `inferDepartment` — correct by
+C1's design); `tsc` — shared 0, four changed files 27 errors before = 27 after (zero
+new); **live re-promotion** of a seeded multifamily fixture confirmed the threaded
+`assetClass` reaches `inferDepartment` end-to-end (e.g. "Water & Sewer" persists as
+`Utilities`, not the marina default). Code-only — no DDL, no schema change.
+
+**C2 fixes 1 of 3 marina-centric chokepoints — see WS5.**
+
+## WS5 — make `normalizeDepartment` + `departmentToAssumptionKey` asset-class-aware (OPEN — needs its own Phase 0)
+
+**This is the completion of what C2 starts.** C2 made department *inference*
+asset-class-aware, but the C2 live re-promotion test surfaced that two downstream
+chokepoints are still marina-centric — so a non-marina deal's persisted department,
+and therefore its projected NOI, is still wrong:
+
+1. **`normalizeDepartment()`** (`shared/coa/department-mapping.ts:319`) — the actuals
+   writers (`promote-to-actuals.ts:148`, doc-intel) run inference output through it.
+   Its `VALID_DEPARTMENTS` allowlist + key-maps recognise only the marina/shared
+   department vocabulary; **any non-marina label** (`Rental`, `R&M`, `Mgmt Fee`,
+   `Other Income`, `Operating`, ...) **falls through to `'General'`**. Live proof:
+   post-C2, multifamily "Gross Potential Rent" *infers* as `Rental` but *persists* as
+   `General`. Shared labels (`Utilities`, `Payroll`) survive; multifamily-only ones
+   do not.
+2. **`departmentToAssumptionKey()`** (same file) — keys the pro-forma engine's
+   growth-rate / margin lookups on the marina department vocabulary; non-marina
+   departments hit the `g_and_a` catch-all.
+
+**Why WS5 needs its own Phase 0 — not a cleanup:**
+- **What is the valid department set per asset class?** `VALID_DEPARTMENTS` is one
+  flat marina set today; WS5 needs a per-asset-class department vocabulary
+  (marina / multifamily / str / ...) — a data-model decision.
+- **Blast radius of `VALID_DEPARTMENTS`** — every `normalizeDepartment` consumer and
+  every persisted `modeling_actuals.department` value; the full consumer map is
+  needed before widening the set.
+- **The engine-key change is number-changing for real.** Re-keying
+  `departmentToAssumptionKey` changes which growth rate / margin each non-marina
+  line receives → changes projected NOI. Golden-harness-gated and live-verified,
+  exactly like C2 (the C1 harness measures the inference side; the assumption-key
+  side needs equivalent coverage).
+- C2's live re-promotion test is the template: assert the persisted `department`
+  label as ground truth, per asset class.
+
+**Until WS5 lands, C2's benefit is partial** — inference routes correctly, but only
+departments that survive `normalizeDepartment` (the marina/shared labels) reach the
+persisted actuals with the right value.
+
+---
+
 ## Open items for the execution plan
 
 - Confirm `quickbooks-service.ts:609` as the 8th `inferDepartment` consumer (under-enumerated here).
@@ -734,6 +795,10 @@ The content is sound; the labels lie. This note is the record.
   `org_id`-nullable question.
 - ~~Build the golden-number regression harness *before* Phase 4.~~ — **DONE**; extended by
   WS4 Piece C1 with the threaded-writer reference (see the WS4 C1 section above).
+- **WS5 — make `normalizeDepartment` + `departmentToAssumptionKey` asset-class-aware**
+  (see the WS5 section above). The completion of what WS4 C2 starts; needs its own
+  Phase 0 (per-asset-class department vocabulary, `VALID_DEPARTMENTS` blast radius,
+  number-changing engine-key re-keying). NOT a cleanup.
 
 **Filed:** 2026-05-21 · Phase 0 investigation. **Updated:** 2026-05-21 — Workstream 1
 executed (`badDebtPct` correction); Workstream 2 investigated **and executed**
@@ -743,3 +808,6 @@ null-cache fix, commit `747e2c83`; no DDL) — WS3 sub-items B (legacy marina se
 (`pnlKeywordRules` double-definition) open, pending decisions.
 **Updated:** 2026-05-22 — WS4 Piece C1 executed (golden-harness threaded-writer reference;
 content in commits `e41a1f25` + `07c7d7e5`, packaging cosmetic — see the WS4 C1 section).
+**Updated:** 2026-05-22 — WS4 Piece C2 executed (actuals-writer inference threaded by asset
+class, commit `a2a4c580`); **WS5 filed** — the two remaining marina-centric chokepoints
+(`normalizeDepartment` + `departmentToAssumptionKey`) that complete what C2 starts.
