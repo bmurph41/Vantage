@@ -781,6 +781,87 @@ and therefore its projected NOI, is still wrong:
 departments that survive `normalizeDepartment` (the marina/shared labels) reach the
 persisted actuals with the right value.
 
+### Step 0 — FROZEN canonical MF/STR assumption-key vocabulary (ratified 2026-05-22)
+
+The keystone of WS5: Step B (`departmentToAssumptionKey`) and Step C (`GrowthRatesTab`
+UI + `getDefaultGrowthRates`/`getDefaultExpenseGrowth` seeders) **must build against one
+identical key set**, or keys emitted by one are not found by the other and the engine
+falls to flat growth (the Phase 0 false-fix). This table is that contract — frozen.
+Build A → B → C against it; do not re-litigate per step.
+
+| Department | Asset class | Side → table | Canonical key | Status | Margin |
+|---|---|---|---|---|---|
+| `Rental` | multifamily | revenue → `granularGrowthRates` | `residential_rental` | **NEW** | No |
+| `Other Income` | multifamily | revenue → `granularGrowthRates` | `other_income` | **NEW** | No |
+| `Payroll` | multifamily | expense → `granularExpenseGrowth` | `payroll` | reuse (already wired) | No |
+| `R&M` | multifamily | expense → `granularExpenseGrowth` | `repairs_maintenance` | reuse (Step-B rewire from `g_and_a`) | No |
+| `Utilities` | multifamily | expense → `granularExpenseGrowth` | `utilities` | reuse (Step-B rewire) | No |
+| `Mgmt Fee` | multifamily | expense → `granularExpenseGrowth` | `management_fees` | reuse (Step-B rewire) | No |
+| `Operating` | multifamily | expense → `granularExpenseGrowth` | `operating_expenses` | **NEW** | No |
+| `Rental` | str | revenue → `granularGrowthRates` | `nightly_rate` | **NEW** | No |
+| `Cleaning` | str | revenue → `granularGrowthRates` | `cleaning_revenue` | **NEW** | No |
+| `Cleaning` | str | expense → `granularExpenseGrowth` | `cleaning_expense` | **NEW** | No |
+| `Platform Fees` | str | expense → `granularExpenseGrowth` | `platform_fees` | **NEW** | No |
+| `Operating` | str | expense → `granularExpenseGrowth` | `operating_expenses` | **NEW** (shared w/ MF `Operating`) | No |
+
+**7 new keys** — `residential_rental`, `other_income`, `operating_expenses`,
+`nightly_rate`, `cleaning_revenue`, `cleaning_expense`, `platform_fees`.
+**4 reused marina keys** — `payroll`, `repairs_maintenance`, `utilities`,
+`management_fees` (all already seeded into `granularExpenseGrowth` defaults; identical
+meaning for MF — only `Payroll` is wired in `departmentToAssumptionKey` today, the other
+three are Step-B rewires from the `g_and_a` catch-all).
+**No new `granularMargins` keys** — every MF/STR department has `hasCOGS: false`;
+`granularMargins[<MF/STR key>]` returns `undefined` and the engine's margin branch
+(`pro-forma-engine-service.ts:918, 1054`) is safely skipped.
+
+**`departmentToAssumptionKey` signature change (Step B):**
+
+```
+- departmentToAssumptionKey(department: string): string
++ departmentToAssumptionKey(department: string, assetClass?: string, side?: 'revenue' | 'expense'): string
+```
+
+Both new params optional → the marina branch stays byte-identical (marina switch ignores
+them). Only callers are `pro-forma-engine-service.ts` (1 import + 8 call sites, all with
+`assetClass` already in scope at `:404`); no other consumers, `.mjs` test harnesses do
+not touch it.
+- `assetClass` disambiguates the one same-string/different-key revenue case:
+  `Rental` → `residential_rental` (multifamily) vs `nightly_rate` (str).
+- `side` disambiguates the one dual-sided department: STR `Cleaning` →
+  `cleaning_revenue` (revenue) vs `cleaning_expense` (expense). Every other department
+  is single-sided; `side` is inert for them. The engine knows the side at each call site
+  by construction — `getRevenueGrowthForDept` is always revenue, `getExpenseGrowthForCategory`
+  always expense.
+
+**Decisions baked in:**
+- **STR `Cleaning` is split, not coupled.** Guest cleaning-fee revenue and cleaner-cost
+  expense escalate independently; separate keys are self-documenting and collision-proof.
+  Splitting later is harder than coupling later.
+- **`operating_expenses` is a new key, NOT folded into `g_and_a`.** For MF/STR `Operating`
+  is the broad opex catch-all (insurance, taxes, marketing, professional, legal — STR also
+  absorbs utilities/repairs); `g_and_a` is narrow General & Admin. Distinct concepts →
+  distinct keys.
+- **Engine mechanism verified (not assumed).** Lines are bucketed by `category` into
+  `revenueBySubcat` / `cogsBySubcat` / `expensesBySubcat` (`pro-forma-engine-service.ts:517-572`).
+  Revenue lines grow via `getRevenueGrowthForDept` → reads `granularGrowthRates` /
+  `yearlyGrowthRates.revenue` only. COGS + expense lines grow via
+  `getExpenseGrowthForCategory` → reads `granularExpenseGrowth` / `yearlyGrowthRates.expenses`
+  only. The two tables are separate objects; no code path reads across — a key present in
+  both holds two independent values, zero cross-contamination. `granularGrowthRates` /
+  `granularExpenseGrowth` keys flow unchanged into the per-year `yearlyGrowthRates` tables
+  via `buildYearlyGrowthRatesForEngine` (`assumptions.tsx:340`) — **one key set fixes both
+  the flat and per-year lookup paths.**
+
+**Collision audit:** the 7 new keys match no existing marina revenue, opex, or
+storage-type key; the 4 reused keys *are* the marina keys (identical meaning). No
+collisions.
+
+**Build contract:** Step B (`departmentToAssumptionKey` re-key + the 3-arg signature)
+and Step C (`GrowthRatesTab` asset-class-aware category cards + `getDefaultGrowthRates`/
+`getDefaultExpenseGrowth` seeders keyed to this table; `getDefaultMargins` unchanged) both
+build against this table verbatim. Golden-harness-gate the engine-key change — it is
+number-changing for every non-marina line.
+
 ---
 
 ## Open items for the execution plan
@@ -811,3 +892,8 @@ content in commits `e41a1f25` + `07c7d7e5`, packaging cosmetic — see the WS4 C
 **Updated:** 2026-05-22 — WS4 Piece C2 executed (actuals-writer inference threaded by asset
 class, commit `a2a4c580`); **WS5 filed** — the two remaining marina-centric chokepoints
 (`normalizeDepartment` + `departmentToAssumptionKey`) that complete what C2 starts.
+**Updated:** 2026-05-22 — WS5 Step 0 ratified: the canonical MF/STR assumption-key
+vocabulary is **FROZEN** (see the WS5 Step 0 table above). 7 new keys + 4 reused marina
+keys; STR `Cleaning` split into `cleaning_revenue`/`cleaning_expense`;
+`departmentToAssumptionKey` gains `assetClass` + `side` params; engine "same-table-by-side"
+mechanism verified. Build A → B → C against the frozen table.
