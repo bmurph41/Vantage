@@ -160,6 +160,14 @@ export async function loadCanonicalActuals(
     .from(modelingActuals)
     .where(eq(modelingActuals.modelingProjectId, projectId));
 
+  // 2b. Load the project's asset class so department inference routes by the
+  // deal's real taxonomy (WS4 C2) instead of always running the marina cascade.
+  const [project] = await db.select({ assetClass: modelingProjects.assetClass })
+    .from(modelingProjects)
+    .where(eq(modelingProjects.id, projectId))
+    .limit(1);
+  const assetClass = project?.assetClass ?? undefined;
+
   // 3. Apply excludes and category overrides
   const actualsAfterOverrides = allActuals
     .filter(a => !excludeSet.has(a.subcategory || ''))
@@ -288,9 +296,8 @@ export async function loadCanonicalActuals(
       
       // Resolve department with consistent priority chain:
       // 1. PNL override → 2. actual.department (from promote-to-actuals) → 3. heuristic
-      // assetClass not in scope here — loadCanonicalActuals takes projectId but
-      // does not fetch the modeling_projects row. Threading TODO: see commit body.
-      const department = deptOverrideMap[key] || actual.department || inferDepartment(key, normalizedCat, undefined);
+      //    keyed by the project's real asset class (WS4 C2 — fetched in §2b above).
+      const department = deptOverrideMap[key] || actual.department || inferDepartment(key, normalizedCat, assetClass);
       
       lineItems[key] = {
         monthlyAmounts: {},

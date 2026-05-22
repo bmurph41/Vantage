@@ -1,8 +1,9 @@
 import { db } from '../db';
-import { 
+import {
   quickbooksIntegrations,
   quickbooksSyncLogs,
   modelingActuals,
+  modelingProjects,
   organizations
 } from '@shared/schema';
 import { eq, and, desc, sql, gte, lte } from 'drizzle-orm';
@@ -597,6 +598,14 @@ export class QuickBooksService {
           eq(modelingActuals.dataSource, 'quickbooks')
         ));
 
+      // Load the project's asset class so department inference routes by the
+      // deal's real taxonomy (WS4 C2) instead of always running the marina cascade.
+      const [project] = await db.select({ assetClass: modelingProjects.assetClass })
+        .from(modelingProjects)
+        .where(eq(modelingProjects.id, modelingProjectId))
+        .limit(1);
+      const assetClass = project?.assetClass ?? undefined;
+
       let transactionsProcessed = 0;
       let transactionsImported = 0;
 
@@ -605,8 +614,8 @@ export class QuickBooksService {
 
         const categoryMapping = this.mapQuickBooksAccountToCategory(row.account, row.type);
         const { inferDepartment } = await import('../utils/department-mapping');
-        // assetClass not in scope — see commit body threading TODO.
-        const dept = inferDepartment(categoryMapping.subcategory, categoryMapping.category, undefined);
+        // heuristic keyed by the project's real asset class (WS4 C2)
+        const dept = inferDepartment(categoryMapping.subcategory, categoryMapping.category, assetClass);
         
         await db.insert(modelingActuals).values({
           orgId,

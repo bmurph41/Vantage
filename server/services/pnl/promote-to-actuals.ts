@@ -4,7 +4,7 @@ import {
   pnlDocuments,
   pnlParsedStatements,
 } from '@shared/pnl-pipeline-schema';
-import { modelingActuals, pnlCanonicalLineItems, pnlJobs } from '@shared/schema';
+import { modelingActuals, modelingProjects, pnlCanonicalLineItems, pnlJobs } from '@shared/schema';
 import { eq, sql } from 'drizzle-orm';
 import { MARINA_COA_SEED } from '@shared/coa/marina-coa-seed';
 import { sectionToCategory, majorGroupToCategory, inferDepartment, normalizeDepartment } from '../../utils/department-mapping';
@@ -44,6 +44,14 @@ export async function promotePnlFactsToActuals(
   for (const item of canonicalItems) {
     canonicalMap[item.id] = item;
   }
+
+  // Load the project's asset class so department inference routes by the deal's
+  // real taxonomy (WS4 C2) instead of always running the marina cascade.
+  const [project] = await db.select({ assetClass: modelingProjects.assetClass })
+    .from(modelingProjects)
+    .where(eq(modelingProjects.id, modelingProjectId))
+    .limit(1);
+  const assetClass = project?.assetClass ?? undefined;
 
   const yearsSet = new Set<number>();
 
@@ -143,8 +151,8 @@ export async function promotePnlFactsToActuals(
         const rawDepartment = pipelineDept
           || coaEntry?.department
           || canonical.subcategoryGroup
-          // assetClass not in scope — see commit body threading TODO.
-          || inferDepartment(fact.sourceLabel || subcategory, category, undefined);
+          // heuristic keyed by the project's real asset class (WS4 C2)
+          || inferDepartment(fact.sourceLabel || subcategory, category, assetClass);
         const department = normalizeDepartment(rawDepartment);
 
         const year = fact.fiscalYear;

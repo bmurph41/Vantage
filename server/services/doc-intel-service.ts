@@ -11,6 +11,7 @@ import {
   docIntelTrainingExamples,
   pnlLines,
   modelingActuals,
+  modelingProjects,
   rentRolls,
   rentRollEntries,
   marinaCustomers,
@@ -2397,6 +2398,14 @@ Respond with JSON only:
       'payroll': 'Expenses'
     };
 
+    // Load the project's asset class so department inference routes by the
+    // deal's real taxonomy (WS4 C2) instead of always running the marina cascade.
+    const [project] = await db.select({ assetClass: modelingProjects.assetClass })
+      .from(modelingProjects)
+      .where(eq(modelingProjects.id, projectId))
+      .limit(1);
+    const assetClass = project?.assetClass ?? undefined;
+
     for (const item of items) {
       let plCategory: string | null = null;
       let subcategory: string = 'Uncategorized';
@@ -2555,9 +2564,9 @@ Respond with JSON only:
         inferredDept = deptKeyToLabel(item.departmentConfirmed);
         deptSource = 'departmentConfirmed';
       } else {
-        // No user confirmation — fall back to heuristic inference
-        // assetClass not in scope — see commit body threading TODO.
-        inferredDept = inferDeptForActual(subcategory, plCategory, undefined);
+        // No user confirmation — fall back to heuristic inference,
+        // keyed by the project's real asset class (WS4 C2)
+        inferredDept = inferDeptForActual(subcategory, plCategory, assetClass);
         deptSource = 'inferred';
       }
 
