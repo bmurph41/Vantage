@@ -82,13 +82,13 @@
         "serverNative": "Storage",
         "serverUndefined": "Storage",
         "serverMarina": "Storage",
-        "client": "General"
+        "client": "Storage"
       },
       "assumptionKey": {
         "serverNative": "storage",
         "serverUndefined": "storage",
         "serverMarina": "storage",
-        "client": "g_and_a"
+        "client": "storage"
       }
     },
     {
@@ -286,13 +286,13 @@
         "serverNative": "Marina & Amenities",
         "serverUndefined": "Marina & Amenities",
         "serverMarina": "Marina & Amenities",
-        "client": "General"
+        "client": "Marina & Amenities"
       },
       "assumptionKey": {
         "serverNative": "marina_amenities",
         "serverUndefined": "marina_amenities",
         "serverMarina": "marina_amenities",
-        "client": "g_and_a"
+        "client": "marina_amenities"
       }
     },
     {
@@ -456,13 +456,13 @@
         "serverNative": "General",
         "serverUndefined": "General",
         "serverMarina": "General",
-        "client": "Marina & Amenities"
+        "client": "General"
       },
       "assumptionKey": {
         "serverNative": "g_and_a",
         "serverUndefined": "g_and_a",
         "serverMarina": "g_and_a",
-        "client": "marina_amenities"
+        "client": "g_and_a"
       }
     },
     {
@@ -473,13 +473,13 @@
         "serverNative": "General",
         "serverUndefined": "General",
         "serverMarina": "General",
-        "client": "Service"
+        "client": "General"
       },
       "assumptionKey": {
         "serverNative": "g_and_a",
         "serverUndefined": "g_and_a",
         "serverMarina": "g_and_a",
-        "client": "service"
+        "client": "g_and_a"
       }
     },
     {
@@ -558,13 +558,13 @@
         "serverNative": "Marina & Amenities",
         "serverUndefined": "Marina & Amenities",
         "serverMarina": "Marina & Amenities",
-        "client": "Service"
+        "client": "Marina & Amenities"
       },
       "assumptionKey": {
         "serverNative": "marina_amenities",
         "serverUndefined": "marina_amenities",
         "serverMarina": "marina_amenities",
-        "client": "service"
+        "client": "marina_amenities"
       }
     },
     {
@@ -592,7 +592,7 @@
         "serverNative": "Rental",
         "serverUndefined": "General",
         "serverMarina": "General",
-        "client": "General"
+        "client": "Rental"
       },
       "assumptionKey": {
         "serverNative": "g_and_a",
@@ -609,7 +609,7 @@
         "serverNative": "Rental",
         "serverUndefined": "General",
         "serverMarina": "General",
-        "client": "General"
+        "client": "Rental"
       },
       "assumptionKey": {
         "serverNative": "g_and_a",
@@ -626,7 +626,7 @@
         "serverNative": "Rental",
         "serverUndefined": "General",
         "serverMarina": "General",
-        "client": "General"
+        "client": "Rental"
       },
       "assumptionKey": {
         "serverNative": "g_and_a",
@@ -643,7 +643,7 @@
         "serverNative": "Rental",
         "serverUndefined": "General",
         "serverMarina": "General",
-        "client": "General"
+        "client": "Rental"
       },
       "assumptionKey": {
         "serverNative": "g_and_a",
@@ -660,7 +660,7 @@
         "serverNative": "Rental",
         "serverUndefined": "General",
         "serverMarina": "General",
-        "client": "General"
+        "client": "Rental"
       },
       "assumptionKey": {
         "serverNative": "g_and_a",
@@ -677,7 +677,7 @@
         "serverNative": "Rental",
         "serverUndefined": "General",
         "serverMarina": "General",
-        "client": "General"
+        "client": "Rental"
       },
       "assumptionKey": {
         "serverNative": "g_and_a",
@@ -694,7 +694,7 @@
         "serverNative": "Other Income",
         "serverUndefined": "General",
         "serverMarina": "General",
-        "client": "General"
+        "client": "Other Income"
       },
       "assumptionKey": {
         "serverNative": "g_and_a",
@@ -711,7 +711,7 @@
         "serverNative": "Other Income",
         "serverUndefined": "Marina & Amenities",
         "serverMarina": "Marina & Amenities",
-        "client": "General"
+        "client": "Other Income"
       },
       "assumptionKey": {
         "serverNative": "g_and_a",
@@ -728,7 +728,7 @@
         "serverNative": "Other Income",
         "serverUndefined": "Marina & Amenities",
         "serverMarina": "Marina & Amenities",
-        "client": "General"
+        "client": "Other Income"
       },
       "assumptionKey": {
         "serverNative": "g_and_a",
@@ -745,7 +745,7 @@
         "serverNative": "Other Income",
         "serverUndefined": "General",
         "serverMarina": "General",
-        "client": "General"
+        "client": "Other Income"
       },
       "assumptionKey": {
         "serverNative": "g_and_a",
@@ -762,7 +762,7 @@
         "serverNative": "Other Income",
         "serverUndefined": "Utilities",
         "serverMarina": "Utilities",
-        "client": "General"
+        "client": "Other Income"
       },
       "assumptionKey": {
         "serverNative": "g_and_a",
@@ -779,7 +779,7 @@
         "serverNative": "Mgmt Fee",
         "serverUndefined": "General",
         "serverMarina": "General",
-        "client": "General"
+        "client": "Mgmt Fee"
       },
       "assumptionKey": {
         "serverNative": "g_and_a",
@@ -813,13 +813,13 @@
         "serverNative": "Payroll",
         "serverUndefined": "Payroll",
         "serverMarina": "Payroll",
-        "client": "General"
+        "client": "Payroll"
       },
       "assumptionKey": {
         "serverNative": "payroll",
         "serverUndefined": "payroll",
         "serverMarina": "payroll",
-        "client": "g_and_a"
+        "client": "payroll"
       }
     },
     {
@@ -830,7 +830,7 @@
         "serverNative": "Utilities",
         "serverUndefined": "Marina & Amenities",
         "serverMarina": "Marina & Amenities",
-        "client": "General"
+        "client": "Utilities"
       },
       "assumptionKey": {
         "serverNative": "g_and_a",
@@ -847,13 +847,13 @@
         "serverNative": "Utilities",
         "serverUndefined": "Marina & Amenities",
         "serverMarina": "Marina & Amenities",
-        "client": "Marina & Amenities"
+        "client": "Utilities"
       },
       "assumptionKey": {
         "serverNative": "g_and_a",
         "serverUndefined": "marina_amenities",
         "serverMarina": "marina_amenities",
-        "client": "marina_amenities"
+        "client": "g_and_a"
       }
     },
     {
@@ -864,7 +864,7 @@
         "serverNative": "Utilities",
         "serverUndefined": "General",
         "serverMarina": "General",
-        "client": "General"
+        "client": "Utilities"
       },
       "assumptionKey": {
         "serverNative": "g_and_a",
@@ -881,7 +881,7 @@
         "serverNative": "R&M",
         "serverUndefined": "General",
         "serverMarina": "General",
-        "client": "General"
+        "client": "R&M"
       },
       "assumptionKey": {
         "serverNative": "g_and_a",
@@ -898,7 +898,7 @@
         "serverNative": "R&M",
         "serverUndefined": "General",
         "serverMarina": "General",
-        "client": "General"
+        "client": "R&M"
       },
       "assumptionKey": {
         "serverNative": "g_and_a",
@@ -915,13 +915,13 @@
         "serverNative": "R&M",
         "serverUndefined": "Service",
         "serverMarina": "Service",
-        "client": "Service"
+        "client": "R&M"
       },
       "assumptionKey": {
         "serverNative": "g_and_a",
         "serverUndefined": "service",
         "serverMarina": "service",
-        "client": "service"
+        "client": "g_and_a"
       }
     },
     {
@@ -932,7 +932,7 @@
         "serverNative": "Operating",
         "serverUndefined": "General",
         "serverMarina": "General",
-        "client": "General"
+        "client": "Operating"
       },
       "assumptionKey": {
         "serverNative": "g_and_a",
@@ -949,7 +949,7 @@
         "serverNative": "Operating",
         "serverUndefined": "Insurance",
         "serverMarina": "Insurance",
-        "client": "General"
+        "client": "Operating"
       },
       "assumptionKey": {
         "serverNative": "g_and_a",
@@ -966,7 +966,7 @@
         "serverNative": "Operating",
         "serverUndefined": "General",
         "serverMarina": "General",
-        "client": "General"
+        "client": "Operating"
       },
       "assumptionKey": {
         "serverNative": "g_and_a",
@@ -983,7 +983,7 @@
         "serverNative": "Operating",
         "serverUndefined": "General",
         "serverMarina": "General",
-        "client": "General"
+        "client": "Operating"
       },
       "assumptionKey": {
         "serverNative": "g_and_a",
@@ -1000,7 +1000,7 @@
         "serverNative": "Rental",
         "serverUndefined": "General",
         "serverMarina": "General",
-        "client": "General"
+        "client": "Rental"
       },
       "assumptionKey": {
         "serverNative": "g_and_a",
@@ -1017,7 +1017,7 @@
         "serverNative": "Rental",
         "serverUndefined": "General",
         "serverMarina": "General",
-        "client": "General"
+        "client": "Rental"
       },
       "assumptionKey": {
         "serverNative": "g_and_a",
@@ -1034,7 +1034,7 @@
         "serverNative": "Rental",
         "serverUndefined": "General",
         "serverMarina": "General",
-        "client": "General"
+        "client": "Rental"
       },
       "assumptionKey": {
         "serverNative": "g_and_a",
@@ -1051,7 +1051,7 @@
         "serverNative": "Rental",
         "serverUndefined": "General",
         "serverMarina": "General",
-        "client": "General"
+        "client": "Rental"
       },
       "assumptionKey": {
         "serverNative": "g_and_a",
@@ -1068,7 +1068,7 @@
         "serverNative": "Rental",
         "serverUndefined": "General",
         "serverMarina": "General",
-        "client": "General"
+        "client": "Rental"
       },
       "assumptionKey": {
         "serverNative": "g_and_a",
@@ -1085,7 +1085,7 @@
         "serverNative": "Cleaning",
         "serverUndefined": "Service",
         "serverMarina": "Service",
-        "client": "General"
+        "client": "Cleaning"
       },
       "assumptionKey": {
         "serverNative": "g_and_a",
@@ -1102,13 +1102,13 @@
         "serverNative": "Cleaning",
         "serverUndefined": "Service",
         "serverMarina": "Service",
-        "client": "Service"
+        "client": "Cleaning"
       },
       "assumptionKey": {
         "serverNative": "g_and_a",
         "serverUndefined": "service",
         "serverMarina": "service",
-        "client": "service"
+        "client": "g_and_a"
       }
     },
     {
@@ -1119,7 +1119,7 @@
         "serverNative": "Cleaning",
         "serverUndefined": "General",
         "serverMarina": "General",
-        "client": "General"
+        "client": "Cleaning"
       },
       "assumptionKey": {
         "serverNative": "g_and_a",
@@ -1136,13 +1136,13 @@
         "serverNative": "Platform Fees",
         "serverUndefined": "Marina & Amenities",
         "serverMarina": "Marina & Amenities",
-        "client": "Service"
+        "client": "Platform Fees"
       },
       "assumptionKey": {
         "serverNative": "g_and_a",
         "serverUndefined": "marina_amenities",
         "serverMarina": "marina_amenities",
-        "client": "service"
+        "client": "g_and_a"
       }
     },
     {
@@ -1153,7 +1153,7 @@
         "serverNative": "Platform Fees",
         "serverUndefined": "Boat Brokerage",
         "serverMarina": "Boat Brokerage",
-        "client": "General"
+        "client": "Platform Fees"
       },
       "assumptionKey": {
         "serverNative": "g_and_a",
@@ -1170,7 +1170,7 @@
         "serverNative": "Platform Fees",
         "serverUndefined": "General",
         "serverMarina": "General",
-        "client": "General"
+        "client": "Platform Fees"
       },
       "assumptionKey": {
         "serverNative": "g_and_a",
@@ -1187,7 +1187,7 @@
         "serverNative": "Operating",
         "serverUndefined": "General",
         "serverMarina": "General",
-        "client": "General"
+        "client": "Operating"
       },
       "assumptionKey": {
         "serverNative": "g_and_a",
@@ -1204,7 +1204,7 @@
         "serverNative": "Operating",
         "serverUndefined": "Utilities",
         "serverMarina": "Utilities",
-        "client": "General"
+        "client": "Operating"
       },
       "assumptionKey": {
         "serverNative": "g_and_a",
@@ -1221,7 +1221,7 @@
         "serverNative": "Operating",
         "serverUndefined": "General",
         "serverMarina": "General",
-        "client": "General"
+        "client": "Operating"
       },
       "assumptionKey": {
         "serverNative": "g_and_a",
@@ -1238,7 +1238,7 @@
         "serverNative": "Operating",
         "serverUndefined": "Insurance",
         "serverMarina": "Insurance",
-        "client": "General"
+        "client": "Operating"
       },
       "assumptionKey": {
         "serverNative": "g_and_a",
@@ -1255,7 +1255,7 @@
         "serverNative": "Operating",
         "serverUndefined": "General",
         "serverMarina": "General",
-        "client": "General"
+        "client": "Operating"
       },
       "assumptionKey": {
         "serverNative": "g_and_a",
@@ -1272,13 +1272,13 @@
         "serverNative": "General",
         "serverUndefined": "General",
         "serverMarina": "General",
-        "client": "Storage"
+        "client": "General"
       },
       "assumptionKey": {
         "serverNative": "g_and_a",
         "serverUndefined": "g_and_a",
         "serverMarina": "g_and_a",
-        "client": "storage"
+        "client": "g_and_a"
       }
     },
     {
@@ -1306,7 +1306,7 @@
         "serverNative": "Insurance",
         "serverUndefined": "Insurance",
         "serverMarina": "Insurance",
-        "client": "General"
+        "client": "Insurance"
       },
       "assumptionKey": {
         "serverNative": "g_and_a",
@@ -1340,13 +1340,13 @@
         "serverNative": "Payroll",
         "serverUndefined": "Payroll",
         "serverMarina": "Payroll",
-        "client": "General"
+        "client": "Payroll"
       },
       "assumptionKey": {
         "serverNative": "payroll",
         "serverUndefined": "payroll",
         "serverMarina": "payroll",
-        "client": "g_and_a"
+        "client": "payroll"
       }
     },
     {
@@ -1425,7 +1425,7 @@
         "serverNative": "Utilities",
         "serverUndefined": "Utilities",
         "serverMarina": "Utilities",
-        "client": "General"
+        "client": "Utilities"
       },
       "assumptionKey": {
         "serverNative": "g_and_a",
@@ -1510,13 +1510,13 @@
         "serverNative": "Marina & Amenities",
         "serverUndefined": "Marina & Amenities",
         "serverMarina": "Marina & Amenities",
-        "client": "General"
+        "client": "Marina & Amenities"
       },
       "assumptionKey": {
         "serverNative": "marina_amenities",
         "serverUndefined": "marina_amenities",
         "serverMarina": "marina_amenities",
-        "client": "g_and_a"
+        "client": "marina_amenities"
       }
     },
     {
@@ -1561,13 +1561,13 @@
         "serverNative": "Marina & Amenities",
         "serverUndefined": "Marina & Amenities",
         "serverMarina": "Marina & Amenities",
-        "client": "Service"
+        "client": "Marina & Amenities"
       },
       "assumptionKey": {
         "serverNative": "marina_amenities",
         "serverUndefined": "marina_amenities",
         "serverMarina": "marina_amenities",
-        "client": "service"
+        "client": "marina_amenities"
       }
     },
     {
@@ -1612,7 +1612,7 @@
         "serverNative": "Utilities",
         "serverUndefined": "Utilities",
         "serverMarina": "Utilities",
-        "client": "General"
+        "client": "Utilities"
       },
       "assumptionKey": {
         "serverNative": "g_and_a",
@@ -1646,13 +1646,13 @@
         "serverNative": "Boat Brokerage",
         "serverUndefined": "Boat Brokerage",
         "serverMarina": "Boat Brokerage",
-        "client": "General"
+        "client": "Boat Brokerage"
       },
       "assumptionKey": {
         "serverNative": "boat_brokerage",
         "serverUndefined": "boat_brokerage",
         "serverMarina": "boat_brokerage",
-        "client": "g_and_a"
+        "client": "boat_brokerage"
       }
     },
     {
@@ -1782,7 +1782,7 @@
         "serverNative": "Repairs & Maintenance",
         "serverUndefined": "Repairs & Maintenance",
         "serverMarina": "Repairs & Maintenance",
-        "client": "General"
+        "client": "Repairs & Maintenance"
       },
       "assumptionKey": {
         "serverNative": "g_and_a",
@@ -1816,13 +1816,13 @@
         "serverNative": "Marina & Amenities",
         "serverUndefined": "Marina & Amenities",
         "serverMarina": "Marina & Amenities",
-        "client": "Service"
+        "client": "Marina & Amenities"
       },
       "assumptionKey": {
         "serverNative": "marina_amenities",
         "serverUndefined": "marina_amenities",
         "serverMarina": "marina_amenities",
-        "client": "service"
+        "client": "marina_amenities"
       }
     }
   ],

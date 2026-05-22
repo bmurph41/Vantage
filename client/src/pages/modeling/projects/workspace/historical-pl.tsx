@@ -4,7 +4,7 @@ import { queryClient, apiRequest } from '@/lib/queryClient';
 // PLModeToggle moved to Inputs tab (Session 4)
 // DirectInputForm moved to Inputs tab (Session 4)
 import { formatCurrency, formatPercent } from '@/lib/utils';
-import { inferDepartmentClient } from '@/lib/department-inference';
+import { inferDepartment } from '@shared/coa/department-mapping';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -1451,7 +1451,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                           const subcats = annualSubcategories[category as keyof typeof annualSubcategories] || [];
                           const deptGrouped: Record<string, string[]> = {};
                           subcats.forEach((sub: string) => {
-                            const dept = annualSubcatDeptMap[sub] || inferDepartmentClient(sub, category);
+                            const dept = annualSubcatDeptMap[sub] || inferDepartment(sub, category, project?.assetClass ?? project?.asset_class);
                             if (!deptGrouped[dept]) deptGrouped[dept] = [];
                             deptGrouped[dept].push(sub);
                           });
@@ -2339,7 +2339,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                         const subcats = annualSubcategories[category as keyof typeof annualSubcategories] || [];
                         const deptGrouped: Record<string, string[]> = {};
                         subcats.forEach((sub: string) => {
-                          const dept = annualSubcatDeptMap[sub] || inferDepartmentClient(sub, category);
+                          const dept = annualSubcatDeptMap[sub] || inferDepartment(sub, category, project?.assetClass ?? project?.asset_class);
                           if (!deptGrouped[dept]) deptGrouped[dept] = [];
                           deptGrouped[dept].push(sub);
                         });

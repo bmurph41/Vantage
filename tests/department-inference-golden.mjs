@@ -16,9 +16,9 @@
 //              pro-forma engine's department -> key -> growth-rate arithmetic.
 //
 // SEAM — pure functions only, no DB, no engine change:
-//   • server inferDepartment           (server/utils/department-mapping.ts)
+//   • server inferDepartment           (server/utils/department-mapping.ts shim → shared/coa/)
 //   • server departmentToAssumptionKey (same file)
-//   • client inferDepartmentClient     (client/src/lib/department-inference.ts)
+//   • client inferDepartment           (client imports @shared/coa/department-mapping — WS4 Piece B)
 //
 // The four dispatch modes per input:
 //   serverNative    — inferDepartment(label, category, <scenario asset class>)
@@ -30,8 +30,10 @@
 //                     surface — non-marina deals run the marina cascade here.
 //   serverMarina    — inferDepartment(label, category, 'marina')
 //                     explicit marina; confirms marina === undefined identity.
-//   client          — inferDepartmentClient(label, category)
-//                     the DRIFTED client copy (stale marina-only snapshot).
+//   client          — inferDepartment(label, category, <scenario asset class>)
+//                     post-WS4-Piece-B the client imports the shared inferDepartment
+//                     and threads the project's asset class — identical to serverNative.
+//                     The drifted marina-only client copy was retired.
 //
 // The golden captures CURRENT behavior INCLUDING current bugs (the marina
 // cascade running on non-marina deals). That is intentional: WS4 fixing that
@@ -44,7 +46,6 @@
 
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { inferDepartment, departmentToAssumptionKey } from '/home/runner/workspace/server/utils/department-mapping.ts';
-import { inferDepartmentClient } from '/home/runner/workspace/client/src/lib/department-inference.ts';
 
 const GOLDEN_PATH = '/home/runner/workspace/tests/department-inference-golden.json';
 const UPDATE = process.argv.includes('--update');
@@ -208,7 +209,7 @@ function computeSnapshot() {
     const dNative = inferDepartment(label, category, ac);
     const dUndef = inferDepartment(label, category, undefined);
     const dMarina = inferDepartment(label, category, 'marina');
-    const dClient = inferDepartmentClient(label, category);
+    const dClient = inferDepartment(label, category, ac); // WS4 Piece B — client now uses shared inferDepartment(ac)
     return {
       label, category, scenario,
       department: {

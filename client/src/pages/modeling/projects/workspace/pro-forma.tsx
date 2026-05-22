@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, Fragment, useRef } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { queryClient, apiRequest } from '@/lib/queryClient';
 import { formatCurrency, formatPercent } from '@/lib/utils';
-import { inferDepartmentClient } from '@/lib/department-inference';
+import { inferDepartment } from '@shared/coa/department-mapping';
 import { useHoldPeriod } from '@/hooks/use-hold-period';
 import { getProFormaConfig } from '@shared/pro-forma-config';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -811,7 +811,7 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
     for (const [category, items] of Object.entries(tableData)) {
       result[category] = {};
       for (const [itemName, values] of Object.entries(items)) {
-        const dept = serverDeptMap[itemName] || inferDepartmentClient(itemName, category);
+        const dept = serverDeptMap[itemName] || inferDepartment(itemName, category, project?.assetClass ?? project?.asset_class);
         if (!result[category][dept]) {
           result[category][dept] = {};
         }
@@ -819,7 +819,7 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
       }
     }
     return result;
-  }, [tableData, serverDeptMap]);
+  }, [tableData, serverDeptMap, project]);
 
   // Calculate totals for each category and period
   const getCategoryTotal = (category: string, periodId: string) => {
