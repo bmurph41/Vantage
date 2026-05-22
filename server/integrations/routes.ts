@@ -7,6 +7,7 @@ import { encrypt, decrypt } from './crypto';
 import crypto from 'crypto';
 import { ConnectorFactory } from './connectors';
 import type { ConnectorConfig } from './connectors';
+import { pmsConflictStore, getConflictKey, recordConflict as recordPmsConflict } from './conflict-store';
 
 export const integrationsRouter = Router();
 
@@ -1667,6 +1668,259 @@ integrationsRouter.get('/api/integrations/quickbooks/status', async (req: Reques
       error: 'Failed to check connection status',
       message: error.message || 'An unexpected error occurred'
     });
+  }
+});
+
+// ── Marina PMS Status & Conflict Detection ───────────────────────────────────
+
+const MARINA_PMS_KEYS = ['dockwa', 'havenstar', 'dockmaster', 'marina_office', 'storable_marine', 'scribble'];
+
+integrationsRouter.get('/api/integrations/pms/status', async (req: Request, res: Response) => {
+  const userId = requireUser(req, res);
+  if (!userId) return;
+  const orgId = getOrgId(req);
+
+  try {
+    const whereConditions = [
+      eq(userIntegrations.userId, userId),
+      inArray(userIntegrations.integrationKey, MARINA_PMS_KEYS),
+    ];
+    if (orgId && userIntegrations.orgId) {
+      whereConditions.push(eq(userIntegrations.orgId, orgId));
+    }
+
+    const pmsConnections = await db.select().from(userIntegrations).where(and(...whereConditions));
+
+    const metricsConditions = [
+      eq(integrationSyncMetrics.userId, userId),
+      inArray(integrationSyncMetrics.integrationKey, MARINA_PMS_KEYS),
+    ];
+    if (orgId) metricsConditions.push(eq(integrationSyncMetrics.orgId, orgId));
+    const metricsData = await db.select().from(integrationSyncMetrics).where(and(...metricsConditions));
+    const metricsMap = new Map(metricsData.map(m => [m.integrationKey, m]));
+
+    const historyConditions = [
+      eq(integrationSyncHistory.userId, userId),
+      inArray(integrationSyncHistory.integrationKey, MARINA_PMS_KEYS),
+    ];
+    if (orgId) historyConditions.push(eq(integrationSyncHistory.orgId, orgId));
+    const recentHistory = await db.select().from(integrationSyncHistory)
+      .where(and(...historyConditions))
+      .orderBy(desc(integrationSyncHistory.startedAt))
+      .limit(20);
+
+    const statusList = pmsConnections.map(conn => {
+      const regItem = getIntegrationByKey(conn.integrationKey);
+      const metrics = metricsMap.get(conn.integrationKey);
+      const connHistory = recentHistory.filter(h => h.integrationKey === conn.integrationKey);
+      const lastRun = connHistory[0] || null;
+
+      let health: 'healthy' | 'warning' | 'error' | 'disconnected' = 'disconnected';
+      if (!conn.isConnected) {
+        health = 'disconnected';
+      } else if (conn.errorMessage) {
+        health = 'error';
+      } else if (metrics && metrics.failedSyncs > 0 && metrics.successfulSyncs === 0) {
+        health = 'error';
+      } else if (metrics && metrics.failedSyncs > 0) {
+        health = 'warning';
+      } else {
+        health = 'healthy';
+      }
+
+      return {
+        key: conn.integrationKey,
+        name: regItem?.name || conn.integrationKey,
+        category: regItem?.category || 'Marina PMS',
+        isConnected: conn.isConnected,
+        health,
+        lastSyncAt: conn.lastSyncAt,
+        errorMessage: conn.errorMessage,
+        metrics: metrics ? {
+          totalSyncs: metrics.totalSyncs,
+          successfulSyncs: metrics.successfulSyncs,
+          failedSyncs: metrics.failedSyncs,
+          totalRecordsImported: metrics.totalRecordsImported,
+          healthScore: metrics.healthScore,
+          lastSuccessfulSyncAt: metrics.lastSuccessfulSyncAt,
+        } : null,
+        recentHistory: connHistory.slice(0, 5).map(h => ({
+          id: h.id,
+          syncType: h.syncType,
+          status: h.status,
+          startedAt: h.startedAt,
+          completedAt: h.completedAt,
+          recordsProcessed: h.recordsProcessed,
+          recordsCreated: h.recordsCreated,
+          recordsUpdated: h.recordsUpdated,
+          errorCount: h.errorCount,
+          errors: ((h.errors || []) as any[]).slice(0, 3),
+        })),
+        dataMappings: (regItem?.dataMappings || []).map(m => ({
+          sourceEntity: m.sourceEntity,
+          targetModule: m.targetModule,
+          targetEntity: m.targetEntity,
+          frequency: m.frequency,
+        })),
+        settings: conn.settings || {},
+      };
+    });
+
+    const allPmsKeys = MARINA_PMS_KEYS;
+    const connectedKeys = new Set(pmsConnections.map(c => c.integrationKey));
+    const availablePms = allPmsKeys
+      .filter(k => !connectedKeys.has(k))
+      .map(k => {
+        const reg = getIntegrationByKey(k);
+        return reg ? { key: k, name: reg.name, category: reg.category, description: reg.description } : null;
+      })
+      .filter(Boolean);
+
+    res.json({
+      connected: statusList,
+      available: availablePms,
+      summary: {
+        connectedCount: statusList.filter(s => s.isConnected).length,
+        healthyCount: statusList.filter(s => s.health === 'healthy').length,
+        errorCount: statusList.filter(s => s.health === 'error').length,
+        totalRecordsImported: metricsData.reduce((sum, m) => sum + (m.totalRecordsImported || 0), 0),
+      },
+    });
+  } catch (error) {
+    console.error('Error fetching PMS status:', error);
+    res.status(500).json({ error: 'Failed to fetch PMS status' });
+  }
+});
+
+integrationsRouter.get('/api/integrations/pms/conflicts', async (req: Request, res: Response) => {
+  const userId = requireUser(req, res);
+  if (!userId) return;
+  const orgId = getOrgId(req) || userId;
+
+  try {
+    const conflicts = pmsConflictStore.get(getConflictKey(orgId)) || [];
+    const open = conflicts.filter(c => c.status === 'open');
+    res.json({ conflicts: open, total: open.length });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch conflicts' });
+  }
+});
+
+integrationsRouter.post('/api/integrations/pms/conflicts', async (req: Request, res: Response) => {
+  const userId = requireUser(req, res);
+  if (!userId) return;
+  const orgId = getOrgId(req) || userId;
+
+  try {
+    const { integrationKey, entityType, entityId, fieldName, pmsValue, manualValue, pmsSource } = req.body;
+
+    recordPmsConflict({
+      orgId,
+      integrationKey,
+      pmsSource: pmsSource || integrationKey,
+      entityType,
+      entityId,
+      fieldName,
+      pmsValue,
+      manualValue,
+    });
+
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to record conflict' });
+  }
+});
+
+integrationsRouter.post('/api/integrations/pms/conflicts/:conflictId/resolve', async (req: Request, res: Response) => {
+  const userId = requireUser(req, res);
+  if (!userId) return;
+  const orgId = getOrgId(req) || userId;
+
+  const { conflictId } = req.params;
+  const { resolution, resolvedValue } = req.body;
+
+  if (!resolution || !['use_pms', 'use_manual', 'use_custom'].includes(resolution)) {
+    return res.status(400).json({ error: 'Invalid resolution. Use: use_pms, use_manual, or use_custom.' });
+  }
+
+  try {
+    const conflicts = pmsConflictStore.get(getConflictKey(orgId)) || [];
+    const conflict = conflicts.find(c => c.id === conflictId);
+
+    if (!conflict) {
+      return res.status(404).json({ error: 'Conflict not found' });
+    }
+
+    const winningValue = resolution === 'use_custom'
+      ? resolvedValue
+      : resolution === 'use_pms'
+        ? conflict.pmsValue
+        : conflict.manualValue;
+
+    conflict.status = 'resolved';
+    conflict.resolution = resolution;
+    conflict.resolvedValue = winningValue;
+    conflict.resolvedAt = new Date().toISOString();
+    conflict.resolvedBy = userId;
+
+    pmsConflictStore.set(getConflictKey(orgId), conflicts);
+
+    // Apply the winning value back to the underlying entity when PMS wins
+    // (use_manual means keep existing DB value; use_pms / use_custom writes back)
+    if (resolution !== 'use_manual' && winningValue != null) {
+      try {
+        const { storageLocations, marinaLeases } = await import('@shared/schema');
+        const { db } = await import('../db');
+        const { eq, and } = await import('drizzle-orm');
+
+        if (conflict.entityType === 'slip') {
+          await db.update(storageLocations)
+            .set({ monthlyRate: String(winningValue), updatedAt: new Date() })
+            .where(
+              and(
+                eq(storageLocations.orgId, orgId),
+                eq(storageLocations.externalId, conflict.entityId)
+              )
+            );
+        } else if (conflict.entityType === 'lease') {
+          await db.update(marinaLeases)
+            .set({ monthlyRent: String(winningValue), updatedAt: new Date() })
+            .where(
+              and(
+                eq(marinaLeases.orgId, orgId),
+                eq(marinaLeases.externalId, conflict.entityId)
+              )
+            );
+        }
+      } catch (writeErr) {
+        console.error('[PMS Conflict] Failed to apply resolution to entity:', writeErr);
+      }
+    }
+
+    res.json({ success: true, conflict });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to resolve conflict' });
+  }
+});
+
+integrationsRouter.post('/api/integrations/pms/conflicts/dismiss-all', async (req: Request, res: Response) => {
+  const userId = requireUser(req, res);
+  if (!userId) return;
+  const orgId = getOrgId(req) || userId;
+
+  try {
+    const conflicts = pmsConflictStore.get(getConflictKey(orgId)) || [];
+    conflicts.forEach(c => {
+      if (c.status === 'open') {
+        c.status = 'dismissed';
+        c.resolvedAt = new Date().toISOString();
+        c.resolvedBy = userId;
+      }
+    });
+    pmsConflictStore.set(getConflictKey(orgId), conflicts);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to dismiss conflicts' });
   }
 });
 

@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useLocation } from "wouter";
+import { Link, useLocation } from "wouter";
 import {
   Plug,
   Search,
@@ -35,6 +35,8 @@ import {
   ArrowRight,
   BadgeCheck,
   Layers,
+  Activity,
+  ChevronRight,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -540,6 +542,33 @@ export default function IntegrationsMarketplace() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           <GoogleMapsCard />
         </div>
+      </div>
+
+      {/* Marina PMS Status Dashboard */}
+      <div className="mb-6">
+        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">Marina PMS</h2>
+        <Link href="/settings/integrations/pms">
+          <Card className="cursor-pointer hover:shadow-sm hover:border-primary/40 transition-all group">
+            <CardContent className="p-5 flex items-center gap-4">
+              <div className="w-11 h-11 rounded-xl bg-blue-600/10 flex items-center justify-center shrink-0">
+                <Anchor className="h-5 w-5 text-blue-600" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold">Marina PMS Integrations</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Sync reservation data, slip occupancy, and billing actuals from Dockwa, Havenstar, and other marina management systems.
+                </p>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <Activity className="h-3.5 w-3.5" />
+                  <span>Status Dashboard</span>
+                </div>
+                <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
       </div>
 
       {/* Asset Class Filter Bar */}

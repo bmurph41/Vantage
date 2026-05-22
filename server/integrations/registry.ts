@@ -626,6 +626,101 @@ export const INTEGRATION_REGISTRY: IntegrationRegistryItem[] = [
     }
   },
   {
+    key: "havenstar",
+    name: "Havenstar",
+    description: "Full-featured marina property management system. Sync slip inventory, customer records, lease data, and billing actuals directly into Vantage for complete operational visibility.",
+    category: "Marina PMS",
+    assetClasses: ["marina"],
+    contexts: ["rentRoll", "crm", "financials"],
+    uiPlacements: ["rentRoll.integrations.panel", "rentRoll.actions.importLeases", "crm.integrations.panel", "financials.integrations.panel"],
+    authType: "apiKey",
+    websiteUrl: "https://www.havenstar.com/",
+    iconUrl: "/assets/integrations/havenstar.svg",
+    logoColor: "#1A6FA8",
+    capabilities: {
+      dataRead: ["rentRoll.leases", "rentRoll.tenants", "rentRoll.slips", "crm.contacts", "financials.billing", "financials.invoices"],
+      dataWrite: [],
+      actions: ["rentRoll.import", "rentRoll.sync", "crm.sync", "financials.sync"],
+      uiHooks: ["rentRoll.toolbar.importButton", "crm.toolbar.syncButton"],
+    },
+    settingsSchema: {
+      fields: [
+        { key: "apiKey", label: "API Key", type: "secret", required: true, helpText: "Your Havenstar API key from the Admin portal. Stored encrypted." },
+        { key: "facilityId", label: "Facility ID", type: "string", required: true, helpText: "Your unique Havenstar facility identifier, found in Account Settings." },
+        { key: "syncFrequency", label: "Sync Frequency", type: "select", required: true, options: [
+          { label: "Every Hour", value: "hourly" },
+          { label: "Every 6 Hours", value: "6hourly" },
+          { label: "Daily", value: "daily" },
+        ], helpText: "How often Vantage pulls updates from Havenstar." },
+        { key: "syncBilling", label: "Sync Billing Records", type: "boolean", helpText: "Import invoice and payment history for revenue actuals." },
+      ],
+    },
+    connectionGuide: {
+      overview: "Connect Havenstar using your API credentials to sync slip inventory, customer records, leases, and billing data into Vantage.",
+      prerequisites: [
+        "Havenstar administrator account",
+        "API access enabled in your Havenstar plan",
+        "Facility ID from Account Settings"
+      ],
+      steps: [
+        { title: "Open Admin Portal", description: "Log into your Havenstar account and navigate to Admin > Integrations > API Access." },
+        { title: "Generate API Key", description: "Click 'Create New Key', give it a name like 'Vantage', and copy the key immediately — it will only be shown once." },
+        { title: "Find Your Facility ID", description: "Go to Account Settings. Your Facility ID is listed under 'Facility Details'." },
+        { title: "Enter Credentials", description: "Paste your API Key and Facility ID into the fields above." },
+        { title: "Configure Sync Options", description: "Choose your sync frequency and whether to include billing records." }
+      ],
+      supportUrl: "https://support.havenstar.com/",
+      apiDocsUrl: "https://developers.havenstar.com/api",
+      estimatedTime: "10-15 minutes"
+    },
+    dataMappings: [
+      { sourceEntity: "slips", targetModule: "rentRoll", targetEntity: "storageLocations", fields: [
+        { source: "slip_id", target: "externalId" },
+        { source: "slip_number", target: "code" },
+        { source: "dock_section", target: "dockSection" },
+        { source: "slip_length", target: "lengthFeet" },
+        { source: "slip_width", target: "widthFeet" },
+        { source: "water_depth", target: "depthFeet" },
+        { source: "monthly_rate", target: "monthlyRate" },
+        { source: "status", target: "isAvailable", transform: "status_to_available" }
+      ], syncDirection: "read", frequency: "daily" },
+      { sourceEntity: "customers", targetModule: "rentRoll", targetEntity: "tenants", fields: [
+        { source: "customer_id", target: "externalId" },
+        { source: "first_name", target: "firstName" },
+        { source: "last_name", target: "lastName" },
+        { source: "email", target: "email" },
+        { source: "phone", target: "phone" }
+      ], syncDirection: "read", frequency: "daily" },
+      { sourceEntity: "leases", targetModule: "rentRoll", targetEntity: "leases", fields: [
+        { source: "lease_id", target: "externalId" },
+        { source: "customer_id", target: "tenantExternalId" },
+        { source: "slip_id", target: "locationExternalId" },
+        { source: "start_date", target: "startDate" },
+        { source: "end_date", target: "endDate" },
+        { source: "monthly_amount", target: "monthlyRent" },
+        { source: "status", target: "status" }
+      ], syncDirection: "read", frequency: "hourly" },
+      { sourceEntity: "billing", targetModule: "financials", targetEntity: "revenue", fields: [
+        { source: "invoice_id", target: "externalId" },
+        { source: "total_amount", target: "amount" },
+        { source: "invoice_date", target: "date" },
+        { source: "status", target: "paymentStatus" }
+      ], syncDirection: "read", frequency: "daily" },
+      { sourceEntity: "customers", targetModule: "crm", targetEntity: "contacts", fields: [
+        { source: "customer_id", target: "externalId" },
+        { source: "first_name", target: "firstName" },
+        { source: "last_name", target: "lastName" },
+        { source: "email", target: "email" }
+      ], syncDirection: "read", frequency: "daily" }
+    ],
+    migrationSupport: {
+      canExportAll: true,
+      supportsHistoricalImport: true,
+      migrationComplexity: "medium",
+      estimatedMigrationDays: 7
+    }
+  },
+  {
     key: "snagaslip",
     name: "Snag-A-Slip",
     description: "Popular marina booking marketplace. Import reservations from the Snag-A-Slip network directly into your operations.",

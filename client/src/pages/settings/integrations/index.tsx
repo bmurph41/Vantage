@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useLocation } from "wouter";
+import { Link, useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -18,7 +18,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Plug, Search, CheckCircle, XCircle, RefreshCw, Clock, Zap, Map as MapIcon,
   Eye, EyeOff, Loader2, TestTube, ExternalLink, AlertTriangle, Shield,
-  ArrowRight, BookOpen, HelpCircle, Building2, Info,
+  ArrowRight, BookOpen, HelpCircle, Building2, Info, Anchor, ChevronRight, Activity,
 } from "lucide-react";
 import { SiGooglemaps, SiQuickbooks } from "react-icons/si";
 
@@ -798,6 +798,35 @@ export default function IntegrationsMarketplacePage() {
         <p className="text-muted-foreground mt-1">
           Connect your tools to keep financial data in sync — {totalConnected} active connection{totalConnected !== 1 ? "s" : ""}.
         </p>
+      </div>
+
+      {/* ── Marina PMS section ── */}
+      <div>
+        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+          Marina PMS
+        </h2>
+        <Link href="/settings/integrations/pms">
+          <Card className="cursor-pointer hover:shadow-sm hover:border-primary/40 transition-all group">
+            <CardContent className="p-5 flex items-center gap-4">
+              <div className="w-11 h-11 rounded-xl bg-blue-600/10 flex items-center justify-center shrink-0">
+                <Anchor className="h-5 w-5 text-blue-600" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold">Marina PMS Integrations</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Sync reservation data, slip occupancy, and billing actuals from Dockwa, Havenstar, and other marina management systems.
+                </p>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <Activity className="h-3.5 w-3.5" />
+                  <span>Status Dashboard</span>
+                </div>
+                <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
       </div>
 
       {/* ── First-party / OAuth integrations ── */}

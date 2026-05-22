@@ -1,7 +1,8 @@
 import { BaseConnector, ConnectorConfig, EntitySyncConfig } from './base';
 import { db } from '../../db';
-import { storageLocations, marinaTenants, marinaLeases, marinaProjects, crmContacts } from '@shared/schema';
+import { storageLocations, marinaTenants, marinaLeases, marinaProjects, crmContacts, actualsFacts } from '@shared/schema';
 import { eq, and } from 'drizzle-orm';
+import { recordConflict } from '../conflict-store';
 
 const DOCKWA_API_URL = 'https://api.dockwa.com/v1';
 
@@ -135,6 +136,13 @@ export class DockwaConnector extends BaseConnector {
         syncDirection: 'read',
         batchSize: 100,
       },
+      {
+        sourceEntity: 'revenue',
+        targetEntity: 'revenue',
+        targetModule: 'financials',
+        syncDirection: 'read',
+        batchSize: 100,
+      },
     ];
   }
 
@@ -149,6 +157,8 @@ export class DockwaConnector extends BaseConnector {
         return this.fetchReservations(options);
       case 'customers':
         return this.fetchCustomers(options);
+      case 'revenue':
+        return this.fetchRevenue(options);
       default:
         throw new Error(`Unsupported entity type: ${entityType}`);
     }
@@ -283,6 +293,60 @@ export class DockwaConnector extends BaseConnector {
     };
   }
 
+  private async fetchRevenue(options?: { since?: Date; limit?: number; offset?: number }): Promise<{ data: any[]; hasMore: boolean; total?: number }> {
+    // Reuse reservations endpoint — each confirmed reservation is a revenue event
+    const result = await this.fetchReservations(options);
+    const revenue = result.data
+      .filter(r => r.status === 'active' || r.totalAmount > 0)
+      .map(r => ({
+        externalId: r.externalId,
+        amount: r.totalAmount || 0,
+        description: `Dockwa reservation: slip ${r.locationExternalId}`,
+        category: 'slip_rental',
+        periodDate: r.startDate || new Date().toISOString(),
+        tenantName: r.tenantName,
+      }));
+    return { data: revenue, hasMore: result.hasMore, total: revenue.length };
+  }
+
+  private async saveBillingRecord(data: any): Promise<{ created: boolean; updated: boolean; id?: string }> {
+    if (!data.amount || data.amount <= 0) return { created: false, updated: false };
+
+    const periodDate = data.periodDate ? new Date(data.periodDate) : new Date();
+    const periodStart = new Date(periodDate.getFullYear(), periodDate.getMonth(), 1)
+      .toISOString()
+      .split('T')[0];
+
+    const sourceRef = `dockwa:${data.externalId}:slip_rental`;
+
+    const existing = await db.query.actualsFacts.findFirst({
+      where: and(
+        eq(actualsFacts.orgId, this.config.orgId),
+        eq(actualsFacts.sourceRef, sourceRef)
+      ),
+    });
+
+    if (existing) {
+      await db.update(actualsFacts)
+        .set({ amount: data.amount.toString(), updatedAt: new Date() })
+        .where(eq(actualsFacts.id, existing.id));
+      return { created: false, updated: true, id: existing.id };
+    }
+
+    const [inserted] = await db.insert(actualsFacts).values({
+      userId: this.config.userId,
+      orgId: this.config.orgId,
+      periodStart,
+      lineType: 'REVENUE',
+      accountKey: 'marina.revenue.slip_rental',
+      amount: data.amount.toString(),
+      source: 'UPLOAD',
+      sourceRef,
+    }).returning({ id: actualsFacts.id });
+
+    return { created: true, updated: false, id: inserted.id };
+  }
+
   private mapReservationStatus(status: string): string {
     const statusMap: Record<string, string> = {
       'confirmed': 'active',
@@ -307,6 +371,8 @@ export class DockwaConnector extends BaseConnector {
         return this.saveTenant(data);
       case 'contacts':
         return this.saveContact(data);
+      case 'revenue':
+        return this.saveBillingRecord(data);
       default:
         throw new Error(`Cannot save entity type: ${entityType}`);
     }

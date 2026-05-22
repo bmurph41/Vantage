@@ -708,6 +708,11 @@ server.listen({
         .then(({ startCampaignExecutionScheduler }) => startCampaignExecutionScheduler())
         .catch((err) => console.error('[campaignExecution] Failed to start scheduler:', err));
 
+      // Start Marina PMS sync scheduler (every 30 min for all connected PMS integrations)
+      import('./integrations/pms-sync-scheduler')
+        .then(({ startPmsSyncScheduler }) => startPmsSyncScheduler())
+        .catch((err) => console.error('[PMS Scheduler] Failed to start:', err));
+
     });
   } catch (error) {
     console.error('Fatal error during server initialization:', error);

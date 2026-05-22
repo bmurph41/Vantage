@@ -140,6 +140,7 @@ const IntegrationsMarketplace = lazy(() => import("@/pages/integrations/Integrat
 const IntegrationDetail = lazy(() => import("@/pages/integrations/IntegrationDetail"));
 const MigrationDashboard = lazy(() => import("@/pages/integrations/MigrationDashboard"));
 const SyncMonitor = lazy(() => import("@/pages/integrations/SyncMonitor"));
+const MarinaPmsStatus = lazy(() => import("@/pages/settings/integrations/pms-status"));
 const VDRActivity = lazy(() => import("@/pages/vdr/ActivityDashboard"));
 const AccountMappingPage = lazy(() => import("@/pages/admin/AccountMappingPage"));
 const CuratedDataDashboard = lazy(() => import("@/pages/admin/CuratedDataDashboard"));
@@ -710,6 +711,13 @@ function Router() {
         {() => (
           <UnifiedLayout>
             <MigrationDashboard />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/settings/integrations/pms">
+        {() => (
+          <UnifiedLayout>
+            <MarinaPmsStatus />
           </UnifiedLayout>
         )}
       </Route>
