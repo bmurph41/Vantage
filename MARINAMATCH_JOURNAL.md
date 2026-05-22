@@ -1,5 +1,35 @@
 # MarinaMatch Platform Journal
 
+## ✅ WS4 C1 + C2 — golden harness threaded-writer reference + actuals-writer assetClass fix (2026-05-22)
+
+Anchor-3 WS4 completed across one session: C1 extended the department-inference golden harness with a second writer-path reference, and C2 threaded the real `assetClass` into the four actuals-writer call sites so non-marina deals stop running the marina department cascade in the writer path. The C2 live re-promotion test surfaced that inference is only the first of three marina-centric chokepoints — `normalizeDepartment` and `departmentToAssumptionKey` still flatten/mis-key non-marina departments — so C2 is honestly scoped as a prerequisite and the remainder is filed as WS5.
+
+### What changed
+- `tests/department-inference-golden.mjs` (WS4 C1) — renamed `syntheticNOI_writerPath` → `syntheticNOI_writerPath_undefined`; added `syntheticNOI_writerPath_threaded` and first-class `writerPathGap`; rewrote the header to state the pure-oracle / live-test-gate contract. Content landed in commits `e41a1f25` (`.mjs`, mislabeled "Task #442" by Replit auto-commit) + `07c7d7e5` (`.json`).
+- `server/services/canonical-actuals-loader.ts` (WS4 C2) — hoisted a `modelingProjects.assetClass` fetch after the actuals load (§2b); threaded `assetClass` into the `inferDepartment` call (read path).
+- `server/services/pnl/promote-to-actuals.ts` (WS4 C2) — added `modelingProjects` import; hoisted assetClass fetch above the doc loop; threaded into `inferDepartment`.
+- `server/services/quickbooks-service.ts` (WS4 C2) — added `modelingProjects` import; hoisted assetClass fetch inside the sync `try` above the row loop; threaded into `inferDepartment`.
+- `server/services/doc-intel-service.ts` (WS4 C2) — added `modelingProjects` import; hoisted assetClass fetch before the items loop; threaded into `inferDeptForActual`.
+- `ANCHOR_3_PRE_PHASE0.md` — WS4 C1 section, WS4 C2 section, and WS5 filed (commits `e3bb74a6`, `dc1e3cb8`).
+- `.gitignore` + `attached_assets/` — removed two committed PDF binaries (7.3MB), added `attached_assets/*.pdf` rule (commit `f202dfcc`).
+- Session commits: `f202dfcc` (PDF cleanup), `e3bb74a6` (C1 doc), `a2a4c580` (C2 fix), `dc1e3cb8` (C2 doc + WS5). C2 fix = the four service files only.
+
+### Decisions made
+- **C1 design** — rejected a source-text-reading auto-detector (couples the gate to C2's textual form, risks a silent false-green). Chose the pure-oracle design: the harness publishes both writer behaviors as reference numbers; the live re-promotion test is the behavioral gate. Reframe accepted on record — C2 produces zero harness diff by design.
+- **C2 atomic** — all four call sites in one commit.
+- **C2 Step 0** — 12 non-marina `modeling_actuals` rows exist (one `business` project), but `business` is branch-less in `inferDepartment` (only `str`/`multifamily` branch), so threading it is a proven no-op → no backfill.
+- **C2 scope honest** — fixes 1 of 3 marina-centric chokepoints; `normalizeDepartment` (`department-mapping.ts:319`) flattens non-marina labels to `General`, `departmentToAssumptionKey` keys on the marina vocabulary. Filed as WS5.
+- **PDF binaries** — chose `git rm` + `.gitignore` (no history rewrite); declined a 15-commit rebase racing the still-active Replit Agent. 7.3MB stays in history at `c285e6b7`.
+- **C1 packaging** — Replit auto-commit scattered C1's `.mjs` into a mislabeled commit; disentangle surgery declined as racing the Agent — documented in ANCHOR instead.
+
+### Verification
+- C1 — golden harness GREEN; `writerPath_undefined` byte-identical to old `writerPath`, `enginePath` unmoved, gaps preserved (multifamily −80,059, str −8,403), `inferences[]` byte-identical.
+- C2 — harness GREEN (`inferDepartment` untouched); `tsc -p shared/tsconfig.json` 0 errors; server-scoped tsc — four changed files 27 errors before = 27 after (zero new); live re-promotion of a seeded multifamily fixture confirmed the threaded `assetClass` reaches `inferDepartment` end-to-end (Water & Sewer persisted as `Utilities`, not the marina default). Code-only — no DDL, no schema change. Fixture cleaned up; DB back to 12 `modeling_actuals` rows.
+
+### Next session
+- **WS5** — make `normalizeDepartment` + `departmentToAssumptionKey` asset-class-aware (see `ANCHOR_3_PRE_PHASE0.md` WS5 section). Needs its own Phase 0: per-asset-class department vocabulary, `VALID_DEPARTMENTS` blast radius, number-changing engine re-key. This is what makes a multifamily deal actually persist/compute correct departments.
+- `db/schema-index.ts` shows modified in the working tree — known benign auto-regen artifact (pre-commit/pre-push hooks); don't chase.
+
 ## ✅ Phase 1 items #1/#2/#3 shipped — asset-class-agnostic infrastructure (2026-05-17)
 
 Six commits across one session executing BETA_MVP_SPEC.md Section 7.B surgical changes plus closing spec/test scaffolding. Three of five Phase 1 items landed (silent fallback removal, enrichFromProfitCenters gate, inferDepartment asset-class branches); items #4 (client UI `STORAGE_SUB_TYPES`) and #5 (LLM prompt branching) plus multifamily fixture seed remain for next session.
