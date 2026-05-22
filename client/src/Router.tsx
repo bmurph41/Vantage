@@ -1,6 +1,7 @@
 import { lazy, Suspense, useState, useEffect } from "react";
 import { Switch, Route, useLocation, Redirect } from "wouter";
 import { Loader2, Anchor, Plus } from "lucide-react";
+import { trackEvent } from "@/lib/analytics";
 import { CommandPalette } from "@/components/CommandPalette";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { useAuth, RequireRole } from "@/contexts/AuthContext";
@@ -438,6 +439,7 @@ function UnifiedLayout({ children }: { children: React.ReactNode }) {
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'n' && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
+        trackEvent('quick_add_used', { trigger: 'keyboard' });
         setQuickAddOpen(true);
       }
     };
@@ -491,7 +493,7 @@ function UnifiedLayout({ children }: { children: React.ReactNode }) {
       />
       {/* Floating Quick Add button — always visible, opens the Quick Add modal */}
       <button
-        onClick={() => setQuickAddOpen(true)}
+        onClick={() => { trackEvent('quick_add_used', { trigger: 'button' }); setQuickAddOpen(true); }}
         className="fixed bottom-20 right-4 md:bottom-8 md:right-6 z-40 w-12 h-12 bg-primary text-white rounded-full shadow-lg hover:bg-primary/90 active:scale-95 transition-all flex items-center justify-center"
         title="Quick Add (⌘N)"
         aria-label="Quick Add"

@@ -96,6 +96,7 @@ interface User {
   orgName?: string;
   ssoProvider?: string | null;
   userPrimaryRole?: string | null;
+  createdAt?: string | null;
 }
 
 interface AuthContextValue {
@@ -121,7 +122,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (user) {
-      identifyUser({ userId: user.id, orgId: user.orgId, role: user.role });
+      identifyUser({
+        userId: user.id,
+        orgId: user.orgId,
+        role: user.role,
+        ...(user.createdAt ? { createdAt: user.createdAt } : {}),
+      });
     } else if (!isLoading) {
       resetUser();
     }

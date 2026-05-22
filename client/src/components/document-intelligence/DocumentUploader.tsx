@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { useMutation } from '@tanstack/react-query';
 import { Upload, FileText, Table2, TrendingDown, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { trackEvent } from '@/lib/analytics';
 
 interface Props {
   projectId?: string;
@@ -33,7 +34,10 @@ export function DocumentUploader({ projectId, onJobCreated }: Props) {
       }
       return res.json();
     },
-    onSuccess: (data) => onJobCreated(data.jobId)
+    onSuccess: (data) => {
+      trackEvent('first_document_uploaded', { documentClass });
+      onJobCreated(data.jobId);
+    }
   });
 
   const onDrop = useCallback((files: File[]) => {

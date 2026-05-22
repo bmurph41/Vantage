@@ -683,6 +683,7 @@ router.get('/me', async (req: Request, res: Response) => {
             orgId: user.orgId,
             orgName: org?.name || 'Unknown Organization',
             ssoProvider: user.ssoProvider || null,
+            createdAt: user.createdAt?.toISOString() || null,
           });
         }
       }

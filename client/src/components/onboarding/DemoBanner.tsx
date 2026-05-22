@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
+import { trackEvent } from "@/lib/analytics";
 
 function getDismissKey(orgId: string): string {
   return `vantage_demo_banner_dismissed_${orgId}`;
@@ -30,6 +31,7 @@ export function DemoBanner() {
       return apiRequest("DELETE", "/api/onboarding/demo-data");
     },
     onSuccess: () => {
+      trackEvent('demo_data_cleared');
       dismiss();
       queryClient.invalidateQueries({ queryKey: ["/api/onboarding/demo-data/status"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/contacts"] });
