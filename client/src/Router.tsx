@@ -14,6 +14,8 @@ import { PageLoader } from "@/components/PageLoader";
 import { PageErrorBoundary } from "@/components/ErrorBoundary";
 import { MobileShell } from "@/components/layout/MobileBottomNav";
 import { DesktopOnlyGate } from "@/components/DesktopOnlyGate";
+import { RolePickerModal } from "@/components/onboarding/RolePickerModal";
+import AddNewModal from "@/components/modals/add-new-modal";
 
 const Dashboard = lazy(() => import("@/pages/dashboard"));
 const CRMDashboard = lazy(() => import("@/pages/crm-dashboard"));
@@ -355,6 +357,7 @@ function SidebarLoader() {
 // Module-level guard: only trigger the onboarding check once per browser session,
 // regardless of how many times UnifiedLayout mounts (i.e. across navigations).
 let _onboardingSessionChecked = false;
+let _rolePickerSessionChecked = false;
 
 // Hook to check if user should see onboarding
 function useOnboardingCheck() {
@@ -379,10 +382,44 @@ function useOnboardingCheck() {
   return { showOnboarding, setShowOnboarding, completeOnboarding };
 }
 
+// Hook to check if user needs to pick their primary role
+function useRolePickerCheck(user: { userPrimaryRole?: string | null } | null) {
+  const [showRolePicker, setShowRolePicker] = useState(false);
+
+  useEffect(() => {
+    if (_rolePickerSessionChecked || !user) return;
+    _rolePickerSessionChecked = true;
+
+    const hasPickedRole = localStorage.getItem('vantage_primary_role') || user.userPrimaryRole;
+    if (!hasPickedRole) {
+      const timer = setTimeout(() => setShowRolePicker(true), 400);
+      return () => clearTimeout(timer);
+    }
+  }, [user]);
+
+  const completeRolePicker = () => setShowRolePicker(false);
+
+  return { showRolePicker, completeRolePicker };
+}
+
 // Unified Layout wrapper with sidebar for both DD Tracker and CRM
 function UnifiedLayout({ children }: { children: React.ReactNode }) {
   const { isLoading, user } = useAuth();
   const { showOnboarding, setShowOnboarding, completeOnboarding } = useOnboardingCheck();
+  const { showRolePicker, completeRolePicker } = useRolePickerCheck(user);
+  const [quickAddOpen, setQuickAddOpen] = useState(false);
+
+  // Cmd+N / Ctrl+N → open Quick Add modal
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'n' && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        setQuickAddOpen(true);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
 
   if (isLoading) {
     return (
@@ -419,6 +456,14 @@ function UnifiedLayout({ children }: { children: React.ReactNode }) {
       </div>
       <CommandPalette />
       <AIAssistant />
+      {/* Role picker — shown once for new users before the property wizard */}
+      <RolePickerModal
+        open={showRolePicker && !showOnboarding}
+        onComplete={completeRolePicker}
+        userName={user?.name?.split(' ')[0] || user?.email?.split('@')[0]}
+      />
+      {/* Global Quick Add modal (Cmd+N shortcut) */}
+      <AddNewModal isOpen={quickAddOpen} onClose={() => setQuickAddOpen(false)} />
       <EntitlementsProvider>
         <Suspense fallback={null}>
           <OnboardingWizard 

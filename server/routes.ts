@@ -1623,12 +1623,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Auth endpoints
   app.get("/api/auth/me", authenticateUser, async (req: any, res) => {
     try {
+      const [dbUser] = await db
+        .select({ userPrimaryRole: users.userPrimaryRole })
+        .from(users)
+        .where(eq(users.id, req.user.id))
+        .limit(1);
+
       const baseUser = {
         id: req.user.id,
         orgId: req.user.orgId,
         role: req.user.role,
         email: req.user.email,
         name: req.user.name,
+        userPrimaryRole: dbUser?.userPrimaryRole ?? null,
       };
 
       // Attach broker registration if the user's role is broker
@@ -1673,6 +1680,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("[/api/users] Failed to fetch users:", error);
       res.status(500).json({ error: "Failed to fetch users" });
+    }
+  });
+
+  // PATCH /api/users/me — update current user's profile preferences
+  app.patch("/api/users/me", authenticateUser, async (req: any, res) => {
+    try {
+      const { userPrimaryRole } = req.body as { userPrimaryRole?: string };
+      const allowed = ["investor", "broker", "operator", "gp", "analyst"];
+      if (userPrimaryRole !== undefined && !allowed.includes(userPrimaryRole)) {
+        return res.status(400).json({ error: "Invalid userPrimaryRole value" });
+      }
+      const updates: Record<string, any> = {};
+      if (userPrimaryRole !== undefined) updates.userPrimaryRole = userPrimaryRole;
+      if (Object.keys(updates).length === 0) {
+        return res.status(400).json({ error: "No valid fields to update" });
+      }
+      await db.update(users).set(updates).where(eq(users.id, req.user.id));
+      res.json({ ok: true });
+    } catch (err: any) {
+      console.error("[PATCH /api/users/me] error:", err);
+      res.status(500).json({ error: "server_error" });
     }
   });
 

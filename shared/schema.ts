@@ -457,6 +457,8 @@ export const users = pgTable("users", {
   // Platform discovery
   referralSource: text("referral_source"), // How they found Vantage
   referralSourceOther: text("referral_source_other"), // Free text when source = "other"
+  // UX personalization
+  userPrimaryRole: text("user_primary_role"), // investor | broker | operator | gp | analyst
 });
 
 // User Sessions - Track active sessions with device info

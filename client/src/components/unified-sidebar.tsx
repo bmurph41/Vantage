@@ -158,17 +158,40 @@ type BootstrapData = {
   };
 };
 
+// Compute role-aware default expansions for first-time users
+function getRoleDefaults(primaryRole: string | null | undefined): Record<string, boolean> {
+  switch (primaryRole) {
+    case 'investor':
+      return { crm: true, pipeline: true };
+    case 'broker':
+      return { crm: true, prospecting: true, pipeline: true };
+    case 'operator':
+      return { operations: true, crm: true };
+    case 'gp':
+      return { dealWorkspace: true, analysis: true, investorServices: true };
+    case 'analyst':
+      return { analysis: true, dealWorkspace: true };
+    default:
+      return {};
+  }
+}
+
 export default function UnifiedSidebar() {
   const [location] = useLocation();
   const { user, hasRole } = useAuth();
-  const [operationsExpanded, setOperationsExpanded] = useState(false); // Default collapsed for Operations
-  const [crmExpanded, setCrmExpanded] = useState(false);
-  const [pipelineExpanded, setPipelineExpanded] = useState(false); // Pipeline deals section
-  const [prospectingExpanded, setProspectingExpanded] = useState(false); // Prospecting section
+
+  // Derive role-aware defaults (used only on first mount, before location-based expansion kicks in)
+  const primaryRole = (user?.userPrimaryRole ?? localStorage.getItem('vantage_primary_role'));
+  const roleDefaults = getRoleDefaults(primaryRole);
+
+  const [operationsExpanded, setOperationsExpanded] = useState(roleDefaults.operations ?? false);
+  const [crmExpanded, setCrmExpanded] = useState(roleDefaults.crm ?? false);
+  const [pipelineExpanded, setPipelineExpanded] = useState(roleDefaults.pipeline ?? false); // Pipeline deals section
+  const [prospectingExpanded, setProspectingExpanded] = useState(roleDefaults.prospecting ?? false); // Prospecting section
   const [marketingExpanded, setMarketingExpanded] = useState(false); // Marketing section
-  const [dealWorkspaceExpanded, setDealWorkspaceExpanded] = useState(false); // Consolidated DD, VDR, Modeling
-  const [analysisExpanded, setAnalysisExpanded] = useState(false);
-  const [investorServicesExpanded, setInvestorServicesExpanded] = useState(false);
+  const [dealWorkspaceExpanded, setDealWorkspaceExpanded] = useState(roleDefaults.dealWorkspace ?? false); // Consolidated DD, VDR, Modeling
+  const [analysisExpanded, setAnalysisExpanded] = useState(roleDefaults.analysis ?? false);
+  const [investorServicesExpanded, setInvestorServicesExpanded] = useState(roleDefaults.investorServices ?? false);
   const [marketIntelExpanded, setMarketIntelExpanded] = useState(false);
   const [documentStudioExpanded, setDocumentStudioExpanded] = useState(false);
   const [adminExpanded, setAdminExpanded] = useState(false);

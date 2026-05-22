@@ -94,6 +94,7 @@ interface User {
   orgId: string;
   orgName?: string;
   ssoProvider?: string | null;
+  userPrimaryRole?: string | null;
 }
 
 interface AuthContextValue {

@@ -54,9 +54,13 @@ export default function TopBar({ title, subtitle }: TopBarProps) {
               onClick={() => setIsAddModalOpen(true)}
               className="bg-primary hover:bg-primary/90"
               data-testid="button-add-new"
+              title="Add new item (⌘N)"
             >
               <Plus className="w-4 h-4 mr-2" />
               Add New
+              <span className="ml-2 hidden xl:inline-flex items-center gap-0.5 text-xs opacity-60 font-mono">
+                <kbd className="text-[10px]">⌘N</kbd>
+              </span>
             </Button>
           </div>
         </div>

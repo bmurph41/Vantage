@@ -10058,6 +10058,8 @@ const MIGRATIONS: Migration[] = [
   { name: "loans: add annual_servicing_fee", sql: `ALTER TABLE loans ADD COLUMN IF NOT EXISTS annual_servicing_fee numeric` },
   { name: "loans: add exit_fee_pct", sql: `ALTER TABLE loans ADD COLUMN IF NOT EXISTS exit_fee_pct numeric` },
   { name: "loans: add prepay_type", sql: `ALTER TABLE loans ADD COLUMN IF NOT EXISTS prepay_type text` },
+  { name: "users: add user_primary_role", sql: `ALTER TABLE users ADD COLUMN IF NOT EXISTS user_primary_role text` },
+
   { name: "loans: add stepdown_schedule_json", sql: `ALTER TABLE loans ADD COLUMN IF NOT EXISTS stepdown_schedule_json jsonb` },
   { name: "loans: add created_at", sql: `ALTER TABLE loans ADD COLUMN IF NOT EXISTS created_at timestamp` },
   { name: "loans: add updated_at", sql: `ALTER TABLE loans ADD COLUMN IF NOT EXISTS updated_at timestamp` },
