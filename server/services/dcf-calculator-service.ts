@@ -384,6 +384,21 @@ export async function performDCFAnalysis(
   }
 
   // ── Step 4: Generate Multi-Year Projection (CANONICAL SOURCE) ───────────
+  // Workstream #2 (2026-05-23): pull belowTheLine.capexPct + capexAmount
+  // from the already-loaded canonical assumptions and thread to the engine.
+  // Pre-fix this path silently used the engine's 2% DEFAULT_CAPEX_PCT
+  // regardless of what the user set in the Assumptions tab; pro-forma
+  // engine (line 458) reads belowTheLine correctly, so DCF + Pro Forma
+  // disagreed on capex. capexAmount > 0 builds a flat capexSchedule per
+  // year (mirrors pro-forma-engine-service.ts:1162 `capexAmount > 0 ?
+  // amount/12 monthly : pctBasis × capexPct`).
+  const belowTheLine = (scenarioData.assumptions?.belowTheLine ?? {}) as Record<string, any>;
+  const userCapexPct = typeof belowTheLine.capexPct === 'number' ? belowTheLine.capexPct : 2;
+  const userCapexAmount = typeof belowTheLine.capexAmount === 'number' ? belowTheLine.capexAmount : 0;
+  const capexSchedule = userCapexAmount > 0
+    ? Array.from({ length: holdPeriod }, (_, i) => ({ year: i + 1, amount: userCapexAmount }))
+    : undefined;
+
   const projection = computeMultiYearProjection(year1, {
     holdPeriod,
     revenueGrowthRate,
@@ -391,6 +406,8 @@ export async function performDCFAnalysis(
     exitCapRate,
     sellingCostPct,
     noiOverrides,
+    defaultCapExPct: userCapexPct / 100,
+    capexSchedule,
   });
 
   // ── Step 5: Compute debt schedule ───────────────────────────────────────
@@ -499,6 +516,9 @@ export async function performDCFAnalysis(
       acquisitionDate,
       purchasePrice,
       noiOverrides,
+      // Workstream #2: forward user-set capex into sensitivity sweep.
+      defaultCapExPct: userCapexPct / 100,
+      capexSchedule,
     }
   );
 
@@ -613,6 +633,11 @@ function buildSensitivityMatrix(
     /** Per-year NOI overrides from lease escalation schedules — threaded through so
      *  sensitivity IRR values remain consistent with the main DCF projection. */
     noiOverrides?: number[];
+    /** Workstream #2 (2026-05-23): user-set capex pass-through so the
+     *  sensitivity matrix uses the same capex as the main DCF and Pro Forma.
+     *  Pre-fix sensitivity silently used 2% regardless. */
+    defaultCapExPct?: number;
+    capexSchedule?: Array<{ year: number; amount: number; label?: string }>;
   }
 ): SensitivityMatrix {
   // Growth rate columns: base ± 1%, ± 2% (5 columns)
@@ -636,6 +661,9 @@ function buildSensitivityMatrix(
         sellingCostPct: params.sellingCostPct,
         // Pass lease NOI overrides so sensitivity correctly reflects contractual income
         noiOverrides: params.noiOverrides,
+        // Workstream #2: thread user-set capex into sensitivity sweep.
+        defaultCapExPct: params.defaultCapExPct,
+        capexSchedule: params.capexSchedule,
       });
 
       const flows = buildQuickFlows(

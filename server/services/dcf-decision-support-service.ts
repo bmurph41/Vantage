@@ -8,6 +8,8 @@
  * Full mode: tornado + attribution + memo with MC quantiles
  */
 
+import { readCanonicalPayload } from './canonical-assumption-store';
+import type { CapExScheduleEntry } from './multi-year-projection-engine';
 import { runScenarioAnalysis, ScenarioAnalysisResult } from './dcf-scenario-layer';
 import { runMonteCarlo, MonteCarloResult } from './dcf-simulation-service';
 import { computeTornado, getDefaultDrivers, TornadoResult, TornadoConfig } from '../../shared/finance/tornado';
@@ -155,12 +157,28 @@ export async function runDecisionSupport(
   );
 
   const holdPeriod = scenarioData.holdPeriod;
+  // Workstream #2 (2026-05-23): cross-surface capex consistency.
+  // Pass user-set defaultCapExPct so the multi-year-projection engine uses
+  // the user's % instead of the universal 2% fallback. When capexAmount > 0
+  // ($ override), build a flat capexSchedule (same $ each year) — mirrors
+  // pro-forma-engine-service.ts:1162's `capexAmount > 0 ? amount/12 monthly
+  // : pctBasis × capexPct`. Engine precedence at multi-year-projection-
+  // engine.ts:420-425: capexEntry.amount wins when present, else defaultCapExPct.
+  const capexSchedule: CapExScheduleEntry[] | undefined =
+    scenarioData.belowTheLineCapexAmount > 0
+      ? Array.from({ length: holdPeriod }, (_, i) => ({
+          year: i + 1,
+          amount: scenarioData.belowTheLineCapexAmount,
+        }))
+      : undefined;
   const baseConfig = {
     holdPeriod,
     revenueGrowthRate: scenarioData.revenueGrowthRate / 100,
     expenseGrowthRate: scenarioData.expenseGrowthRate / 100,
     exitCapRate: scenarioData.exitCapRate / 100,
     sellingCostPct: 0.03,
+    defaultCapExPct: scenarioData.belowTheLineCapexPct / 100,
+    capexSchedule,
   };
 
   // Debt
@@ -315,6 +333,9 @@ function buildAttributionSamples(
       expenseGrowthRate: baseConfig.expenseGrowthRate,
       exitCapRate: exitCap,
       sellingCostPct: sellCost,
+      // Workstream #2: thread user-set capex through MC iterations.
+      defaultCapExPct: baseConfig.defaultCapExPct,
+      capexSchedule: baseConfig.capexSchedule,
     });
 
     const flows = buildFlowsForAttribution(
@@ -377,8 +398,16 @@ async function loadProjectForDS(pool: any, projectId: string) {
 }
 
 async function loadScenarioForDS(pool: any, modelingProjectId: string) {
+  // Workstream #2 (2026-05-23): include scenario id so we can read the
+  // canonical assumption payload's belowTheLine — pre-fix this loader only
+  // pulled columns from modeling_scenario_versions and dropped user-set
+  // capex on the floor, causing the DCF/Decision-Support/Monte-Carlo/
+  // Sensitivity surfaces to silently substitute the engine's 2% default
+  // even when the user explicitly set, e.g., 7% capex in the Assumptions
+  // tab. Pro-forma engine reads belowTheLine.capexPct correctly at line
+  // 458; this brings the DCF compute pipeline into agreement.
   const sv = await pool.query(
-    `SELECT revenue_growth_rate, expense_growth_rate, exit_cap_rate
+    `SELECT id, revenue_growth_rate, expense_growth_rate, exit_cap_rate
      FROM modeling_scenario_versions
      WHERE modeling_project_id = $1 ORDER BY created_at DESC LIMIT 1`,
     [modelingProjectId]
@@ -391,6 +420,27 @@ async function loadScenarioForDS(pool: any, modelingProjectId: string) {
   );
   const s = sv.rows[0] ?? {};
   const c = pc.rows[0] ?? {};
+
+  // Workstream #2: read belowTheLine from canonical assumption payload.
+  // capexPct: scalar % universal fallback (2% if unset — preserves the
+  // engine's DEFAULT_CAPEX_PCT semantics). capexAmount: $ override that
+  // takes precedence over the % path when > 0, mirroring pro-forma engine
+  // behavior at pro-forma-engine-service.ts:1162.
+  let belowTheLineCapexPct = 2;
+  let belowTheLineCapexAmount = 0;
+  if (s.id) {
+    try {
+      const canonical = await readCanonicalPayload(s.id);
+      const btl = canonical?.belowTheLine;
+      if (btl && typeof btl === 'object') {
+        if (typeof btl.capexPct === 'number') belowTheLineCapexPct = btl.capexPct;
+        if (typeof btl.capexAmount === 'number') belowTheLineCapexAmount = btl.capexAmount;
+      }
+    } catch (e) {
+      console.warn(`[dcf-decision-support] Failed to load canonical payload for scenario ${s.id}:`, e);
+    }
+  }
+
   return {
     revenueGrowthRate: Number(s.revenue_growth_rate) || 3,
     expenseGrowthRate: Number(s.expense_growth_rate) || 2.5,
@@ -398,6 +448,8 @@ async function loadScenarioForDS(pool: any, modelingProjectId: string) {
     holdPeriod: Number(c.hold_period) || 5,
     acquisitionCloseDate: c.acquisition_close_date ?? null,
     seasonMonths: [],
+    belowTheLineCapexPct,
+    belowTheLineCapexAmount,
   };
 }
 

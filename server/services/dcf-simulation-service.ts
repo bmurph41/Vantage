@@ -104,6 +104,11 @@ export function runMonteCarlo(
     expenseGrowthRate: number;    // decimal
     exitCapRate: number;          // decimal
     sellingCostPct: number;       // decimal
+    // Workstream #2 (2026-05-23): optional capex pass-through. When set,
+    // forwarded into the base projection AND every per-iteration projection
+    // so user-set capex reaches MC samples. Pre-fix MC silently used 2%.
+    defaultCapExPct?: number;
+    capexSchedule?: Array<{ year: number; amount: number; label?: string }>;
   },
   equity: {
     equityInvested: number;
@@ -137,6 +142,9 @@ export function runMonteCarlo(
       expenseGrowthRate: baseConfig.expenseGrowthRate,
       exitCapRate: baseConfig.exitCapRate,
       sellingCostPct: baseConfig.sellingCostPct,
+      // Workstream #2: thread user-set capex into baseline projection.
+      defaultCapExPct: baseConfig.defaultCapExPct,
+      capexSchedule: baseConfig.capexSchedule,
     });
   }
 
@@ -222,6 +230,9 @@ function runExactIteration(
     expenseGrowthRate: baseConfig.expenseGrowthRate,
     exitCapRate: exitCap,
     sellingCostPct: sellCost,
+    // Workstream #2: thread user-set capex into MC exact-mode iterations.
+    defaultCapExPct: baseConfig.defaultCapExPct,
+    capexSchedule: baseConfig.capexSchedule,
   });
 
   return buildFlows(

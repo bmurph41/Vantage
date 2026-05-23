@@ -94,6 +94,11 @@ export function runScenarioAnalysis(
     expenseGrowthRate: number;    // decimal
     exitCapRate: number;          // decimal
     sellingCostPct: number;       // decimal
+    // Workstream #2 (2026-05-23): optional capex pass-through. When set,
+    // forwarded into each scenario's projection so user-set capex reaches
+    // the per-scenario IRR/NPV. Pre-fix scenarios silently used 2% default.
+    defaultCapExPct?: number;
+    capexSchedule?: Array<{ year: number; amount: number; label?: string }>;
   },
   equity: {
     equityInvested: number;
@@ -121,6 +126,9 @@ export function runScenarioAnalysis(
       expenseGrowthRate: baseConfig.expenseGrowthRate,
       exitCapRate: exitCap,
       sellingCostPct: sellCost,
+      // Workstream #2: thread user-set capex through per-scenario projection.
+      defaultCapExPct: baseConfig.defaultCapExPct,
+      capexSchedule: baseConfig.capexSchedule,
     });
 
     const flows = buildLeveredFlows(
