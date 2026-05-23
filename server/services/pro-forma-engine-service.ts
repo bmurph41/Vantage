@@ -58,6 +58,7 @@ import { loadCanonicalActuals, normalizeCategory } from './canonical-actuals-loa
 import { getConsolidatedPnL } from './consolidated-pnl-service';
 import { computeDirectInputFinancials } from './direct-input-engine';
 import { getModelConfig } from '../../shared/asset-class-model-config';
+import { getProjectionLineValue } from '../../shared/coa/projection-calculator';
 
 // ============================================
 // TYPES
@@ -782,51 +783,22 @@ export class ProFormaEngineService {
       return flatExpenseGrowthRate;
     };
     
-    // Asset-class-aware occupancy adjustment (Day 5 of engine unification).
-    // Marina: per-storage-type occupancy ratio (current/base year).
-    // STR/multifamily: stub returning 1; Year 1 occupancy applied by direct-input,
-    // pro-forma grows via revenueGrowthRate scalar. Future commits may add
-    // projection-time occupancy curves for these asset classes.
-    const getOccupancyAdjustment = (department: string, subcategory: string, year: number): Decimal => {
-      switch (assetClass) {
-        case 'marina':
-          return getMarinaOccupancyAdjustment(department, subcategory, year);
-        case 'str':
-          return getStrOccupancyAdjustment(department, subcategory, year);
-        case 'multifamily':
-          return getMultifamilyOccupancyAdjustment(department, subcategory, year);
-        default:
-          return new Decimal(1);
-      }
-    };
-
-    const getMarinaOccupancyAdjustment = (department: string, subcategory: string, year: number): Decimal => {
-      if (department !== 'Storage') return new Decimal(1);
-
-      const storageTypeKey = storageSubcategoryToTypeKey(subcategory);
-      if (!storageTypeKey || Object.keys(granularOccupancy).length === 0) return new Decimal(1);
-
-      const typeOccupancy = granularOccupancy[storageTypeKey];
-      if (!typeOccupancy) return new Decimal(1);
-
-      const currentOccPct = new Decimal(typeOccupancy[String(year)] ?? 85);
-      const baseOccPct = new Decimal(typeOccupancy[String(latestHistoricalYear)] ?? 85);
-
-      if (baseOccPct.lte(0)) return new Decimal(1);
-      return currentOccPct.dividedBy(baseOccPct);
-    };
-
-    const getStrOccupancyAdjustment = (_department: string, _subcategory: string, _year: number): Decimal => {
-      // STUB — STR occupancy is scalar-applied at Year 1 by direct-input.
-      // See project_marina_occupancy_key_mismatch_2026_05_18.md for context.
-      return new Decimal(1);
-    };
-
-    const getMultifamilyOccupancyAdjustment = (_department: string, _subcategory: string, _year: number): Decimal => {
-      // STUB — Year 1 vacancy applied by direct-input. Pro-forma grows via revenueGrowthRate.
-      // See project_marina_occupancy_key_mismatch_2026_05_18.md for context.
-      return new Decimal(1);
-    };
+    // ─── Step A (2026-05-23): dispatcher replaced with shared calculator ───
+    // The asset-class switch + the three per-class helpers (marina/str/mf)
+    // were consolidated into shared/coa/projection-calculator.ts behind
+    // getProjectionLineValue(). Engine call site at the consumption point
+    // uses result._stepA_multiplier in Decimal-land for byte-identical
+    // marina output. v1-marina semantics preserved via the calculator's
+    // adapter (passing legacyV1Occupancy + latestHistoricalYear).
+    //
+    // Marina-protection invariant: dept-golden harness must show gap=0
+    // across all 6 scenarios. Verified at commit time.
+    //
+    // Step B (next): canonical-store v1 → v3 migration; legacyV1Occupancy
+    // passthrough removed; calculator reads from blob.dimensions instead.
+    // Step D-prime: multi-year-projection engine wires through this same
+    // calculator (PF + DCF lockstep flip).
+    const modelConfig = getModelConfig(assetClass);
     
     const actualsMonthlyLookup: Record<string, Record<string, number>> = {};
     const actualsMonthsPerYearPerSubcat: Record<string, Record<number, Set<number>>> = {};
@@ -876,8 +848,22 @@ export class ProFormaEngineService {
 
         let projectedAmount = baseMonthly.times(cumulativeGrowth);
 
-        const occAdj = getOccupancyAdjustment(department, name, period.year);
-        projectedAmount = projectedAmount.times(occAdj);
+        // Step A: occupancy adjustment via shared calculator. Multiplier
+        // applied in Decimal-land (no number↔Decimal round-trip on the line
+        // amount) so marina stays byte-identical.
+        const _calcResult = getProjectionLineValue({
+          assetClass,
+          department,
+          lineKey: name,
+          period: { year: period.year, month: period.month },
+          blob: null, // v3 not written yet — Step B migration
+          modelConfig,
+          y1Amount: projectedAmount.toNumber(),
+          growthRates: { line: annualGrowthRate.toNumber() },
+          legacyV1Occupancy: granularOccupancy, // STEP-A ONLY — removed at Step B
+          latestHistoricalYear,                  // STEP-A ONLY — removed at Step B
+        });
+        projectedAmount = projectedAmount.times(new Decimal(_calcResult._stepA_multiplier ?? 1));
 
         projectionsMonthly[period.key] = projectedAmount.round().toNumber();
       }

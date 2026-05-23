@@ -1516,3 +1516,81 @@ spec passes:
 **v3 contract FROZEN — Brett ratified 2026-05-23. Step A may proceed.**
 Agent-autonomy-safe ratification marker — do not modify the schema or
 calculator signature without Brett's explicit re-ratification.
+
+---
+
+## Step A — DONE (2026-05-23, Hybrid)
+
+Calculator implementation + engine generic-dispatcher shipped. Marina-
+protected: dept-golden harness gap=0 across all 6 scenarios (marina/MF/
+STR/SS/office/retail), byte-identical to pre-Step-A baseline.
+
+### What shipped
+
+- `shared/coa/projection-calculator.ts` (Step 0 signature → Step A impl,
+  +244 lines). Resolves `revenueMode` via the ratified cascade, applies
+  the v1-marina occupancy adapter (mirrors the legacy
+  `getMarinaOccupancyAdjustment` byte-for-byte), throws loud on v3
+  `driver_based` data (Brett's gate — silent passthrough is unacceptable
+  because Step B writes would silently ignore occupancy). Other classes
+  degrade to no-op multiplier=1 — pre-Step-A stub behavior preserved.
+- `server/services/pro-forma-engine-service.ts` — surgical swap. Removed
+  the dispatcher switch + 3 per-class helpers at :790-829 (40 lines);
+  replaced the consumption site at :879-880 with a `getProjectionLineValue`
+  call that consumes `_stepA_multiplier` in Decimal-land. Engine keeps
+  `cumulativeGrowth` tracking, actuals injection, and per-period iteration.
+- `tests/v1-marina-adapter.mjs` (NEW, 9 cases) — byte-identical
+  regression shield. Case 1 asserts ratio=90/85 + amount=y1×ratio. Case
+  9 asserts v3 throws with "Step D-prime not wired" message.
+
+### Byte-identical by construction (not by rounding-luck)
+
+The Decimal→number→Decimal round-trip on the line amount was engineered
+out. The calculator returns `_stepA_multiplier` (a clean ratio or 1) and
+the engine applies it via `projectedAmount.times(new Decimal(multiplier))`
+— the line amount NEVER leaves Decimal-land. The only number crossing the
+boundary is the multiplier itself; for integer ratios or 1 the
+construction is exact (decimal.js uses string-based number-to-Decimal
+conversion). Marina byte-identical is preserved by construction, not by
+sub-cent rounding tolerance.
+
+### Brett's three gates honored
+
+- ✓ Byte-identical-by-construction (gap=0 verified via dept-golden;
+  Decimal precision preserved via `_stepA_multiplier`).
+- ✓ v3 `driver_based` fails LOUD (calculator throws with explicit
+  "Step D-prime not wired" message; Test Case 9 asserts).
+- ✓ Transitional fields explicitly labeled (`legacyV1Occupancy` +
+  `latestHistoricalYear` on input, `_stepA_multiplier` +
+  `_stepA_degradedToNoOp` on output — all carry `STEP-A ONLY` comments
+  in the type).
+
+### Cleanup obligations (filed)
+
+- `legacyV1Occupancy` + `latestHistoricalYear` ProjectionLineInput fields
+  → removed at **Step B** (v1 → v3 canonical-store migration). After
+  Step B the calculator reads occupancy from `blob.dimensions` instead
+  of the v1 passthrough.
+- `_stepA_multiplier` + `_stepA_degradedToNoOp` ProjectionLineOutput
+  fields → removed at **Step D-prime** (calculator owns full amount
+  semantics; both engines do all math in number-land via the calculator;
+  `.amount` becomes the only canonical revenue field).
+
+### Verification snapshot 2026-05-23
+
+- `npm run test:dept-golden` → ✓ GREEN, gap=0 all 6 scenarios
+  (marina=13493783 — identical to pre-Step-A and pre-Step-0 baseline)
+- `npx tsx tests/v1-marina-adapter.mjs` → ✓ 9/9 cases pass
+- `npx tsc --noEmit -p shared/tsconfig.json` → silent (clean)
+- Engine `grep "assumptions.occupancy\|granularOccupancy"` → 2 hits only
+  (line 434 init + line 863 calculator passthrough); the 4 legacy
+  helpers are GONE. Calculator dispatch is the only occupancy path.
+
+### Step B — held for explicit Brett go-ahead
+
+Step B is the consequential one — the first intentional marina move of
+the program. The location-vs-type key-mismatch bug becomes visible
+during the v1 → v3 migration; marina projection numbers will change
+from "silent no-op in most scenarios" to "corrected occupancy ratio
+applied per type." Pre/post-migration goldens must both be captured in
+the harness for one cycle. Phase 0 of Step B before any code.
