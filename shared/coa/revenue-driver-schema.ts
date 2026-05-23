@@ -32,6 +32,27 @@
  * The ONLY forbidden state is a driver_based line also receiving a WS5
  * line-growth multiplier. The calculator (Step A) and both engines
  * (Step D-prime) must honor this rule.
+ *
+ * ─── RESOLUTION CASCADE (authoritative) ─────────────────────────
+ * The effective revenueMode for a line is resolved by the calculator
+ * in this exact precedence order. Both engines (pro-forma + multi-
+ * year-projection) must apply the same cascade — a mode-selection
+ * divergence between engines would be worse than a numeric one.
+ *
+ *   1. stream.revenueMode                            (per-line override; null = inherit)
+ *   2. blob.departmentDefaults[department]           (per-department default; absent = inherit)
+ *   3. modelConfig.revenueDriverModel.defaultRevenueMode
+ *      OR ASSET_CLASS_DRIVER_TAXONOMY[assetClass].defaultRevenueMode  (class-level fallback)
+ *   4. 'flat_growth'                                 (final fallback — preserves WS5 behavior for back-compat)
+ *
+ * `none` BASIS SEMANTICS (authoritative):
+ *   basisType: 'none' is NOT "no revenue / return 0." It means
+ *   "rate-only line — no quantity driver." The calculator's
+ *   resolveQuantity returns 1 for this basis; revenue =
+ *   1 × resolveRate(rate, period) × periodScaleFactor.
+ *   Example: a land ground lease ($50K/year flat) modeled as a
+ *   single-stream 'none' line with rate = $50,000 per_year projects
+ *   $50K/yr in Y1 and compounds per its own rate.series mode.
  * ────────────────────────────────────────────────────────────────
  */
 
@@ -399,8 +420,15 @@ export const ASSET_CLASS_DRIVER_TAXONOMY: Record<string, AssetClassRevenueDriver
       electric_reimburse:     { label: 'Electric Reimbursement',  basisType: 'metered_usage',       dimensionScope: 'utility_meter', rateUnitBasis: 'per_kWh',ratePeriodBasis: 'per_use' },
       water_reimburse:        { label: 'Water Reimbursement',     basisType: 'metered_usage',       dimensionScope: 'utility_meter', rateUnitBasis: 'per_gallon',ratePeriodBasis:'per_use' },
       boat_rental_club:       { label: 'Boat Rental / Club',      basisType: 'absolute_count',      dimensionScope: 'whole_property',rateUnitBasis: 'per_visit',ratePeriodBasis:'per_use' },
+      // ─── Marina-OPERATED ancillary departments (own/operate, P&L revenue) ───
+      boat_sales_operated:    { label: 'Boat Sales (Operated)',   basisType: 'absolute_count',      dimensionScope: 'whole_property',rateUnitBasis: 'per_vehicle',ratePeriodBasis:'per_use' },
+      service_dept_operated:  { label: 'Service Dept (ROs/Labor)',basisType: 'absolute_count',      dimensionScope: 'whole_property',rateUnitBasis: 'per_visit',ratePeriodBasis: 'per_use' },
+      parts_sales_operated:   { label: 'Parts Sales (Operated)',  basisType: 'absolute_count',      dimensionScope: 'whole_property',rateUnitBasis: 'flat',    ratePeriodBasis: 'per_use' },
+      ship_store_operated:    { label: 'Ship Store (Operated)',   basisType: 'absolute_count',      dimensionScope: 'whole_property',rateUnitBasis: 'flat',    ratePeriodBasis: 'per_use' },
+      restaurant_operated:    { label: 'Restaurant (Operated)',   basisType: 'absolute_count',      dimensionScope: 'whole_property',rateUnitBasis: 'per_cover',ratePeriodBasis: 'per_use' },
+      // ─── Marina-SUBLEASED ancillary space (tenant pays rent) ───
       sales_service_lease:    { label: 'Sales & Service Subleases',basisType: 'lease_based',        dimensionScope: 'commercial_leases', rateUnitBasis: 'per_SF', ratePeriodBasis: 'per_year', defaultCapacityUnit: 'SF' },
-      restaurant_lease:       { label: 'Restaurant / Concession', basisType: 'lease_based',         dimensionScope: 'commercial_leases', rateUnitBasis: 'per_SF', ratePeriodBasis: 'per_year', defaultCapacityUnit: 'SF' },
+      restaurant_lease:       { label: 'Restaurant / Concession Sublease', basisType: 'lease_based',dimensionScope: 'commercial_leases', rateUnitBasis: 'per_SF', ratePeriodBasis: 'per_year', defaultCapacityUnit: 'SF' },
     },
   },
 
