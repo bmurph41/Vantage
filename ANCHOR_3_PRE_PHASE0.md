@@ -1182,6 +1182,58 @@ A→B→C→#5 sequence (which actually happened) puts this last; A→B→#5→C
 also viable. Sequencing call HELD at Step B; Step C shipped on the A→B→C path
 because it doesn't depend on #5.
 
+#### (d) Charts wire — ready-to-go deferred item (filed 2026-05-23)
+
+The Pro Forma **Charts** tab (`client/src/.../workspace/pro-forma-charts.tsx`,
+691 LOC) was previously consuming a 100% mock endpoint at
+`server/routes/analytics-routes.ts:1248-1396` that returned
+hardcoded marina-flavored literals ($7.5M revenue / Wet Slips / Fuel /
+Ship Store, byte-identical for every project regardless of asset class).
+
+**Gate status (2026-05-23):** FULLY GATED in commit `31e77a42` — tab removed
+from `TAB_GROUPS` so URL-direct `?tab=proforma-charts` falls back to
+`'overview'`. Mock endpoint left dormant; component import + TabsContent
+left as restore path. No demo-bar risk today.
+
+**Phase 0 scope (already executed — ready to build):**
+
+Wire path replaces the mock with aggregation over `proFormaEngineService.generateProForma`'s output. Post-WS5 the engine's
+`revenue.lineItems[].department` + `expenses.lineItems[].department` carry
+the correct per-asset-class labels (MF: Rental/Other Income/Payroll/R&M/
+Operating; STR: Rental(nightly_rate)/Cleaning(cleaning_revenue)/Platform
+Fees; marina: Fuel/Storage/Service/etc.), so wired charts will be
+asset-class-correct by construction.
+
+Mapping engine output → chart contract:
+
+| Chart field | Engine source | Notes |
+|---|---|---|
+| `revenueByCategory` | Group `revenue.lineItems` by `department`, sum `projections`. Breakdown = per-year `projections[i]`. | Direct |
+| `expensesByCategory` | Group `expenses.lineItems` by `department`. Breakdown = per-year. | Direct; mock's invented Payroll → Mgmt/Ops/Maint/Admin sub-bars become per-year time series (honest semantic shift) |
+| `noiWaterfall` | totalRevenue (Y1) - each expense category = NOI | Direct; drop invented `details` arrays or map to per-line subcategories within dept |
+| `revenueTrend` | `years.map` over `revenue.lineItems` cumulative annual totals. Breakdown = per-line per-year. | Direct |
+| `revenueMix` | 1-level hierarchical pie: category → subcategories from doc-intel (e.g., Rental → "Apartment Rent Revenue"/"Parking Income") | Engine has no 2nd-level hierarchy; flatten to subcategory level OR drop chart |
+| `kpis` | `metrics.year1Noi`, totals from `revenueTotals`/`expenseTotals`, `metrics.exitCapRate` | Direct |
+
+**Effort estimate (Phase 0-verified):** ~3.5-4 hours total.
+- Aggregation function (new `pro-forma-charts-service.ts` or inline route handler): ~1.5h
+- Org/auth context, error handling, scenario type query param: ~30 min
+- Replace mock route body with the new call: ~15 min
+- Verification on MF + STR + marina fixtures (numbers match Pro Forma table; charts render class-correct categories): ~1-1.5h
+- TS types for ProFormaChartData adjustments: ~15 min
+- Un-hide the tab (revert `workspace.tsx:891` filter + restore `TAB_GROUPS` entry at `:219`): ~5 min
+
+**Verification gates:**
+- Per-asset-class smoke: MF → Rental/Other Income/Payroll/R&M/Operating (not Wet Slips/Fuel). STR → Rental/Cleaning/Platform Fees. Marina → existing categories.
+- Cross-surface number match: sum of `revenueByCategory` Y1 = Pro Forma table's Y1 revenue total.
+- Empty state fires when project has zero data.
+
+**Lossy aspects (acceptable):**
+- `expensesByCategory.breakdown` becomes per-year (Y1-Y5) instead of fabricated sub-line (Mgmt/Ops/Maint/Admin). Drill-down still useful — shows time-series instead of categorical.
+- `revenueMix` 2nd-level hierarchy drops unless we synthesize from `subcategory` (natural via doc-intel subcategorization).
+
+**Demo positioning:** Unblocked by everything else. Pure aggregation on top of WS5's correct output. Slots in as demo-polish layer once the underlying projection-correctness work (#5, occupancy, exit-side defaults, platform_fees derived) is shipped — at that point charts visualize the now-fully-correct numbers.
+
 ### Sequencing thoughts (demo roadmap)
 
 For the demo path (MF deal uploads a P&L → Pro Forma shows correct compute):
@@ -1196,8 +1248,20 @@ For the demo path (MF deal uploads a P&L → Pro Forma shows correct compute):
   STR deals start moving past wizard stage with actual P&L uploads (i.e.,
   becomes more important AFTER #5 unblocks STR direct-input projects, and
   AFTER the first STR upload-fed deal lands).
+- Deferred (d) charts-wire is demo-polish, unblocked by everything. Slots
+  in AFTER projection-correctness work so the charts visualize correct
+  numbers (otherwise users see correct-looking charts of incorrect data,
+  which is the exact credibility hazard the mock created).
 
-Suggested order: **#5 → (b) → (a)**.
+Updated 2026-05-23 — full demo-roadmap sequence with the post-WS5 audit:
+**charts-gate-close (done, commit `31e77a42`) → exit-side defaults
+(workstream #2, in progress) → MF/STR occupancy projection → #5
+(direct-input bypass) → (b) platform_fees derived → (d) charts wire →
+(a) user-configurable defaults**. The first 5 are projection-correctness;
+the last 2 are presentation + UX. Demo bar is met once #2 + occupancy
+ship; #5/(b)/(d) are polish.
+
+Suggested original order (pre-roadmap-audit): #5 → (b) → (a).
 
 ---
 
