@@ -1739,12 +1739,182 @@ Both walls are explicitly asserted in tests/v3-marina-rollup.mjs.
 Step D-prime is the per-class light-up. For each non-marina class:
 - Light up `percent_of_capacity` (or the relevant basisType per class)
   in the calculator's v3 read path
-- Wire the multi-year-projection-engine (DCF path) through the
+- ~~Wire the multi-year-projection-engine (DCF path) through the
   calculator alongside pro-forma-engine-service (PF path) — both
-  engines in lockstep
+  engines in lockstep~~ **DONE at Step D-zero (2026-05-23).**
 - Reconcile the placeholder rate (Option A per above memory)
 - Delete the v1-marina adapter once marina's v3 read path is verified
   load-bearing across all marina scenarios
 
 The Step B foundation makes each class an incremental light-up
 behind the same fail-loud wall.
+
+---
+
+## Step D-zero — SHIPPED 2026-05-23
+
+DCF (`multi-year-projection-engine.ts`) now joins the shared-calculator
+architecture, parallel to what Step A did for PF and Step B for the
+PF+UI v3 contract. The latent silent-no-op DCF marina-occupancy bug
+is closed — the next user who populates marina occupancy via the
+Step B UI will see the correct unit-weighted multiplier applied
+in the DCF tab, sensitivity matrix, scenario analysis, Monte Carlo,
+and tornado.
+
+### What shipped (8 files modified, 2 new)
+
+- `server/services/multi-year-projection-engine.ts` — calculator wire-up
+  at `buildProjectedYear:397-462`. Revenue line loop routes through
+  `getProjectionLineValue` when `config.assetClass` is set; legacy
+  direct-compound path stays for callers that haven't supplied it
+  (back-compat for `modeling-export.ts`). Expenses at `:415` UNCHANGED
+  — calculator's v3 occupancy is revenue-only by construction.
+  `ProjectionConfig` gained `assetClass?`, `dimensions?`, and
+  `projectionStartYear?` (all optional, back-compat-safe). v3
+  RevenueDriverBlob built ONCE in `computeMultiYearProjection` and
+  passed to the Y2+ loop.
+- `tests/dcf-multi-year-golden.mjs` (NEW, 357 lines) — DCF baseline
+  harness with 4 asset-class fixtures, dual-path empty-dimensions gate
+  (legacy AND calculator-routed both byte-identical to baseline),
+  populated-dimensions cross-method delta gate (Y3 hand-computed
+  against calendar-year-keyed data), DCF fail-loud wall assertion.
+- `tests/dcf-multi-year-golden.json` (NEW) — frozen pre-wiring
+  baseline snapshot. Captured via `--capture` BEFORE any wire-up
+  touched the engine; post-wiring asserts byte-identical.
+- `server/services/dcf-calculator-service.ts` — main DCF caller at
+  `:402` + sensitivity matrix params at `:646`. Reads
+  `scenarioData.assumptions.dimensions` and derives
+  `projectionStartYear` from `scenarioData.acquisitionCloseDate`.
+- `server/services/dcf-decision-support-service.ts` — base config at
+  `:174`. SQL at `:418` extended to select `assumptions` from
+  `modeling_scenario_versions`. Threads `assetClass` + `dimensions` +
+  `projectionStartYear` to `runScenarioAnalysis`, `computeTornado`,
+  and `runMonteCarlo` via the shared baseConfig.
+- `server/services/dcf-scenario-layer.ts` — baseConfig signature
+  extended; per-scenario projection threads the new fields.
+- `server/services/dcf-simulation-service.ts` — MC baseConfig + base
+  projection + exact-iteration all thread.
+- `server/services/multi-year-projection-route.ts` — passes `assetClass`
+  via `bodyOverrides`; dimensions auto-extracted from
+  `latestScenario.assumptions` inside `buildProjectionConfig`;
+  `projectionStartYear` derived from project config / scenario
+  `acquisitionCloseDate`.
+- `shared/finance/tornado.ts` — baseConfig type extended; driver.apply
+  spreads propagate the new fields automatically.
+
+### The year-keying fix (Brett catch — anchored to production shape)
+
+Phase 0 surfaced that PF passes calendar years to the calculator
+(per `server/utils/modeling-periods.ts:51` — `// Calendar year (e.g.,
+2025)`). The Step B UI writes `series.values` keyed by calendar years
+(`assumptions.tsx:701` — `years[i] = projectionStartYear + i`) and
+`baselineYear = years[0]` (also calendar, per
+`assumptions.tsx:1280`).
+
+My first wire-up passed `period: { year: yearNum }` where `yearNum` is
+the projection ordinal (2, 3, 4, 5). Against real Step-B-written data
+this would silently no-op: `values[String(ordinal)]` → `undefined → 85`
+(default), `values[String(baselineYear=calendarYear)]` → real pct → ratio
+= 85 / real → wrong multiplier (or 1 in the empty case, which is exactly
+why the bug stayed hidden in a fixture I had to hand-bend to ordinals).
+
+**Brett caught it before commit.** Fix:
+- `ProjectionConfig` gained optional `projectionStartYear?: number`.
+- Engine computes `calendarYear = projectionStartYear + (yearNum - 1)`
+  before calling the calculator. Falls back to ordinal when unset
+  (back-compat for `modeling-export.ts`, safe only for empty dimensions).
+- Each caller derives `projectionStartYear` from
+  `acquisitionCloseDate` — same anchor PF uses via
+  `deriveProjectionStartDate(config)` at `modeling-periods.ts:226`.
+- Harness fixture re-keyed to calendar years (`values['2024']..'2028'`,
+  `baselineYear: 2024`, `projectionStartYear: 2024`). The gate would
+  FAIL if the wire-up reverted to ordinals — proving the wire-up is
+  load-bearing against production shape, not just a fixture bent
+  to the bug.
+
+### Why this matters
+
+Step D-zero CLOSES the silent-no-op bug for DCF the same way Step B
+closed it for PF. Empty-dimensions scenarios (all 3 prod marina
+scenarios per Step B Phase 0 DB query) stay byte-identical via BOTH
+the legacy ordinal-fallback path AND the calculator-routed path with
+`projectionStartYear` supplied. Populated-dimensions scenarios will
+now see the correct calendar-year-keyed occupancy multiplier applied
+end-to-end through DCF, sensitivity, MC, scenarios, and tornado.
+
+### Gates at commit time
+
+```
+✓ dept-golden                    gap=0 across 6 scenarios (PF untouched, marina 13493783)
+✓ v1-marina-adapter              9/9 (PF shield untouched)
+✓ v3-marina-rollup               19/19 (PF shield untouched)
+✓ v3-engine-circuit              12/12 (PF shield untouched)
+✓ dcf-multi-year-golden          dual-path empty-dimensions byte-identical
+                                 (legacy ordinal fallback + calendar-routed
+                                 with projectionStartYear), populated-dimensions
+                                 Y3 cross-method match against CALENDAR-YEAR
+                                 data (engine 2,525,209 = hand 2,525,209),
+                                 Y2 isolation, Y4 propagation, DCF fail-loud
+                                 wall fires for marina transient_usage v3
+✓ shared/ tsc                    0 errors (clean)
+✓ server/ scoped tsc             3,540 (= baseline, 0 net new from Step D-zero;
+                                 remaining file errors pre-existing per memory
+                                 project_scenario_result_type_drift + Drizzle
+                                 types at unchanged lines)
+✓ client/ scoped tsc             2,410 (Step D-zero is server-only — no change)
+```
+
+### The 1.37% PF/DCF divergence — EXPLICITLY NOT FIXED
+
+Phase 0 traced the 1.37% Y1 ratio (deferred item `(f)` above) to its
+true source: PF compounds revenue month-by-month within Y1 (`pro-forma-
+engine-service.ts:849`), while DCF reads `direct-input-engine.ts`'s Y1
+`totalRevenue` as-is (a flat line sum at `direct-input-engine.ts:796`)
+and compounds annually from there. The gap is a **Y1-source mechanic**
+that lives UPSTREAM of the calculator. Routing DCF through the
+calculator does NOT change which Y1 each engine reads from, so the
+gap survives Step D-zero unchanged. Closing it requires picking
+deferred-(f) option (i) "align PF to DCF" or (ii) "align DCF to PF" —
+both are separate workstreams, not Step D-zero scope.
+
+What Step D-zero DOES tee up: once both engines route through the
+same calculator with the same per-line shape, the calculator becomes
+the natural single owner of compounding semantic. Step D-prime can
+decide whether to unify Y1 sourcing inside the calculator (option ii)
+or keep them divergent. D-zero is the prerequisite for that decision,
+not the decision itself.
+
+### New tracked gap (filed as memory)
+
+- **DCF export v3 occupancy gap**
+  (`project_dcf_export_v3_occupancy_gap.md`) — `modeling-export.ts`
+  reads `project.customMetrics.inputAssumptions`, NOT
+  `modeling_scenario_versions.assumptions.dimensions`, so XLSX exports
+  do not reflect v3 occupancy. The optional `dimensions?` +
+  `projectionStartYear?` fields make this back-compat-safe (undefined
+  → blob:null + ordinal fallback → byte-identical to today). Surfaces
+  only when a populated-dimensions marina scenario is exported (0
+  prod scenarios qualify today). Resolution sketch in the memory:
+  two DB queries (scenario for `assumptions`, project config for
+  `acquisition_close_date`) — ~30 minutes.
+
+  The memory's Year-keying addendum documents the calendar-year
+  requirement Brett surfaced: any future export wire-up MUST supply
+  BOTH `dimensions` AND `projectionStartYear` — otherwise XLSX would
+  silently no-op even after dimensions is plumbed. The Step D-zero
+  fallback exists precisely to prevent export from breaking today
+  while this gap stays filed.
+
+### Step D-prime — sequence updated
+
+With DCF now routing through the calculator, the per-class light-up
+ahead reduces to:
+- Per non-marina class: light up `percent_of_capacity` (or relevant
+  basisType) in the calculator's v3 read path. Both engines pick it
+  up automatically — no per-engine wiring needed.
+- Reconcile the placeholder rate (Option A per
+  `project_v3_placeholder_rate_axis_handoff`).
+- Decide deferred-(f): whether to unify Y1 sourcing semantic inside
+  the calculator now that it's the single owner.
+- Delete the v1-marina adapter once marina's v3 path is verified
+  load-bearing across all marina scenarios in both engines.

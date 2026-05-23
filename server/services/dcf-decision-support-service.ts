@@ -179,6 +179,17 @@ export async function runDecisionSupport(
     sellingCostPct: 0.03,
     defaultCapExPct: scenarioData.belowTheLineCapexPct / 100,
     capexSchedule,
+    // Step D-zero (2026-05-23): thread asset class + v3 dimensions so
+    // runScenarioAnalysis / computeTornado / runMonteCarlo all use the
+    // same calculator-routed projection path as the main DCF.
+    assetClass: projectData.assetClass,
+    dimensions: scenarioData.assumptions?.dimensions as Record<string, any> | undefined,
+    // Step D-zero year-keying — calendar-year semantic match for the
+    // calculator's series.values lookup. Absent acquisitionCloseDate →
+    // undefined → ordinal fallback (back-compat).
+    projectionStartYear: scenarioData.acquisitionCloseDate
+      ? new Date(scenarioData.acquisitionCloseDate).getUTCFullYear()
+      : undefined,
   };
 
   // Debt
@@ -407,7 +418,10 @@ async function loadScenarioForDS(pool: any, modelingProjectId: string) {
   // tab. Pro-forma engine reads belowTheLine.capexPct correctly at line
   // 458; this brings the DCF compute pipeline into agreement.
   const sv = await pool.query(
-    `SELECT id, revenue_growth_rate, expense_growth_rate, exit_cap_rate
+    // Step D-zero (2026-05-23): include assumptions JSONB so we can read
+    // assumptions.dimensions (the Step B v3 occupancy blob the UI writes)
+    // and forward to the DCF projection for marina percent_of_capacity.
+    `SELECT id, revenue_growth_rate, expense_growth_rate, exit_cap_rate, assumptions
      FROM modeling_scenario_versions
      WHERE modeling_project_id = $1 ORDER BY created_at DESC LIMIT 1`,
     [modelingProjectId]
@@ -441,6 +455,20 @@ async function loadScenarioForDS(pool: any, modelingProjectId: string) {
     }
   }
 
+  // Step D-zero: s.assumptions is the modeling_scenario_versions.assumptions
+  // JSONB (the Step B UI write surface). When pg returns JSONB it arrives as
+  // a parsed object; defensive cast either way. v3 dimensions blob lives at
+  // assumptions.dimensions when populated; absent / empty → engine takes the
+  // legacy direct-compound path → byte-identical to pre-D-zero.
+  const assumptions: Record<string, any> =
+    s.assumptions && typeof s.assumptions === 'object'
+      ? s.assumptions
+      : typeof s.assumptions === 'string'
+        ? (() => {
+            try { return JSON.parse(s.assumptions); } catch { return {}; }
+          })()
+        : {};
+
   return {
     revenueGrowthRate: Number(s.revenue_growth_rate) || 3,
     expenseGrowthRate: Number(s.expense_growth_rate) || 2.5,
@@ -450,6 +478,7 @@ async function loadScenarioForDS(pool: any, modelingProjectId: string) {
     seasonMonths: [],
     belowTheLineCapexPct,
     belowTheLineCapexAmount,
+    assumptions,
   };
 }
 

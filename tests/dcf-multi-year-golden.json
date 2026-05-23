@@ -1,0 +1,208 @@
+{
+  "_meta": {
+    "purpose": "Step D-zero — DCF baseline. Pre-wiring snapshot of computeMultiYearProjection output across 4 empty-dimensions fixtures. Post-wiring assertions must match byte-identical.",
+    "generatedFrom": "tests/dcf-multi-year-golden.mjs --capture",
+    "configUsed": {
+      "holdPeriod": 5,
+      "revenueGrowthRate": 0.03,
+      "expenseGrowthRate": 0.025,
+      "defaultCapExPct": 0.02,
+      "exitCapRate": 0.065,
+      "sellingCostPct": 0.03
+    }
+  },
+  "fixtures": {
+    "marina-empty": {
+      "years": [
+        {
+          "year": 1,
+          "totalRevenue": 2350000,
+          "totalExpenses": 1335000,
+          "noi": 1015000,
+          "capex": 47000,
+          "ncf": 968000
+        },
+        {
+          "year": 2,
+          "totalRevenue": 2420500,
+          "totalExpenses": 1368375,
+          "noi": 1052125,
+          "capex": 48410,
+          "ncf": 1003715
+        },
+        {
+          "year": 3,
+          "totalRevenue": 2493115,
+          "totalExpenses": 1402584.37,
+          "noi": 1090530.63,
+          "capex": 49862.3,
+          "ncf": 1040668.33
+        },
+        {
+          "year": 4,
+          "totalRevenue": 2567908.45,
+          "totalExpenses": 1437648.97,
+          "noi": 1130259.48,
+          "capex": 51358.17,
+          "ncf": 1078901.31
+        },
+        {
+          "year": 5,
+          "totalRevenue": 2644945.71,
+          "totalExpenses": 1473590.2,
+          "noi": 1171355.51,
+          "capex": 52898.91,
+          "ncf": 1118456.6
+        }
+      ],
+      "totalNOI": 5459270.62,
+      "totalNCF": 5209741.24,
+      "exitNOI": 1171355.51,
+      "exitValue": 18020854
+    },
+    "str-empty": {
+      "years": [
+        {
+          "year": 1,
+          "totalRevenue": 305000,
+          "totalExpenses": 79500,
+          "noi": 225500,
+          "capex": 6100,
+          "ncf": 219400
+        },
+        {
+          "year": 2,
+          "totalRevenue": 314150,
+          "totalExpenses": 81487.5,
+          "noi": 232662.5,
+          "capex": 6283,
+          "ncf": 226379.5
+        },
+        {
+          "year": 3,
+          "totalRevenue": 323574.5,
+          "totalExpenses": 83524.69,
+          "noi": 240049.81,
+          "capex": 6471.49,
+          "ncf": 233578.32
+        },
+        {
+          "year": 4,
+          "totalRevenue": 333281.74,
+          "totalExpenses": 85612.81,
+          "noi": 247668.93,
+          "capex": 6665.63,
+          "ncf": 241003.3
+        },
+        {
+          "year": 5,
+          "totalRevenue": 343280.2,
+          "totalExpenses": 87753.13,
+          "noi": 255527.07,
+          "capex": 6865.6,
+          "ncf": 248661.47
+        }
+      ],
+      "totalNOI": 1201408.31,
+      "totalNCF": 1169022.59,
+      "exitNOI": 255527.07,
+      "exitValue": 3931185.69
+    },
+    "multifamily-empty": {
+      "years": [
+        {
+          "year": 1,
+          "totalRevenue": 872000,
+          "totalExpenses": 187000,
+          "noi": 685000,
+          "capex": 17440,
+          "ncf": 667560
+        },
+        {
+          "year": 2,
+          "totalRevenue": 898160,
+          "totalExpenses": 191675,
+          "noi": 706485,
+          "capex": 17963.2,
+          "ncf": 688521.8
+        },
+        {
+          "year": 3,
+          "totalRevenue": 925104.8,
+          "totalExpenses": 196466.88,
+          "noi": 728637.92,
+          "capex": 18502.1,
+          "ncf": 710135.82
+        },
+        {
+          "year": 4,
+          "totalRevenue": 952857.94,
+          "totalExpenses": 201378.56,
+          "noi": 751479.38,
+          "capex": 19057.16,
+          "ncf": 732422.22
+        },
+        {
+          "year": 5,
+          "totalRevenue": 981443.68,
+          "totalExpenses": 206413.02,
+          "noi": 775030.66,
+          "capex": 19628.87,
+          "ncf": 755401.79
+        }
+      ],
+      "totalNOI": 3646632.96,
+      "totalNCF": 3554041.63,
+      "exitNOI": 775030.66,
+      "exitValue": 11923548.62
+    },
+    "office-empty": {
+      "years": [
+        {
+          "year": 1,
+          "totalRevenue": 1580000,
+          "totalExpenses": 406000,
+          "noi": 1174000,
+          "capex": 31600,
+          "ncf": 1142400
+        },
+        {
+          "year": 2,
+          "totalRevenue": 1627400,
+          "totalExpenses": 416150,
+          "noi": 1211250,
+          "capex": 32548,
+          "ncf": 1178702
+        },
+        {
+          "year": 3,
+          "totalRevenue": 1676222,
+          "totalExpenses": 426553.74,
+          "noi": 1249668.26,
+          "capex": 33524.44,
+          "ncf": 1216143.82
+        },
+        {
+          "year": 4,
+          "totalRevenue": 1726508.66,
+          "totalExpenses": 437217.58,
+          "noi": 1289291.08,
+          "capex": 34530.17,
+          "ncf": 1254760.91
+        },
+        {
+          "year": 5,
+          "totalRevenue": 1778303.92,
+          "totalExpenses": 448148.03,
+          "noi": 1330155.89,
+          "capex": 35566.08,
+          "ncf": 1294589.81
+        }
+      ],
+      "totalNOI": 6254365.23,
+      "totalNCF": 6086596.54,
+      "exitNOI": 1330155.89,
+      "exitValue": 20463936.77
+    }
+  }
+}

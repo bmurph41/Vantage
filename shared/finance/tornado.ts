@@ -140,6 +140,17 @@ export function computeTornado(
     expenseGrowthRate: number;
     exitCapRate: number;
     sellingCostPct: number;
+    // Workstream #2 (2026-05-23): forwarded through driver.apply spreads
+    // into per-driver projections so capex follows the main DCF.
+    defaultCapExPct?: number;
+    capexSchedule?: Array<{ year: number; amount: number; label?: string }>;
+    // Step D-zero (2026-05-23): forwarded through driver.apply spreads into
+    // per-driver projections so tornado uses the same calculator-routed
+    // projection path as the main DCF.
+    assetClass?: string;
+    dimensions?: Record<string, any>;
+    /** Step D-zero year-keying — calendar-year semantic match. */
+    projectionStartYear?: number;
   },
   equity: {
     equityInvested: number;

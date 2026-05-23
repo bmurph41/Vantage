@@ -99,6 +99,13 @@ export function runScenarioAnalysis(
     // the per-scenario IRR/NPV. Pre-fix scenarios silently used 2% default.
     defaultCapExPct?: number;
     capexSchedule?: Array<{ year: number; amount: number; label?: string }>;
+    // Step D-zero (2026-05-23): forwarded into per-scenario projections so
+    // each scenario uses the same calculator-routed path as the main DCF.
+    // Empty/undefined → blob:null → byte-identical to pre-D-zero.
+    assetClass?: string;
+    dimensions?: Record<string, any>;
+    /** Step D-zero year-keying — calendar-year semantic match. */
+    projectionStartYear?: number;
   },
   equity: {
     equityInvested: number;
@@ -129,6 +136,10 @@ export function runScenarioAnalysis(
       // Workstream #2: thread user-set capex through per-scenario projection.
       defaultCapExPct: baseConfig.defaultCapExPct,
       capexSchedule: baseConfig.capexSchedule,
+      // Step D-zero: forward calculator-routed path to per-scenario projection.
+      assetClass: baseConfig.assetClass,
+      dimensions: baseConfig.dimensions,
+      projectionStartYear: baseConfig.projectionStartYear,
     });
 
     const flows = buildLeveredFlows(

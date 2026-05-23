@@ -18,6 +18,10 @@
  */
 
 import type { DirectInputFinancials, FinancialLine, MonthlyBreakdown } from './direct-input-engine';
+import { getProjectionLineValue } from '../../shared/coa/projection-calculator';
+import { storageSubcategoryToTypeKey, inferDepartment } from '../../shared/coa/department-mapping';
+import type { RevenueDriverBlob } from '../../shared/coa/revenue-driver-schema';
+import { getModelConfig } from '../../shared/asset-class-model-config';
 
 // ─────────────────────────────────────────────
 // CONFIG TYPES
@@ -98,6 +102,53 @@ export interface ProjectionConfig {
    * are overridden. Use computeLeaseIncomeByYear() to generate these values.
    */
   noiOverrides?: number[];
+
+  /**
+   * Step D-zero (2026-05-23): asset class for calculator dispatch.
+   * Optional for back-compat — when undefined, the engine takes the legacy
+   * direct-compound path on every revenue line (byte-identical to pre-D-zero).
+   * When set, the engine routes revenue compounding through the shared
+   * `getProjectionLineValue` calculator, the same dispatcher PF uses since
+   * Step A. Expenses stay on the legacy path either way (calculator's v3
+   * occupancy is revenue-only by construction).
+   */
+  assetClass?: string;
+
+  /**
+   * Step D-zero: v3 occupancy dimensions (the `assumptions.dimensions` shape
+   * Step B's UI writes). When populated AND `assetClass === 'marina'` AND
+   * a revenue line's label maps to a stored dimension, the calculator
+   * returns the unit-weighted occupancy multiplier and the engine applies it.
+   * Optional + back-compat-safe: undefined → blob:null → v1 fallback →
+   * multiplier=1 → byte-identical to pre-D-zero.
+   *
+   * The shape matches `RevenueDriverBlob['dimensions']` from
+   * `shared/coa/revenue-driver-schema.ts`.
+   */
+  dimensions?: RevenueDriverBlob['dimensions'];
+
+  /**
+   * Step D-zero year-keying semantic (2026-05-23):
+   *   PF passes calendar year (per server/utils/modeling-periods.ts:51 —
+   *   "year: Calendar year (e.g., 2025)") to the calculator.
+   *   Step B's UI writes `series.values` keyed by CALENDAR years and
+   *   `baselineYear` = years[0] = projectionStartYear (also calendar).
+   *   DCF's per-year loop ranges over yearNum=2..holdPeriod (ordinal).
+   *
+   * Without this field, the wire-up would look up values[String(ordinal)]
+   * → undefined → defaults to 85 → ratio against calendar-keyed baseline →
+   * silent no-op (or wrong multiplier on populated data). When this field
+   * IS set, the engine computes calendar year as
+   *   calendarYear = projectionStartYear + (yearNum - 1)
+   * and passes that as period.year to the calculator — matching PF and
+   * the UI write.
+   *
+   * Optional + back-compat-safe: when undefined the engine passes yearNum
+   * (ordinal); for empty-dimensions scenarios that no-ops as today
+   * (multiplier=1 either way). For populated-dimensions scenarios callers
+   * MUST supply this field or the calculator returns wrong numbers.
+   */
+  projectionStartYear?: number;
 }
 
 // ─────────────────────────────────────────────
@@ -363,16 +414,80 @@ function buildProjectedYear(
   year1Financials: DirectInputFinancials,
   config: ProjectionConfig,
   vacancyEntry: VacancyCurveEntry | undefined,
-  capexEntry: CapExScheduleEntry | undefined
+  capexEntry: CapExScheduleEntry | undefined,
+  v3Blob: RevenueDriverBlob | null,
 ): ProjectionYear {
   // ── Revenue lines ──────────────────────────────────────────────────────────
+  // Step D-zero (2026-05-23): when assetClass is configured, route each
+  // revenue line's annual compound through the shared calculator (the same
+  // dispatcher PF uses since Step A). This closes the silent-no-op DCF
+  // marina-occupancy bug for populated-dimensions scenarios. Empty-dimensions
+  // and non-marina lines take the v1-fallback/degraded-no-op path → multiplier=1
+  // → byte-identical to pre-D-zero. When assetClass is undefined the legacy
+  // direct-compound path runs (back-compat safety net for any caller that
+  // hasn't been updated yet — see modeling-export.ts known-gap).
+  const assetClass = config.assetClass;
+  const modelConfig = assetClass ? getModelConfig(assetClass) : undefined;
+  const V3_STREAM_ID = 'default';
+
   const newRevenueLines: ProjectionLineItem[] = prevYear.revenueLines.map(line => {
     const rate = resolveGrowthRate(line.key, true, config);
-    const newAmount = round2(line.amount * (1 + rate));
+    const grownAmount = line.amount * (1 + rate);
+
+    // Legacy path — direct compound, byte-identical to pre-Step-D-zero.
+    if (!assetClass || !modelConfig) {
+      const newAmount = round2(grownAmount);
+      return {
+        ...line,
+        amount: newAmount,
+        formula: `$${fmtC(line.amount)} × (1 + ${fmtP(rate)}) = $${fmtC(newAmount)}`,
+      };
+    }
+
+    // Calculator-routed path. dimensionId resolves from line.label
+    // (Title-case subcategory name like "Wet Slip Revenue", same vocabulary
+    // PF feeds via `name`). When undefined, the v3 read path returns null
+    // and we fall through to the calculator's v1-fallback / degraded-no-op,
+    // multiplier=1.
+    const dimensionId = storageSubcategoryToTypeKey(line.label);
+    const lineHasV3Stream =
+      v3Blob !== null &&
+      dimensionId !== undefined &&
+      v3Blob.dimensions[dimensionId]?.streams?.[V3_STREAM_ID] !== undefined;
+
+    // Step D-zero year-keying: match PF + UI calendar-year semantic.
+    // projectionStartYear → calendarYear = startYear + (yearNum - 1).
+    // Absent → ordinal fallback (back-compat for callers that haven't been
+    // updated, e.g. modeling-export.ts; safe for empty dimensions).
+    const calendarYear =
+      config.projectionStartYear !== undefined
+        ? config.projectionStartYear + (yearNum - 1)
+        : yearNum;
+
+    const calcResult = getProjectionLineValue({
+      assetClass,
+      department: inferDepartment(line.label, line.category, assetClass),
+      lineKey: line.label,
+      period: { year: calendarYear },
+      blob: lineHasV3Stream ? v3Blob : null,
+      dimensionId: lineHasV3Stream ? dimensionId : undefined,
+      streamId: lineHasV3Stream ? V3_STREAM_ID : undefined,
+      modelConfig,
+      y1Amount: grownAmount,
+      growthRates: { line: rate },
+      // No legacyV1Context — DCF historically had ZERO occupancy logic; the
+      // v1 adapter would return 1 either way (department gate or empty data
+      // gate). Passing undefined keeps that semantic explicit.
+    });
+    const multiplier = calcResult._stepA_multiplier ?? 1;
+    const newAmount = round2(grownAmount * multiplier);
     return {
       ...line,
       amount: newAmount,
-      formula: `$${fmtC(line.amount)} × (1 + ${fmtP(rate)}) = $${fmtC(newAmount)}`,
+      formula:
+        multiplier === 1
+          ? `$${fmtC(line.amount)} × (1 + ${fmtP(rate)}) = $${fmtC(newAmount)}`
+          : `$${fmtC(line.amount)} × (1 + ${fmtP(rate)}) × ${multiplier.toFixed(4)} occ = $${fmtC(newAmount)}`,
     };
   });
 
@@ -510,6 +625,19 @@ export function computeMultiYearProjection(
 
   const years: ProjectionYear[] = [year1];
 
+  // ── Step D-zero: build v3 RevenueDriverBlob ONCE, pass through Y2+ loop ──
+  // Dimensions absent or empty → blob:null → calculator falls through to
+  // v1-fallback/degraded-no-op → multiplier=1 → byte-identical to pre-D-zero.
+  const v3Blob: RevenueDriverBlob | null =
+    config.dimensions && Object.keys(config.dimensions).length > 0
+      ? {
+          schemaVersion: 3,
+          granularity: 'year',
+          departmentDefaults: {},
+          dimensions: config.dimensions,
+        }
+      : null;
+
   // ── Project Years 2–N ──────────────────────────────────────────────────────
   for (let y = 2; y <= config.holdPeriod; y++) {
     const prevYear = years[y - 2];
@@ -524,7 +652,8 @@ export function computeMultiYearProjection(
       year1Financials,
       config,
       vacancyEntry,
-      capexEntry
+      capexEntry,
+      v3Blob,
     );
 
     years.push(projectedYear);
@@ -593,12 +722,21 @@ export function computeMultiYearProjection(
 export function buildProjectionConfig(
   projectConfig: {
     holdPeriod?: number | null;
+    /** Step D-zero: project-level start anchor for calendar-year mapping.
+     *  When supplied, the engine maps yearNum (ordinal) → calendar year via
+     *  projectionStartYear + (yearNum-1) before calling the calculator. */
+    projectionStartDate?: string | Date | null;
+    acquisitionCloseDate?: string | Date | null;
   },
   scenarioVersion?: {
     revenueGrowthRate?: string | number | null;
     expenseGrowthRate?: string | number | null;
     holdPeriodYears?: number | null;
     categoryGrowthRates?: Record<string, number> | null;
+    /** Step D-zero: scenario `assumptions` JSONB carries `dimensions` (v3 occupancy
+     *  blob produced by the Step B UI write). Optional; absent → empty-dimensions. */
+    assumptions?: any;
+    acquisitionCloseDate?: string | Date | null;
   } | null,
   overrides?: Partial<ProjectionConfig>
 ): ProjectionConfig {
@@ -620,6 +758,27 @@ export function buildProjectionConfig(
       ? Number(scenarioVersion.expenseGrowthRate)
       : 0.025);
 
+  // Step D-zero: thread v3 occupancy dimensions from the scenario version.
+  // Engine builds the RevenueDriverBlob inside computeMultiYearProjection from
+  // this field. Absent / empty → blob:null → byte-identical to pre-D-zero.
+  const dimensions =
+    overrides?.dimensions ?? (scenarioVersion?.assumptions?.dimensions as RevenueDriverBlob['dimensions'] | undefined);
+
+  // Step D-zero year-keying: derive projectionStartYear from the same sources
+  // pro-forma-engine-service uses (modeling-periods.ts:226 deriveProjectionStartDate)
+  // so DCF and PF lookups are calendar-aligned. Precedence: overrides →
+  // projectConfig.projectionStartDate → projectConfig.acquisitionCloseDate →
+  // scenarioVersion.acquisitionCloseDate. Falls back to undefined when no
+  // anchor is available → engine uses ordinal yearNum (back-compat).
+  const startDateSource =
+    projectConfig?.projectionStartDate ??
+    projectConfig?.acquisitionCloseDate ??
+    scenarioVersion?.acquisitionCloseDate ??
+    null;
+  const projectionStartYear =
+    overrides?.projectionStartYear ??
+    (startDateSource ? new Date(startDateSource as string | Date).getUTCFullYear() : undefined);
+
   return {
     holdPeriod,
     revenueGrowthRate,
@@ -630,5 +789,8 @@ export function buildProjectionConfig(
     defaultCapExPct: overrides?.defaultCapExPct ?? DEFAULT_CAPEX_PCT,
     exitCapRate: overrides?.exitCapRate ?? DEFAULT_EXIT_CAP_RATE,
     sellingCostPct: overrides?.sellingCostPct ?? DEFAULT_SELLING_COST_PCT,
+    assetClass: overrides?.assetClass,
+    dimensions,
+    projectionStartYear,
   };
 }

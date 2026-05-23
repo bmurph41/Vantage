@@ -399,6 +399,20 @@ export async function performDCFAnalysis(
     ? Array.from({ length: holdPeriod }, (_, i) => ({ year: i + 1, amount: userCapexAmount }))
     : undefined;
 
+  // Step D-zero (2026-05-23): thread assetClass + dimensions into config so
+  // the multi-year engine routes revenue compounding through the shared
+  // calculator. Empty assumptions.dimensions → blob:null → byte-identical
+  // to pre-D-zero (verified by tests/dcf-multi-year-golden.mjs).
+  const dimensions = scenarioData.assumptions?.dimensions as Record<string, any> | undefined;
+
+  // Step D-zero year-keying: PF + UI use calendar years. Derive
+  // projectionStartYear from acquisitionCloseDate so DCF's calculator
+  // lookups match. Absent date → undefined → ordinal fallback (back-compat,
+  // safe only for empty dimensions).
+  const projectionStartYear = scenarioData.acquisitionCloseDate
+    ? new Date(scenarioData.acquisitionCloseDate).getUTCFullYear()
+    : undefined;
+
   const projection = computeMultiYearProjection(year1, {
     holdPeriod,
     revenueGrowthRate,
@@ -408,6 +422,9 @@ export async function performDCFAnalysis(
     noiOverrides,
     defaultCapExPct: userCapexPct / 100,
     capexSchedule,
+    assetClass: projectData.assetClass,
+    dimensions,
+    projectionStartYear,
   });
 
   // ── Step 5: Compute debt schedule ───────────────────────────────────────
@@ -519,6 +536,12 @@ export async function performDCFAnalysis(
       // Workstream #2: forward user-set capex into sensitivity sweep.
       defaultCapExPct: userCapexPct / 100,
       capexSchedule,
+      // Step D-zero (2026-05-23): forward assetClass + dimensions so the
+      // sensitivity sweep uses the same calculator-routed path as the main
+      // DCF projection. Empty dimensions → byte-identical to pre-D-zero.
+      assetClass: projectData.assetClass,
+      dimensions,
+      projectionStartYear,
     }
   );
 
@@ -638,6 +661,12 @@ function buildSensitivityMatrix(
      *  Pre-fix sensitivity silently used 2% regardless. */
     defaultCapExPct?: number;
     capexSchedule?: Array<{ year: number; amount: number; label?: string }>;
+    /** Step D-zero (2026-05-23): forwarded into per-cell projections so
+     *  sensitivity uses the same calculator-routed path as the main DCF. */
+    assetClass?: string;
+    dimensions?: Record<string, any>;
+    /** Step D-zero year-keying — match PF + UI calendar-year semantic. */
+    projectionStartYear?: number;
   }
 ): SensitivityMatrix {
   // Growth rate columns: base ± 1%, ± 2% (5 columns)
@@ -664,6 +693,10 @@ function buildSensitivityMatrix(
         // Workstream #2: thread user-set capex into sensitivity sweep.
         defaultCapExPct: params.defaultCapExPct,
         capexSchedule: params.capexSchedule,
+        // Step D-zero (2026-05-23): same calculator-routed path as main DCF.
+        assetClass: params.assetClass,
+        dimensions: params.dimensions,
+        projectionStartYear: params.projectionStartYear,
       });
 
       const flows = buildQuickFlows(

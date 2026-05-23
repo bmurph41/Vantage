@@ -109,6 +109,12 @@ export function runMonteCarlo(
     // so user-set capex reaches MC samples. Pre-fix MC silently used 2%.
     defaultCapExPct?: number;
     capexSchedule?: Array<{ year: number; amount: number; label?: string }>;
+    // Step D-zero (2026-05-23): forwarded so MC iterations use the same
+    // calculator-routed projection path as the main DCF.
+    assetClass?: string;
+    dimensions?: Record<string, any>;
+    /** Step D-zero year-keying — calendar-year semantic match. */
+    projectionStartYear?: number;
   },
   equity: {
     equityInvested: number;
@@ -145,6 +151,10 @@ export function runMonteCarlo(
       // Workstream #2: thread user-set capex into baseline projection.
       defaultCapExPct: baseConfig.defaultCapExPct,
       capexSchedule: baseConfig.capexSchedule,
+      // Step D-zero: thread calculator-routed path into MC base projection.
+      assetClass: baseConfig.assetClass,
+      dimensions: baseConfig.dimensions,
+      projectionStartYear: baseConfig.projectionStartYear,
     });
   }
 
@@ -233,6 +243,10 @@ function runExactIteration(
     // Workstream #2: thread user-set capex into MC exact-mode iterations.
     defaultCapExPct: baseConfig.defaultCapExPct,
     capexSchedule: baseConfig.capexSchedule,
+    // Step D-zero: calculator-routed path in MC exact-mode iterations too.
+    assetClass: baseConfig.assetClass,
+    dimensions: baseConfig.dimensions,
+    projectionStartYear: baseConfig.projectionStartYear,
   });
 
   return buildFlows(

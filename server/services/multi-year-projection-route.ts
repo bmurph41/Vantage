@@ -95,14 +95,18 @@ export async function multiYearProjectionHandler(req: Request, res: Response) {
       k => (bodyOverrides as any)[k] === undefined && delete (bodyOverrides as any)[k]
     );
 
+    // ── 5. Sync commercial leases before Year 1 compute (rent step-ups) ───────
+    const assetClass: string = project.assetClass ?? 'multifamily';
+
+    // Step D-zero (2026-05-23): thread assetClass into config so the engine
+    // routes revenue compounding through the shared calculator. Dimensions
+    // are auto-extracted from latestScenario.assumptions inside
+    // buildProjectionConfig — no separate plumbing needed here.
     const projectionConfig = buildProjectionConfig(
       projConfig ?? { holdPeriod: 5 },
       latestScenario ?? null,
-      bodyOverrides
+      { ...bodyOverrides, assetClass },
     );
-
-    // ── 5. Sync commercial leases before Year 1 compute (rent step-ups) ───────
-    const assetClass: string = project.assetClass ?? 'multifamily';
     if (COMMERCIAL_ASSET_CLASSES.has(assetClass)) {
       try {
         await syncLeaseRollupToAssumptions(projectId, orgId);
