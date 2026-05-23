@@ -54,8 +54,7 @@ console.log('=== V1 Marina Adapter — byte-identical regression shield ===\n');
     modelConfig,
     y1Amount: 100_000,
     growthRates: { line: 0.03 },
-    legacyV1Occupancy: { wet_slips: { '2024': 85, '2027': 90 } },
-    latestHistoricalYear: 2024,
+    legacyV1Context: { occupancy: { wet_slips: { '2024': 85, '2027': 90 } }, latestHistoricalYear: 2024 },
   });
   // Legacy marina helper formula: currentPct / basePct = 90/85
   assertNear(result._stepA_multiplier, 90 / 85, 'Case 1: ratio = 90/85');
@@ -75,8 +74,7 @@ console.log('=== V1 Marina Adapter — byte-identical regression shield ===\n');
     modelConfig,
     y1Amount: 100_000,
     growthRates: { line: 0.03 },
-    legacyV1Occupancy: {}, // empty — the bug-state today
-    latestHistoricalYear: 2024,
+    legacyV1Context: { occupancy: {}, latestHistoricalYear: 2024 }, // empty — the bug-state today
   });
   assertEqual(result._stepA_multiplier, 1, 'Case 2: empty v1 → multiplier=1');
   assertEqual(result.amount, 100_000, 'Case 2: amount unchanged');
@@ -93,8 +91,7 @@ console.log('=== V1 Marina Adapter — byte-identical regression shield ===\n');
     modelConfig,
     y1Amount: 50_000,
     growthRates: { line: 0.03 },
-    legacyV1Occupancy: { wet_slips: { '2024': 85, '2027': 90 } },
-    latestHistoricalYear: 2024,
+    legacyV1Context: { occupancy: { wet_slips: { '2024': 85, '2027': 90 } }, latestHistoricalYear: 2024 },
   });
   // Cascade: marina.departmentRevenueModeDefaults.Fuel='driver_based',
   // but department !== 'Storage' so v1 adapter returns 1.
@@ -113,8 +110,7 @@ console.log('=== V1 Marina Adapter — byte-identical regression shield ===\n');
     modelConfig,
     y1Amount: 25_000,
     growthRates: { line: 0.03 },
-    legacyV1Occupancy: { wet_slips: { '2024': 85, '2027': 90 } },
-    latestHistoricalYear: 2024,
+    legacyV1Context: { occupancy: { wet_slips: { '2024': 85, '2027': 90 } }, latestHistoricalYear: 2024 },
   });
   // storageSubcategoryToTypeKey('Unrecognized Storage Line') → undefined → multiplier=1
   assertEqual(result._stepA_multiplier, 1, 'Case 4: unrecognized subcat → multiplier=1');
@@ -131,8 +127,7 @@ console.log('=== V1 Marina Adapter — byte-identical regression shield ===\n');
     modelConfig,
     y1Amount: 100_000,
     growthRates: { line: 0.03 },
-    legacyV1Occupancy: { wet_slips: { '2027': 90 } }, // no 2024 entry
-    latestHistoricalYear: 2024,
+    legacyV1Context: { occupancy: { wet_slips: { '2027': 90 } }, latestHistoricalYear: 2024 }, // no 2024 entry
   });
   // Legacy fallback: missing year defaults to 85. 90/85 again.
   assertNear(result._stepA_multiplier, 90 / 85, 'Case 5: missing base year → uses 85 default');
@@ -149,8 +144,7 @@ console.log('=== V1 Marina Adapter — byte-identical regression shield ===\n');
     modelConfig,
     y1Amount: 100_000,
     growthRates: { line: 0.03 },
-    legacyV1Occupancy: { wet_slips: { '2024': 80 } }, // no 2027 entry
-    latestHistoricalYear: 2024,
+    legacyV1Context: { occupancy: { wet_slips: { '2024': 80 } }, latestHistoricalYear: 2024 }, // no 2027 entry
   });
   // Legacy fallback: missing current year defaults to 85. 85/80.
   assertNear(result._stepA_multiplier, 85 / 80, 'Case 6: missing current year → uses 85 default');
@@ -194,7 +188,9 @@ console.log('=== V1 Marina Adapter — byte-identical regression shield ===\n');
   assertEqual(result._stepA_multiplier, 1, 'Case 8: office no-op multiplier=1');
 }
 
-// ─── Case 9: v3 fail-loud guard — must throw on premature v3 data ───
+// ─── Case 9: v3 fail-loud wall — Step B lit up marina percent_of_capacity ONLY.
+//            A marina v3 stream with a NOT-yet-wired basisType must still throw.
+//            (The wall sits at the tightest boundary: same class, different basis.) ───
 {
   let threw = false;
   let message = '';
@@ -202,10 +198,10 @@ console.log('=== V1 Marina Adapter — byte-identical regression shield ===\n');
     getProjectionLineValue({
       assetClass: 'marina',
       department: 'Storage',
-      lineKey: 'Wet Slip Rental',
+      lineKey: 'Transient Slip Rental',
       period: { year: 2027 },
       dimensionId: 'wet_slips',
-      streamId: 'wet_slips_long_term',
+      streamId: 'wet_slips_transient',
       blob: {
         schemaVersion: 3,
         granularity: 'year',
@@ -214,12 +210,14 @@ console.log('=== V1 Marina Adapter — byte-identical regression shield ===\n');
           wet_slips: {
             totalCapacity: { value: 1000, unit: 'LF' },
             streams: {
-              wet_slips_long_term: {
-                basisType: 'percent_of_capacity',
-                capacityAllocation: 0.85,
+              wet_slips_transient: {
+                // basisType='transient_usage' is NOT yet wired (Step D-prime).
+                // Same class as the lit-up case, different basis → must throw.
+                basisType: 'transient_usage',
+                capacityAllocation: 0.15,
                 revenueMode: 'driver_based',
-                driver: { series: { mode: 'fixed', values: { '2027': 90 }, baselineYear: 2024 }, seasons: null, quantityUnit: 'percent' },
-                rate: { unitBasis: 'per_LF', periodBasis: 'per_month', series: { mode: 'fixed', values: { '2027': 30 }, baselineYear: 2024 } },
+                driver: { series: { mode: 'fixed', values: { '2027': 5000 }, baselineYear: 2024 }, seasons: null, quantityUnit: 'unit_nights' },
+                rate: { unitBasis: 'per_LF', periodBasis: 'per_night', series: { mode: 'fixed', values: { '2027': 3 }, baselineYear: 2024 } },
               },
             },
           },
@@ -234,14 +232,14 @@ console.log('=== V1 Marina Adapter — byte-identical regression shield ===\n');
     message = String(e.message ?? e);
   }
   if (!threw) {
-    console.error('✗ FAIL: Case 9: v3 blob did NOT throw');
+    console.error('✗ FAIL: Case 9: marina transient_usage v3 blob did NOT throw');
     process.exit(1);
   }
-  if (!message.includes('Step D-prime')) {
-    console.error(`✗ FAIL: Case 9: throw message missing Step D-prime guidance: ${message}`);
+  if (!message.includes('not wired for this class/basis')) {
+    console.error(`✗ FAIL: Case 9: throw message missing narrowed-wall guidance: ${message}`);
     process.exit(1);
   }
-  console.log(`✓ Case 9: v3 driver_based throws — "${message.split('\n')[0].slice(0, 80)}..."`);
+  console.log(`✓ Case 9: marina transient_usage still fails loud — "${message.split('\n')[0].slice(0, 80)}..."`);
 }
 
 console.log('\n✓ GREEN — v1-marina adapter byte-identical to legacy. v3 fails loud. Cascade resolves correctly.');

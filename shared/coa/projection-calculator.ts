@@ -83,19 +83,22 @@ export interface ProjectionLineInput {
     yearly?: Record<string, number>;
   };
 
-  // ─── STEP-A ONLY — removed at Step B migration ─────────────────
   /**
-   * Pre-v3 marina occupancy shape: `assumptions.occupancy` v1 from the
-   * canonical blob. Keyed by storage-type (e.g. 'wet_slips') → year → pct.
-   * STEP-A ONLY — removed at Step B migration (v1 → v3 canonical migration).
+   * Read-time fallback vehicle for marina scenarios whose `assumptions.dimensions`
+   * (the v3 shape) is not yet populated. The calculator consults this ONLY when
+   * the v3 blob lacks a stream for the current line — supporting migrate-on-read
+   * back-compat (existing scenarios with `occupancy: {}` keep flowing through
+   * the v1 adapter and produce multiplier=1, byte-identical to pre-Step-B).
+   *
+   * STEP-A/B ONLY — deletes at Step D-prime once all classes are v3-wired
+   * end-to-end and the v1 adapter has no remaining producers.
    */
-  legacyV1Occupancy?: Record<string, Record<string, number>>;
-
-  /**
-   * The base year for the v1 marina occupancy ratio's denominator.
-   * STEP-A ONLY — removed at Step B migration.
-   */
-  latestHistoricalYear?: number;
+  legacyV1Context?: {
+    /** Keyed by storage-type (e.g. 'wet_slips') → year → pct. */
+    occupancy?: Record<string, Record<string, number>>;
+    /** Base year for the v1 ratio's denominator (= v3 baselineYear semantic). */
+    latestHistoricalYear?: number;
+  };
 }
 
 export interface ProjectionLineOutput {
@@ -180,13 +183,18 @@ function resolveRevenueMode(
 }
 
 // ═══════════════════════════════════════════════════════════════
-// V1 marina occupancy adapter (STEP-A ONLY — removed at Step B)
+// V1 marina occupancy adapter (STEP-A/B fallback — removed at Step D-prime)
 // ═══════════════════════════════════════════════════════════════
 
 /**
- * Mirrors the byte-for-byte semantics of the legacy getMarinaOccupancyAdjustment
- * in pro-forma-engine-service.ts:803-817. Step A's marina-protection
- * invariant rests on this returning identical numbers.
+ * Read-time fallback for marina scenarios that have not yet been written
+ * with v3-shaped `assumptions.dimensions`. Mirrors byte-for-byte the legacy
+ * getMarinaOccupancyAdjustment in pro-forma-engine-service.ts:803-817.
+ *
+ * Step B: the v3 read path takes precedence; this fires only when v3 has no
+ * stream for the line (migrate-on-read back-compat). All existing marina
+ * scenarios have `occupancy: {}` so this branch always returns 1 today,
+ * preserving the dept-golden byte-identity gate.
  *
  * Algorithm (preserved exactly):
  *   - Only Storage department participates (return 1 otherwise)
@@ -201,11 +209,12 @@ function computeV1MarinaOccupancyMultiplier(
   department: string,
   subcategory: string,
   year: number,
-  legacyV1Occupancy: Record<string, Record<string, number>> | undefined,
-  latestHistoricalYear: number | undefined,
+  legacyV1Context: ProjectionLineInput['legacyV1Context'],
 ): number {
   if (department !== 'Storage') return 1;
+  const legacyV1Occupancy = legacyV1Context?.occupancy;
   if (!legacyV1Occupancy || Object.keys(legacyV1Occupancy).length === 0) return 1;
+  const latestHistoricalYear = legacyV1Context?.latestHistoricalYear;
   if (latestHistoricalYear === undefined) return 1;
 
   const storageTypeKey = storageSubcategoryToTypeKey(subcategory);
@@ -219,6 +228,58 @@ function computeV1MarinaOccupancyMultiplier(
 
   if (baseOccPct <= 0) return 1;
   return currentOccPct / baseOccPct;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// V3 marina occupancy read (Step B — marina percent_of_capacity only)
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Reads the type-level occupancy ratio from a v3 RevenueDriverBlob for
+ * marina percent_of_capacity streams. The UI has already rolled location-keyed
+ * occupancy up to the type level (unit-weighted) at write time, so the
+ * calculator sees one pct per (dimension, year).
+ *
+ * Returns `null` when the v3 path doesn't apply — caller falls through
+ * to the v1 adapter or the fail-loud guard, as appropriate.
+ *
+ * Algorithm (mirrors v1 ratio semantics; baselineYear == latestHistoricalYear):
+ *   currentPct = stream.driver.series.values[year] ?? 85
+ *   basePct    = stream.driver.series.values[baselineYear] ?? 85
+ *   ratio      = basePct > 0 ? currentPct / basePct : 1
+ *
+ * Lit-up scope (Step B):
+ *   - assetClass === 'marina'
+ *   - basisType === 'percent_of_capacity'
+ * Everything else still throws via the fail-loud guard (Step D-prime).
+ */
+function readV3MarinaOccupancyMultiplier(
+  input: ProjectionLineInput,
+): {
+  multiplier: number;
+  capacityUsed?: { value: number; unit: CapacityUnit };
+} | null {
+  if (input.assetClass !== 'marina') return null;
+  if (!input.blob || input.blob.schemaVersion !== 3) return null;
+  if (!input.dimensionId || !input.streamId) return null;
+
+  const dim = input.blob.dimensions?.[input.dimensionId];
+  if (!dim) return null;
+  const stream = dim.streams?.[input.streamId];
+  if (!stream) return null;
+  if (stream.basisType !== 'percent_of_capacity') return null;
+
+  const series = stream.driver.series;
+  if (!series) return null;
+
+  const currentPct = series.values[String(input.period.year)] ?? 85;
+  const basePct = series.values[String(series.baselineYear)] ?? 85;
+
+  const multiplier = basePct > 0 ? currentPct / basePct : 1;
+  return {
+    multiplier,
+    capacityUsed: dim.totalCapacity ?? undefined,
+  };
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -255,30 +316,52 @@ export function getProjectionLineValue(
 
   // mode === 'driver_based'
 
-  // v3 fail-loud guard (Step A gate)
+  // ─── Step B: marina percent_of_capacity v3 read (lit up) ─────────────
+  // Takes precedence over the v1 adapter and the fail-loud guard. The UI
+  // has already rolled location-keyed occupancy up to the type level
+  // (unit-weighted) before writing the blob, so we just read the type-level
+  // pct here. v3 ratio semantics mirror v1: currentPct / baselineYearPct.
+  const v3MarinaResult = readV3MarinaOccupancyMultiplier(input);
+  if (v3MarinaResult !== null) {
+    return {
+      amount: input.y1Amount * v3MarinaResult.multiplier,
+      appliedMechanic: 'driver_based',
+      basisType: 'percent_of_capacity',
+      capacityUsed: v3MarinaResult.capacityUsed,
+      _stepA_multiplier: v3MarinaResult.multiplier,
+    };
+  }
+
+  // ─── v3 fail-loud guard (narrowed for Step B) ────────────────────────
+  // Still fires for any v3 stream NOT lit up by Step B:
+  //   - non-marina v3 streams (STR/MF/SS/...)
+  //   - marina v3 streams whose basisType !== 'percent_of_capacity'
+  // The narrowing is the wall: proves Step B did NOT silently broaden the
+  // lit-up scope. Step D-prime peels this back per class as they wire.
   if (input.blob && input.blob.schemaVersion === 3) {
-    const hasV3StreamForLine =
-      input.dimensionId &&
-      input.streamId &&
-      input.blob.dimensions?.[input.dimensionId]?.streams?.[input.streamId];
-    if (hasV3StreamForLine) {
+    const stream =
+      input.dimensionId && input.streamId
+        ? input.blob.dimensions?.[input.dimensionId]?.streams?.[input.streamId]
+        : undefined;
+    if (stream) {
       throw new Error(
-        '[projection-calculator] v3 driver_based not wired until Step D-prime. ' +
+        '[projection-calculator] v3 driver_based not wired for this class/basis. ' +
           `Premature v3 data detected for assetClass='${input.assetClass}' ` +
-          `dimension='${input.dimensionId}' stream='${input.streamId}'. ` +
-          'Remove the v3 stream or wait for Step D-prime.',
+          `dimension='${input.dimensionId}' stream='${input.streamId}' ` +
+          `basisType='${stream.basisType}'. ` +
+          'Step B lit up ONLY marina percent_of_capacity; other classes/bases ' +
+          'wire at Step D-prime. Remove the v3 stream or wait.',
       );
     }
   }
 
-  // v1-marina adapter
+  // v1-marina adapter (read-time fallback for scenarios with no v3 dimensions)
   if (input.assetClass === 'marina') {
     const multiplier = computeV1MarinaOccupancyMultiplier(
       input.department,
       input.lineKey,
       input.period.year,
-      input.legacyV1Occupancy,
-      input.latestHistoricalYear,
+      input.legacyV1Context,
     );
     return {
       amount: input.y1Amount * multiplier,

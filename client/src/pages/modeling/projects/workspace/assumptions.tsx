@@ -100,7 +100,27 @@ import {
   Settings2
 } from 'lucide-react';
 import { getModelConfig } from '@shared/asset-class-model-config';
+import { rollupLocationOccupancyToType, sumUnitsPerType } from '@shared/coa/occupancy-rollup';
 import { format } from 'date-fns';
+
+// Canonical storage-type IDs accepted by the engine's storageSubcategoryToTypeKey
+// (shared/coa/department-mapping.ts:439-463). UI write path validates against
+// this set before serializing the v3 dimensions blob — any enabledStorageTypes
+// id not in this set would be silently invisible to the engine, so we surface
+// them via toast instead of writing unreadable data (fail-loud-on-write per
+// Step B directive 2026-05-23).
+const CANONICAL_STORAGE_TYPE_IDS = new Set<string>([
+  'wet_slips',
+  'dry_racks_indoor',
+  'dry_racks_outdoor',
+  'carports',
+  'boats_on_trailers',
+  'transient',
+  'houseboats',
+  'moorings',
+  'lift_slips',
+  'land_storage',
+]);
 
 function PercentInput({
   value,
@@ -883,10 +903,32 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
     triggerAutosave();
   };
 
+  // Unit-weighted rollup (Step B canonical math; replaces pre-Step-B arithmetic mean).
+  // Locations with units=0 drop out (weight zero — placeholders don't bias the mean).
+  // Type-level summary now matches what the v3 write path serializes and what the
+  // engine consumes — one source of truth.
   const getStorageTypeAvgOccupancy = (storageType: typeof enabledStorageTypes[0], year: number) => {
     if (storageType.locations.length === 0) return 85;
-    const sum = storageType.locations.reduce((acc, loc) => acc + getLocationOccupancy(loc.id, year), 0);
-    return sum / storageType.locations.length;
+    const yearKey = String(year);
+    const locationOccupancyByYear: Record<string, Record<string, number>> = {};
+    const locationUnitsById: Record<string, number> = {};
+    const locationToTypeMap: Record<string, string> = {};
+    for (const loc of storageType.locations) {
+      // Number() cast: getLocationOccupancy returns `number | Record<string, number>`
+      // due to OccupancyData being keyed both flat (monthly) and nested (yearly).
+      // The yearly call always produces a number at runtime; narrow it here so
+      // the rolled-up record stays Record<string, number>.
+      const occVal = Number(getLocationOccupancy(loc.id, year)) || 0;
+      locationOccupancyByYear[loc.id] = { [yearKey]: occVal };
+      locationUnitsById[loc.id] = loc.units;
+      locationToTypeMap[loc.id] = storageType.id;
+    }
+    const rolled = rollupLocationOccupancyToType({
+      locationOccupancyByYear,
+      locationUnitsById,
+      locationToTypeMap,
+    });
+    return rolled[storageType.id]?.[yearKey] ?? 85;
   };
 
   const getYoYChange = (locationId: string, year: number) => {
@@ -1181,12 +1223,100 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
       const avgRevenue = Object.values(flatGrowth).length > 0 ? Object.values(flatGrowth).reduce((a, b) => a + b, 0) / Object.values(flatGrowth).length : 3;
       const avgExpense = Object.values(flatExpense).length > 0 ? Object.values(flatExpense).reduce((a, b) => a + b, 0) / Object.values(flatExpense).length : 2.5;
       const yearlyGrowthRatesForEngine = buildYearlyGrowthRatesForEngine(growthRates, expenseGrowth, storageGrowth, years);
+
+      // ─── Step B v3 dimensions blob (the shape contract producer) ────────────
+      // Roll location-keyed occupancy up to the type level via the shared
+      // unit-weighted helper (shared/coa/occupancy-rollup.ts), then write
+      // assumptions.dimensions in the v3 schema (shared/coa/revenue-driver-schema.ts).
+      // Engine consumes this at pro-forma-engine-service.ts via the dimensions-present
+      // guard. Unmappable storage-type IDs are surfaced via toast (fail-loud-on-write).
+      const unmappableTypes = enabledStorageTypes
+        .filter(st => !CANONICAL_STORAGE_TYPE_IDS.has(st.id))
+        .map(st => `${st.name} (id=${st.id})`);
+      if (unmappableTypes.length > 0) {
+        toast({
+          title: 'Storage types missing canonical mapping',
+          description:
+            'These types will not contribute to the v3 occupancy blob — engine cannot resolve them: ' +
+            unmappableTypes.join(', '),
+          variant: 'destructive',
+        });
+      }
+
+      const v3Dimensions: Record<string, any> = {};
+      const writableTypes = enabledStorageTypes.filter(st => CANONICAL_STORAGE_TYPE_IDS.has(st.id));
+      if (writableTypes.length > 0) {
+        const locationOccupancyByYear: Record<string, Record<string, number>> = {};
+        const locationUnitsById: Record<string, number> = {};
+        const locationToTypeMap: Record<string, string> = {};
+        for (const st of writableTypes) {
+          for (const loc of st.locations) {
+            const byYear: Record<string, number> = {};
+            for (const y of years) {
+              // Number() cast: same latent OccupancyData union as in
+              // getStorageTypeAvgOccupancy above. Yearly read always
+              // produces a number at runtime.
+              byYear[String(y)] = Number(getLocationOccupancy(loc.id, y)) || 0;
+            }
+            locationOccupancyByYear[loc.id] = byYear;
+            locationUnitsById[loc.id] = loc.units;
+            locationToTypeMap[loc.id] = st.id;
+          }
+        }
+        const rolled = rollupLocationOccupancyToType({
+          locationOccupancyByYear,
+          locationUnitsById,
+          locationToTypeMap,
+        });
+        const totalsByType = sumUnitsPerType({ locationUnitsById, locationToTypeMap });
+
+        for (const st of writableTypes) {
+          const totalUnits = totalsByType[st.id] ?? 0;
+          if (totalUnits <= 0) continue; // skip placeholder types with no real capacity
+          const valuesByYear = rolled[st.id] ?? {};
+          // Step B baselineYear convention: earliest year in the series (= the
+          // engine's latestHistoricalYear semantic — see projection-calculator.ts
+          // v3 read path which divides by series.values[baselineYear]).
+          const baselineYear = years[0] ?? new Date().getUTCFullYear();
+          v3Dimensions[st.id] = {
+            totalCapacity: { value: totalUnits, unit: 'count' as const }, // Step B: count default; LF gap tracked separately
+            streams: {
+              // Step B convention: one stream per dim, id='default'.
+              // Multi-stream-per-dim is Step D-prime.
+              default: {
+                basisType: 'percent_of_capacity' as const,
+                capacityAllocation: 1.0,
+                revenueMode: 'driver_based' as const,
+                driver: {
+                  series: { mode: 'fixed' as const, values: valuesByYear, baselineYear },
+                  seasons: null,
+                  quantityUnit: 'percent' as const,
+                },
+                rate: {
+                  // Step B: rate axis is inert (engine still applies its own
+                  // cumulativeGrowth × base monthly). Carrying a placeholder
+                  // rate keeps the v3 stream schema-valid; Step D-prime owns
+                  // the full quantity × rate revenue formula.
+                  unitBasis: 'per_unit' as const,
+                  periodBasis: 'per_month' as const,
+                  series: { mode: 'fixed' as const, values: {}, baselineYear },
+                },
+              },
+            },
+          };
+        }
+      }
+
       const assumptions = {
         growthRates: flatGrowth,
         growthRatesByYear: growthRates,
         expenseGrowth: flatExpense,
         expenseGrowthByYear: expenseGrowth,
-        occupancy,
+        // Step B: v3 dimensions is the canonical shape. The legacy `occupancy`
+        // field is OMITTED on write (hard cut). Engines read v3 first; the
+        // calculator's v1 fallback only fires for scenarios that never wrote
+        // v3 (existing empty scenarios stay byte-identical).
+        dimensions: v3Dimensions,
         margins,
         storageGrowth,
         belowTheLine,

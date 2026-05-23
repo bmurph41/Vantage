@@ -1594,3 +1594,157 @@ during the v1 → v3 migration; marina projection numbers will change
 from "silent no-op in most scenarios" to "corrected occupancy ratio
 applied per type." Pre/post-migration goldens must both be captured in
 the harness for one cycle. Phase 0 of Step B before any code.
+
+---
+
+## Step B — SHIPPED 2026-05-23
+
+Brett-approved post-Phase-0 build. The bug Brett's directive set out to
+close ("UI writes location-keyed; engine reads type-keyed; silent
+no-op for every populated occupancy line") is closed. The shape
+contract is complete and atomic: UI writes v3 → engine reads v3
+(dimensions-present guard) → calculator computes unit-weighted v3
+multiplier. The next user who populates marina occupancy via the UI
+gets the correct projection, not the silent no-op.
+
+### Phase 0 finding (the de-risker)
+
+DB query against `modeling_scenario_versions` joined to `modeling_projects`
+returned: **0 of 3 marina scenarios have populated occupancy** (all
+`occupancy: {}`). The migration risk collapsed to zero — there's no
+production data to backfill. Step B became a **shape-contract** step
+(producer/consumer wiring), not a data-migration step. dept-golden
+gap=0 falls out automatically because every existing scenario takes
+the v1 fallback branch unchanged.
+
+### What shipped (5 files modified, 3 new)
+
+- `shared/coa/projection-calculator.ts` — `readV3MarinaOccupancyMultiplier`
+  lights up marina percent_of_capacity v3. `ProjectionLineInput` refactored:
+  flat `legacyV1Occupancy` + `latestHistoricalYear` replaced by one labeled
+  `legacyV1Context` sub-object (STEP-A/B-only). The v3 fail-loud throw
+  narrowed to "not wired for this class/basis" — wall stands at the
+  basis boundary (marina non-percent_of_capacity throws) AND the class
+  boundary (non-marina v3 throws). The v1 adapter stays as the
+  read-time fallback; deletes at Step D-prime.
+- `shared/coa/occupancy-rollup.ts` — NEW, 122 lines. Pure unit-weighted
+  rollup helper: `Σ(loc.occ × loc.units) / Σ(loc.units)` per type;
+  zero-unit locations drop out. Shared by UI summary (latent-bug fix at
+  the display layer) and UI write path (v3 blob production). Single
+  source of truth.
+- `server/services/pro-forma-engine-service.ts:854` — engine wire-up
+  with dimensions-present guard. `assumptions.dimensions` populated →
+  build RevenueDriverBlob → resolve dimensionId via
+  `storageSubcategoryToTypeKey(lineKey)` → pass v3 blob to calculator.
+  Otherwise pass `blob: null` + `legacyV1Context` (byte-identical
+  fallback). Per-line routing (Wet Slip Rental → v3, Fuel Sales → v1
+  fallback because non-Storage department).
+- `client/src/pages/modeling/projects/workspace/assumptions.tsx` —
+  Imports the rollup helper. `getStorageTypeAvgOccupancy` swapped from
+  unweighted arithmetic mean (latent display bug) to the unit-weighted
+  helper. Save mutation: builds `assumptions.dimensions` (v3 blob shape)
+  from `enabledStorageTypes`, rolls each location's occupancy up to
+  type-level unit-weighted, writes `totalCapacity: { value: <sum_units>,
+  unit: 'count' }`. HARD CUT — the legacy `occupancy: occupancy` field
+  is removed from the save payload (no dual-write; legacy data was empty
+  so nothing to protect). Fail-loud-on-write: types whose IDs are not
+  in `CANONICAL_STORAGE_TYPE_IDS` are surfaced via destructive toast and
+  excluded from the v3 write.
+- `tests/v1-marina-adapter.mjs` — Cases 1-8 mechanically updated to use
+  the new `legacyV1Context` shape. Case 9 repointed to marina
+  `transient_usage` (not non-marina) — narrowed wall at the tightest
+  boundary: same class, different basis. Proves Step B did NOT broaden
+  beyond percent_of_capacity. 9/9 still green.
+- `tests/v3-marina-rollup.mjs` — NEW, 313 lines, cross-method gate.
+  Case A: single-location → rollup == location value. Case B: equal
+  units → arithmetic mean == unit-weighted (both formulas agree).
+  Case C: UNEQUAL units (200@90 + 10@30) → unit-weighted 87.143%,
+  arithmetic 60%; harness asserts unit-weighted is canonical. Locks
+  the math: rolled value != arithmetic mean by 27.14pp. Two walls:
+  marina transient_usage still throws, STR percent_of_capacity still
+  throws — narrowed wall holds at class AND basis boundaries.
+- `tests/v3-engine-circuit.mjs` — NEW, 277 lines, end-to-end gate.
+  Mirrors the engine call-site logic in a shim. (A) Empty scenario →
+  blob:null → v1 fallback → multiplier=1 (byte-identical). (B)
+  Populated dimensions → engine builds blob → calculator returns
+  hand-computed 87.143/85 multiplier (NOT the silent no-op multiplier=1).
+  (C) Mixed-line routing: Wet Slip Rental → v3, Fuel Sales (no
+  storage-type mapping) → v1 fallback. Closes the
+  "next-user-silent-no-op" bug.
+
+### Gates at commit time
+
+```
+✓ dept-golden                  gap=0 across 6 scenarios (marina 13493783 byte-identical)
+✓ v1-marina-adapter            9/9 (Case 9 = marina transient_usage, narrowed wall)
+✓ v3-marina-rollup             19/19 (Cases A/B/C cross-method + 2 walls)
+✓ v3-engine-circuit            12/12 (empty / populated / mixed routing)
+✓ shared/ tsc                  0 errors (clean)
+✓ server/ scoped tsc           3,540 errors (≤ 3,566 baseline; 0 in Step B files)
+✓ client/ scoped tsc           2,410 errors (0 NEW from Step B after 2 cast fixes)
+✓ DB query                     0/3 marina scenarios have populated occupancy
+✓ Calculator rate-axis check   grep "rate\.|\.rate\b" on calculator → 0 hits
+                               (Brett-required confirmation: stream.rate
+                                placeholder values:{} is inert at Step B)
+```
+
+### The narrowed wall
+
+Step B lit up marina + percent_of_capacity ONLY. The fail-loud throw
+fires now for:
+- **Class boundary:** non-marina v3 streams (STR / MF / SS / office /
+  retail with v3 driver_based data) — must wait for Step D-prime per
+  class.
+- **Basis boundary:** marina v3 streams whose basisType is anything
+  other than `percent_of_capacity` (e.g. `transient_usage` for
+  unit-nights, `metered_usage` for fuel throughput) — Step D-prime
+  territory.
+
+Both walls are explicitly asserted in tests/v3-marina-rollup.mjs.
+
+### Cleanup obligations — STATUS
+
+- `legacyV1Occupancy` + `latestHistoricalYear` flat fields on
+  `ProjectionLineInput` → **REMOVED at Step B**. Replaced by one
+  `legacyV1Context` sub-object. The v1 adapter still reads this
+  sub-object as the read-time fallback. Sub-object itself deletes at
+  Step D-prime.
+- `_stepA_multiplier` + `_stepA_degradedToNoOp` on
+  `ProjectionLineOutput` → still present; deletes at Step D-prime
+  when the calculator owns full amount semantics.
+
+### New tracked gaps (filed as memories, not Step B blockers)
+
+- **LF-capacity reconstruction** (`project_v3_capacity_lf_reconstruction_gap.md`)
+  — Step B writes `totalCapacity.unit='count'` (rent-roll units). Per-LF
+  (RevPALF, $/LF transient rates) has no source in
+  `shared/marina-catalog.ts`. Surfaces at first per-foot transient
+  marina deal. Resolution sketched (storage-type config gets
+  `defaultLengthFeet`; rent-roll gains optional `lengthFeet`).
+- **v3 placeholder rate axis handoff** (`project_v3_placeholder_rate_axis_handoff.md`)
+  — Step B's UI writes a placeholder `rate` axis on every v3 stream
+  (`unitBasis: 'per_unit'`, `series.values: {}`) because
+  `RevenueStream.rate` is schema-required. Calculator IGNORES rate
+  entirely at Step B (grep-verified 0 hits) — engine still owns rate
+  via `cumulativeGrowth × baseMonthly`. No NaN / divide-by-zero risk
+  today. **Step D-prime obligation:** when the full v3 revenue formula
+  (`resolveQuantity × resolveRate × periodScaleFactor`) goes live, the
+  empty-values placeholder rate must be handled. Recommended Option A:
+  fall back to legacy `cumulativeGrowth` path when `rate.series.values`
+  is empty (preserves Step B byte-identity on the rate axis until
+  users explicitly populate).
+
+### Step D-prime — what's next
+
+Step D-prime is the per-class light-up. For each non-marina class:
+- Light up `percent_of_capacity` (or the relevant basisType per class)
+  in the calculator's v3 read path
+- Wire the multi-year-projection-engine (DCF path) through the
+  calculator alongside pro-forma-engine-service (PF path) — both
+  engines in lockstep
+- Reconcile the placeholder rate (Option A per above memory)
+- Delete the v1-marina adapter once marina's v3 read path is verified
+  load-bearing across all marina scenarios
+
+The Step B foundation makes each class an incremental light-up
+behind the same fail-loud wall.

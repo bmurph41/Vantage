@@ -59,6 +59,8 @@ import { getConsolidatedPnL } from './consolidated-pnl-service';
 import { computeDirectInputFinancials } from './direct-input-engine';
 import { getModelConfig } from '../../shared/asset-class-model-config';
 import { getProjectionLineValue } from '../../shared/coa/projection-calculator';
+import { storageSubcategoryToTypeKey } from '../../shared/coa/department-mapping';
+import type { RevenueDriverBlob } from '../../shared/coa/revenue-driver-schema';
 
 // ============================================
 // TYPES
@@ -783,22 +785,43 @@ export class ProFormaEngineService {
       return flatExpenseGrowthRate;
     };
     
-    // ─── Step A (2026-05-23): dispatcher replaced with shared calculator ───
-    // The asset-class switch + the three per-class helpers (marina/str/mf)
-    // were consolidated into shared/coa/projection-calculator.ts behind
-    // getProjectionLineValue(). Engine call site at the consumption point
-    // uses result._stepA_multiplier in Decimal-land for byte-identical
-    // marina output. v1-marina semantics preserved via the calculator's
-    // adapter (passing legacyV1Occupancy + latestHistoricalYear).
+    // ─── Step B (2026-05-23): v3 read path wired with dimensions-present guard ───
+    // The shared calculator owns occupancy semantics. Step B lit up the v3 read
+    // path for marina percent_of_capacity only. The engine builds a v3
+    // RevenueDriverBlob ONLY when assumptions.dimensions is populated; otherwise
+    // it passes blob:null and the calculator's v1-marina adapter handles the
+    // back-compat fallback (read-tolerant for scenarios with no v3 data yet).
     //
-    // Marina-protection invariant: dept-golden harness must show gap=0
-    // across all 6 scenarios. Verified at commit time.
+    // Byte-identity guarantee: every existing marina scenario has
+    // assumptions.dimensions === undefined and assumptions.occupancy === {},
+    // so the guard skips the v3 branch → v1 fallback → multiplier=1 →
+    // dept-golden gap=0 stays.
     //
-    // Step B (next): canonical-store v1 → v3 migration; legacyV1Occupancy
-    // passthrough removed; calculator reads from blob.dimensions instead.
     // Step D-prime: multi-year-projection engine wires through this same
-    // calculator (PF + DCF lockstep flip).
+    // calculator (PF + DCF lockstep flip); v1 adapter retires class-by-class
+    // as each lights up its v3 path.
     const modelConfig = getModelConfig(assetClass);
+
+    // ─── Build v3 RevenueDriverBlob from canonical assumptions, if present ───
+    // Producer side: UI write path in client/src/pages/modeling/projects/
+    // workspace/assumptions.tsx rolls location-keyed occupancy up to the type
+    // level (unit-weighted via shared/coa/occupancy-rollup.ts) before writing
+    // assumptions.dimensions. Dimensions absent → blob remains null → v1 path.
+    const v3Dimensions = assumptions.dimensions as RevenueDriverBlob['dimensions'] | undefined;
+    const v3Blob: RevenueDriverBlob | null =
+      v3Dimensions && Object.keys(v3Dimensions).length > 0
+        ? {
+            schemaVersion: 3,
+            granularity: 'year', // marina occupancy is year-keyed in the UI rollup
+            departmentDefaults: {},
+            dimensions: v3Dimensions,
+          }
+        : null;
+
+    // Step B streamId convention: one stream per dimension, named 'default'.
+    // Multi-stream-per-dim (e.g. wet_slips_long_term + wet_slips_transient)
+    // is Step D-prime territory.
+    const V3_STREAM_ID = 'default';
     
     const actualsMonthlyLookup: Record<string, Record<string, number>> = {};
     const actualsMonthsPerYearPerSubcat: Record<string, Record<number, Set<number>>> = {};
@@ -848,20 +871,34 @@ export class ProFormaEngineService {
 
         let projectedAmount = baseMonthly.times(cumulativeGrowth);
 
-        // Step A: occupancy adjustment via shared calculator. Multiplier
-        // applied in Decimal-land (no number↔Decimal round-trip on the line
-        // amount) so marina stays byte-identical.
+        // Step B: occupancy adjustment via shared calculator.
+        // (1) If assumptions.dimensions carries a stream for this line → v3
+        //     read path (marina percent_of_capacity, lit up at Step B).
+        // (2) Otherwise → blob:null + legacyV1Context fallback (today's
+        //     behavior; empty occupancy → multiplier=1 → byte-identical).
+        // Multiplier applied in Decimal-land (no number↔Decimal round-trip
+        // on the line amount).
+        const lineDimensionId = storageSubcategoryToTypeKey(name);
+        const lineHasV3Stream =
+          v3Blob !== null &&
+          lineDimensionId !== undefined &&
+          v3Blob.dimensions[lineDimensionId]?.streams?.[V3_STREAM_ID] !== undefined;
+
         const _calcResult = getProjectionLineValue({
           assetClass,
           department,
           lineKey: name,
           period: { year: period.year, month: period.month },
-          blob: null, // v3 not written yet — Step B migration
+          blob: lineHasV3Stream ? v3Blob : null,
+          dimensionId: lineHasV3Stream ? lineDimensionId : undefined,
+          streamId: lineHasV3Stream ? V3_STREAM_ID : undefined,
           modelConfig,
           y1Amount: projectedAmount.toNumber(),
           growthRates: { line: annualGrowthRate.toNumber() },
-          legacyV1Occupancy: granularOccupancy, // STEP-A ONLY — removed at Step B
-          latestHistoricalYear,                  // STEP-A ONLY — removed at Step B
+          legacyV1Context: {
+            occupancy: granularOccupancy,
+            latestHistoricalYear,
+          },
         });
         projectedAmount = projectedAmount.times(new Decimal(_calcResult._stepA_multiplier ?? 1));
 
