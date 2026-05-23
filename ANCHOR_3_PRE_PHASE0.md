@@ -1144,6 +1144,17 @@ defaults (e.g., an MF-focused fund may want residential_rental=4 instead of 3).
 - ~3-5 hours: table + settings UI + precedence helper + plug-in. No engine
   changes; the engine reads the saved scenario value either way.
 
+**Scope note — reusable per-asset-class capex defaults belong HERE, not
+in a system default table** (per Brett's intent, 2026-05-23). Workstream
+#2 (DCF capex read-path fix) deliberately leaves the universal 2% system
+fallback in place; per-class capex variation (MF 5%, STR 8%, etc.) is a
+user/org preference, not a platform-imposed default. The same precedence
+chain (scenario > user-default > org-default > system-default) applies:
+an org-level default of `belowTheLine.capexPct=5` for asset_class='multifamily'
+would seed new MF projects at 5% but a user can still override per-scenario.
+This generalizes the assumption-defaults seam beyond growth rates to all
+belowTheLine values (capexPct, managementFeePct, reservesPct, sellingFeePct).
+
 #### (b) Platform fees as a derived %-of-revenue projection line
 
 The §0 finding above. Year 1 already computes platform_fees as % of revenue
@@ -1234,6 +1245,27 @@ Mapping engine output → chart contract:
 
 **Demo positioning:** Unblocked by everything else. Pure aggregation on top of WS5's correct output. Slots in as demo-polish layer once the underlying projection-correctness work (#5, occupancy, exit-side defaults, platform_fees derived) is shipped — at that point charts visualize the now-fully-correct numbers.
 
+#### (e) Per-year capex schedule (UI + data model) — filed 2026-05-23
+
+Surfaced during Workstream #2 Phase 0 (DCF capex read-path). Today's
+data model + UI are scalar-only: `belowTheLine.capexPct: number` +
+`belowTheLine.capexAmount: number`, applied uniformly across all months
+of the projection. The engine `multi-year-projection-engine.ts:75`
+ALREADY accepts `capexSchedule?: CapExScheduleEntry[]` (per-year array)
+and has the schedule-lookup logic at `:502, :518` — but no caller wires
+it (pre-DCF-refactor code at `routes.ts.pre-dcf-refactor:19766` did;
+the refactor removed the upstream).
+
+**Sketch:**
+- Saved payload: extend `belowTheLine` with optional `capexSchedule?: Array<{year: number, pct?: number, amount?: number}>`. Scalar `capexPct` / `capexAmount` remain as the "all years" fallback.
+- UI: `YearlyRateRow` pattern from `growth-rates/GrowthRatesTab.tsx` lifted to the Adjustments tab's CapEx row. Toggle: "Universal" (current scalar) vs "Per-year" (Yr1/Yr2/.../YrN inputs). Same toggle pattern as the Storage Revenue Growth section (`StorageGrowthMode = 'universal' | 'per_type' | 'granular'`).
+- Engine threading:
+  - `pro-forma-engine-service.ts:458, :1162` — if `belowTheLine.capexSchedule` present, look up per-year entry; else fall to scalar.
+  - DCF orchestrator (post-Workstream-#2): pass `capexSchedule` to `multi-year-projection-engine`'s already-existing `capexSchedule` field.
+- ~4-6h: payload extension + UI toggle + dual-mode engine handling (pro-forma + DCF) + cross-surface verification (same per-year array shows up in both surfaces).
+
+**Pairs with (a)** — user-configurable defaults benefits from per-year as well (an org may want a per-year capex schedule template, not just a scalar). Sequence: ship (e) data-model + UI first, then (a) builds on top with org/user-level overrides at both scalar and per-year granularity.
+
 ### Sequencing thoughts (demo roadmap)
 
 For the demo path (MF deal uploads a P&L → Pro Forma shows correct compute):
@@ -1257,9 +1289,11 @@ Updated 2026-05-23 — full demo-roadmap sequence with the post-WS5 audit:
 **charts-gate-close (done, commit `31e77a42`) → exit-side defaults
 (workstream #2, in progress) → MF/STR occupancy projection → #5
 (direct-input bypass) → (b) platform_fees derived → (d) charts wire →
-(a) user-configurable defaults**. The first 5 are projection-correctness;
-the last 2 are presentation + UX. Demo bar is met once #2 + occupancy
-ship; #5/(b)/(d) are polish.
+(a) user-configurable defaults → (e) per-year capex schedule**. The
+first 5 are projection-correctness; the last 3 are presentation + UX.
+Demo bar is met once #2 + occupancy ship; the rest are progressive
+polish. (e) pairs naturally with (a) since both extend the assumption
+edit affordance — file together for sequencing.
 
 Suggested original order (pre-roadmap-audit): #5 → (b) → (a).
 
