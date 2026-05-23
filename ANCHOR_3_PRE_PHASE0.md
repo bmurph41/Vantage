@@ -1407,3 +1407,112 @@ inert per-key default hook in place for deferred user-configurable-defaults feat
 assumption defaults, (b) platform_fees derived-line projection, (c) chokepoint #5
 direct-input bypass. Suggested order: #5 → (b) → (a). See "Deferred features" + "WS5
 — DONE" sections above.
+
+---
+
+## Revenue-Driver Subsystem — Step 0 keystone (FROZEN 2026-05-23)
+
+The MF/STR occupancy projection demo item generalized through three
+spec passes:
+
+1. **Phase 0 audit (read-only)** — stubs at
+   `pro-forma-engine-service.ts:819-829` return `Decimal(1)` for all
+   non-marina classes; data model + UI absent for MF/STR; marina path
+   carries a latent location-vs-type key-mismatch bug; DCF reads
+   through a separate `multi-year-projection-engine` whose mechanics
+   don't match the pro-forma engine. Headline: BUILD, not stub-fill.
+
+2. **Design pass — `OccupancyBlob` (v2)** — proposed a unit-based /
+   lease-based / none taxonomy keyed off `unitMix.types[].id`, with
+   `occupancyModel` on `AssetClassModelConfig`. Identified the shared
+   `getProjectionMultiplier` calculator and promoted PF/DCF alignment
+   from Step F to Step D-prime (lockstep flips).
+
+3. **Generalization — `RevenueDriverBlob` (v3) — RATIFIED**.
+   Occupancy is one of seven `basisType` axes
+   (`percent_of_capacity` · `transient_usage` · `metered_usage` ·
+   `absolute_count` · `lease_based` · `custom` · `none`). Driver
+   (quantity) and Rate (price) are independent axes. Multi-stream-per-
+   dimension with `totalCapacity` + per-stream `capacityAllocation`
+   (Tier 1 soft enforcement). Marina is the completeness anchor (6 of
+   7 basisTypes). The double-count invariant is mutual exclusion
+   between `flat_growth` (WS5 path) and `driver_based` (driver × rate
+   path).
+
+### Files committed in Step 0 (contract only — no behavior, no UI):
+
+- `shared/coa/revenue-driver-schema.ts` — full v3 types + the
+  load-bearing invariant in the file header + the ratified-so-far
+  taxonomy (`ASSET_CLASS_DRIVER_TAXONOMY`).
+- `shared/coa/projection-calculator.ts` — `getProjectionLineValue`
+  signature + types. Stub throws; Step A delivers the impl.
+- `shared/asset-class-model-config.ts` — optional
+  `revenueDriverModel` field added to `AssetClassModelConfig`
+  interface; per-class population is via the taxonomy const (single
+  source of truth).
+
+### Per-class taxonomy status (ratified-so-far):
+
+- **LOCKED**: marina (anchor — 20 streams), multifamily, str, self_storage,
+  hotel, mixed_use (residential + commercial cohort split), retail,
+  office, industrial, medical_office, shopping_center (commercial_leases
+  base — %-rent custom branch DEFERRED Q8), sfr, duplex, triplex, quad,
+  land.
+- **ROUGHED-IN**: rv_park (marina-class dynamic), mobile_home_park,
+  parking, gas_station, gym, laundromat, car_wash, golf_course,
+  restaurant, car_dealership, business.
+- **DEFERRED**:
+  - Q3 — accounting_firm, landscaping, construction
+    (operating-biz; revisit when first deal lands).
+  - Q4 — daycare (pct_of_capacity vs absolute_count).
+  - Q7 — data_center (kW vs racks vs SF capacity unit).
+  - Q8 — shopping_center %-rent over breakpoints (custom basis or
+    inside commercial-lease record).
+
+### Verified in code 2026-05-23:
+
+- Q9 — `build_to_rent` is NOT present in `MODEL_CONFIG_REGISTRY`. Not
+  added in this commit per Brett's instruction; flagged for later
+  addition alongside any build_to_rent deal/class build-out.
+
+### Step sequence forward (lockstep PF + DCF per Step D-prime):
+
+- **Step 0** — schema + signature + taxonomy (this commit). Keystone.
+  Marina-protected (no behavior change, harness byte-identical).
+- **Step A** — calculator implementation + engine generic-dispatcher
+  in `pro-forma-engine-service.ts`. Marina-protected.
+- **Step B** — canonical-store v1→v2/v3 auto-migration. Marina's
+  location-keyed occupancy rolls up to type-keyed driver series.
+  **First intentional marina move of the program** (the latent
+  key-mismatch bug fix becomes visible); harness double-baselined
+  pre/post for one cycle.
+- **Step C** — UI Revenue Drivers tab (replaces today's marina-shaped
+  Occupancy tab), asset-class-aware via the taxonomy.
+- **Step D-prime** — engine consumption for the LOCKED classes
+  (MF, STR, self_storage, hotel) — PF + DCF wired in lockstep through
+  the shared calculator (the architectural mandate from §4).
+- **Step E** — lease_based classes (office/retail/industrial/medical/
+  mixed-use commercial cohort).
+- **Step F** — ROUGHED-IN operating-business classes (golf,
+  restaurant, gym, etc.) — refined per first-deal feedback.
+- **Step G** — deprecate legacy `assumptions.occupancy` v1 reader
+  once all production scenarios are v3 (auto-migrated on next save).
+
+### Load-bearing invariant (preserved verbatim from schema file header):
+
+> WS5 `granularGrowthRates` applies ONLY to lines whose effective
+> `revenueMode` resolves to `'flat_growth'`. Lines whose effective
+> `revenueMode` is `'driver_based'` are ENTIRELY outside the WS5 growth
+> path — a `driver_based` line NEVER reads `granularGrowthRates`.
+>
+> Within `driver_based`, the driver's growth series (quantity lever)
+> and the rate's growth series (price lever) BOTH apply independently;
+> their Δqty × Δrate interaction is real underwriting, not a double-
+> count.
+>
+> The ONLY forbidden state is a `driver_based` line also receiving a
+> WS5 line-growth multiplier.
+
+**v3 contract FROZEN — Brett ratified 2026-05-23. Step A may proceed.**
+Agent-autonomy-safe ratification marker — do not modify the schema or
+calculator signature without Brett's explicit re-ratification.

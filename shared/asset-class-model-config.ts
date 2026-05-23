@@ -103,6 +103,18 @@ export interface AssetClassModelConfig {
   // LLM during P&L line-item categorization in doc-intel-service. When absent,
   // doc-intel falls back to DEFAULT_DOC_INTEL_PROMPT_HINTS (generic CRE).
   docIntelPromptHints?: DocIntelPromptHints;
+
+  // ─── Revenue-Driver Model (Step 0 keystone, 2026-05-23) ──
+  // Optional inline override of the per-class driver taxonomy.
+  //
+  // AUTHORITATIVE SOURCE for Step 0 is the `ASSET_CLASS_DRIVER_TAXONOMY`
+  // const in `shared/coa/revenue-driver-schema.ts`. Callers should resolve
+  // via `getRevenueDriverModel(assetClass)`. This field exists so a future
+  // class config can override the taxonomy without editing the schema file.
+  //
+  // The full ratified taxonomy + load-bearing invariant live in
+  // revenue-driver-schema.ts. Do not duplicate them here.
+  revenueDriverModel?: import('./coa/revenue-driver-schema').AssetClassRevenueDriverModel;
 }
 
 export interface DocIntelPromptHints {
