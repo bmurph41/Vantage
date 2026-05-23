@@ -1266,6 +1266,61 @@ the refactor removed the upstream).
 
 **Pairs with (a)** — user-configurable defaults benefits from per-year as well (an org may want a per-year capex schedule template, not just a scalar). Sequence: ship (e) data-model + UI first, then (a) builds on top with org/user-level overrides at both scalar and per-year granularity.
 
+#### (f) Cross-surface revenue compounding semantic — Pro Forma vs DCF engines (filed 2026-05-23)
+
+Surfaced during Workstream #2 verification. Pro-forma engine
+(`pro-forma-engine-service.ts`) and DCF compute pipeline
+(`multi-year-projection-engine.ts` via `dcf-calculator-service.ts` +
+`dcf-decision-support-service.ts`) produce slightly different Year-N
+revenue / NOI / capex totals for the same project + same inputs because
+they compound revenue with different semantics:
+
+- **Pro-forma engine** compounds revenue **month-by-month** from a
+  resolved monthly baseline. Even within Year 1, late months are already
+  compounded over early months at the granular per-line growth rate. Y1
+  total ends up ~1.37% higher than the direct-input-engine's Y1
+  baseline.
+- **multi-year-projection-engine** uses `direct-input-engine.ts`'s Y1
+  `totalRevenue` as-is (no within-year compounding) and compounds yearly
+  thereafter: `yN_revenue = y1_revenue × (1 + growth)^(N-1)`.
+
+**Measured Y1 ratio** on the MF fixture
+(`c3a1eebc-…`, natural direct-input mode, capexPct=7%): PF/engine =
+**1.0137 for revenue and capex (identical), 1.0151 for NOI** (NOI ratio
+differs because expense compounding has its own semantics). Constant
+across all years.
+
+**Downstream effects:**
+- Pro Forma table tab vs DCF Calculator tab show ~1.37% revenue +
+  capex divergence + ~1.5% NOI divergence on the same project — visible
+  to a careful reader comparing the two surfaces.
+- Exit Strategy Studio reads Pro Forma's Y1 NOI directly, so its
+  cap-rate-exit math uses the higher PF numbers.
+- IRR / Equity Multiple from DCF will sit slightly below what a "Pro
+  Forma-derived" IRR would suggest.
+
+**Out of WS2 scope** — pre-existing, mechanical, NOT a capex-specific
+bug. WS2 verified the gap by capturing PF/engine ratios for revenue +
+capex + NOI separately; revenue and capex ratios match exactly (1.0137 =
+1.0137), confirming capex is downstream of revenue compounding, not
+capex-specific.
+
+**Sketch for resolution** (separate workstream if/when it matters):
+- (i) **Align PF to engine semantics**: make pro-forma engine consume
+  `direct-input-engine` Y1 baseline as-is and compound yearly. Simpler;
+  removes within-year compounding granularity in PF (which may be a
+  feature, not a bug, for users wanting accurate monthly cash flows).
+- (ii) **Align engine to PF semantics**: extend `multi-year-projection-
+  engine` to accept monthly-compounded Y1 base or to apply within-year
+  growth itself. More complex; reshapes the engine contract.
+- (iii) **Leave the divergence + label it in UI**: add explanatory tooltips
+  on PF tab + DCF tab clarifying which compounding semantic each uses,
+  + a "view in DCF-engine math" toggle on PF. Honest; no engine work.
+
+Recommend (iii) for the near term (no engine surgery), (i) or (ii) only
+if friendlies start comparing the two surfaces head-to-head. ~30 min for
+(iii); ~4-8h for (i) or (ii) including verification.
+
 ### Sequencing thoughts (demo roadmap)
 
 For the demo path (MF deal uploads a P&L → Pro Forma shows correct compute):
@@ -1286,14 +1341,17 @@ For the demo path (MF deal uploads a P&L → Pro Forma shows correct compute):
   which is the exact credibility hazard the mock created).
 
 Updated 2026-05-23 — full demo-roadmap sequence with the post-WS5 audit:
-**charts-gate-close (done, commit `31e77a42`) → exit-side defaults
-(workstream #2, in progress) → MF/STR occupancy projection → #5
+**charts-gate-close (done, commit `31e77a42`) → exit-side defaults WS2
+(done, commit `532beb14`) → MF/STR occupancy projection → #5
 (direct-input bypass) → (b) platform_fees derived → (d) charts wire →
-(a) user-configurable defaults → (e) per-year capex schedule**. The
-first 5 are projection-correctness; the last 3 are presentation + UX.
-Demo bar is met once #2 + occupancy ship; the rest are progressive
-polish. (e) pairs naturally with (a) since both extend the assumption
-edit affordance — file together for sequencing.
+(a) user-configurable defaults → (e) per-year capex schedule → (f) PF/
+DCF revenue compounding alignment**. The first 5 are projection-
+correctness; the last 4 are presentation + UX. Demo bar is met once
+occupancy ships; the rest are progressive polish. (e) pairs with (a) —
+both extend the assumption edit affordance. (f) is a known cross-
+surface semantic divergence (1.37% revenue ratio) — file as documented
+follow-up; users won't notice unless they compare PF + DCF
+side-by-side.
 
 Suggested original order (pre-roadmap-audit): #5 → (b) → (a).
 
