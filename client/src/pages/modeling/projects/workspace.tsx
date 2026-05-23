@@ -216,7 +216,16 @@ const TAB_GROUPS: TabGroup[] = [
       { value: 'irr-decomposition', label: 'IRR Attribution', icon: TrendingUp },
       { value: 'mark-to-market', label: 'Mark-to-Market', icon: Scale },
       { value: 'replacement-cost', label: 'Replacement Cost', icon: Building2 },
-      { value: 'proforma-charts', label: 'Charts', icon: BarChart3 },
+      // 'proforma-charts' (Charts tab) — fully gated 2026-05-23. The previous
+      // gate (the rail filter below at ~:878) hid the tab from the visible nav
+      // but the entry here kept it in TAB_TO_GROUP, so ?tab=proforma-charts URLs
+      // still mounted the mock-fed component. Removing the entry closes that
+      // URL-direct hole — invalid tab values now fall back to 'overview' per
+      // the validation at :474/:494. Restore-path: add the entry back here,
+      // un-hide the filter below, when the engine-backed rewrite of
+      // /api/analytics/.../pro-forma-charts lands. See ANCHOR_3_PRE_PHASE0.md
+      // "Charts wire — ready-to-go deferred item" section for the wire scope
+      // (Phase 0 done; ~3.5-4h to wire + verify).
       { value: 'scenario-compare', label: 'Compare', icon: Layers },
       { value: 'deal-compare', label: 'Deal Compare', icon: Scale },
       { value: 'sensitivity', label: 'Sensitivity', icon: Tornado },
@@ -869,12 +878,16 @@ export default function ProjectWorkspace() {
           <div className="overflow-x-auto">
             <TabsList key={activeGroup} className="inline-flex h-8 bg-transparent gap-0.5 rounded-none p-0 py-0.5" data-testid="tabs-workspace">
               {currentGroup.tabs.filter((tab) => {
-                // Pro Forma Charts tab hidden 2026-05-20 (Phase 4a Item 7b gate-first).
+                // Pro Forma Charts tab — FULLY GATED until engine-backed rewrite.
+                // Originally hidden from the rail 2026-05-20 (Phase 4a Item 7b
+                // gate-first); URL-direct hole closed 2026-05-23 by removing the
+                // entry from TAB_GROUPS (above, ~:219). This filter is now a
+                // belt-and-suspenders for the (no-longer-reachable) entry; safe
+                // to remove once the TAB_GROUPS entry is restored.
                 // Endpoint /api/analytics/.../pro-forma-charts is 100% mock (marina
-                // literals, ignores projectId). Hidden until the engine-backed rewrite
-                // lands. See BETA_MVP_SPEC.md §3.5 + BETA_MVP_PHASE_1_5_AUDIT.md §6.A
-                // Item 7b. To restore: rewrite the endpoint to call proFormaEngineService,
-                // then un-hide here.
+                // literals, ignores projectId). See BETA_MVP_SPEC.md §3.5 +
+                // BETA_MVP_PHASE_1_5_AUDIT.md §6.A Item 7b + ANCHOR_3_PRE_PHASE0.md
+                // "Charts wire — ready-to-go deferred item" for restore scope.
                 if (tab.value === "proforma-charts") return false;
                 if (tab.value === "storage-leases" && !tabOverrides.showStorageLeases) return false;
                 if (tab.value === "profit" && !tabOverrides.showProfitCenters) return false;
