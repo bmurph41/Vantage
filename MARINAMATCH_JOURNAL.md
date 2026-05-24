@@ -55,9 +55,91 @@ Byte-identical AT NOI **TODAY** only because all 10 prod marina bypass fixtures 
   3. Does v3 need to cover aggregate-vacancy classes at all, or does it stay marina-shaped while MF/SS/office stay on their existing vacancy path?
 - **Placeholder rate axis handoff** (Option A per `project_v3_placeholder_rate_axis_handoff.md`) — still ahead. Single-marina prerequisite for the full v3 formula going live.
 - **Deferred-(f) decision** — both engines now route through the calculator; the natural single-owner question becomes actionable. Decide whether to unify Y1 sourcing inside the calculator (closes the 1.37% PF/DCF Y1-source divergence) or formally keep them divergent.
-- **Pending journal catch-up** — Step B + Step D-zero entries (drafted in working tree from prior sessions, not committed) are unrelated prior-session drift. Sitting in working tree; commit on their own when the moment comes.
+- **Pending journal catch-up** — Step B + Step D-zero entries (drafted in working tree from prior sessions, not committed) are unrelated prior-session drift. Don't bundle into chokepoint #5 doc commits; commit on their own when the moment comes.
 
 ---
+
+## ✅ Step D-zero — DCF routed through shared calculator with calendar-year-keyed v3 occupancy (2026-05-23)
+
+DCF (`multi-year-projection-engine.ts`) joins the shared-calculator architecture established at Step A (PF) and extended at Step B (PF+UI v3 contract). Closes the silent-no-op DCF marina-occupancy bug parallel to Step B's PF fix — the next user who populates marina occupancy via the Step B UI now sees the correct unit-weighted multiplier in the DCF tab, sensitivity matrix, scenario analysis, Monte Carlo, and tornado. The 1.37% PF/DCF Y1-source divergence (deferred-f) is explicitly NOT fixed — Phase 0 traced it upstream of the calculator (PF's within-Y1 monthly compound vs DCF's direct-input Y1 read); D-zero tees up unification but doesn't enact it. Shipped as commit `f39d08cd`.
+
+### What changed
+- `server/services/multi-year-projection-engine.ts` — calculator wire-up at `buildProjectedYear:397-462`. Revenue lines route through `getProjectionLineValue` when `config.assetClass` is set; legacy direct-compound path retained for back-compat (covers modeling-export.ts). Expenses at `:415` UNCHANGED (calculator's v3 occupancy is revenue-only). `ProjectionConfig` gained `assetClass?`, `dimensions?`, `projectionStartYear?` (all optional). v3 RevenueDriverBlob built ONCE in `computeMultiYearProjection`. `buildProjectionConfig` extended to auto-derive dimensions from `scenarioVersion.assumptions` and `projectionStartYear` from `projectConfig.projectionStartDate / acquisitionCloseDate`.
+- `server/services/dcf-calculator-service.ts:402` (main) + `:646` (sensitivity params) — read `scenarioData.assumptions.dimensions`, derive `projectionStartYear` from `scenarioData.acquisitionCloseDate`.
+- `server/services/dcf-decision-support-service.ts:174` (baseConfig) — propagates to runScenarioAnalysis / computeTornado / runMonteCarlo. SQL at `:418` extended to select `assumptions` JSONB from `modeling_scenario_versions`.
+- `server/services/dcf-scenario-layer.ts:91-108` (baseConfig type) + `:123` (per-scenario projection) — threaded.
+- `server/services/dcf-simulation-service.ts:101-118` (MC baseConfig) + `:139` (base proj) + `:234` (exact-iteration) — threaded.
+- `server/services/multi-year-projection-route.ts:98-103` — passes `assetClass` via overrides; `buildProjectionConfig` auto-extracts dimensions + projectionStartYear.
+- `shared/finance/tornado.ts:137-156` (baseConfig type) — driver.apply spreads propagate the new fields automatically.
+- `tests/dcf-multi-year-golden.mjs` (NEW, ~357 lines) — DCF baseline harness with dual-path empty-dimensions byte-identical gate + populated-dimensions cross-method delta gate + DCF fail-loud wall assertion.
+- `tests/dcf-multi-year-golden.json` (NEW) — frozen pre-wiring baseline captured via `--capture` BEFORE the wire-up touched the engine.
+- `ANCHOR_3_PRE_PHASE0.md` — Step D-zero section appended; Step D-prime "next steps" list updated to mark DCF wire-up as DONE.
+
+### Decisions made
+- **Sub-step 1 (baseline harness) shipped BEFORE the wire-up.** No DCF golden existed; byte-identity was unprovable without one. Captured baseline JSON pre-wiring, asserted byte-identical post-wiring — the discipline that catches accidental shifts that a single after-the-fact run would mask.
+- **Dual-path empty-dimensions gate.** Harness exercises BOTH the legacy ordinal-fallback path (no `assetClass`) AND the calculator-routed path (with `assetClass` + `projectionStartYear`). Both must match the same baseline JSON — proves the calculator-routed path doesn't drift from legacy for empty-dimensions scenarios.
+- **Year-keying fix (Brett catch before commit).** My first wire-up passed `period: { year: yearNum }` where `yearNum` is the projection ordinal (2,3,4,5). PF and the Step B UI both use CALENDAR years (`server/utils/modeling-periods.ts:51`, `client/.../assumptions.tsx:701`, `:1280`). Against real Step-B-written data this would silently no-op — `values[String(ordinal)] → undefined → 85` default. Fix: `projectionStartYear` anchor on `ProjectionConfig`, engine computes `calendarYear = projectionStartYear + (yearNum-1)`. Each caller derives from `acquisitionCloseDate`. Ordinal fallback retained for back-compat (safe only for empty dimensions — documented in the export-gap memory's Year-keying addendum).
+- **Harness fixture re-keyed to production shape.** Populated-dimensions fixture's `series.values` keyed by calendar years 2024-2028, `baselineYear: 2024`, `projectionStartYear: 2024` — matches Step B UI write exactly. The gate would FAIL if the wire-up reverted to ordinals — proving it's load-bearing against production data, not a fixture bent to the bug.
+- **Expenses NOT routed through the calculator.** At `:415`, expense growth stays on the legacy direct-compound path. Calculator's v3 occupancy is revenue-only by construction; routing expenses adds risk for zero behavioral gain.
+- **modeling-export.ts deferred (gap memory filed).** Brett's audit Option 1: accept divergence rather than add a DB query path. Optional `dimensions?` + `projectionStartYear?` make this back-compat-safe (undefined → blob:null + ordinal fallback → byte-identical to today). Memory `project_dcf_export_v3_occupancy_gap.md` documents both `dimensions` and `projectionStartYear` as required for any future wire-up.
+- **1.37% PF/DCF divergence (deferred-f) EXPLICITLY out of scope.** Phase 0 confirmed the gap lives at the Y1 source — PF compounds within-Y1 monthly (`pro-forma-engine-service.ts:849`), DCF reads `direct-input-engine.ts`'s Y1 totalRevenue as-is (`:796` — flat line sum). Calculator wire-up doesn't touch which Y1 each engine reads from. D-zero is the architectural prerequisite for any future fix, not the fix itself.
+
+### Verification
+- `npm run test:dept-golden` → ✓ GREEN gap=0 across 6 scenarios (PF untouched, marina 13493783 byte-identical).
+- `npx tsx tests/v1-marina-adapter.mjs` → ✓ 9/9.
+- `npx tsx tests/v3-marina-rollup.mjs` → ✓ 19/19 (both class + basis walls hold).
+- `npx tsx tests/v3-engine-circuit.mjs` → ✓ 12/12.
+- `npx tsx tests/dcf-multi-year-golden.mjs` → ✓ GREEN: 4 fixtures × 2 paths × 5 years × 5 totals = 200 per-cell empty-dimensions asserts; populated Y3 cross-method match against CALENDAR-YEAR-keyed data (engine 2,525,209 = hand 2,525,209); Y2 isolation byte-identical to legacy; Y4 propagation hand-verified (`Y4 == Y3 × 1.03`); DCF fail-loud wall fires for marina transient_usage v3 (basis boundary holds in DCF).
+- `npm run typecheck:shared` → silent (0 errors).
+- `NODE_OPTIONS=--max-old-space-size=6144 npx tsc --noEmit -p tsconfig.diag-server-only.json` → 3,540 errors (= prior session baseline, 0 net new from Step D-zero; remaining errors in modified files are pre-existing per memory `project_scenario_result_type_drift.md` + Drizzle types + null-handling at unchanged lines).
+- `NODE_OPTIONS=--max-old-space-size=6144 npx tsc --noEmit -p tsconfig.diag-client-only.json` → 2,410 errors (= prior session, Step D-zero is server-only).
+- Commit `f39d08cd` (10 files, +1170/-11) pushed to origin/main; divergence 0/0.
+
+### Next session
+- **Step D-prime entry decision** — pick the next class to light up in the calculator's v3 read path. Now that both engines route through the calculator, lighting up a new class auto-propagates to PF AND DCF (no per-engine wiring needed). STR `percent_of_capacity` is the cleanest next candidate (simple unit-mix model, similar to marina); multifamily is more substantial. Pair with the placeholder-rate-axis handoff (Option A per `project_v3_placeholder_rate_axis_handoff.md`) — calculator should fall back to legacy `cumulativeGrowth` path when `rate.series.values: {}` is empty.
+- **Deferred-(f) decision now teed up.** With both engines on the calculator, the natural single-owner-of-compounding-semantic question becomes actionable. Decide whether to unify Y1 sourcing inside the calculator (option ii of deferred-f) or formally keep them divergent.
+- **Filed gaps for follow-up:** `project_dcf_export_v3_occupancy_gap.md` (modeling-export.ts XLSX divergence; ~30 min DB-query fix when surfaced), `project_v3_capacity_lf_reconstruction_gap.md` (per-LF capacity, first per-foot transient marina deal), `project_v3_placeholder_rate_axis_handoff.md` (Step-D-prime obligation).
+- **v1-marina adapter retirement** still ahead — deletes once marina's v3 path is verified load-bearing across all marina scenarios in both engines (today no marina scenarios have populated dimensions).
+
+## ✅ Step B — v3 occupancy read path + UI write + engine wire-up + harness (2026-05-23)
+
+Brett-approved post-Phase-0 build closing the latent "UI writes location-keyed; engine reads type-keyed → silent no-op" bug for marina occupancy. The next user who populates marina occupancy via the UI now gets the correct unit-weighted projection, not multiplier=1. Phase 0 DB query confirmed 0/3 marina scenarios have populated occupancy (all `occupancy:{}`) — no data migration required; existing scenarios take the v1 fallback branch and stay byte-identical (dept-golden gap=0). Shipped as commit `b0f49e95` after the calculator-doesn't-touch-rate confirmation (grep verified 0 hits on `stream.rate` in the calculator).
+
+### What changed
+- `shared/coa/projection-calculator.ts` — `readV3MarinaOccupancyMultiplier` lights up marina + percent_of_capacity v3 reads (driver series only; rate axis untouched). `ProjectionLineInput`'s flat `legacyV1Occupancy` + `latestHistoricalYear` refactored into one labeled `legacyV1Context` sub-object (STEP-A/B-only). v3 fail-loud throw narrowed: "not wired for this class/basis" — fires for non-marina v3 (class boundary) AND marina non-percent_of_capacity (basis boundary).
+- `shared/coa/occupancy-rollup.ts` (NEW, 122 lines) — pure unit-weighted rollup helper. `Σ(loc.occ × loc.units) / Σ(loc.units)` per type; zero-unit locations drop out. Single source of truth shared by UI summary + UI write path.
+- `server/services/pro-forma-engine-service.ts:854` — engine wire-up with dimensions-present guard. `assumptions.dimensions` populated → build `RevenueDriverBlob` → resolve dimensionId via `storageSubcategoryToTypeKey(lineKey)`, streamId='default' → pass v3 blob to calculator. Otherwise `blob: null` + `legacyV1Context` (byte-identical fallback).
+- `client/src/pages/modeling/projects/workspace/assumptions.tsx` — `getStorageTypeAvgOccupancy` swapped from unweighted arithmetic mean (latent display bug) to unit-weighted helper. Save mutation builds `assumptions.dimensions` (v3 shape, `totalCapacity.unit='count'`, single 'default' stream per dim); HARD CUT on legacy `occupancy: occupancy` field (no dual-write). Fail-loud-on-write: storage-type IDs not in `CANONICAL_STORAGE_TYPE_IDS` surface as destructive toast and are excluded from the write. Two `Number(getLocationOccupancy(...)) || 0` casts narrow the latent `OccupancyData` union (the new errors I introduced — fixed pre-commit).
+- `tests/v1-marina-adapter.mjs` — Cases 1-8 mechanically updated to use `legacyV1Context`. Case 9 repointed to marina `transient_usage` (not non-marina) — narrowed wall at tightest boundary: same class, different basis, proves Step B did NOT broaden beyond percent_of_capacity. 9/9 still green.
+- `tests/v3-marina-rollup.mjs` (NEW, 313 lines) — cross-method gate. Case A single-location; Case B equal units (formulas agree); Case C UNEQUAL units (200@90 + 10@30) locks unit-weighted 87.143% != arithmetic 60%. Two walls assert fail-loud still fires for marina transient_usage AND STR percent_of_capacity.
+- `tests/v3-engine-circuit.mjs` (NEW, 277 lines) — end-to-end gate. Shim mirrors the engine call-site exactly. (A) empty → v1 fallback byte-identical; (B) populated → v3 hand-computed multiplier (not 1); (C) mixed routing — Wet Slip Rental → v3, Fuel Sales → v1 fallback.
+- `ANCHOR_3_PRE_PHASE0.md` — Step B wrap-up section appended under Step A (closed bug, dimensions-present guard pattern, narrowed wall description, full gate results, both filed gaps, Step-D-prime sequencing).
+
+### Decisions made
+- **Unit-weighted is canonical** — replaces the UI's pre-Step-B unweighted arithmetic mean (latent display bug). The same helper drives the UI summary AND the v3 write payload — one source of truth between display and engine consumption.
+- **Migrate-on-read, hard-cut UI write** — UI stops writing `assumptions.occupancy` entirely (the legacy field) and writes `assumptions.dimensions` exclusively. Dual-write was rejected: Phase 0 confirmed empty legacy data so nothing to protect; dual-write would create permanent two-shape-sync overhead and block Step-D-prime adapter deprecation. The calculator's v1 adapter stays as the read-time fallback for scenarios that never wrote v3 (today's empty scenarios stay byte-identical via this branch).
+- **Narrowed wall at the basis boundary, not the class boundary** — Case 9 repointed to marina `transient_usage` (not STR). The class-boundary check is added separately in v3-marina-rollup. Proves Step B did not broaden inside marina to other basisTypes (the tightest assertion).
+- **Engine wire-up included (not deferred)** — without it, calculator v3 path is dead code in prod and the silent no-op bug stays. Brett explicitly confirmed: "Step B is now the COMPLETE circuit; atomic — don't split the circuit across steps." Wired with a dimensions-present guard so empty scenarios take the unchanged v1 path.
+- **Placeholder rate axis kept inert at Step B** — UI writes `rate.series.values: {}` (because schema requires `rate`) but calculator NEVER reads `stream.rate` (grep-verified 0 hits). Engine still owns rate via `cumulativeGrowth × baseMonthly`. The handoff to Step D-prime when the full v3 formula goes live is filed as a memory with Option A recommended (legacy fallback when `rate.values` empty).
+- **Two subagent reports flagged and corrected** — initial Phase 0 Explore agent claimed "memory framing reversed" (it wasn't — memory matched code exactly; agent misread). Surfaced in the Phase 0 report rather than silently propagated.
+
+### Verification
+- `npm run test:dept-golden` → ✓ GREEN gap=0 across 6 scenarios (marina 13493783 byte-identical — verified twice, pre and post engine wire-up).
+- `npx tsx tests/v1-marina-adapter.mjs` → ✓ 9/9 (Case 9 = marina transient_usage, narrowed wall).
+- `npx tsx tests/v3-marina-rollup.mjs` → ✓ 19/19 (Cases A/B/C cross-method + 2 walls; Case C 87.143% != 60%).
+- `npx tsx tests/v3-engine-circuit.mjs` → ✓ 12/12 (empty/populated/mixed routing).
+- `npm run typecheck:shared` → silent (0 errors).
+- `npx tsc --noEmit -p tsconfig.diag-server-only.json` → 3,540 errors (BELOW 3,566 post-cleanup baseline per `BETA_MVP_TSC_DEBT.md`; **0 in any Step B file**).
+- `npx tsc --noEmit -p tsconfig.diag-client-only.json` → 2,410 errors (was 2,412 with my edits; the 2 new errors at `:917` + `:1251` were `OccupancyData`-union casts in code I introduced — fixed via `Number()` cast pre-commit; **0 net new from Step B**).
+- DB scope query (`.marina_occ_scope.mjs` ephemeral): 0/3 marina `modeling_scenario_versions` have populated occupancy; `assumptions.dimensions` is NULL across all 3. Step B's migration scope is empty by construction.
+- Calculator rate-axis confirmation: `grep -E "\.rate\b|rate\." shared/coa/projection-calculator.ts` → 0 hits. `stream.rate` placeholder is inert at Step B.
+- Commit `b0f49e95` (8 files, +1188/-74) pushed to origin/main; divergence 0/0.
+
+### Next session
+- **Step D-prime entry decision** — pick the next class to light up (STR percent_of_capacity is the cleanest after marina; multifamily is more substantial). Before any per-class code: implement the placeholder-rate-axis handoff (Option A in `project_v3_placeholder_rate_axis_handoff.md`) — calculator falls back to legacy `cumulativeGrowth` path when `rate.series.values` is empty. This unblocks the full v3 revenue formula without breaking Step B's UI writes.
+- **multi-year-projection-engine (DCF path) — also needs to flow through the calculator** in Step D-prime (per `projection-calculator.ts` header comments: PF + DCF lockstep flip). Today only `pro-forma-engine-service.ts` calls `getProjectionLineValue`; DCF still uses its own projection path. Wire that before lighting up any non-marina class to avoid the PF/DCF revenue compounding semantic divergence (deferred (f) at ~1.37%) compounding further.
+- **Filed gaps not blocking but worth knowing**: LF-capacity reconstruction (`project_v3_capacity_lf_reconstruction_gap.md`) — first per-foot transient marina deal will need this; resolution sketched. Placeholder rate axis handoff (`project_v3_placeholder_rate_axis_handoff.md`) — Option A recommended.
+- **Cleanup obligation status**: `legacyV1Occupancy` + `latestHistoricalYear` flat fields are REMOVED from `ProjectionLineInput` (refactored into `legacyV1Context` sub-object). `_stepA_multiplier` + `_stepA_degradedToNoOp` still present on output; delete at Step D-prime when calculator owns full amount semantics. v1-marina-adapter function itself stays as fallback through D-prime; deletes class-by-class as each lights up.
 
 ## ✅ Roadmap-to-demo pass + Charts gate-close + WS2 DCF capex read-path fix (2026-05-23)
 
