@@ -538,10 +538,18 @@ export default function ProjectWorkspace() {
   });
   const pricingData = _pricingRaw?.dealPricingResults ?? _pricingRaw?.dealPricing ?? (_pricingRaw?.irr !== undefined ? _pricingRaw : _pricingRaw);
 
-  const { data: _proFormaRaw } = useQuery<any>({
+  const { data: _proFormaRaw, isFetching: isFetchingProForma } = useQuery<any>({
     queryKey: ['/api/modeling/projects', projectId, 'pro-forma'],
     enabled: !!projectId,
   });
+  // 2026-05-24 mode-switch flicker fix: Overview + ExecutiveSummary KPI
+  // values are gated on pro-forma's isFetching only — it's the single
+  // mode-varying source. _pricingRaw data is mode-invariant (just the
+  // typed dealPricing inputs blob); project.customMetrics is mode-
+  // invariant. Gating on those would show loading-theater for numbers
+  // that aren't changing. Add pricing/project to this gate if either
+  // becomes mode-aware in the future.
+  const overviewLoading = isFetchingProForma;
   const financials = (() => {
     if (!_proFormaRaw) return undefined;
     // Shape 1: { scenarios: [{ metrics: { totalRevenue, noi, ... } }] } — produced
@@ -975,7 +983,7 @@ export default function ProjectWorkspace() {
 
         <div className="px-6 lg:px-8 pt-2">
         <TabsContent value="overview" className="mt-8 space-y-6">
-          <OverviewDynamic project={project} pricingData={pricingData} financials={financials} onTabChange={handleTabChange} />
+          <OverviewDynamic project={project} pricingData={pricingData} financials={financials} loading={overviewLoading} onTabChange={handleTabChange} />
           <DDTimelineSection dealId={project?.dealId ? String(project.dealId) : null} />
           {projectId && <BrokerFeedbackPanel targetType="modeling-project" targetId={projectId} />}
         </TabsContent>
@@ -1014,7 +1022,7 @@ export default function ProjectWorkspace() {
         </TabsContent>
 
         <TabsContent value="summary" className="mt-8 space-y-4" data-tour="valuator-export">
-          <ExecutiveSummaryDynamic projectId={projectId!} pricingData={pricingData} financials={financials} onTabChange={handleTabChange} />
+          <ExecutiveSummaryDynamic projectId={projectId!} pricingData={pricingData} financials={financials} loading={overviewLoading} onTabChange={handleTabChange} />
         </TabsContent>
 
         <TabsContent value="debt" className="mt-8 space-y-4">

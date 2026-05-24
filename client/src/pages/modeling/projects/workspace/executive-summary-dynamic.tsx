@@ -13,6 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Building2, MapPin, DollarSign, TrendingUp, BarChart3, Calendar } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useModelConfig, useTerms } from '@/hooks/use-model-config';
 
 // ---------------------------------------------------------------------------
@@ -24,6 +25,16 @@ interface ExecutiveSummaryDynamicProps {
   onTabChange?: (tab: string) => void;
   pricingData?: any;
   financials?: any;
+  /**
+   * Mode-switch flicker fix (2026-05-24): when true, the Year-1 Operating
+   * Performance and Revenue Breakdown values render as skeletons — the
+   * only sections sourced from financials (the mode-varying source).
+   * Property Overview / Acquisition / Returns are sourced from pricing.*
+   * and project, both mode-invariant; they keep showing their stable
+   * values to avoid loading-theater on numbers that aren't changing.
+   * Same single-source gate as OverviewDynamic — see workspace.tsx.
+   */
+  loading?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -35,6 +46,7 @@ export function ExecutiveSummaryDynamic({
   onTabChange,
   pricingData,
   financials,
+  loading,
 }: ExecutiveSummaryDynamicProps) {
   const { data: project } = useQuery<any>({
     queryKey: [`/api/modeling/projects/${projectId}`],
@@ -106,7 +118,7 @@ export function ExecutiveSummaryDynamic({
               </h4>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                 {summary.operatingMetrics.map((m, i) => (
-                  <SummaryMetric key={i} label={m.label} value={m.value} />
+                  <SummaryMetric key={i} label={m.label} value={m.value} loading={loading} />
                 ))}
               </div>
             </div>
@@ -142,7 +154,11 @@ export function ExecutiveSummaryDynamic({
               {summary.revenueBreakdown.map((line, i) => (
                 <div key={i} className="flex items-center justify-between py-1">
                   <span className="text-sm text-muted-foreground">{line.label}</span>
-                  <span className="text-sm font-medium tabular-nums">{line.value}</span>
+                  {loading ? (
+                    <Skeleton className="h-4 w-20" data-testid="es-revenue-skeleton" />
+                  ) : (
+                    <span className="text-sm font-medium tabular-nums">{line.value}</span>
+                  )}
                 </div>
               ))}
             </div>
@@ -290,17 +306,23 @@ function SummaryMetric({
   label,
   value,
   highlight,
+  loading,
 }: {
   label: string;
   value: string;
   highlight?: boolean;
+  loading?: boolean;
 }) {
   return (
     <div>
       <div className="text-xs text-muted-foreground">{label}</div>
-      <div className={`text-sm font-medium mt-0.5 tabular-nums ${highlight ? 'text-emerald-600 dark:text-emerald-400' : ''}`}>
-        {value}
-      </div>
+      {loading ? (
+        <Skeleton className="h-5 w-16 mt-0.5" data-testid="es-summary-skeleton" />
+      ) : (
+        <div className={`text-sm font-medium mt-0.5 tabular-nums ${highlight ? 'text-emerald-600 dark:text-emerald-400' : ''}`}>
+          {value}
+        </div>
+      )}
     </div>
   );
 }

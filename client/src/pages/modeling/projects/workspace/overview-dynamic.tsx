@@ -18,6 +18,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { TrendingUp, TrendingDown, Minus, Info, Building2 } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useModelConfig, useTerms } from '@/hooks/use-model-config';
 
 // ---------------------------------------------------------------------------
@@ -29,6 +30,14 @@ interface OverviewDynamicProps {
   project: any;
   pricingData?: any;
   financials?: any;
+  /**
+   * Mode-switch flicker fix (2026-05-24): when true, KPI cards render a
+   * value-line skeleton instead of the formatted number. Gated upstream
+   * on the /pro-forma query's isFetching (the single mode-varying KPI
+   * source). Card label / frame / tooltip remain — only the value line
+   * shimmers, so the grid stays layout-stable during refetch.
+   */
+  loading?: boolean;
 }
 
 interface KPIConfig {
@@ -123,7 +132,7 @@ function formatKPIValue(value: number | null, format: string): string {
 // Component
 // ---------------------------------------------------------------------------
 
-export function OverviewDynamic({ project, pricingData, financials, onTabChange }: OverviewDynamicProps) {
+export function OverviewDynamic({ project, pricingData, financials, loading, onTabChange }: OverviewDynamicProps) {
   const config = useModelConfig(project);
   const terms = useTerms(project);
 
@@ -174,6 +183,7 @@ export function OverviewDynamic({ project, pricingData, financials, onTabChange 
             value={kpi.value}
             format={kpi.format}
             description={kpi.description}
+            loading={loading}
           />
         ))}
       </div>
@@ -190,11 +200,13 @@ function KPICard({
   value,
   format,
   description,
+  loading,
 }: {
   label: string;
   value: number | null;
   format: string;
   description?: string;
+  loading?: boolean;
 }) {
   const isGood = value !== null ? getKPIHealth(label, value) : 'neutral';
   const healthColor =
@@ -224,9 +236,15 @@ function KPICard({
             </TooltipProvider>
           )}
         </div>
-        <div className={`text-2xl font-bold tabular-nums ${value === null ? 'text-muted-foreground/40' : healthColor}`}>
-          {formatKPIValue(value, format)}
-        </div>
+        {loading ? (
+          // Value-skeleton — h-8 matches the text-2xl line height so the card
+          // doesn't shift size during refetch. data-testid for the wiring gate.
+          <Skeleton className="h-8 w-24" data-testid="kpi-skeleton" />
+        ) : (
+          <div className={`text-2xl font-bold tabular-nums ${value === null ? 'text-muted-foreground/40' : healthColor}`}>
+            {formatKPIValue(value, format)}
+          </div>
+        )}
       </CardContent>
     </Card>
   );
