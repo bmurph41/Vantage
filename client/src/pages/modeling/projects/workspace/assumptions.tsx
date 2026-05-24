@@ -94,10 +94,74 @@ import {
   Container,
   Sailboat,
   Hash,
-  Shield
-,
+  Shield,
   Building2,
-  Settings2
+  Settings2,
+  // Added 2026-05-24 — close the ICON_MAP coverage gap so config-specified
+  // icons render their intended lucide icon instead of falling back to
+  // <Anchor />. Each name below appears in shared/asset-class-model-config.ts
+  // and was previously hitting the anchor fallback.
+  Activity,
+  ArrowRight,
+  ArrowUp,
+  BarChart,
+  Bed,
+  Bike,
+  Book,
+  Briefcase,
+  Building,
+  Calendar,
+  Clipboard,
+  CloudSnow,
+  Coffee,
+  Compass,
+  CreditCard,
+  Crown,
+  Droplet,
+  Dumbbell,
+  Edit,
+  FileText,
+  Flag,
+  Flame,
+  Gauge,
+  HardHat,
+  Heart,
+  Landmark,
+  Layout,
+  Link,
+  Map,
+  Monitor,
+  Package,
+  Palette,
+  PieChart,
+  Pill,
+  Presentation,
+  Receipt,
+  RefreshCw,
+  Ruler,
+  Scissors,
+  Server,
+  Settings,
+  Shirt,
+  ShoppingBag,
+  Smile,
+  Sparkles,
+  Square,
+  Star,
+  Sun,
+  Tag,
+  Target,
+  Tent,
+  Train,
+  TreeDeciduous,
+  Trophy,
+  Truck,
+  User,
+  UserCheck,
+  Wind,
+  Wine,
+  X,
+  Zap,
 } from 'lucide-react';
 import { getModelConfig } from '@shared/asset-class-model-config';
 import { rollupLocationOccupancyToType, sumUnitsPerType } from '@shared/coa/occupancy-rollup';
@@ -397,31 +461,147 @@ function buildYearlyGrowthRatesForEngine(
 // ─── Dynamic Config-Driven Categories (from getModelConfig) ─────────────────
 // These were previously hardcoded marina arrays. Now driven by asset class config.
 
+// ICON_MAP — exhaustive coverage for every kebab-case icon name referenced in
+// shared/asset-class-model-config.ts (87 unique names across unitMix.types,
+// profitCenters.departments, inputSections, growthCategories, kpis, etc.).
+//
+// 2026-05-24: closed the coverage gap. Previously only 20 names were mapped;
+// the other ~67 fell through to the <Anchor /> fallback regardless of asset
+// class, producing the marina-anchor symptom on multifamily / retail / office
+// / hotel / healthcare / etc. Now every config-specified icon resolves to its
+// intended lucide icon.
+//
+// Three legacy mappings preserved to avoid changing currently-working
+// rendering: 'building' → Building2 (vs Building), 'edit' → Settings2 (vs
+// Edit), 'settings' → Settings2 (vs Settings). These are aesthetic choices
+// embedded since the file was first written; not flipped here.
+//
+// One residual config bug: configs reference 'tool' (9 sites) but lucide-react
+// has no Tool icon (renamed long ago — use Wrench or Hammer). Filed as memory
+// project_config_tool_icon_residual.md. Until configs are fixed, those 9 sites
+// render via the neutral fallback (Building2) instead of staying invisible.
 const ICON_MAP: Record<string, React.ReactNode> = {
+  // Marine / nautical (marina's explicit icons — DO NOT CHANGE)
   anchor: <Anchor className="h-4 w-4" />,
   waves: <Waves className="h-4 w-4" />,
   sailboat: <Sailboat className="h-4 w-4" />,
+  ship: <Ship className="h-4 w-4" />,
+  compass: <Compass className="h-4 w-4" />,
+
+  // Storage / structural
   warehouse: <Warehouse className="h-4 w-4" />,
   container: <Container className="h-4 w-4" />,
-  ship: <Ship className="h-4 w-4" />,
-  home: <Home className="h-4 w-4" />,
-  car: <Car className="h-4 w-4" />,
-  'map-pin': <MapPin className="h-4 w-4" />,
-  fuel: <Fuel className="h-4 w-4" />,
-  store: <Store className="h-4 w-4" />,
-  wrench: <Wrench className="h-4 w-4" />,
-  users: <Users className="h-4 w-4" />,
-  utensils: <Utensils className="h-4 w-4" />,
-  building: <Building2 className="h-4 w-4" />,
+  building: <Building2 className="h-4 w-4" />, // legacy: 'building' → Building2
   'building-2': <Building2 className="h-4 w-4" />,
+  landmark: <Landmark className="h-4 w-4" />,
+  layout: <Layout className="h-4 w-4" />,
+  layers: <Layers className="h-4 w-4" />,
+
+  // Residential / hospitality
+  home: <Home className="h-4 w-4" />,
+  bed: <Bed className="h-4 w-4" />,
+  tent: <Tent className="h-4 w-4" />,
+  utensils: <Utensils className="h-4 w-4" />,
+  coffee: <Coffee className="h-4 w-4" />,
+  wine: <Wine className="h-4 w-4" />,
+
+  // Retail / commerce
+  store: <Store className="h-4 w-4" />,
   'shopping-cart': <ShoppingCart className="h-4 w-4" />,
+  'shopping-bag': <ShoppingBag className="h-4 w-4" />,
+  tag: <Tag className="h-4 w-4" />,
+  receipt: <Receipt className="h-4 w-4" />,
+  shirt: <Shirt className="h-4 w-4" />,
+
+  // Transport / vehicles
+  car: <Car className="h-4 w-4" />,
+  truck: <Truck className="h-4 w-4" />,
+  bike: <Bike className="h-4 w-4" />,
+  train: <Train className="h-4 w-4" />,
+  package: <Package className="h-4 w-4" />,
+
+  // Operations / services
+  fuel: <Fuel className="h-4 w-4" />,
+  wrench: <Wrench className="h-4 w-4" />,
+  'hard-hat': <HardHat className="h-4 w-4" />,
+  scissors: <Scissors className="h-4 w-4" />,
+  palette: <Palette className="h-4 w-4" />,
+  ruler: <Ruler className="h-4 w-4" />,
+
+  // Health / personal
+  heart: <Heart className="h-4 w-4" />,
+  pill: <Pill className="h-4 w-4" />,
+  dumbbell: <Dumbbell className="h-4 w-4" />,
+  smile: <Smile className="h-4 w-4" />,
+
+  // People
+  user: <User className="h-4 w-4" />,
+  users: <Users className="h-4 w-4" />,
+  'user-check': <UserCheck className="h-4 w-4" />,
+
+  // Money / finance
   'dollar-sign': <DollarSign className="h-4 w-4" />,
-  edit: <Settings2 className="h-4 w-4" />,
-  settings: <Settings2 className="h-4 w-4" />,
+  'credit-card': <CreditCard className="h-4 w-4" />,
+  percent: <Percent className="h-4 w-4" />,
+  'pie-chart': <PieChart className="h-4 w-4" />,
+  'bar-chart': <BarChart className="h-4 w-4" />,
+  'trending-up': <TrendingUp className="h-4 w-4" />,
+  gauge: <Gauge className="h-4 w-4" />,
+  trophy: <Trophy className="h-4 w-4" />,
+  star: <Star className="h-4 w-4" />,
+  crown: <Crown className="h-4 w-4" />,
+
+  // Tech / digital
+  server: <Server className="h-4 w-4" />,
+  monitor: <Monitor className="h-4 w-4" />,
+  zap: <Zap className="h-4 w-4" />,
+  link: <Link className="h-4 w-4" />,
+
+  // Documents / admin
+  'file-text': <FileText className="h-4 w-4" />,
+  clipboard: <Clipboard className="h-4 w-4" />,
+  book: <Book className="h-4 w-4" />,
+  briefcase: <Briefcase className="h-4 w-4" />,
+  presentation: <Presentation className="h-4 w-4" />,
+  edit: <Settings2 className="h-4 w-4" />, // legacy: 'edit' → Settings2
+  settings: <Settings2 className="h-4 w-4" />, // legacy: 'settings' → Settings2
+
+  // Geography / location
+  'map-pin': <MapPin className="h-4 w-4" />,
+  map: <Map className="h-4 w-4" />,
+  globe: <Globe className="h-4 w-4" />,
+  flag: <Flag className="h-4 w-4" />,
+  target: <Target className="h-4 w-4" />,
+
+  // Nature / weather
+  sun: <Sun className="h-4 w-4" />,
+  'cloud-snow': <CloudSnow className="h-4 w-4" />,
+  wind: <Wind className="h-4 w-4" />,
+  droplet: <Droplet className="h-4 w-4" />,
+  flame: <Flame className="h-4 w-4" />,
+  'tree-deciduous': <TreeDeciduous className="h-4 w-4" />,
+  sparkles: <Sparkles className="h-4 w-4" />,
+
+  // Status / flow
+  activity: <Activity className="h-4 w-4" />,
+  'alert-circle': <AlertCircle className="h-4 w-4" />,
+  'check-circle': <CheckCircle className="h-4 w-4" />,
+  clock: <Clock className="h-4 w-4" />,
+  calendar: <Calendar className="h-4 w-4" />,
+  'refresh-cw': <RefreshCw className="h-4 w-4" />,
+  'arrow-right': <ArrowRight className="h-4 w-4" />,
+  'arrow-up': <ArrowUp className="h-4 w-4" />,
+  shield: <Shield className="h-4 w-4" />,
+  lock: <Lock className="h-4 w-4" />,
+  square: <Square className="h-4 w-4" />,
+  x: <X className="h-4 w-4" />,
 };
 
+// Neutral fallback (Building2) — was <Anchor /> pre-2026-05-24, which leaked
+// marina flavor into every non-marina class that referenced an icon name not
+// in ICON_MAP. Building2 is asset-class-agnostic (generic CRE).
 function getIcon(iconName: string | undefined): React.ReactNode {
-  return ICON_MAP[iconName || 'anchor'] || <Anchor className="h-4 w-4" />;
+  return ICON_MAP[iconName || 'building-2'] || <Building2 className="h-4 w-4" />;
 }
 
 function buildStorageTypesConfig(assetClass: string | null | undefined) {
@@ -745,7 +925,7 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
         name: dept.name || id.split('_').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' '),
         icon: storageTypesConfig.find(s => s.id === id)?.icon || 
               designatedSpaceCategories.find(d => d.id === id)?.icon || 
-              <Warehouse className="h-4 w-4" />,
+              <Building2 className="h-4 w-4" />,
       }));
   }, [config]);
 
@@ -842,7 +1022,7 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
         return {
           id: configId,
           name: typeName,
-          icon: stConfig?.icon || <Warehouse className="h-4 w-4" />,
+          icon: stConfig?.icon || <Building2 className="h-4 w-4" />,
           totalUnits: units.length,
           occupiedUnits: units.filter(u => u.status === 'occupied').length,
           locations,
