@@ -36,6 +36,7 @@ import {
 } from './finance/cashflow-parity';
 
 import { readCanonicalPayload } from './canonical-assumption-store';
+import { buildY1FromActuals } from './dcf-y1-sourcer';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -310,7 +311,16 @@ export async function performDCFAnalysis(
     leaseIncomeInjected = true;
   }
 
-  const year1 = computeDirectInputFinancials(
+  // Gap-3 fix (2026-05-24): data-driven Y1 sourcing.
+  // Precedence: actuals → inputAssumptions → empty. Mode-agnostic — the
+  // model_input_mode column does not gate this; the data itself does.
+  // When actuals are present and usable, DCF reads them as a flat annual sum
+  // (Route I, see server/services/dcf-y1-sourcer.ts). When absent or
+  // unusable, falls back to the existing direct-input path so projects
+  // currently working stay byte-identical.
+  // Deferred-(f) intentionally untouched — Route I is flat by construction.
+  const year1FromActuals = await buildY1FromActuals(orgId, projectId);
+  const year1 = year1FromActuals ?? computeDirectInputFinancials(
     projectData.assetClass,
     assumptions,
     projectData.unitMix

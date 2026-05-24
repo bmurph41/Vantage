@@ -9,6 +9,7 @@
  */
 
 import { readCanonicalPayload } from './canonical-assumption-store';
+import { buildY1FromActuals } from './dcf-y1-sourcer';
 import type { CapExScheduleEntry } from './multi-year-projection-engine';
 import { runScenarioAnalysis, ScenarioAnalysisResult } from './dcf-scenario-layer';
 import { runMonteCarlo, MonteCarloResult } from './dcf-simulation-service';
@@ -150,7 +151,10 @@ export async function runDecisionSupport(
       : mc.seasonConfig.defaultInSeasonMonths || [];
   }
 
-  const year1 = computeDirectInputFinancials(
+  // Gap-3 fix (2026-05-24): data-driven Y1 sourcing.
+  // See dcf-calculator-service.ts for the full rationale + Route I rationale.
+  const year1FromActuals = await buildY1FromActuals(request.orgId, request.projectId);
+  const year1 = year1FromActuals ?? computeDirectInputFinancials(
     projectData.assetClass,
     dsAssumptions,
     projectData.unitMix

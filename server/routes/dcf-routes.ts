@@ -18,6 +18,7 @@ import type { Express, Request, Response } from 'express';
 import { performDCFAnalysis, computeQuickIRR, loadLeaseIncomeForProject, computeLeaseIncomeByYear } from '../services/dcf-calculator-service';
 import { runMonteCarlo } from '../services/dcf-simulation-service';
 import { runDecisionSupport, checkEntitlement } from '../services/dcf-decision-support-service';
+import { buildY1FromActuals } from '../services/dcf-y1-sourcer';
 import { getModelConfig } from '../../shared/asset-class-model-config';
 
 // Import your existing engine functions — adjust paths to match your project
@@ -110,7 +111,10 @@ export function registerDCFRoutes(
           mcAssumptions.inSeasonMonths = mc.seasonConfig.defaultInSeasonMonths || [];
         }
 
-        const year1 = computeDirectInputFinancials(
+        // Gap-3 fix (2026-05-24): data-driven Y1 sourcing — see
+        // dcf-calculator-service.ts for full rationale.
+        const year1FromActuals = await buildY1FromActuals(orgId, projectId);
+        const year1 = year1FromActuals ?? computeDirectInputFinancials(
           projectData.assetClass,
           mcAssumptions,
           projectData.unitMix
