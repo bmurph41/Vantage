@@ -52,11 +52,22 @@ function extractKPIValue(
   const pricing = pricingData ?? {};
 
   // Direct pricing data
+  //
+  // 2026-05-24 Overview Gap A + Gap C fix: financials.* is now populated from
+  // the PF engine's metrics.* sub-object (see workspace.tsx financials extractor).
+  // For every KPI below, financials wins when present; pricing-blob fallbacks
+  // remain for empty-state and not-yet-computed cases.
+  //
+  // Gap C specifically: capRate now sources from financials.capRate (engine-
+  // computed NOI₀ ÷ purchasePrice via metrics.goingInCapRate) before falling
+  // back to pricing.goingInCapRate (the user-typed target). When PF returns
+  // zero NOI (empty project), financials.capRate is undefined and the typed
+  // fallback still displays as a sensible empty-state target.
   const pricingMap: Record<string, any> = {
     noi: financials?.noi ?? pricing.noi,
-    capRate: pricing.capRate ?? pricing.goingInCapRate,
+    capRate: financials?.capRate ?? pricing.capRate ?? pricing.goingInCapRate,
     cashOnCash: financials?.cashOnCash ?? pricing.cashOnCashReturn ?? pricing.cashOnCash,
-    dscr: pricing.dscr ?? pricing.debtServiceCoverageRatio,
+    dscr: financials?.dscr ?? pricing.dscr ?? pricing.debtServiceCoverageRatio,
     irr: financials?.irr ?? pricing.irr ?? pricing.internalRateOfReturn,
     leveredIrr: financials?.irr ?? pricing.leveredIrr ?? pricing.irr,
     equityMultiple: financials?.equityMultiple ?? pricing.equityMultiple,
@@ -68,11 +79,11 @@ function extractKPIValue(
     pricePerSlip: pricing.pricePerSlip,
     pricePerRoom: pricing.pricePerRoom ?? pricing.pricePerKey,
     pricePerDoor: pricing.pricePerDoor ?? pricing.pricePerUnit,
-    occupancy: customMetrics?.occupancy ?? customMetrics?.inputAssumptions?.occupancy,
-    adr: customMetrics?.adr ?? customMetrics?.inputAssumptions?.averageDailyRate ?? customMetrics?.inputAssumptions?.nightlyRate,
-    revpar: pricing.revPAR ?? pricing.revpar,
+    occupancy: financials?.occupancy ?? customMetrics?.occupancy ?? customMetrics?.inputAssumptions?.occupancy,
+    adr: financials?.adr ?? customMetrics?.adr ?? customMetrics?.inputAssumptions?.averageDailyRate ?? customMetrics?.inputAssumptions?.nightlyRate,
+    revpar: financials?.revPAR ?? pricing.revPAR ?? pricing.revpar,
     effectiveGrossIncome: financials?.totalRevenue ?? pricing.effectiveGrossIncome,
-    debtYield: pricing.debtYield,
+    debtYield: financials?.debtYield ?? pricing.debtYield,
     breakEvenOccupancy: pricing.breakEvenOccupancy,
     operatingExpenseRatio: financials ? (financials.totalExpenses / Math.max(1, financials.totalRevenue)) : pricing.operatingExpenseRatio,
     noiMargin: financials?.noiMargin ?? (financials && financials.totalRevenue > 0 ? (financials.noi / financials.totalRevenue) : pricing.noiMargin),

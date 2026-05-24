@@ -544,7 +544,9 @@ export default function ProjectWorkspace() {
   });
   const financials = (() => {
     if (!_proFormaRaw) return undefined;
-    // Shape 1: { scenarios: [{ metrics: { totalRevenue, noi, ... } }] }
+    // Shape 1: { scenarios: [{ metrics: { totalRevenue, noi, ... } }] } — produced
+    // by /scenario-comparison endpoint, NOT /pro-forma. Kept here for forward
+    // compatibility if Overview ever switches its source.
     const s0 = _proFormaRaw.scenarios?.[0];
     if (s0?.metrics) {
       return {
@@ -559,11 +561,59 @@ export default function ProjectWorkspace() {
         revenueLines: s0.revenueBreakdown ?? [],
       };
     }
-    // Shape 2: flat with revenue.totals[]
+    // Shape 2: flat ProFormaData with revenue.totals[] + the rich metrics{} object
+    // (the actual /pro-forma response shape — see pro-forma-engine-service.ts:128-218).
+    //
+    // 2026-05-24: Overview-accuracy Gap A fix. Pre-fix this branch read only
+    // revenue/expenses/noi and silently dropped the entire metrics.* sub-object,
+    // so financials.irr / equityMultiple / capRate / etc. were undefined on every
+    // project even though PF computed them. KPI cards rendered '—'.
+    //
+    // Unit forms (verified empirically against 18bbede6/c3a1eebc/7a487b18 on
+    // 2026-05-24): PF emits irr / unleveredIrr / goingInCapRate as PERCENTAGES
+    // (e.g. 20.21 for 20.21%). Overview's formatKPIValue('percent', v) computes
+    // formatPercent(v*100), expecting DECIMAL form. Convert here by dividing by
+    // 100 before storing — single conversion point keeps Overview's existing
+    // format-helper convention intact.
+    //
+    // Gap C (cap rate): financials.capRate is now sourced from PF's computed
+    // metrics.goingInCapRate (NOI₀ / purchasePrice, verified at engine line
+    // 1312), not from pricing.goingInCapRate (user-typed target). When PF
+    // returns 0 (no inputs, no actuals — empty project), this falls through
+    // null and the Overview's extractor cascade picks up the user-typed target
+    // as a sensible empty-state fallback.
     const rev = _proFormaRaw.revenue?.totals?.[0] ?? _proFormaRaw.revenue?.total ?? _proFormaRaw.totalRevenue ?? 0;
     const exp = _proFormaRaw.expenses?.totals?.[0] ?? _proFormaRaw.expenses?.total ?? _proFormaRaw.totalExpenses ?? 0;
     const noi = Array.isArray(_proFormaRaw.noi) ? _proFormaRaw.noi[0] : (_proFormaRaw.noi ?? (rev - exp));
-    return { totalRevenue: rev, totalExpenses: exp, noi, revenueLines: [] };
+    const m = _proFormaRaw.metrics ?? {};
+    const pctToDecimal = (v: any) => (typeof v === 'number' && isFinite(v) && v !== 0 ? v / 100 : undefined);
+    const passNonzero = (v: any) => (typeof v === 'number' && isFinite(v) && v !== 0 ? v : undefined);
+    return {
+      totalRevenue: rev,
+      totalExpenses: exp,
+      noi,
+      revenueLines: [],
+      // metrics.* wired through (Gap A + Gap C, 2026-05-24)
+      irr: pctToDecimal(m.irr),
+      unleveredIrr: pctToDecimal(m.unleveredIrr),
+      capRate: pctToDecimal(m.goingInCapRate),
+      exitCapRate: pctToDecimal(m.exitCapRate),
+      equityMultiple: passNonzero(m.equityMultiple),
+      unleveredEquityMultiple: passNonzero(m.unleveredEquityMultiple),
+      year1Noi: passNonzero(m.year1Noi),
+      stabilizedNoi: passNonzero(m.stabilizedNoi),
+      exitValue: passNonzero(m.exitValue),
+      purchasePrice: passNonzero(m.purchasePrice),
+      // Debt metrics — present when project has capital stack; undefined otherwise
+      dscr: passNonzero(m.minDscr),
+      avgDscr: passNonzero(m.avgDscr),
+      debtYield: pctToDecimal(m.debtYield),
+      ltv: pctToDecimal(m.ltv),
+      // STR-specific (undefined for non-STR; PF gates on asset class)
+      adr: passNonzero(m.adr),
+      occupancy: passNonzero(m.occupancy),
+      revPAR: passNonzero(m.revPAR),
+    };
   })();
 
   // === Asset-class-aware tab config ===
