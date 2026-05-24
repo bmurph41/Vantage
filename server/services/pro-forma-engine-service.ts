@@ -632,7 +632,7 @@ export class ProFormaEngineService {
             amount: line.amount,
             category: 'Revenue',
             subcategory: line.label,
-            department: 'Revenue',
+            department: inferDepartment(line.label, 'revenue', assetClass),
             year: latestHistoricalYear,
           };
         }
@@ -641,7 +641,7 @@ export class ProFormaEngineService {
             amount: line.amount,
             category: 'Expense',
             subcategory: line.label,
-            department: 'Operating Expenses',
+            department: inferDepartment(line.label, 'expense', assetClass),
             year: latestHistoricalYear,
           };
         }
@@ -670,7 +670,7 @@ export class ProFormaEngineService {
               amount: line.amount,
               category: 'Revenue',
               subcategory: line.label,
-              department: 'Revenue',
+              department: inferDepartment(line.label, 'revenue', assetClass),
               year: latestHistoricalYear,
             };
           }
@@ -681,7 +681,7 @@ export class ProFormaEngineService {
               amount: line.amount,
               category: 'Expense',
               subcategory: line.label,
-              department: 'Operating Expenses',
+              department: inferDepartment(line.label, 'expense', assetClass),
               year: latestHistoricalYear,
             };
           }
