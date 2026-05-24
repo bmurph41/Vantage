@@ -1,5 +1,64 @@
 # MarinaMatch Platform Journal
 
+## ✅ Step D-prime re-scope + chokepoint #5 fix (2026-05-24)
+
+**The strategic finding this session produced is much larger than the code it shipped.** The D-prime per-class light-up premise was wrong: lighting up non-marina classes in the v3 calculator's read path is NOT a calculator task. It's a data-model decision (vacancy-vs-occupancy mapping) plus per-class input-UI product work. Marina is the only class with a working per-type input→save chain today; MF/SS/office model AGGREGATE VACANCY (a different shape entirely, and the correct underwriting convention for those classes); STR has no occupancy input UI at all. Original "STR is the cheap next class after marina because both are unit-mix" framing collapsed once the input→save chain was traced end-to-end. Filed as `project_v3_non_marina_design_questions.md` with three design questions a real D-prime non-marina pass must answer first. The session's actual code commit is chokepoint #5 (`7760c8b4`) — the small real bug that's unrelated to v3 and bounded enough to ship cleanly.
+
+### The session's no-op-builds-avoided record
+
+This session's value was almost entirely in NOT shipping. Four proposed builds were considered and rejected after deeper traces showed they wouldn't close the loop:
+
+1. **Option C STR department synthesis** — would clear chokepoint #5's "empty `config.departments`" check (which doesn't exist in any engine anyway — `config.departments` is consumed only by client UI). Synthesized records would be filtered out by `enabledStorageTypes`'s `totalUnits > 0` filter at `assumptions.tsx:875`. No-op at the input UI layer.
+2. **Single `whole_property` dimension synth** — half-Option-A bridge. Would render a single occupancy row, but STR has no source of `totalUnits` and no equivalent of marina's wizard. Trying to bend it to work would entrench a wrong data model.
+3. **Aggregate-vacancy bridge for MF** — read `vacancyPercent` → synthesize a single whole_property v3 dimension. The "bridge for now, not real underwriting" hedge plus the vacancy-vs-occupancy mismatch made it improvisation without a design pass. Filed the three design Qs instead.
+4. **Marina-gated chokepoint #5 fix** — would entrench the bypass bug for marina forever. The Sunset Bay BEFORE/AFTER table proved marina is byte-identical-today AND would catch the bug fix automatically once granular rates land. No reason to gate.
+
+Each of these would have been a code commit that produced no actual user-facing improvement. The discipline of tracing each one end-to-end before committing is what kept the session from shipping no-op infrastructure.
+
+### What chokepoint #5 actually was
+
+The direct-input compute path at `pro-forma-engine-service.ts:625-685` bypassed `inferDepartment` entirely and hardcoded `department: 'Revenue'` / `'Operating Expenses'` literal strings. `departmentToAssumptionKey('Revenue', ...)` falls through the marina cascade to `'g_and_a'` for every class, so every line bucketed to the scalar-growth fallback regardless of asset class. WS5 Step C shipped keyed growth rates that no direct-input project could reach.
+
+11 prod projects on this path today (10 marina Sunset Bay duplicates + 1 MF). The fix: route all four sites through `inferDepartment(line.label, side, assetClass)`. Eight lines changed total. `inferDepartment` already imported at `:452`; `assetClass` already in scope. Shipped as `7760c8b4`.
+
+### Marina byte-identicality — honest framing
+
+Live Sunset Bay full-engine BEFORE/AFTER run: NOI series **906,982 / 935,953 / 965,834 / 996,664 / 1,028,473** byte-identical across all 5 hold years. revenue/cogs/grossProfit/expenses/noi/capex all unchanged.
+
+But NOT a pure refactor — classification changes for **11 of 23 emitted Sunset Bay lines**:
+- Revenue: Wet Slip 30/40/50ft → storage, Transient Slip → storage, Dry Storage → storage, Fuel → fuel_dock, Ship Store → ship_store, Service → service
+- Expense: Payroll → payroll, Fuel COGS → fuel_dock, Ship Store COGS → ship_store, Maintenance → service, Admin → payroll (over-broad keyword — filed)
+
+Byte-identical AT NOI **TODAY** only because all 10 prod marina bypass fixtures have null `granularGrowthRates` / null `granularExpenseGrowth` / 0 `scenario_versions`. The engine's `getRevenueGrowthForDept` at `:739` short-circuits with `if (!hasGranularAssumptions) return flatRevenueGrowthRate` before any keyed lookup. So both BEFORE and AFTER fall to the same scalar fallback.
+
+**The bug becomes consequential the moment any granular rate is set on a marina bypass project** — a likely first-touch scenario interaction. That's the fix landing, not a regression.
+
+### Verification
+- `npm run test:dept-golden` → ✓ gap=0 marina (byte-identical), baselines preserved
+- `npx tsx tests/v1-marina-adapter.mjs` → ✓ 9/9
+- `npx tsx tests/v3-marina-rollup.mjs` → ✓ 19/19
+- `npx tsx tests/v3-engine-circuit.mjs` → ✓ 12/12
+- `npx tsx tests/dcf-multi-year-golden.mjs` → ✓ GREEN
+- `npm run typecheck:shared` → 0 errors
+- `npx tsc -p tsconfig.diag-server-only.json` → 3,540 errors (= prior baseline, 0 net new)
+- **Live Sunset Bay BEFORE=AFTER full-engine NOI byte-identical across 5 years** — the gate that covers what dept-golden structurally can't see at the bypass sites (per `tests/department-inference-golden.mjs` header: "this harness neither imports nor observes those call sites")
+
+### Two latent inferDepartment cascade issues surfaced (filed, not fixed)
+- `project_infer_department_dry_stack_gap.md` — `'Dry Stack Indoor'` / `'Dry Stack Outdoor'` miss the Storage cascade at `department-mapping.ts:67` (no `'stack'` / `'dry rack'` keywords). Inert today (no granular rates). Fix: ~5 min when bundled with next inferDepartment pass.
+- `project_infer_department_admin_keyword_overreach.md` — `'admin'` keyword on `marina-coa-seed.ts:77` catches `'Admin & General'` → Payroll. May be intentional (admin wages ARE payroll) or over-broad. Decision-first.
+
+### Next session
+
+- **DO NOT pick "the next class to light up" without first answering the three design Qs in `project_v3_non_marina_design_questions.md`:**
+  1. Is aggregate vacancy a new basisType (`vacancy_rate`) or `occupancy = 1 − vacancy` mapping?
+  2. Flat stabilized vacancy or hold-period curve? (If flat, multiplier is always 1 — v3 adds nothing.)
+  3. Does v3 need to cover aggregate-vacancy classes at all, or does it stay marina-shaped while MF/SS/office stay on their existing vacancy path?
+- **Placeholder rate axis handoff** (Option A per `project_v3_placeholder_rate_axis_handoff.md`) — still ahead. Single-marina prerequisite for the full v3 formula going live.
+- **Deferred-(f) decision** — both engines now route through the calculator; the natural single-owner question becomes actionable. Decide whether to unify Y1 sourcing inside the calculator (closes the 1.37% PF/DCF Y1-source divergence) or formally keep them divergent.
+- **Pending journal catch-up** — Step B + Step D-zero entries (drafted in working tree from prior sessions, not committed) are unrelated prior-session drift. Sitting in working tree; commit on their own when the moment comes.
+
+---
+
 ## ✅ Roadmap-to-demo pass + Charts gate-close + WS2 DCF capex read-path fix (2026-05-23)
 
 Single session, three tracks. (1) Read-only roadmap pass reconciled Brett's demo bar — "doc upload → finalized pro forma → exit scenarios, 100% complete" — against current state; the headline finding is that exit-scenarios is NOT a hidden marina-centric workstream because the exit/DCF math is asset-class-agnostic and reads the post-WS5-correct pro-forma output. WS5 closed more of the demo bar than just its own portion. (2) Charts gate-close shipped — discovered pro-forma-charts tab was already hidden from the tab rail since 2026-05-20 (Phase 4a Item 7b gate-first), so last session's "biggest credibility hazard" framing was overstated; closed the residual URL-direct hole (`?tab=proforma-charts` now falls back to overview). (3) WS2 (DCF capex read-path) Phase 0 re-framed the original roadmap "tune marina-biased capex defaults" item as the SYMPTOM — the real bug was that the DCF compute path didn't read `scenario_assumption_payloads.belowTheLine` at all, dropping user-set capex on the floor across 4 user-facing surfaces while the Pro Forma table read it correctly. WS2 fix shipped with cross-surface BEFORE/AFTER verification. Three new deferred items filed (e/f + scope note on a).
