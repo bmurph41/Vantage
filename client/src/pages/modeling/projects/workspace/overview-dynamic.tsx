@@ -72,9 +72,19 @@ function extractKPIValue(
   // back to pricing.goingInCapRate (the user-typed target). When PF returns
   // zero NOI (empty project), financials.capRate is undefined and the typed
   // fallback still displays as a sensible empty-state target.
+  //
+  // Gap B (fallback unit fix, 2026-05-24): pricing.goingInCapRate is stored in
+  // DB as PERCENTAGE form (e.g. 9.37 / 7.5 — verified empirically against the
+  // 2 fallback-cohort projects). formatKPIValue('percent', v) does
+  // formatPercent(v*100), expecting DECIMAL form. The pricingPctToDecimal
+  // conversion below applies ONLY to the goingInCapRate fallback branch —
+  // financials.capRate is already decimal from workspace.tsx's pctToDecimal,
+  // and pricing.capRate is undefined across the cohort today (engine-match
+  // projects use the financials.* primary path).
+  const pricingPctToDecimal = (v: any) => (v != null ? Number(v) / 100 : undefined);
   const pricingMap: Record<string, any> = {
     noi: financials?.noi ?? pricing.noi,
-    capRate: financials?.capRate ?? pricing.capRate ?? pricing.goingInCapRate,
+    capRate: financials?.capRate ?? pricing.capRate ?? pricingPctToDecimal(pricing.goingInCapRate),
     cashOnCash: financials?.cashOnCash ?? pricing.cashOnCashReturn ?? pricing.cashOnCash,
     dscr: financials?.dscr ?? pricing.dscr ?? pricing.debtServiceCoverageRatio,
     irr: financials?.irr ?? pricing.irr ?? pricing.internalRateOfReturn,

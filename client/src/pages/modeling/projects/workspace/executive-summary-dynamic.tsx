@@ -276,12 +276,40 @@ function buildSummary(
   ].filter(m => m.value !== '—');
 
   // Returns
+  //
+  // 2026-05-24 ES Gap A parallel: Returns row now precedences financials?.*
+  // (PF-computed metrics from workspace.tsx, already decimal-form) ahead of
+  // pricing.* (user-typed targets). Mirrors Overview's extractKPIValue
+  // pattern. The 3 PF computes — IRR, Equity Multiple, Cap Rate — get the
+  // upgrade. Cash-on-Cash and GRM stay pricing.*-only because /pro-forma
+  // doesn't emit them. DSCR's inline truthiness check (filed separately as
+  // Finding C convention inconsistency) is intentionally left alone here.
+  //
+  // Gap B (fallback unit fix): pricing.goingInCapRate is stored in DB as
+  // PERCENTAGE form (e.g. 9.37 / 7.5 — verified against the 2 fallback-
+  // cohort projects). fmtPct does formatPercent(n*100), expecting DECIMAL
+  // form. pricingPctToDecimal applies ONLY to the goingInCapRate fallback
+  // branch — financials.capRate is already decimal, pricing.capRate is
+  // undefined across the cohort today.
+  const pricingPctToDecimal = (v: any) => (v != null ? Number(v) / 100 : undefined);
   const returnMetrics = [
-    { label: 'Cap Rate', value: fmtPct(pricing.capRate ?? pricing.goingInCapRate), highlight: true },
+    {
+      label: 'Cap Rate',
+      value: fmtPct(financials?.capRate ?? pricing.capRate ?? pricingPctToDecimal(pricing.goingInCapRate)),
+      highlight: true,
+    },
     { label: 'Cash-on-Cash', value: fmtPct(pricing.cashOnCashReturn ?? pricing.cashOnCash), highlight: true },
     { label: 'DSCR', value: pricing.dscr ? `${Number(pricing.dscr).toFixed(2)}x` : '—' },
-    { label: 'IRR', value: fmtPct(pricing.irr) },
-    { label: 'Equity Multiple', value: pricing.equityMultiple ? `${Number(pricing.equityMultiple).toFixed(2)}x` : '—' },
+    { label: 'IRR', value: fmtPct(financials?.irr ?? pricing.irr) },
+    {
+      label: 'Equity Multiple',
+      value:
+        financials?.equityMultiple != null
+          ? `${Number(financials.equityMultiple).toFixed(2)}x`
+          : pricing.equityMultiple
+            ? `${Number(pricing.equityMultiple).toFixed(2)}x`
+            : '—',
+    },
     { label: 'GRM', value: pricing.grm ? `${Number(pricing.grm).toFixed(1)}` : '—' },
   ].filter(m => m.value !== '—');
 

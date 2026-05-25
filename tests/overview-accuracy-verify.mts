@@ -29,7 +29,20 @@ const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 //   c3a1eebc — multifamily, direct_input+inputs (real PF metrics, different class)
 //   7a487b18 — marina, auto+inputs (sibling to 18bbede6 — should match)
 //   7df94d2a — marina, auto+NO inputs (PF returns zeros — falls back to typed)
-const PROJECT_ID_PREFIXES = ['18bbede6', 'c3a1eebc', '7a487b18', '7df94d2a'];
+//   d4dcdaa5 — multifamily, fallback-cohort sibling (different class, different typed value)
+const PROJECT_ID_PREFIXES = ['18bbede6', 'c3a1eebc', '7a487b18', '7df94d2a', 'd4dcdaa5'];
+
+// Fallback-cohort anchors with EXPECTED displayed cap-rate values.
+// These projects have NO engine-computed cap rate (PF metrics zero / no inputs)
+// AND a typed pricing.goingInCapRate (percentage form in DB). The Gap B fix
+// (2026-05-25) routes the fallback through pricingPctToDecimal so the
+// formatKPIValue('percent', v) renders 9.37% / 7.5% instead of 937% / 750%.
+// Closes the harness blind spot that previously treated engine-zero as '(empty)'
+// and never asserted the displayed-cap-rate fallback path.
+const FALLBACK_EXPECT: Record<string, { dbGoingInCapRate: number; displayed: string }> = {
+  '7df94d2a': { dbGoingInCapRate: 9.37, displayed: '9.37%' },
+  'd4dcdaa5': { dbGoingInCapRate: 7.5,  displayed: '7.50%' },
+};
 
 // === BEFORE extractor (pre-2026-05-24 workspace.tsx logic) ===
 function extractFinancialsBefore(pf: any) {
@@ -81,15 +94,37 @@ const fmtCurrency = (v: any) => typeof v === 'number' ? `$${Math.round(v).toLoca
 const fmtPct = (v: any) => typeof v === 'number' ? `${(v * 100).toFixed(2)}%` : '—';
 const fmtMultiplier = (v: any) => typeof v === 'number' ? `${v.toFixed(2)}x` : '—';
 
+// Final-display extractor for cap rate — mirrors overview-dynamic.tsx and
+// executive-summary-dynamic.tsx precedence: financials.capRate (decimal) →
+// pricing.capRate (decimal) → pricingPctToDecimal(pricing.goingInCapRate)
+// (percentage-form fallback converted). Same shape as both consumer files
+// post-Gap-B fix.
+function extractCapRateDisplayed(financials: any, pricingBlob: any): number | null {
+  const pricingPctToDecimal = (v: any) => (v != null ? Number(v) / 100 : undefined);
+  const val =
+    (financials?.capRate as number | undefined) ??
+    (pricingBlob?.capRate as number | undefined) ??
+    pricingPctToDecimal(pricingBlob?.goingInCapRate);
+  if (val == null || !isFinite(val)) return null;
+  return val;
+}
+
 let regressions = 0;
 let goldenChecks = 0;
+let fallbackChecks = 0;
 
 console.log('=== Overview-accuracy verification (Gap A + Gap C fix, 2026-05-24) ===\n');
 
 for (const prefix of PROJECT_ID_PREFIXES) {
-  const r = await pool.query(`SELECT id, org_id, asset_class, COALESCE(model_input_mode, 'auto') AS mode FROM modeling_projects WHERE id::text LIKE $1`, [prefix + '%']);
+  const r = await pool.query(
+    `SELECT id, org_id, asset_class, COALESCE(model_input_mode, 'auto') AS mode,
+            custom_metrics -> 'dealPricing' AS pricing_blob
+     FROM modeling_projects WHERE id::text LIKE $1`,
+    [prefix + '%']
+  );
   if (!r.rows[0]) { console.log(`${prefix}: not found, skipping\n`); continue; }
   const p = r.rows[0];
+  const pricingBlob = p.pricing_blob ?? {};
 
   let pf: any = null;
   try {
@@ -139,12 +174,47 @@ for (const prefix of PROJECT_ID_PREFIXES) {
   }
 
   console.table(rows);
+
+  // === Fallback-path assertion (Gap B blind-spot closure, 2026-05-25) ===
+  // For fallback-cohort projects, the financials.capRate path returns null
+  // (engine zero) and the displayed cap rate MUST come from the pricing
+  // fallback branch through pricingPctToDecimal. Asserts:
+  //   1. DB storage form matches expectation (catches DB drift)
+  //   2. Displayed cap rate (post pricingPctToDecimal) is the percentage
+  //      form converted to decimal — NOT the raw value (which would render
+  //      as 100x the intended display, the "937%" symptom)
+  const expect = FALLBACK_EXPECT[prefix];
+  if (expect) {
+    const dbVal = Number(pricingBlob.goingInCapRate);
+    const financialsCapRate = (after as any)?.capRate ?? null;
+    const displayedDecimal = extractCapRateDisplayed(after, pricingBlob);
+    const displayedFormatted = displayedDecimal != null
+      ? `${(displayedDecimal * 100).toFixed(2)}%`
+      : '—';
+
+    const dbMatches = dbVal === expect.dbGoingInCapRate;
+    const usedFallback = financialsCapRate == null; // financials must be null for fallback to fire
+    const displayMatches = displayedFormatted === expect.displayed;
+
+    console.log(`  [fallback-cohort assertions]`);
+    console.log(`    DB pricing.goingInCapRate     : ${dbVal} (expect ${expect.dbGoingInCapRate}) ${dbMatches ? '✓' : '✗'}`);
+    console.log(`    financials.capRate is null    : ${usedFallback ? '✓ (fallback path active)' : '✗ (engine produced a value — wrong cohort)'}`);
+    console.log(`    Displayed cap rate            : ${displayedFormatted} (expect ${expect.displayed}) ${displayMatches ? '✓' : '✗'}`);
+
+    if (!dbMatches || !usedFallback || !displayMatches) {
+      console.error(`  ✗ FALLBACK REGRESSION — ${prefix} would render '${displayedFormatted}' (raw db value: ${dbVal}, no /100 → would render as '${(dbVal*100).toFixed(2)}%')`);
+      regressions++;
+    } else {
+      fallbackChecks++;
+    }
+  }
 }
 
 console.log(`\n=== Summary ===`);
-console.log(`Engine-match checks passed: ${goldenChecks}`);
-console.log(`Regressions / mismatches:   ${regressions}`);
-if (regressions === 0) console.log('✓ GREEN — Overview extractor faithfully reflects PF engine output, NOI/Rev/Exp byte-identical pre/post fix.');
+console.log(`Engine-match checks passed:  ${goldenChecks}`);
+console.log(`Fallback-path checks passed: ${fallbackChecks} (Gap B blind-spot closure)`);
+console.log(`Regressions / mismatches:    ${regressions}`);
+if (regressions === 0) console.log('✓ GREEN — Overview extractor faithfully reflects PF engine output, NOI/Rev/Exp byte-identical pre/post fix; fallback path renders percentage-form pricing.goingInCapRate correctly.');
 else { console.error('✗ FAILED — see mismatches above'); process.exit(1); }
 
 await pool.end();
