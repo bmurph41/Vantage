@@ -191,15 +191,130 @@ if (goodKeys.fiscalYear !== 2023) {
 
 console.log(`\n  Site 2 assert: ${ASSERT_CASES.length + 1 - assertFailures}/${ASSERT_CASES.length + 1} passed`);
 
+// ─── (D) Sheet-selection regression — QB Desktop "Tips + Sheet1" shape ──────
+//
+// Real marina-upload blocker found 2026-05-25 while verifying Layer 0 Step 1
+// against the SS3_2023_Monthly_P&Ls.xlsx file. selectBestSheet was picking
+// SheetNames[0] when name-scoring tied at 0, which deterministically chose the
+// "QuickBooks Desktop Export Tips" cover sheet over the real "Sheet1" data.
+// Fix: content-aware tiebreaker (numericCellCount) gated strictly below the
+// name-decisive path. See project_select_best_sheet_qb_tips_defect.md.
+//
+// Fixtures protect:
+//   D1  single-sheet generically named — still picks its only sheet
+//   D2  multi-sheet, sheet 0 generic name + data, sheet 1 empty — still picks sheet 0
+//   D3  sheet 0 = SKIP (-100), sheet 1 = P&L (+10) — name-decisive, tiebreaker NEVER reached
+//   D4  SS3-shape synthetic ("Tips" cover + "Sheet1" data) — tiebreaker picks Sheet1
+
+console.log('\n━━━ (D) Sheet-selection: QB Desktop "Tips + Sheet1" shape ━━━\n');
+
+function makeWorkbook(sheets: { name: string; rows: any[][] }[]): Buffer {
+  const wb = XLSX.utils.book_new();
+  for (const s of sheets) {
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(s.rows), s.name);
+  }
+  return XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+}
+
+interface SheetCase {
+  id: string;
+  label: string;
+  buf: Buffer;
+  filename: string;
+  expectedSheet: string;
+  why: string;
+}
+
+const SHEET_CASES: SheetCase[] = [
+  {
+    id: 'D1', label: 'single-sheet generic name',
+    buf: makeWorkbook([{
+      name: 'Sheet1',
+      rows: [
+        ['', '', 'Jan 24', 'Feb 24', 'Mar 24'],
+        ['Income',  '',    1000,    1100,    1200],
+        ['Expense', '',     500,     520,     540],
+      ],
+    }]),
+    filename: 'd1_single.xlsx',
+    expectedSheet: 'Sheet1',
+    why: 'only one sheet present — tiebreaker degenerates correctly',
+  },
+  {
+    id: 'D2', label: 'sheet 0 generic+data, sheet 1 empty',
+    buf: makeWorkbook([
+      { name: 'Sheet1', rows: [
+        ['', 'Jan 24', 'Feb 24', 'Mar 24'],
+        ['Income',  1000, 1100, 1200],
+        ['Expense',  500,  520,  540],
+      ]},
+      { name: 'Notes', rows: [['Empty notes sheet']] },
+    ]),
+    filename: 'd2_data_on_sheet0.xlsx',
+    expectedSheet: 'Sheet1',
+    why: 'tiebreaker picks content-heaviest; sheet 0 retains',
+  },
+  {
+    id: 'D3', label: 'SKIP sheet 0 + P&L sheet 1 — name-decisive',
+    buf: makeWorkbook([
+      { name: 'Balance Sheet', rows: [['Asset', 100], ['Liability', 50]] },
+      { name: 'Income Statement', rows: [
+        ['', 'Jan 24', 'Feb 24'],
+        ['Revenue', 1000, 1100],
+        ['COGS',     400,  420],
+      ]},
+    ]),
+    filename: 'd3_named_pnl.xlsx',
+    expectedSheet: 'Income Statement',
+    why: 'positive name-score short-circuits; tiebreaker never reached',
+  },
+  {
+    id: 'D4', label: 'SS3-shape synthetic ("Tips" cover + "Sheet1" data)',
+    buf: makeWorkbook([
+      { name: 'QuickBooks Desktop Export Tips', rows: Array.from({ length: 40 }, () => [null, null]) },
+      { name: 'Sheet1', rows: [
+        ['', '', 'Jan 23', 'Feb 23', 'Mar 23', 'Apr 23'],
+        ['Income',  '', 1000, 1100, 1200, 1300],
+        ['Rent',    '',  500,  510,  520,  530],
+        ['Expense', '',  300,  310,  320,  330],
+      ]},
+    ]),
+    filename: 'd4_ss3_synthetic.xlsx',
+    expectedSheet: 'Sheet1',
+    why: 'the real defect — both sheets score 0 on name; tiebreaker by numeric-cell count picks Sheet1',
+  },
+];
+
+let sheetFailures = 0;
+for (const t of SHEET_CASES) {
+  const r = extractExcelPnl(t.buf, null, t.filename);
+  const ok = r.sheetUsed === t.expectedSheet;
+  const sym = ok ? '✓' : '✗';
+  console.log(`  ${sym} ${t.id} ${t.label} → sheetUsed="${r.sheetUsed}" (expected "${t.expectedSheet}")${ok ? '' : '  — ' + t.why}`);
+  if (!ok) sheetFailures++;
+}
+
+// D4 additionally validates that monthly-header parsing works downstream of
+// the correct sheet pick (regression guard if anyone touches MONTH_PATTERNS).
+{
+  const r = extractExcelPnl(SHEET_CASES[3].buf, null, SHEET_CASES[3].filename);
+  const periodsOk = r.periods.length === 4 && r.periods[0].year === 2023 && r.periods[0].periodNo === 1;
+  console.log(`  ${periodsOk ? '✓' : '✗'} D4 monthly parse — ${r.periods.length} periods, first="${r.periods[0]?.label}" year=${r.periods[0]?.year} month=${r.periods[0]?.periodNo}`);
+  if (!periodsOk) sheetFailures++;
+}
+
+console.log(`\n  Sheet-selection: ${SHEET_CASES.length + 1 - sheetFailures}/${SHEET_CASES.length + 1} passed`);
+
 // ─── Summary ────────────────────────────────────────────────────────────────
 
-const totalFailures = inferFailures + extractFailures + assertFailures;
+const totalFailures = inferFailures + extractFailures + assertFailures + sheetFailures;
 console.log('\n━━━ Summary ━━━');
-console.log(`  (A) inferYearFromText matrix: ${INFER_CASES.length - inferFailures}/${INFER_CASES.length}`);
-console.log(`  (B) End-to-end extractor:     ${extractFailures === 0 ? 'GREEN' : 'FAIL'}`);
+console.log(`  (A) inferYearFromText matrix:   ${INFER_CASES.length - inferFailures}/${INFER_CASES.length}`);
+console.log(`  (B) End-to-end extractor:       ${extractFailures === 0 ? 'GREEN' : 'FAIL'}`);
 console.log(`  (C) Site 2 ingest write-assert: ${ASSERT_CASES.length + 1 - assertFailures}/${ASSERT_CASES.length + 1}`);
+console.log(`  (D) Sheet selection (QB-Tips):  ${SHEET_CASES.length + 1 - sheetFailures}/${SHEET_CASES.length + 1}`);
 if (totalFailures === 0) {
-  console.log(`\n✓ GREEN — Sites 1a + 1b + 2 all verified on synthetic. Real-file end-to-end pass still required before demo-ready.`);
+  console.log(`\n✓ GREEN — Sites 1a + 1b + 2 + sheet-selection all verified on synthetic.`);
   process.exit(0);
 } else {
   console.error(`\n✗ FAILED — ${totalFailures} regression(s).`);

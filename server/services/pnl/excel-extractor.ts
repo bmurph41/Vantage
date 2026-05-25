@@ -65,10 +65,39 @@ function scoreSheet(name: string): number {
   return score;
 }
 
+function countNumericCells(ws: XLSX.WorkSheet): number {
+  // Cheap pass over a single sheet — counts cells whose value parses as money.
+  // Used only as the tiebreaker below; never alters name-decisive selection.
+  const data = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null }) as any[][];
+  let n = 0;
+  for (const row of data) {
+    if (!row) continue;
+    for (const v of row) {
+      if (parseMoney(v) !== null) n++;
+    }
+  }
+  return n;
+}
+
 function selectBestSheet(workbook: XLSX.WorkBook): string {
   const scored = workbook.SheetNames.map(n => ({ n, s: scoreSheet(n) }));
   scored.sort((a, b) => b.s - a.s);
-  return scored[0].s > 0 ? scored[0].n : workbook.SheetNames[0];
+
+  // Name-decisive fast path: any positive-scoring sheet wins by name alone.
+  if (scored[0].s > 0) return scored[0].n;
+
+  // Name-indecisive: every sheet scored ≤ 0 (e.g. QB Desktop exports where
+  // sheet 0 is "QuickBooks Desktop Export Tips" and sheet 1 is "Sheet1" — both
+  // score 0). Pre-2026-05-25 the fallback was workbook.SheetNames[0], which
+  // deterministically picked the cover sheet. Now: pick the content-heaviest
+  // sheet by numeric-cell count. See project_select_best_sheet_qb_tips_defect.md.
+  let best = workbook.SheetNames[0];
+  let bestNumeric = -1;
+  for (const { n } of scored) {
+    const numeric = countNumericCells(workbook.Sheets[n]);
+    if (numeric > bestNumeric) { bestNumeric = numeric; best = n; }
+  }
+  return best;
 }
 
 // ─── Year inference ───────────────────────────────────────────────────────────
