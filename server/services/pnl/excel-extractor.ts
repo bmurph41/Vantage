@@ -73,11 +73,27 @@ function selectBestSheet(workbook: XLSX.WorkBook): string {
 
 // ─── Year inference ───────────────────────────────────────────────────────────
 
-function inferYearFromText(text: string): number | null {
-  const m4 = text.match(/\b(20\d{2}|19\d{2})\b/);
-  if (m4) { const y = parseInt(m4[1], 10); if (y >= 2000 && y <= 2099) return y; }
-  const m2 = text.match(/\b(?:fy|cy)?['\'']?(\d{2})\b/i);
-  if (m2) { const y = parseInt(m2[1], 10); return y > 50 ? 1900 + y : 2000 + y; }
+export function inferYearFromText(text: string): number | null {
+  // Canonical year range: 1900-2099 (matches the (?:19|20)\d{2} pattern;
+  // consistent across timeAlign.ts:136, ingest.ts write-assert).
+  //
+  // Boundary uses [^a-z0-9] instead of \b so underscore-separated filenames
+  // work — JS \b doesn't match between digit + underscore (both \w). Real
+  // production uploads ("2022_Income_Statement.xlsx", "SS3_2023_Monthly_P_Ls.xlsx",
+  // "Sunset_Bay_2023_P_and_L.xlsx") all returned null pre-fix because of this.
+  // See project_year_corruption_parse_layer.md.
+  const m4 = text.match(/(?:^|[^a-z0-9])((?:19|20)\d{2})(?:[^a-z0-9]|$)/i);
+  if (m4) {
+    const y = parseInt(m4[1], 10);
+    if (y >= 1900 && y <= 2099) return y;
+  }
+  // 2-digit branch — REQUIRES fy/cy/quote prefix. Pre-fix this matched bare
+  // 2-digit numbers, producing false positives like "10-1-24" → 2010.
+  const m2 = text.match(/(?:^|[^a-z0-9])(?:fy|cy|['\''])\s?(\d{2})(?:[^a-z0-9]|$)/i);
+  if (m2) {
+    const y = parseInt(m2[1], 10);
+    return y > 50 ? 1900 + y : 2000 + y;
+  }
   return null;
 }
 

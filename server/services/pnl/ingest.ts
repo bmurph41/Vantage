@@ -39,6 +39,25 @@ export async function storeMappedFacts(jobId: string): Promise<{ storedCount: nu
       if (!p) continue;
 
       const keys = periodToFactKeys(p);
+
+      // Fail-loud guard against year-corruption defects upstream. Range
+      // 1900-2099 matches parseColumnHeaderToPeriod (timeAlign.ts:136)
+      // + inferYearFromText (excel-extractor.ts). If any new derivation
+      // path produces out-of-range years, this prevents persistence and
+      // surfaces the bug as a job failure instead of silently corrupting
+      // modeling_actuals (which would then be masked by the engine's
+      // year-filter — see project_year_corruption_parse_layer.md).
+      if (keys.fiscalYear < 1900 || keys.fiscalYear > 2099) {
+        throw new Error(
+          `[storeMappedFacts] Refusing to persist pnl_fact with out-of-range ` +
+          `fiscalYear=${keys.fiscalYear} (canonical range 1900-2099). ` +
+          `Period: ${JSON.stringify(p)}. ` +
+          `Document: ${job.documentId}, job: ${jobId}. ` +
+          `This indicates a parser-layer year-derivation bug — see ` +
+          `project_year_corruption_parse_layer.md.`
+        );
+      }
+
       const value = v.value;
 
       if (value === null || value === undefined) continue;

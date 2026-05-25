@@ -1419,8 +1419,9 @@ ${fullText.slice(0, 40000)}`
       try {
         const { mapExtractedItems, persistMappingResults } = await import('./coa-mapping-engine');
         const itemIds = extractedItems.map((i: any) => i.id);
-        mapExtractedItems(itemIds, orgId, userId).then(async (batchResult) => {
-          const persisted = await persistMappingResults(batchResult.results, userId, orgId);
+        const mappingUserId = upload.uploadedBy || orgId;
+        mapExtractedItems(itemIds, orgId, mappingUserId).then(async (batchResult) => {
+          const persisted = await persistMappingResults(batchResult.results, mappingUserId, orgId);
           console.log(`[DocIntelService] COA taxonomy auto-map: ${batchResult.autoMapped} auto-mapped, ${batchResult.needsReview} needs review, ${persisted} persisted`);
         }).catch(err => {
           console.error(`[DocIntelService] COA taxonomy mapping failed (non-blocking):`, err);

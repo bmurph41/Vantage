@@ -133,11 +133,16 @@ export function parseColumnHeaderToPeriod(header: string, yearHint?: number): Pa
     };
   }
   
-  const yearMatch = normalized.match(/^(?:fy\s*)?['']?(\d{4})$/i);
+  // Year-header pattern: tightened to (?:19|20)\d{2} (1900-2099 canonical
+  // range, consistent with inferYearFromText + storeMappedFacts write-assert).
+  // Pre-2026-05-25 this accepted ANY 4-digit number, so junk cell values like
+  // "3032" / "6064" (production-observed for 54c1b93a) were taken as years —
+  // see project_year_corruption_parse_layer.md for the full trace.
+  const yearMatch = normalized.match(/^(?:fy\s*)?['']?((?:19|20)\d{2})$/i);
   if (yearMatch) {
     const year = parseInt(yearMatch[1], 10);
     const { start, end } = getYearPeriod(year);
-    
+
     return {
       label: header,
       start: start.toISOString(),
@@ -147,6 +152,6 @@ export function parseColumnHeaderToPeriod(header: string, yearHint?: number): Pa
       periodNo: 1,
     };
   }
-  
+
   return null;
 }
