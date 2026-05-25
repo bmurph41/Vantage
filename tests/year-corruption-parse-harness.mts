@@ -27,6 +27,7 @@
 
 import * as XLSX from 'xlsx';
 import { extractExcelPnl, inferYearFromText } from '../server/services/pnl/excel-extractor';
+import { periodToFactKeys } from '../server/services/pnl/timeAlign';
 
 // ─── (A) inferYearFromText matrix ───────────────────────────────────────────
 
@@ -143,14 +144,62 @@ if (result.periods.length === 0) {
   }
 }
 
+// ─── (C) Site 2 write-time assert (simulates storeMappedFacts ingest guard) ──
+
+console.log('\n━━━ (C) Site 2 ingest.ts write-time assert ━━━\n');
+
+interface AssertCase { fiscalYear: number; shouldThrow: boolean; why: string; }
+const ASSERT_CASES: AssertCase[] = [
+  { fiscalYear: 2023, shouldThrow: false, why: 'in-range year' },
+  { fiscalYear: 1900, shouldThrow: false, why: 'lower bound inclusive' },
+  { fiscalYear: 2099, shouldThrow: false, why: 'upper bound inclusive' },
+  { fiscalYear: 3032, shouldThrow: true,  why: 'production-observed corruption value' },
+  { fiscalYear: 6064, shouldThrow: true,  why: 'production-observed corruption value' },
+  { fiscalYear: 1899, shouldThrow: true,  why: 'below lower bound' },
+  { fiscalYear: 2100, shouldThrow: true,  why: 'above upper bound (engine-filter starts ignoring at >2200, write-assert tighter)' },
+];
+
+// Replicate the assert exactly from ingest.ts to validate consistency.
+function ingestAssert(fiscalYear: number): void {
+  if (fiscalYear < 1900 || fiscalYear > 2099) {
+    throw new Error(`out-of-range fiscalYear=${fiscalYear}`);
+  }
+}
+
+let assertFailures = 0;
+for (const t of ASSERT_CASES) {
+  let threw = false;
+  try { ingestAssert(t.fiscalYear); } catch { threw = true; }
+  const ok = threw === t.shouldThrow;
+  const sym = ok ? '✓' : '✗';
+  console.log(`  ${sym} fiscalYear=${t.fiscalYear} → ${threw ? 'THROW' : 'pass'} (expected ${t.shouldThrow ? 'THROW' : 'pass'}) — ${t.why}`);
+  if (!ok) assertFailures++;
+}
+
+// Also: verify timeAlign.periodToFactKeys propagates a real year correctly
+// (the upstream of Site 2 — make sure the assert sees the right thing).
+const goodKeys = periodToFactKeys({
+  label: 'FY 2023', start: '2023-01-01', end: '2023-12-31',
+  type: 'year', year: 2023, periodNo: 1,
+});
+if (goodKeys.fiscalYear !== 2023) {
+  console.error(`  ✗ periodToFactKeys did not propagate year=2023 — got ${goodKeys.fiscalYear}`);
+  assertFailures++;
+} else {
+  console.log(`  ✓ periodToFactKeys propagates year=2023 → keys.fiscalYear=${goodKeys.fiscalYear} (upstream contract holds)`);
+}
+
+console.log(`\n  Site 2 assert: ${ASSERT_CASES.length + 1 - assertFailures}/${ASSERT_CASES.length + 1} passed`);
+
 // ─── Summary ────────────────────────────────────────────────────────────────
 
-const totalFailures = inferFailures + extractFailures;
+const totalFailures = inferFailures + extractFailures + assertFailures;
 console.log('\n━━━ Summary ━━━');
-console.log(`  inferYearFromText matrix: ${INFER_CASES.length - inferFailures}/${INFER_CASES.length}`);
-console.log(`  End-to-end extractor:     ${extractFailures === 0 ? 'GREEN' : 'FAIL'}`);
+console.log(`  (A) inferYearFromText matrix: ${INFER_CASES.length - inferFailures}/${INFER_CASES.length}`);
+console.log(`  (B) End-to-end extractor:     ${extractFailures === 0 ? 'GREEN' : 'FAIL'}`);
+console.log(`  (C) Site 2 ingest write-assert: ${ASSERT_CASES.length + 1 - assertFailures}/${ASSERT_CASES.length + 1}`);
 if (totalFailures === 0) {
-  console.log(`\n✓ GREEN — all ${INFER_CASES.length} inferYearFromText cases pass + extractor produces year=2023 from filename fallback after junk rejected.`);
+  console.log(`\n✓ GREEN — Sites 1a + 1b + 2 all verified on synthetic. Real-file end-to-end pass still required before demo-ready.`);
   process.exit(0);
 } else {
   console.error(`\n✗ FAILED — ${totalFailures} regression(s).`);

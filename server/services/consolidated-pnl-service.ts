@@ -87,6 +87,29 @@ async function fetchCoverageBounds(
     max_yyyymm: number | null;
   }>(COVERAGE_QUERY, [projectId, orgId]);
   const row = r.rows[0] ?? { min_year: null, max_year: null, max_yyyymm: null };
+
+  // Telemetry: surface when the year-filter (1900-2200) drops rows. The
+  // filter is defense-in-depth against parser-layer corruption (year=3032
+  // produced for 54c1b93a — see project_year_corruption_parse_layer.md),
+  // but silently masking is the same blind-spot class as the 937% cap-rate
+  // harness gap. Counting + warning ensures any future regression of the
+  // parse-layer fix surfaces visibly instead of vanishing.
+  const dropped = await pool.query<{ bad_rows: string }>(
+    `SELECT COUNT(*) AS bad_rows FROM modeling_actuals
+     WHERE modeling_project_id = $1 AND org_id = $2
+       AND (year < 1900 OR year > 2200)`,
+    [projectId, orgId],
+  );
+  const badRows = Number(dropped.rows[0]?.bad_rows ?? 0);
+  if (badRows > 0) {
+    console.warn(
+      `[consolidated-pnl] year-filter masking: ${badRows} modeling_actuals row(s) ` +
+      `for project=${projectId} have year < 1900 or > 2200 and are being silently ` +
+      `excluded. This indicates a parser-layer year-derivation regression — ` +
+      `see project_year_corruption_parse_layer.md.`
+    );
+  }
+
   return {
     minYear: row.min_year === null ? null : Number(row.min_year),
     maxYear: row.max_year === null ? null : Number(row.max_year),
