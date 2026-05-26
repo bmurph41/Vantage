@@ -44,7 +44,7 @@ export class AnthropicClassifier implements LlmClassifier {
 
   constructor(config: { apiKey: string; model?: string }) {
     this.client = new Anthropic({ apiKey: config.apiKey });
-    this.model = config.model ?? 'claude-3-haiku-20240307';
+    this.model = config.model ?? 'claude-haiku-4-5-20251001';
   }
 
   async classify(request: ClassificationRequest): Promise<ClassificationResult> {
@@ -58,7 +58,7 @@ Respond with JSON only.`;
 
       const response = await this.client.messages.create({
         model: this.model,
-        max_tokens: 200,
+        max_tokens: 400,
         system: SYSTEM_PROMPT,
         messages: [{ role: 'user', content: userPrompt }],
       });
