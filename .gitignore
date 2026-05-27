@@ -57,3 +57,9 @@ tsconfig.4files-check.json
 # Large PDF binaries auto-committed into attached_assets/ (e.g. public filings) —
 # block re-addition. Existing tracked PDFs are unaffected; gitignore does not untrack.
 attached_assets/*.pdf
+
+# Dev/verification P&L corpus — REAL financial statements (revenue, payroll,
+# distributions). These are used locally to drive vocabulary-coverage and parser
+# work and MUST NOT enter git history. README is committed as the catalog index.
+fixtures/pnl-samples/*
+!fixtures/pnl-samples/README.md
