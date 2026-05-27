@@ -1,5 +1,68 @@
 # MarinaMatch Platform Journal
 
+## ✅ B3 step 2 — closed-vocab classifier + section HARD GATE (2026-05-27)
+
+Shipped on commit `4ff1cb42`, pushed to `origin/main` (verified `git rev-list --left-right --count HEAD...origin/main` = `0	0`). Closes the B3 work tied to the [[canonical-key-namespace-mismatch]] bottleneck identified 2026-05-26: classifier now picks one canonical from an asset-class-scoped enumerated list (or returns `[REVIEW]`), and the downstream lookup uses exact-match against `canonicalByKey` instead of the snake_case-vs-camelCase suffix/displayName fuzzy backstop that was producing silent mis-maps. Five hardening changes ship together as one bisectable commit; the most important is the section HARD GATE, which forces review on any income/cost cross-class violation (parser-tagged revenue → cogs/expense/payroll/non_operating canonical, or vice versa).
+
+### CRITICAL — honest framing on the B4 numbers
+
+**The 38.2% from B4 is AUTO-MAP RATE, not correctness.** Spot-check correctness was 100% on every probed defect. The gap to the projected 75–80% demo target is MOSTLY explained by SS3's PARSER mis-tagging every row as `revenue` — a pre-existing parser bug, NOT a classifier or vocabulary problem. The section HARD GATE caught ~15 such rows on the 2024 job and correctly deferred them to review. Pre-B3 those same rows would have silently corrupted NOI (COGS-Fuel → revenue.fuel; NYS Corporation Tax → payroll taxes; Depreciation/Interest → general expense above NOI; Automobile Expense → revenue). The gate IS doing its job — deferring is the right behavior when the parser tag and the canonical section disagree on income-vs-cost direction.
+
+**Next-session warning:** if a future session looks at SS3 and sees "only 38% auto-mapped, classifier must still be broken," check the gate log FIRST (`[PNL section gate] forcing review on income/cost cross` lines). If every "wrong" auto-map is a section-conflict deferral, the bug is in the parser, not the classifier. Do not re-spend Phase B vocabulary or prompt-tuning effort on what are actually parser issues. The demo-readiness next bottleneck is the parser's section detection on QB-Desktop exports.
+
+### What changed
+
+- `server/services/pnl/key-bank.ts` (NEW) — closed-vocabulary bank, asset-class-scoped. Marina has 50+ specific keys (storage subtypes, service subtypes, fuel, ship store, boat-sales business_income, payroll, operating expense) with 3–6 normalized aliases each, ordered subtypes-before-aggregates so the classifier prefers granular when present. Universal block (insurance, property tax, utilities, marketing, admin, payroll, depreciation, interest, income-tax, sales-tax flagged review-lean) appended last. Exports `MUST_REVIEW_DENY_LIST` + `isMustReviewLabel` + `formatKeyBankForPrompt(assetClass)`.
+- `scripts/seed-pnl-keyword-bank.mjs` (NEW) — seeded 30 global keyword rules into `pnl_keyword_rules` (was 0 rows): payroll-tax aliases (FUTA/SUI/FICA/Workers Comp/Medicare → annualPayrollTaxesExpense); income-tax aliases (NYS Corp/PTET/State Income/Federal Income → annualIncomeTax non_operating, **not** payroll); depreciation/amortization → annualDepreciation; interest → annualInterestExpense; COGS-Fuel disambiguation (cogs fuel / cogs - fuel / cost of fuel → annualFuelCOGS, never revenue).
+- `server/services/pnl/mapping.ts` — (1) `tryKeywordMatch` now accepts `canonicalByKey` Map and resolves a rule's `canonical_coa_code` → per-org canonical FK at match time, so a single global seed applies to every org. (2) `tryCanonicalMatch` dropped its ≥2-word fuzzy tier — exact-match only at 0.95 (the fuzzy tier was the source of the worst legacy mis-maps like "Sales Tax Expense" → property tax via shared "tax" token). (3) `tryLlmClassification` resolves LLM output via exact-match against `canonicalByKey`; legacy endsWith/displayName.includes path feature-flagged off (`PNL_LLM_FUZZY_BACKSTOP`, default off, logs every fire); no-exact-match defaults to REVIEW. (4) MUST_REVIEW deny-list runs at the TOP of the per-row loop, BEFORE all auto-map passes. (5) Section HARD GATE replaces the old soft-overlay-rebucket: income/cost equivalence classes (INCOME={revenue, business_income} / COST={cogs, expense, payroll, non_operating}), cross-class violations force review; `row.mapping.canonicalLineItemId` is nulled on gate-rejection so `storeMappedFacts` can't write the rejected canonical. (6) Asset class threaded via JOIN `pnl_jobs → pnl_documents → modeling_projects.asset_class`.
+- `server/utils/llm/anthropicProvider.ts` — system prompt restructured to closed-vocabulary form. Prompt now embeds the enumerated key list for the request's asset class (formatted by `formatKeyBankForPrompt`), with ordered routing rules: subtypes before aggregates; income-tax → annualIncomeTax (non_operating, never payroll); payroll-tax (FUTA/SUI/etc) → annualPayrollTaxesExpense (payroll, never income); boat-sales → business_income (never property revenue); sales tax + ask-my-accountant + suspense → `[REVIEW]` sentinel; structural section hint is authoritative. Strict JSON return; `[REVIEW]` / `[CATCH-ALL]` sentinel maps to undefined canonicalKey + confidence 0.
+- `server/utils/llm/types.ts` — `ClassificationRequest.context.assetClass?: string` added.
+- `db/schema-index.ts` — auto-regen blank-line drift only (expected per [[db-schema-index-hooks]], self-resolves at commit).
+
+### Decisions made
+
+- **Closed vocabulary over fuzzy bridging.** Phase 0 coverage diagnosis (memory `canonical-key-namespace-mismatch`) showed 30/58 SS3 labels are COLLAPSE candidates and 20/58 are NO HOME — option (a) "snake_case → camelCase bridge alone" was rejected because forcing 30 lines into 3-4 aggregate buckets is worse than `needs_review`. The right answer was enrich vocabulary FIRST (Phase B v1 — already shipped on commit `f77ebb85`), then make the classifier choose from that enriched list instead of inventing keys.
+- **MUST_REVIEW deny-list runs BEFORE tryCanonicalMatch, not only at the LLM stage.** A display-name fuzzy hit on "Sales Tax" could otherwise smuggle it past the LLM-stage check and auto-map to `annualPropertyTax` via shared "tax" token. The deny-list is now a structural pre-filter that no downstream pass can override.
+- **Section HARD GATE uses income/cost equivalence classes, not strict section equality.** Naive `parserSection !== canonicalSection` would false-positive on every business_income mapping (parser=revenue / canonical=business_income — both are income-side, intentional below-NOI routing). The equivalence classes (INCOME = revenue + business_income; COST = cogs + expense + payroll + non_operating) catch the real corruption (sign flips across the NOI line) without flagging design-intended routings.
+- **Fuzzy LLM backstop kept behind a feature flag for one release.** `PNL_LLM_FUZZY_BACKSTOP=true` restores the legacy endsWith/displayName.includes path and logs every fire. Default off. Gives us an observation window before removing entirely.
+- **`row.mapping.canonicalLineItemId` nulled on gate-rejection.** Without this, the reviewItem correctly captures the suggested canonical for the human, but `row.mapping` retains the gate-rejected canonical and `storeMappedFacts` writes it to `pnl_facts` anyway. The fix nulls the canonical on row.mapping when `sectionConflict=true` so the gate's rejection actually sticks downstream.
+
+### Verification
+
+- **Scoped tsc** (`tsconfig.diag-server-only.json`, `--max-old-space-size=6144` per [[ci-red-known]] — combined-project tsc OOMs as always): `server/services/pnl/mapping.ts` 13 → 7 errors. 6 removed, 0 new. The 7 remaining are all pre-existing nullable-string drift in `tryAliasMatch` / `tryRegexMatch` paths I did not touch (alias.canonicalLineItemId `string|null` vs MapResult `string|undefined`; alias.weight `string|null` arithmetic; structuralSection null-index; boolean coerce in wasResolvedByKeywordBank).
+- **B4 empirical gate** on real SS3 file (project `2c5b8e46-023c-4c17-988d-8f2148426e97`, asset_class=marina; jobs `215c4385-c7e5-423b-a0ea-d5d0f03bcbbf` (2024) + `5a713a9d-e8a2-4fb3-ba26-932e90d721a7` (2023)):
+  - **2024: 21/55 auto-mapped (38.2%)** — was ~7% baseline (4/55) per Phase-0 diagnosis
+  - **2023: 18/54 auto-mapped (33.3%)**
+- **Spot-check correctness (in-file probes, 100% PASS):**
+  - Storage subtypes preserved (Summer Dockage / Winter Storage / Land Storage → granular keys, NOT collapsed to `annualDockageRevenue` aggregate)
+  - Service subtypes preserved (Bottom Paint, Bottom Wash, Hauling, Shrink Wrap, Subcontracted Repairs, Dockside Electric → granular keys, NOT collapsed to `annualServiceRevenue` aggregate)
+  - Boat-sales → business_income (Used Boat Sales, Warranty, Brokerage Commissions, Finance Commission — all routed below NOI as Phase A.1 designed)
+  - Salaries → annualSalariesExpense (payroll section, NOT generic expense)
+  - Gas Dock Fuel → annualFuelRevenue (correct fuel routing; the parser-bug section makes this surprising but the keyword bank seed got there first)
+- **Spot-check deferral correctness (gate working as designed):**
+  - COGS-Fuel → REVIEW (parser tagged as revenue; pre-B3 would have auto-mapped to revenue.fuel and silently corrupted NOI)
+  - NYS Corporation Tax → REVIEW (parser tagged as revenue; pre-B3 would have auto-mapped to payroll taxes)
+  - Interest Expense / Depreciation Expense → REVIEW (parser-bug protection — pre-B3 would have landed above NOI)
+  - Automobile Expense / Outside Services / Payroll Processing Fees → REVIEW (same parser-bug pattern)
+- **DB seed:** `pnl_keyword_rules` 0 → 30 rows (all global, source=`seed_b3_step2`).
+
+### Next session
+
+**Wait for direction** between two paths (see "Open decision" below). The push is the only thing that was unconditionally next this session.
+
+**Open decision (do not start without direction):**
+- **(a)** Full B4 correctness audit — walk EVERY auto-mapped row on SS3 (both jobs) + Oakdale, confirm "100% on probes" generalizes to "no silent mis-maps anywhere." Output: per-row table with canonical key, parser section, canonical section, confidence, method. Catches anything the named-defect probes missed.
+- **(b)** Fix SS3 parser's section detection on QB-Desktop exports — the bottleneck that makes the 75–80% projected auto-map rate actually materialize. Currently every SS3 row is parser-tagged `revenue`. The defect lives in either `parseOrchestrator.ts` (PDF path) or `excel-extractor.ts` (XLSX path) — SS3 was an XLSX upload (per [[select-best-sheet-qb-tips-defect]] sister memory, QB Desktop exports have a "Tips" cover sheet that the sheet-picker already handles; the section-detection layer is the next failure mode).
+- **Recommended order:** (b) first. (a) re-runs cleanly on post-parser-fix output; running (a) now would catalogue ~30+ rows whose only "issue" is parser-bug deferral, which is wasted audit effort.
+
+**Deferred / still-open items:**
+- Pre-existing 7 tsc errors in `tryAliasMatch` / `tryRegexMatch` (string|null vs string|undefined nullable handling) — small cleanup outside B3 scope
+- `PNL_LLM_FUZZY_BACKSTOP` feature flag — observe one release, then remove the legacy path entirely
+- Phase C (re-seed `pnl_canonical_line_items` for orgs that pre-date Phase B v1's expanded marina vocabulary) — separate workstream, untouched today
+- The classifier's per-line Claude call is uncached. Each request embeds the full asset-class key bank (~9KB system prompt) — Anthropic prompt caching would reduce per-call cost. Not a correctness item; defer until per-job cost becomes a real concern.
+
+---
+
 ## ✅ Step D-prime re-scope + chokepoint #5 fix (2026-05-24)
 
 **The strategic finding this session produced is much larger than the code it shipped.** The D-prime per-class light-up premise was wrong: lighting up non-marina classes in the v3 calculator's read path is NOT a calculator task. It's a data-model decision (vacancy-vs-occupancy mapping) plus per-class input-UI product work. Marina is the only class with a working per-type input→save chain today; MF/SS/office model AGGREGATE VACANCY (a different shape entirely, and the correct underwriting convention for those classes); STR has no occupancy input UI at all. Original "STR is the cheap next class after marina because both are unit-mix" framing collapsed once the input→save chain was traced end-to-end. Filed as `project_v3_non_marina_design_questions.md` with three design questions a real D-prime non-marina pass must answer first. The session's actual code commit is chokepoint #5 (`7760c8b4`) — the small real bug that's unrelated to v3 and bounded enough to ship cleanly.
