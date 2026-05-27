@@ -262,7 +262,27 @@ export async function exportModelingProjectToExcel(
         proFormaData.push(['', 'Total Expenses', formatCurrency(computed.totalExpenses), '']);
         proFormaData.push(['']);
         proFormaData.push(['NET OPERATING INCOME (NOI)', '', formatCurrency(computed.noi), '']);
-        
+
+        // Phase A — below-NOI section. Render non-operating lines (depreciation,
+        // amortization, interest expense) AFTER the NOI line. Excluded from NOI
+        // math by direct-input-engine but surfaced here so they don't disappear
+        // from the export. Mirrors consolidated-pnl-service noiSign === 0 semantics.
+        const nonOperatingLines = computed.nonOperatingLines ?? [];
+        if (nonOperatingLines.length > 0) {
+          proFormaData.push(['']);
+          proFormaData.push(['NON-OPERATING (BELOW NOI)', '', 'Annual Amount', 'Formula']);
+          for (const line of nonOperatingLines) {
+            proFormaData.push([
+              '',
+              line.label,
+              formatCurrency(line.amount),
+              line.formula || '',
+            ]);
+          }
+          proFormaData.push(['', '', '', '']);
+          proFormaData.push(['', 'Total Non-Operating', formatCurrency(computed.totalNonOperating ?? 0), '']);
+        }
+
         // Unit Mix detail (if present)
         if (unitMix.length > 0) {
           proFormaData.push(['']);

@@ -42,6 +42,19 @@ const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct'
 const DAYS_PER_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 const DAYS_IN_YEAR = 365;
 
+// Phase A — explicit allowlist for Y1 NOI sourcing. Mirrors consolidated-pnl-service
+// noiSign semantics (revenue = +1, expense = -1, anything else = 0 → excluded).
+// Union of every writer's vocabulary across snake-case (canonical-seed.ts) and
+// Pascal-case (canonical-actuals-loader.ts 'Revenue'|'COGS'|'Expenses') namespaces,
+// plus deal-pricing-service.ts:508's full precedent set. Compared after lowercase().
+const Y1_REVENUE_CATEGORIES = new Set(['revenue']);
+const Y1_EXPENSE_CATEGORIES = new Set([
+  'expense', 'expenses', 'cogs',
+  'operating expense', 'operating expenses',
+  'opex', 'payroll',
+]);
+const Y1_EXCLUDED_CATEGORIES = new Set(['non_operating', 'non-operating']);
+
 function slugify(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || 'line';
 }
@@ -86,15 +99,26 @@ export function buildY1FromConsolidated(
     const cell = li.annual.find(c => c.year === latestYear);
     if (!cell || cell.adjustedAmount === 0) continue;
 
-    const isRevenue = String(li.category ?? '').toLowerCase() === 'revenue';
+    const cat = String(li.category ?? '').toLowerCase();
     const label = li.lineItemLabel || li.subcategory || li.lineItemKey;
-    const line: FinancialLine = {
-      label,
-      amount: cell.adjustedAmount,
-      category: isRevenue ? 'revenue' : 'expense',
-      key: slugify(li.subcategory || label),
-    };
-    (isRevenue ? revenueLines : expenseLines).push(line);
+    const key = slugify(li.subcategory || label);
+    const amount = cell.adjustedAmount;
+
+    if (Y1_REVENUE_CATEGORIES.has(cat)) {
+      revenueLines.push({ label, amount, category: 'revenue', key });
+    } else if (Y1_EXPENSE_CATEGORIES.has(cat)) {
+      expenseLines.push({ label, amount, category: 'expense', key });
+    } else if (!Y1_EXCLUDED_CATEGORIES.has(cat)) {
+      // Unrecognized category — log and exclude (fail-loud, never silent-sweep
+      // into expenses; that's the denylist bug Phase A is fixing).
+      console.warn(
+        `[dcf-y1-sourcer] excluding line with unrecognized category="${li.category}" ` +
+        `(lineKey=${li.lineItemKey}) — not in revenue/expense allowlist, not non_operating; ` +
+        `verify this should be below-NOI.`,
+      );
+    }
+    // Excluded categories (non_operating, non-operating, unrecognized) — out of Y1 NOI.
+    // Matches consolidated-pnl-service noiSign === 0 semantics.
   }
 
   if (revenueLines.length === 0 && expenseLines.length === 0) return null;

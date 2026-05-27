@@ -399,6 +399,29 @@ export function PLBuilder({ project, computedFinancials, isLoading, onRefresh }:
                   </div>
                 </div>
               </div>
+
+              {/* Phase A — Below-NOI section. Renders non-operating lines (depreciation,
+                  amortization, interest expense) AFTER the NOI summary. Excluded from
+                  NOI math but surfaced here so they don't disappear. Mirrors
+                  consolidated-pnl-service noiSign === 0 semantics. */}
+              {(computedFinancials.nonOperatingLines?.length ?? 0) > 0 && (
+                <div className="border-t pt-3 mt-3">
+                  <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                    Non-Operating (Below NOI)
+                  </h4>
+                  <div className="space-y-1">
+                    {computedFinancials.nonOperatingLines!.map((line, i) => (
+                      <FinancialLineRow key={i} line={line} formulaBreakdowns={computedFinancials.formulaBreakdowns} />
+                    ))}
+                  </div>
+                  <div className="flex justify-end pt-2 mt-2 border-t border-dashed">
+                    <div className="text-sm">
+                      <span className="text-muted-foreground mr-2">Total Non-Operating:</span>
+                      <span className="font-semibold">{formatCurrency(computedFinancials.totalNonOperating ?? 0)}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             <div className="text-center py-6 text-muted-foreground">

@@ -33,11 +33,18 @@ const GROUP_TO_SECTION: Record<string, string> = {
   'Fuel':                   'cogs',
   'Storage':                'revenue',
   'Service':                'expense',
+  // Phase A — below-NOI section. Depreciation, amortization, and interest expense
+  // map here so consolidated-pnl-service noiSign returns 0 and they're excluded
+  // from NOI while still rendering in the below-NOI display section.
+  'Non-Operating':          'non_operating',
 };
 
-function groupToSection(group: string | undefined, category: 'revenue' | 'expense'): string {
+function groupToSection(group: string | undefined, category: 'revenue' | 'expense' | 'non_operating'): string {
   if (group && GROUP_TO_SECTION[group]) return GROUP_TO_SECTION[group];
-  return category === 'revenue' ? 'revenue' : 'expense';
+  // Phase A — category now includes 'non_operating' as a third bucket.
+  if (category === 'revenue') return 'revenue';
+  if (category === 'expense') return 'expense';
+  return 'non_operating';
 }
 
 // Additional universal line items that appear across all asset classes

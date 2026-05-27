@@ -18,6 +18,13 @@ export interface DirectInputFinancials {
   noi: number;
   revenueLines: FinancialLine[];
   expenseLines: FinancialLine[];
+  // Phase A — below-NOI bucket. Excluded from NOI (noi = totalRevenue - totalExpenses)
+  // but rendered in the display layer's below-NOI section. Mirrors
+  // consolidated-pnl-service noiSign === 0 semantics. Optional so existing
+  // constructors (dcf-y1-sourcer, tests) compile unchanged; consumers read
+  // with `?? []` / `?? 0`.
+  nonOperatingLines?: FinancialLine[];
+  totalNonOperating?: number;
   computedFrom: 'direct_input';
   formulaBreakdowns: Record<string, string>;
   monthlyBreakdown: MonthlyBreakdown[];
@@ -26,7 +33,7 @@ export interface DirectInputFinancials {
 export interface FinancialLine {
   label: string;
   amount: number;
-  category: 'revenue' | 'expense';
+  category: 'revenue' | 'expense' | 'non_operating';
   formula?: string;
   key: string;          // stable key for persistence (e.g. 'annualPropertyTax')
   isCustom?: boolean;   // user-added line
@@ -58,7 +65,10 @@ export interface MonthlyBreakdown {
 interface COALine {
   key: string;
   label: string;
-  category: 'revenue' | 'expense';
+  // Phase A — third bucket. Aligns with shared/direct-input-coa.ts COAFieldDef.category.
+  // 'non_operating' entries (e.g. depreciation, amortization, interest expense) are
+  // excluded from NOI but rendered in the below-NOI display section.
+  category: 'revenue' | 'expense' | 'non_operating';
   inputKeys: string[];          // keys to look up in inputAssumptions
   computeType: 'direct' | 'pct_of_revenue' | 'pct_of_egi' | 'formula' | 'monthly_x12';
   pctKey?: string;              // for pct-based: key for the percentage value
@@ -675,6 +685,8 @@ function computeFromCOA(
   const computed: Record<string, number> = {};
   const revenueLines: FinancialLine[] = [];
   const expenseLines: FinancialLine[] = [];
+  // Phase A — below-NOI bucket. Populated by the third COA filter pass below.
+  const nonOperatingLines: FinancialLine[] = [];
   const formulaBreakdowns: Record<string, string> = {};
 
   // --- Unit mix revenue injection (prepend before COA if available) ---
@@ -766,6 +778,23 @@ function computeFromCOA(
     if (result.formula) formulaBreakdowns[line.label] = result.formula;
   }
 
+  // Phase A — third pass: non-operating lines (depreciation, amortization, interest
+  // expense). EXCLUDED from NOI but tracked separately so the display layer can
+  // render them in the below-NOI section.
+  for (const line of coa.filter(l => l.category === 'non_operating')) {
+    const result = computeLine(line, inputs, computed, grossRevenue, egi);
+    computed[line.key] = result.amount;
+
+    nonOperatingLines.push({
+      label: line.label,
+      amount: result.amount,
+      category: 'non_operating',
+      formula: result.formula,
+      key: line.key,
+    });
+    if (result.formula) formulaBreakdowns[line.label] = result.formula;
+  }
+
   // --- Append custom user lines ---
   const customRevenue = inputs.customRevenueLines ?? [];
   const customExpenses = inputs.customExpenseLines ?? [];
@@ -795,6 +824,9 @@ function computeFromCOA(
   // --- Totals ---
   const totalRevenue = revenueLines.reduce((s, l) => s + l.amount, 0);
   const totalExpenses = expenseLines.reduce((s, l) => s + l.amount, 0);
+  // Phase A — non-operating total. Computed but EXCLUDED from NOI
+  // (noi = totalRevenue - totalExpenses below stays unchanged).
+  const totalNonOperating = nonOperatingLines.reduce((s, l) => s + l.amount, 0);
 
   // --- Monthly breakdown ---
   const _inSeasonMonths: number[] = inputs.inSeasonMonths ?? [];
@@ -842,9 +874,11 @@ function computeFromCOA(
   return {
     totalRevenue,
     totalExpenses,
-    noi: totalRevenue - totalExpenses,
+    noi: totalRevenue - totalExpenses,  // Phase A — non-operating EXCLUDED from NOI
     revenueLines,
     expenseLines,
+    nonOperatingLines,
+    totalNonOperating,
     computedFrom: 'direct_input',
     formulaBreakdowns,
     monthlyBreakdown,

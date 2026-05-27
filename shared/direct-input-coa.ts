@@ -14,7 +14,10 @@
 export interface COAFieldDef {
   key: string;                    // stable storage key in inputAssumptions
   label: string;                  // display label
-  category: 'revenue' | 'expense';
+  // Phase A — third bucket. 'non_operating' fields (depreciation, amortization,
+  // interest expense) are excluded from NOI but rendered in the below-NOI
+  // section. Mirrors consolidated-pnl-service noiSign === 0 semantics.
+  category: 'revenue' | 'expense' | 'non_operating';
   inputType: 'currency' | 'percent' | 'number' | 'formula'; // how to render the input
   hint?: string;                  // placeholder / helper text
   group?: string;                 // optional grouping header

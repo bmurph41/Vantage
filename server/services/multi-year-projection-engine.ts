@@ -210,6 +210,14 @@ export interface ProjectionYear {
    * rather than computed from revenue-minus-expenses growth.
    */
   noiOverrideFromLeases?: number;
+  /**
+   * Phase A — non-operating lines (depreciation, amortization, interest expense).
+   * EXCLUDED from NOI (noi = totalRevenue - totalExpenses) but propagated through
+   * the projection for display in the below-NOI section. Optional so projections
+   * built before Phase A constructors are still type-valid.
+   */
+  nonOperatingLines?: ProjectionLineItem[];
+  totalNonOperating?: number;
 }
 
 export interface ExitMetrics {
@@ -363,6 +371,17 @@ function buildYear1(
     formula: l.formula,
   }));
 
+  // Phase A — propagate non-operating lines through Y1 (depreciation, amortization,
+  // interest expense). Excluded from NOI math, surfaced for below-NOI display.
+  const nonOperatingLines: ProjectionLineItem[] = (financials.nonOperatingLines ?? []).map(l => ({
+    key: l.key,
+    label: l.label,
+    category: l.category ?? 'non_operating',
+    amount: round2(l.amount),
+    formula: l.formula,
+  }));
+  const totalNonOperating = round2(financials.totalNonOperating ?? 0);
+
   // Build monthly breakdown from engine output
   const monthlyBreakdown: ProjectionMonthlyBreakdown[] = financials.monthlyBreakdown.map(
     (m, idx) => ({
@@ -390,6 +409,8 @@ function buildYear1(
     ncf,
     revenueLines,
     expenseLines,
+    nonOperatingLines,
+    totalNonOperating,
     monthlyBreakdown,
     appliedRevenueGrowthRate: 0,
     appliedExpenseGrowthRate: 0,
@@ -521,7 +542,21 @@ function buildProjectedYear(
   });
 
   const newTotalExpenses = round2(newExpenseLines.reduce((s, l) => s + l.amount, 0));
+  // Phase A — NOI explicitly excludes non-operating lines. Depreciation, amortization,
+  // and interest expense never contribute to NOI even when carried in the projection.
   const computedNOI = round2(newTotalRevenue - newTotalExpenses);
+
+  // ── Non-operating lines ────────────────────────────────────────────────────
+  // Phase A — propagate non-operating lines (depreciation, amortization, interest)
+  // through the projection. Held CONSTANT year-over-year by default since these
+  // typically follow depreciation/debt schedules, not revenue/expense growth rates.
+  // Excluded from newTotalRevenue/newTotalExpenses → never affects NOI.
+  const newNonOperatingLines: ProjectionLineItem[] = (prevYear.nonOperatingLines ?? []).map(line => ({
+    ...line,
+    // No growth applied — depreciation schedules and debt payments are externally driven.
+    // Future enhancement: per-line schedules for declining depreciation, interest amortization.
+  }));
+  const newTotalNonOperating = round2(newNonOperatingLines.reduce((s, l) => s + l.amount, 0));
 
   // ── Per-year lease NOI override ────────────────────────────────────────────
   // When per-tenant escalation schedules produce a NOI override for this year,
@@ -565,6 +600,8 @@ function buildProjectedYear(
     ncf,
     revenueLines: newRevenueLines,
     expenseLines: newExpenseLines,
+    nonOperatingLines: newNonOperatingLines,
+    totalNonOperating: newTotalNonOperating,
     monthlyBreakdown,
     appliedRevenueGrowthRate: config.revenueGrowthRate,
     appliedExpenseGrowthRate: config.expenseGrowthRate,
