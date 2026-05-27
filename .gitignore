@@ -63,3 +63,11 @@ attached_assets/*.pdf
 # work and MUST NOT enter git history. README is committed as the catalog index.
 fixtures/pnl-samples/*
 !fixtures/pnl-samples/README.md
+
+# Dev/verification rent-roll corpus — REAL tenant/lease data (tenant names,
+# rents, lease terms, options). Same real-financial-data protection as the
+# P&L corpus above. README is committed as the catalog index. Parked here as
+# sample collection ahead of a future rent-roll ingestion pipeline — NOT
+# part of the active P&L pipeline.
+fixtures/rent-roll-samples/*
+!fixtures/rent-roll-samples/README.md
