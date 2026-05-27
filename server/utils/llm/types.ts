@@ -14,6 +14,8 @@ export interface ClassificationRequest {
     documentType?: string;
     vendorHint?: string;
     sectionHint?: string;
+    /** B3 step 2: asset class scopes the closed-vocabulary key bank. */
+    assetClass?: string;
   };
 }
 

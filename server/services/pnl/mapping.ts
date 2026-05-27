@@ -6,6 +6,8 @@ import {
   pnlReviewItems,
   pnlJobs,
   pnlKeywordRules,
+  pnlDocuments,
+  modelingProjects,
   type PnlMappingMethod,
   type ParsedRow,
   type ParsedStatementPayload,
@@ -14,6 +16,7 @@ import {
 import { and, eq, or, isNull, sql, desc, asc } from 'drizzle-orm';
 import { getLlmClassifier, type ClassificationRequest } from '../../utils/llm';
 import { normalizeDepartment, normalizeBucket } from '../../utils/department-mapping';
+import { isMustReviewLabel } from './key-bank';
 
 interface AmbiguousDepartmentOption {
   department: string;
@@ -235,7 +238,11 @@ function scoreKeywordMatch(normalized: string, rule: PnlKeywordRule): KeywordMat
   return null;
 }
 
-async function tryKeywordMatch(orgId: string, normalized: string): Promise<MapResult> {
+async function tryKeywordMatch(
+  orgId: string,
+  normalized: string,
+  canonicalByKey: Map<string, { id: string }>,
+): Promise<MapResult> {
   const rules = await db.query.pnlKeywordRules.findMany({
     where: and(
       or(eq(pnlKeywordRules.orgId, orgId), isNull(pnlKeywordRules.orgId)),
@@ -243,13 +250,13 @@ async function tryKeywordMatch(orgId: string, normalized: string): Promise<MapRe
     ),
     orderBy: [asc(pnlKeywordRules.priority)],
   });
-  
+
   if (rules.length === 0) {
     return { mappingMethod: 'none', confidence: 0 };
   }
-  
+
   const matches: KeywordMatch[] = [];
-  
+
   for (const rule of rules) {
     const match = scoreKeywordMatch(normalized, rule);
     if (match) {
@@ -258,24 +265,34 @@ async function tryKeywordMatch(orgId: string, normalized: string): Promise<MapRe
       matches.push({ ...match, score: adjustedScore });
     }
   }
-  
+
   if (matches.length === 0) {
     return { mappingMethod: 'none', confidence: 0 };
   }
-  
+
   matches.sort((a, b) => b.score - a.score);
   const best = matches[0];
-  
+
   await db
     .update(pnlKeywordRules)
-    .set({ 
+    .set({
       timesMatched: sql`${pnlKeywordRules.timesMatched} + 1`,
-      updatedAt: new Date() 
+      updatedAt: new Date()
     })
     .where(eq(pnlKeywordRules.id, best.rule.id));
-  
+
+  // B3 step 2: keyword rules can reference a canonical via either
+  // canonical_line_item_id (per-org FK) OR canonical_coa_code (text key). For
+  // global seeds (org_id IS NULL), the FK is null and we resolve the org's
+  // canonical row by canonical_coa_code → pnl_canonical_line_items.canonical_key.
+  let resolvedCanonicalId: string | undefined = best.rule.canonicalLineItemId ?? undefined;
+  if (!resolvedCanonicalId && best.rule.canonicalCoaCode) {
+    const hit = canonicalByKey.get(best.rule.canonicalCoaCode);
+    if (hit) resolvedCanonicalId = hit.id;
+  }
+
   return {
-    canonicalLineItemId: best.rule.canonicalLineItemId ?? undefined,
+    canonicalLineItemId: resolvedCanonicalId,
     mappingMethod: 'rule',
     confidence: best.score,
     matchedKeywordRuleId: best.rule.id,
@@ -286,6 +303,7 @@ async function tryKeywordMatch(orgId: string, normalized: string): Promise<MapRe
       keyword: best.rule.keyword,
       department: best.rule.department,
       bucket: best.rule.bucket,
+      canonicalCoaCode: best.rule.canonicalCoaCode ?? null,
     },
   };
 }
@@ -331,6 +349,12 @@ async function tryRegexMatch(orgId: string, normalized: string): Promise<MapResu
   return { mappingMethod: 'none', confidence: 0 };
 }
 
+/**
+ * B3 step 2: exact-match only. The previous ≥2-word fuzzy tier was the source
+ * of the worst auto-map mismaps (e.g., "Sales Tax Expense" → property tax via
+ * shared "tax" token). Fuzzy is removed; ambiguous-but-not-exact labels fall
+ * through to the LLM stage where the closed-vocab prompt makes the call.
+ */
 async function tryCanonicalMatch(orgId: string, normalized: string): Promise<MapResult> {
   const canonicals = await db.query.pnlCanonicalLineItems.findMany({
     where: and(
@@ -338,43 +362,45 @@ async function tryCanonicalMatch(orgId: string, normalized: string): Promise<Map
       eq(pnlCanonicalLineItems.isActive, true)
     ),
   });
-  
+
   for (const c of canonicals) {
     const canonicalNormalized = normalizeLabel(c.displayName);
     if (canonicalNormalized === normalized) {
       return {
         canonicalLineItemId: c.id,
         mappingMethod: 'rule',
-        confidence: 0.90,
-        department: c.department,
-      };
-    }
-    
-    const words = normalized.split(' ');
-    const canonicalWords = canonicalNormalized.split(' ');
-    const matchingWords = words.filter(w => canonicalWords.includes(w));
-    
-    if (matchingWords.length >= 2 && matchingWords.length / words.length >= 0.6) {
-      return {
-        canonicalLineItemId: c.id,
-        mappingMethod: 'rule',
-        confidence: 0.55 + (matchingWords.length / words.length) * 0.25,
+        confidence: 0.95,
         department: c.department,
       };
     }
   }
-  
+
   return { mappingMethod: 'none', confidence: 0 };
 }
 
 const LLM_PROVIDER = process.env.LLM_PROVIDER?.toLowerCase() ?? 'mock';
 const IS_REAL_LLM = LLM_PROVIDER === 'openai' || LLM_PROVIDER === 'anthropic';
 
+// B3 step 2: legacy fuzzy backstop is OFF by default. The old endsWith / display-
+// name-includes path produced silent mis-maps (e.g., "Insurance Expense" → any
+// canonical ending in 'expense'). Default behavior is: no exact match in
+// canonicalById → route to needs_review. Setting the env var to 'true' restores
+// the legacy fuzzy pass for one release while we observe behavior.
+const PNL_LLM_FUZZY_BACKSTOP = process.env.PNL_LLM_FUZZY_BACKSTOP === 'true';
+
+function sectionToBucketStr(section: string | undefined): string {
+  if (section === 'cogs') return 'COGS';
+  if (section === 'revenue') return 'Revenue';
+  if (section === 'payroll') return 'Expense';
+  return 'Expense';
+}
+
 async function tryLlmClassification(
   orgId: string,
   label: string,
   normalized: string,
-  context?: { nearbyLabels?: string[]; vendorHint?: string; sectionHint?: string }
+  canonicalByKey: Map<string, { id: string; section: string; department: string }>,
+  context?: { nearbyLabels?: string[]; vendorHint?: string; sectionHint?: string; assetClass?: string }
 ): Promise<MapResult> {
   try {
     const classifier = getLlmClassifier();
@@ -391,44 +417,88 @@ async function tryLlmClassification(
     const adjustedConfidence = result.confidence * confidenceAdjustment;
     const normalizedDept = normalizeDepartment(result.department);
 
+    // Classifier explicitly returned no key (review sentinel or low confidence)
+    // — pass straight to review with the classifier reasoning preserved.
     if (!result.canonicalKey || adjustedConfidence < 0.5) {
       return {
         mappingMethod: isMockResult ? 'rule' : 'ai',
         confidence: adjustedConfidence,
         department: normalizedDept,
-        bucket: result.section === 'cogs' ? 'COGS' : result.section === 'revenue' ? 'Revenue' : 'Expense',
+        bucket: sectionToBucketStr(result.section),
         suggestion: {
           llmResponse: result,
           noCanonicalMatch: true,
+          isMockClassifier: isMockResult,
+          reason: 'classifier_returned_no_key',
+        },
+      };
+    }
+
+    // B3 step 2: exact-match only against the org's canonical bank. The
+    // canonicalByKey map is keyed on canonical_key (exact, case-sensitive). No
+    // suffix-split, no displayName.includes — those were the namespace-bridge
+    // hacks that produced confident wrong matches across the snake_case ↔
+    // camelCase divide.
+    const exact = canonicalByKey.get(result.canonicalKey);
+
+    if (exact) {
+      return {
+        canonicalLineItemId: exact.id,
+        mappingMethod: isMockResult ? 'rule' : 'ai',
+        confidence: adjustedConfidence,
+        department: normalizedDept,
+        bucket: sectionToBucketStr(result.section),
+        suggestion: {
+          llmResponse: result,
+          matchedCanonical: result.canonicalKey,
+          matchMode: 'exact',
           isMockClassifier: isMockResult,
         },
       };
     }
 
-    const canonicals = await db.query.pnlCanonicalLineItems.findMany({
-      where: eq(pnlCanonicalLineItems.orgId, orgId),
+    // No exact match. Feature-flagged legacy fuzzy backstop — LOG every fire so
+    // we can observe its impact before removing entirely next release.
+    if (PNL_LLM_FUZZY_BACKSTOP) {
+      const suffix = result.canonicalKey.split('.').pop() || '';
+      const canonicals = Array.from(canonicalByKey.values());
+      const fuzzy = canonicals.find(c => suffix && (c as any).canonicalKey?.endsWith(suffix));
+      if (fuzzy) {
+        console.warn('[PNL_LLM_FUZZY_BACKSTOP] fuzzy match fired', {
+          orgId, normalized, llmKey: result.canonicalKey, matched: (fuzzy as any).canonicalKey,
+        });
+        return {
+          canonicalLineItemId: fuzzy.id,
+          mappingMethod: isMockResult ? 'rule' : 'ai',
+          confidence: adjustedConfidence * 0.7,
+          department: normalizedDept,
+          bucket: sectionToBucketStr(result.section),
+          suggestion: {
+            llmResponse: result,
+            matchedCanonical: (fuzzy as any).canonicalKey,
+            matchMode: 'fuzzy_backstop',
+            isMockClassifier: isMockResult,
+          },
+        };
+      }
+    }
+
+    // Default: no exact match → REVIEW. Preserve the classifier suggestion so
+    // the human reviewer sees what the model would have picked.
+    console.log('[PNL classifier] no exact-match canonical for LLM key, routing to review', {
+      orgId, normalized, llmKey: result.canonicalKey,
     });
-
-    const matchingCanonical = canonicals.find(c => 
-      c.canonicalKey === result.canonicalKey ||
-      c.canonicalKey.endsWith(result.canonicalKey.split('.').pop() || '') ||
-      normalizeLabel(c.displayName).includes(result.canonicalKey.split('.').pop() || '')
-    );
-
-    const finalConfidence = matchingCanonical 
-      ? adjustedConfidence 
-      : adjustedConfidence * 0.7;
-
     return {
-      canonicalLineItemId: matchingCanonical?.id,
       mappingMethod: isMockResult ? 'rule' : 'ai',
-      confidence: finalConfidence,
+      confidence: 0,
       department: normalizedDept,
-      bucket: result.section === 'cogs' ? 'COGS' : result.section === 'revenue' ? 'Revenue' : 'Expense',
+      bucket: sectionToBucketStr(result.section),
       suggestion: {
         llmResponse: result,
-        matchedCanonical: matchingCanonical?.canonicalKey,
+        noCanonicalMatch: true,
+        attemptedKey: result.canonicalKey,
         isMockClassifier: isMockResult,
+        reason: 'llm_key_not_in_canonical_bank',
       },
     };
   } catch (error) {
@@ -437,57 +507,129 @@ async function tryLlmClassification(
   }
 }
 
+/**
+ * B3 step 2: resolve the asset class for a parsed statement. Threads through
+ * pnl_documents.modeling_project_id → modeling_projects.asset_class. Returns
+ * undefined if any link is missing — the classifier falls back to the
+ * universal-only key bank in that case (still safe; just less granular).
+ */
+async function resolveAssetClassForJob(jobId: string): Promise<string | undefined> {
+  try {
+    const rows = await db
+      .select({ assetClass: modelingProjects.assetClass })
+      .from(pnlJobs)
+      .innerJoin(pnlDocuments, eq(pnlJobs.documentId, pnlDocuments.id))
+      .innerJoin(modelingProjects, eq(pnlDocuments.modelingProjectId, modelingProjects.id))
+      .where(eq(pnlJobs.id, jobId))
+      .limit(1);
+    return rows[0]?.assetClass ?? undefined;
+  } catch (e) {
+    console.warn('[mapParsedStatement] asset class lookup failed', (e as Error).message);
+    return undefined;
+  }
+}
+
 export async function mapParsedStatement(jobId: string): Promise<{ reviewCount: number; autoMappedCount: number }> {
   const parsed = await db.query.pnlParsedStatements.findFirst({
     where: eq(pnlParsedStatements.jobId, jobId),
   });
-  
+
   if (!parsed) throw new Error(`No parsed statement for job ${jobId}`);
-  
+
   const orgId = parsed.orgId;
+  const assetClass = await resolveAssetClassForJob(jobId);
+
   const canonical = await db.query.pnlCanonicalLineItems.findMany({
     where: eq(pnlCanonicalLineItems.orgId, orgId),
   });
   const canonicalById = new Map(canonical.map(c => [c.id, c]));
-  
+  // B3 step 2: key-indexed lookup for exact-match (no fuzzy split).
+  // Used both by tryKeywordMatch's canonical_coa_code resolver and by the LLM
+  // exact-match path.
+  const canonicalByKey = new Map<string, { id: string; section: string; department: string; canonicalKey: string }>();
+  for (const c of canonical) {
+    canonicalByKey.set(c.canonicalKey, {
+      id: c.id, section: c.section, department: c.department, canonicalKey: c.canonicalKey,
+    });
+  }
+
   const existingApproved = await db.query.pnlReviewItems.findMany({
     where: and(eq(pnlReviewItems.jobId, jobId), eq(pnlReviewItems.status, 'approved')),
   });
   const approvedLabels = new Set(existingApproved.map(r => r.normalizedLabel));
-  
+
   const pj = parsed.parsedJson as ParsedStatementPayload;
   const rows = pj.rows ?? [];
-  
+
   const reviewInserts: any[] = [];
   let autoMappedCount = 0;
-  
+
   const sectionToBucket: Record<string, string> = {
     'revenue': 'Revenue',
     'cogs': 'COGS',
     'expense': 'Expense',
     'payroll': 'Expense',
+    'non_operating': 'Expense',
+    'business_income': 'Revenue',
   };
 
   for (const row of rows) {
     const rawLabel = row.label ?? '';
     const normalized = row.normalizedLabel ?? normalizeLabel(rawLabel);
-    
+
     const structuralSection = row.sectionHint || null;
     const structuralBucket = structuralSection ? sectionToBucket[structuralSection] || null : null;
-    
+
+    // B3 step 2: MUST_REVIEW deny-list runs BEFORE any auto-map pass. "Sales
+    // Tax" / "Ask My Accountant" / suspense / opening-balance labels never
+    // auto-map even on a displayName fuzzy hit downstream.
+    if (isMustReviewLabel(normalized)) {
+      if (!approvedLabels.has(normalized)) {
+        reviewInserts.push({
+          orgId,
+          jobId: parsed.jobId,
+          documentId: parsed.documentId,
+          extractedLabel: rawLabel,
+          normalizedLabel: normalized,
+          suggestedCanonicalLineItemId: null,
+          suggestionJson: {
+            mappingMethod: 'none',
+            suggestion: { reason: 'must_review_deny_list' },
+            department: null,
+            bucket: structuralBucket,
+            sectionHint: structuralSection,
+            isAmbiguous: false,
+            ambiguityInfo: null,
+          },
+          confidence: '0',
+          status: 'needs_review',
+        });
+      }
+      row.mapping = {
+        canonicalLineItemId: null,
+        mappingMethod: 'none',
+        mappingConfidence: 0,
+        normalizedLabel: normalized,
+        resolvedDepartment: null,
+        resolvedBucket: structuralBucket ? normalizeBucket(structuralBucket) : null,
+        resolvedByKeywordBank: false,
+      };
+      continue;
+    }
+
     let res = await tryAliasMatch(orgId, normalized);
-    
+
     if (!res.canonicalLineItemId) {
       res = await tryRegexMatch(orgId, normalized);
     }
-    
+
     if (!res.canonicalLineItemId || res.confidence < CONFIDENCE_THRESHOLD) {
-      const keywordRes = await tryKeywordMatch(orgId, normalized);
+      const keywordRes = await tryKeywordMatch(orgId, normalized, canonicalByKey);
       if (keywordRes.confidence > (res.confidence || 0)) {
         res = keywordRes;
       }
     }
-    
+
     if (!res.canonicalLineItemId || res.confidence < CONFIDENCE_THRESHOLD) {
       const canonicalRes = await tryCanonicalMatch(orgId, normalized);
       if (canonicalRes.confidence > (res.confidence || 0)) {
@@ -501,7 +643,7 @@ export async function mapParsedStatement(jobId: string): Promise<{ reviewCount: 
         .slice(Math.max(0, rowIdx - 3), rowIdx + 3)
         .filter(r => r !== row)
         .map(r => r.label);
-      
+
       let sectionHint: string | undefined = structuralSection || undefined;
       if (!sectionHint) {
         const sectionKeywords: Record<string, string> = {
@@ -522,48 +664,61 @@ export async function mapParsedStatement(jobId: string): Promise<{ reviewCount: 
         }
       }
 
-      const llmRes = await tryLlmClassification(orgId, rawLabel, normalized, {
+      const llmRes = await tryLlmClassification(orgId, rawLabel, normalized, canonicalByKey as any, {
         nearbyLabels,
         vendorHint: pj.vendorHint || undefined,
         sectionHint,
+        assetClass,
       });
       if (llmRes.confidence > (res.confidence || 0)) {
         res = llmRes;
       }
     }
-    
-    if (structuralBucket && res.bucket !== structuralBucket) {
-      res.bucket = structuralBucket;
-      if (structuralSection === 'payroll') {
-        res.department = res.department || 'Payroll';
-      }
-    }
 
-    const hasValidCanonical = res.canonicalLineItemId && canonicalById.has(res.canonicalLineItemId);
-    
-    if (hasValidCanonical && structuralBucket) {
-      const matchedCanonical = canonicalById.get(res.canonicalLineItemId!);
-      if (matchedCanonical) {
-        const canonicalSection = matchedCanonical.section;
-        const canonicalBucket = sectionToBucket[canonicalSection] || null;
-        if (canonicalBucket && canonicalBucket !== structuralBucket) {
-          const betterCanonical = canonical.find(c => {
-            const cb = sectionToBucket[c.section] || null;
-            return cb === structuralBucket && 
-              (normalizeLabel(c.displayName).includes(normalized) || normalized.includes(normalizeLabel(c.displayName)));
+    // B3 step 2: SECTION HARD GATE. The parser's structuralSection is
+    // authoritative. If the resolved canonical's section conflicts with the
+    // parser's structural section, FORCE review. This kills the worst class of
+    // mismaps: COGS→revenue, income-tax→payroll, gas-utility→fuel-revenue —
+    // all section/sign errors that silently corrupt NOI. The earlier soft
+    // overlay (just rebucketing) was insufficient because it kept the wrong
+    // canonical and only fixed the cosmetic bucket label.
+    // B3 step 2: SECTION HARD GATE — income/cost equivalence-class check.
+    // Equivalence classes (NO conflict within a class):
+    //   INCOME = { revenue, business_income }
+    //   COST   = { cogs, expense, payroll, non_operating }
+    // Cross-class violations are forced to review. Same-class flips (e.g.,
+    // parser=revenue, canonical=business_income for a "Used Boat Sales" line
+    // segregated below NOI) are intentional design routings, not conflicts.
+    let sectionConflict = false;
+    const parserSec: string | null = structuralSection;
+    if (parserSec && res.canonicalLineItemId) {
+      const matched = canonicalById.get(res.canonicalLineItemId);
+      if (matched) {
+        const incomeClass: ReadonlySet<string> = new Set(['revenue', 'business_income']);
+        const costClass: ReadonlySet<string> = new Set(['cogs', 'expense', 'payroll', 'non_operating']);
+        const matchedSec: string = matched.section ?? '';
+        const parserIncome = incomeClass.has(parserSec);
+        const canonicalIncome = incomeClass.has(matchedSec);
+        const parserCost = costClass.has(parserSec);
+        const canonicalCost = costClass.has(matchedSec);
+        if ((parserIncome && canonicalCost) || (parserCost && canonicalIncome)) {
+          sectionConflict = true;
+          console.log('[PNL section gate] forcing review on income/cost cross', {
+            orgId, normalized,
+            parserSection: structuralSection,
+            canonicalSection: matched.section,
+            canonicalKey: matched.canonicalKey,
           });
-          if (betterCanonical) {
-            res.canonicalLineItemId = betterCanonical.id;
-            res.department = betterCanonical.department;
-          }
         }
       }
     }
 
-    const wasResolvedByKeywordBank = res.mappingMethod === 'rule' && 
-      res.matchedKeywordRuleId && 
+    const hasValidCanonical = res.canonicalLineItemId && canonicalById.has(res.canonicalLineItemId);
+
+    const wasResolvedByKeywordBank = res.mappingMethod === 'rule' &&
+      res.matchedKeywordRuleId &&
       res.confidence >= 0.90;
-    
+
     const ambiguityCheck = checkAmbiguity(normalized);
     if (ambiguityCheck.isAmbiguous && !wasResolvedByKeywordBank) {
       if (structuralBucket) {
@@ -573,11 +728,12 @@ export async function mapParsedStatement(jobId: string): Promise<{ reviewCount: 
         res.ambiguityInfo = ambiguityCheck.ambiguityInfo;
       }
     }
-    
-    const needsReview = (!hasValidCanonical && !wasResolvedByKeywordBank) || 
-      (res.confidence < CONFIDENCE_THRESHOLD && !wasResolvedByKeywordBank) || 
+
+    const needsReview = sectionConflict ||
+      (!hasValidCanonical && !wasResolvedByKeywordBank) ||
+      (res.confidence < CONFIDENCE_THRESHOLD && !wasResolvedByKeywordBank) ||
       res.isAmbiguous;
-    
+
     if (needsReview && !approvedLabels.has(normalized)) {
       reviewInserts.push({
         orgId,
@@ -594,6 +750,7 @@ export async function mapParsedStatement(jobId: string): Promise<{ reviewCount: 
           sectionHint: structuralSection,
           isAmbiguous: res.isAmbiguous ?? false,
           ambiguityInfo: res.ambiguityInfo ?? null,
+          sectionConflict: sectionConflict || undefined,
         },
         confidence: String(res.confidence ?? 0),
         status: res.isAmbiguous ? 'ambiguous' : 'needs_review',
@@ -601,11 +758,18 @@ export async function mapParsedStatement(jobId: string): Promise<{ reviewCount: 
     } else if (!needsReview) {
       autoMappedCount++;
     }
-    
+
+    // B3 step 2: if the row was forced to review by the section gate, null out
+    // the canonicalLineItemId in row.mapping so downstream consumers
+    // (storeMappedFacts → pnl_facts insert) don't accept the gate-rejected
+    // canonical. The reviewInserts row still preserves the suggested canonical
+    // for the human reviewer.
+    const writeCanonicalId = sectionConflict ? null : (res.canonicalLineItemId ?? null);
+
     row.mapping = {
-      canonicalLineItemId: res.canonicalLineItemId ?? null,
+      canonicalLineItemId: writeCanonicalId,
       mappingMethod: res.mappingMethod,
-      mappingConfidence: res.confidence,
+      mappingConfidence: sectionConflict ? 0 : res.confidence,
       normalizedLabel: normalized,
       resolvedDepartment: res.department ? normalizeDepartment(res.department) : null,
       resolvedBucket: res.bucket ? normalizeBucket(res.bucket) : null,
