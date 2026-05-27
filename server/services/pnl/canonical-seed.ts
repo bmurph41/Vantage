@@ -76,6 +76,18 @@ const UNIVERSAL_ITEMS = [
   { key: 'totalExpenses',       label: 'Total Expenses',        category: 'expense' as const, section: 'expense', group: 'Operating Expenses' },
   { key: 'noi',                 label: 'Net Operating Income',  category: 'expense' as const, section: 'other',   group: 'Operating Expenses' },
   { key: 'ebitda',              label: 'EBITDA',                category: 'expense' as const, section: 'other',   group: 'Operating Expenses' },
+
+  // Phase B v1 — Universal BELOW-NOI keys (depreciation, interest, income tax,
+  // sales tax). Asset-class-agnostic; available to every COA. Section is set
+  // explicitly to 'non_operating' so the Phase A plumbing routes them out of
+  // NOI and into the NON-OPERATING below-NOI display section.
+  { key: 'annualDepreciation',     label: 'Depreciation Expense',          category: 'expense' as const, section: 'non_operating', group: 'Non-Operating' },
+  { key: 'annualInterestExpense',  label: 'Interest Expense',              category: 'expense' as const, section: 'non_operating', group: 'Non-Operating' },
+  { key: 'annualIncomeTax',        label: 'Income Tax (Corp + PTET)',      category: 'expense' as const, section: 'non_operating', group: 'Non-Operating', hint: 'Aggregates corporate income tax + pass-through entity tax (semantic confirmed for v1; split keys are a follow-up if dollar materiality warrants)' },
+  // Sales Tax — visible-and-flagged key. B3 classifier routes 'Sales Tax'
+  // matches to needs_review rather than confident auto-map; ambiguous
+  // between pass-through (collected and remitted) and one-time catch-up.
+  { key: 'annualSalesTaxExpense',  label: 'Sales Tax Expense (review)',    category: 'expense' as const, section: 'non_operating', group: 'Non-Operating', hint: 'B3 prompt rule: route classifier matches to needs_review — pass-through vs operating-expense ambiguity must be confirmed' },
 ];
 
 export interface SeedResult {

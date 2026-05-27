@@ -252,30 +252,124 @@ const HOTEL_FIELDS: COAFieldDef[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// Marina
+// Marina — vocab v1 (PROVISIONAL)
+//
+// Source: SS3 corpus (1 property: marina + boat dealership hybrid, 2 years
+// of monthly P&Ls) + general marina knowledge for obvious storage siblings
+// (transient/mooring/dry-stack). Designed B0 → B1 → R2 of Phase B work.
+//
+// EXPECTED TO EXTEND as more marina samples land in fixtures/pnl-samples/
+// marina/. Boat-sales lines lean SS3-shaped — a pure-slip marina with no
+// dealership would have most boat-sales keys empty (which is fine, the
+// engine handles optional fields).
+//
+// Category convention (Phase A + A.1):
+//   'revenue'         — property operating revenue (ABOVE NOI)
+//   'expense'         — property operating expense (ABOVE NOI)
+//   'business_income' — ancillary operating business (boat dealership, etc.)
+//                       — EXCLUDED from property NOI; rendered in BUSINESS
+//                       INCOME below-NOI section so CRE buyers can underwrite
+//                       property cap rate independently
+//   'non_operating'   — depreciation/interest/income-tax (lives in
+//                       UNIVERSAL_ITEMS below; rendered in NON-OPERATING
+//                       below-NOI section)
 // ---------------------------------------------------------------------------
 const MARINA_FIELDS: COAFieldDef[] = [
+  // ── Calc inputs (slip rate × occupancy model; not P&L lines) ──────────
   { key: 'wetSlips', label: 'Wet Slips', category: 'revenue', inputType: 'number', hint: 'Total wet slips', group: 'Revenue Assumptions' },
   { key: 'avgMonthlySlipRate', label: 'Avg Monthly Slip Rate', category: 'revenue', inputType: 'currency', hint: '$/slip/month', group: 'Revenue Assumptions' },
   { key: 'slipOccupancy', label: 'Slip Occupancy', category: 'revenue', inputType: 'percent', hint: 'Annual slip occupancy', group: 'Revenue Assumptions', defaultValue: 85 },
   { key: 'dryStorageSpaces', label: 'Dry Storage Spaces', category: 'revenue', inputType: 'number', group: 'Revenue Assumptions', showWhen: 'nonzero' },
   { key: 'avgMonthlyDryRate', label: 'Avg Monthly Dry Rate', category: 'revenue', inputType: 'currency', group: 'Revenue Assumptions', showWhen: 'nonzero' },
-  { key: 'annualFuelRevenue', label: 'Fuel Revenue', category: 'revenue', inputType: 'currency', group: 'Other Revenue', showWhen: 'nonzero' },
-  { key: 'annualShipStoreRevenue', label: 'Ship Store Revenue', category: 'revenue', inputType: 'currency', group: 'Other Revenue', showWhen: 'nonzero' },
-  { key: 'annualServiceRevenue', label: 'Service / Repair Revenue', category: 'revenue', inputType: 'currency', group: 'Other Revenue', showWhen: 'nonzero' },
-  { key: 'annualOtherRevenue', label: 'Other Revenue', category: 'revenue', inputType: 'currency', group: 'Other Revenue', showWhen: 'nonzero' },
-  { key: 'annualPayroll', label: 'Payroll & Benefits', category: 'expense', inputType: 'currency', group: 'Operating Expenses' },
-  { key: 'annualFuelCOGS', label: 'Fuel COGS', category: 'expense', inputType: 'currency', group: 'COGS', showWhen: 'nonzero' },
+
+  // ── Storage / Dockage subtypes (Phase B v1) ──────────────────────────
+  { key: 'annualSummerDockageRevenue',   label: 'Summer Dockage Revenue',       category: 'revenue', inputType: 'currency', group: 'Storage', showWhen: 'nonzero' },
+  { key: 'annualWinterStorageRevenue',   label: 'Winter Storage Revenue',       category: 'revenue', inputType: 'currency', group: 'Storage', showWhen: 'nonzero' },
+  { key: 'annualLandStorageRevenue',     label: 'Land Storage Revenue',         category: 'revenue', inputType: 'currency', group: 'Storage', showWhen: 'nonzero' },
+  { key: 'annualDockageRevenue',         label: 'Annual Dockage/Storage (combined)', category: 'revenue', inputType: 'currency', group: 'Storage', showWhen: 'nonzero', hint: 'Aggregate when source breaks out only one combined line' },
+  { key: 'annualTransientDockageRevenue',label: 'Transient Dockage Revenue',    category: 'revenue', inputType: 'currency', group: 'Storage', showWhen: 'nonzero', hint: 'Sibling key — not in SS3' },
+  { key: 'annualMooringRevenue',         label: 'Mooring Revenue',              category: 'revenue', inputType: 'currency', group: 'Storage', showWhen: 'nonzero', hint: 'Sibling key — not in SS3' },
+  { key: 'annualDryStackStorageRevenue', label: 'Dry Stack / Rack Storage',     category: 'revenue', inputType: 'currency', group: 'Storage', showWhen: 'nonzero', hint: 'Sibling key — not in SS3' },
+  { key: 'annualMarinaOperationsRevenue',label: 'Marina Operations Revenue',    category: 'revenue', inputType: 'currency', group: 'Other Revenue', showWhen: 'nonzero', hint: 'Catchall for marina-side fees not in subtypes' },
+
+  // ── Service revenue subtypes (Phase B v1) ────────────────────────────
+  { key: 'annualHaulingRevenue',              label: 'Hauling Revenue',                category: 'revenue', inputType: 'currency', group: 'Service Revenue', showWhen: 'nonzero' },
+  { key: 'annualBottomPaintRevenue',          label: 'Bottom Paint Revenue',           category: 'revenue', inputType: 'currency', group: 'Service Revenue', showWhen: 'nonzero' },
+  { key: 'annualBottomWashRevenue',           label: 'Bottom Wash Revenue',            category: 'revenue', inputType: 'currency', group: 'Service Revenue', showWhen: 'nonzero' },
+  { key: 'annualShrinkWrapRevenue',           label: 'Shrink Wrap Revenue',            category: 'revenue', inputType: 'currency', group: 'Service Revenue', showWhen: 'nonzero' },
+  { key: 'annualDocksideElectricRevenue',     label: 'Dockside Electric Revenue',      category: 'revenue', inputType: 'currency', group: 'Service Revenue', showWhen: 'nonzero' },
+  { key: 'annualSubcontractedRepairsRevenue', label: 'Subcontracted Repairs Revenue',  category: 'revenue', inputType: 'currency', group: 'Service Revenue', showWhen: 'nonzero' },
+  { key: 'annualServiceLaborRevenue',         label: 'Service Labor Revenue',          category: 'revenue', inputType: 'currency', group: 'Service Revenue', showWhen: 'nonzero', hint: 'Service-side labor billed (distinct from payroll expense) — review-lean: B3 classifier flags for verification given ambiguity with payroll contra-entries' },
+
+  // ── Fuel (existing + 1 new boat-sales-adjacent) ──────────────────────
+  { key: 'annualFuelRevenue',         label: 'Fuel Revenue',           category: 'revenue', inputType: 'currency', group: 'Other Revenue', showWhen: 'nonzero' },
+  { key: 'annualNewBoatFuelRevenue',  label: 'New Boat Fuel Revenue',  category: 'revenue', inputType: 'currency', group: 'Other Revenue', showWhen: 'nonzero', hint: 'Boat-sales-adjacent fuel; kept ABOVE NOI as fuel sales infrastructure is property-tied' },
+  { key: 'annualShipStoreRevenue',    label: 'Ship Store Revenue',     category: 'revenue', inputType: 'currency', group: 'Other Revenue', showWhen: 'nonzero' },
+
+  // ── Other revenue (existing aggregates + 1 new granular) ─────────────
+  { key: 'annualServiceRevenue', label: 'Service Revenue (aggregate)',  category: 'revenue', inputType: 'currency', group: 'Service Revenue', showWhen: 'nonzero', hint: 'AGGREGATE fallback for files with one combined service line' },
+  { key: 'annualRentalIncome',   label: 'Rental Income',                category: 'revenue', inputType: 'currency', group: 'Other Revenue', showWhen: 'nonzero' },
+  { key: 'annualOtherRevenue',   label: 'Other Revenue',                category: 'revenue', inputType: 'currency', group: 'Other Revenue', showWhen: 'nonzero' },
+
+  // ── Boat Sales revenue — BUSINESS_INCOME (Phase A.1 segregated) ──────
+  // EXCLUDED from property NOI. Rendered in BUSINESS INCOME below-NOI section.
+  { key: 'annualUsedBoatSalesRevenue',         label: 'Used Boat Sales',              category: 'business_income', inputType: 'currency', group: 'Boat Sales', showWhen: 'nonzero' },
+  { key: 'annualNewBoatSalesRevenue',          label: 'New Boat Sales',               category: 'business_income', inputType: 'currency', group: 'Boat Sales', showWhen: 'nonzero' },
+  { key: 'annualTradeInRevenue',               label: 'Trade In Revenue',             category: 'business_income', inputType: 'currency', group: 'Boat Sales', showWhen: 'nonzero', hint: 'Buyback offset; structurally NEGATIVE — engine handles signed amounts, never abs/reject' },
+  { key: 'annualBoatSalesCommissionsRevenue',  label: 'Boat Sales Commissions',       category: 'business_income', inputType: 'currency', group: 'Boat Sales', showWhen: 'nonzero', hint: 'CATCHALL — B3 classifier prefers brokerage/finance subtypes when present' },
+  { key: 'annualBrokerageCommissionsRevenue',  label: 'Brokerage Commissions',        category: 'business_income', inputType: 'currency', group: 'Boat Sales', showWhen: 'nonzero' },
+  { key: 'annualFinanceCommissionRevenue',     label: 'Finance Commission',           category: 'business_income', inputType: 'currency', group: 'Boat Sales', showWhen: 'nonzero' },
+  { key: 'annualWarrantyRevenue',              label: 'Warranty Revenue',             category: 'business_income', inputType: 'currency', group: 'Boat Sales', showWhen: 'nonzero', hint: 'Distinct from Extended Warranty per SS3 data' },
+  { key: 'annualExtendedWarrantyRevenue',      label: 'Extended Warranty Revenue',    category: 'business_income', inputType: 'currency', group: 'Boat Sales', showWhen: 'nonzero', hint: 'Distinct from Warranty per SS3 data ($75K vs $9K, separate COGS, net-negative dynamic)' },
+
+  // ── Boat Sales COGS — BUSINESS_INCOME (Phase A.1 segregated) ─────────
+  { key: 'annualBoatPurchasesCOGS',           label: 'Boat Purchases (COGS)',         category: 'business_income', inputType: 'currency', group: 'Boat Sales', showWhen: 'nonzero' },
+  { key: 'annualBoatsAndTrailersCOGS',        label: 'Boats & Trailers Inc. (COGS)',  category: 'business_income', inputType: 'currency', group: 'Boat Sales', showWhen: 'nonzero' },
+  { key: 'annualPartsCOGS',                   label: 'Parts (COGS)',                  category: 'business_income', inputType: 'currency', group: 'Boat Sales', showWhen: 'nonzero' },
+  { key: 'annualSubcontractedRepairsCOGS',    label: 'Subcontracted Repairs (COGS)',  category: 'business_income', inputType: 'currency', group: 'Boat Sales', showWhen: 'nonzero' },
+  { key: 'annualExtendedWarrantyCOGS',        label: 'Extended Warranty (COGS)',      category: 'business_income', inputType: 'currency', group: 'Boat Sales', showWhen: 'nonzero' },
+  { key: 'annualDocumentServicesCOGS',        label: 'Document Services (COGS)',      category: 'business_income', inputType: 'currency', group: 'Boat Sales', showWhen: 'nonzero' },
+  { key: 'annualEquipmentSuppliesCOGS',       label: 'Equipment & Supplies (COGS)',   category: 'business_income', inputType: 'currency', group: 'Boat Sales', showWhen: 'nonzero' },
+  { key: 'annualTradePayoffCOGS',             label: 'Trade Payoff (COGS)',           category: 'business_income', inputType: 'currency', group: 'Boat Sales', showWhen: 'nonzero' },
+  { key: 'annualGenericCOGS',                 label: 'Cost of Goods Sold (generic)',  category: 'business_income', inputType: 'currency', group: 'Boat Sales', showWhen: 'nonzero', hint: 'CATCHALL — B3 classifier prefers specific boat-sales COGS subtypes when present' },
+
+  // ── Boat Sales operating expenses — BUSINESS_INCOME (Phase A.1) ──────
+  { key: 'annualSalesmenCommissionsExpense',  label: 'Salesmen Commissions (paid)',    category: 'business_income', inputType: 'currency', group: 'Boat Sales', showWhen: 'nonzero', hint: 'Boat-sales-side commission paid to salespeople' },
+  { key: 'annualBoatSalesCommissionsExpense', label: 'Boat Sales Commissions (paid)',  category: 'business_income', inputType: 'currency', group: 'Boat Sales', showWhen: 'nonzero', hint: 'Generic "Commissions" expense line — boat-sales side' },
+
+  // ── Fuel COGS / Ship Store COGS (existing) ───────────────────────────
+  { key: 'annualFuelCOGS',  label: 'Fuel COGS',       category: 'expense', inputType: 'currency', group: 'COGS', showWhen: 'nonzero' },
   { key: 'annualStoreCOGS', label: 'Ship Store COGS', category: 'expense', inputType: 'currency', group: 'COGS', showWhen: 'nonzero' },
-  { key: 'monthlyUtilities', label: 'Utilities (monthly)', category: 'expense', inputType: 'currency', group: 'Operating Expenses' },
-  { key: 'annualInsurance', label: 'Insurance', category: 'expense', inputType: 'currency', group: 'Fixed Expenses' },
-  { key: 'annualPropertyTax', label: 'Property Tax', category: 'expense', inputType: 'currency', group: 'Fixed Expenses' },
-  { key: 'annualMaintenance', label: 'Maintenance & Repairs', category: 'expense', inputType: 'currency', group: 'Operating Expenses' },
-  { key: 'annualDredging', label: 'Dredging', category: 'expense', inputType: 'currency', group: 'Operating Expenses', showWhen: 'nonzero' },
-  { key: 'managementFeePct', label: 'Management Fee %', category: 'expense', inputType: 'percent', defaultValue: 0, pctOf: 'revenue', group: 'Management', showWhen: 'nonzero' },
-  { key: 'annualMarketing', label: 'Marketing', category: 'expense', inputType: 'currency', group: 'Operating Expenses', showWhen: 'nonzero' },
-  { key: 'annualAdmin', label: 'Admin & General', category: 'expense', inputType: 'currency', group: 'Operating Expenses', showWhen: 'nonzero' },
-  { key: 'annualOtherExpenses', label: 'Other Expenses', category: 'expense', inputType: 'currency', group: 'Operating Expenses', showWhen: 'nonzero' },
+
+  // ── Payroll (3 new granular + existing aggregate) ────────────────────
+  { key: 'annualSalariesExpense',         label: 'Salaries',                 category: 'expense', inputType: 'currency', group: 'Payroll', showWhen: 'nonzero' },
+  { key: 'annualPayrollTaxesExpense',     label: 'Payroll Taxes',            category: 'expense', inputType: 'currency', group: 'Payroll', showWhen: 'nonzero', hint: 'AGGREGATE: FUTA + SUI + SS/Medicare + state withholding' },
+  { key: 'annualPayrollProcessingExpense',label: 'Payroll Processing Fees',  category: 'expense', inputType: 'currency', group: 'Operating Expenses', showWhen: 'nonzero' },
+  { key: 'annualPayroll',                 label: 'Payroll & Benefits (aggregate)', category: 'expense', inputType: 'currency', group: 'Payroll', hint: 'AGGREGATE fallback for files with one combined payroll line' },
+
+  // ── Occupancy (Phase B v1 — NEW per B0 decision) ─────────────────────
+  { key: 'annualRentExpense', label: 'Rent / Facility Lease', category: 'expense', inputType: 'currency', group: 'Occupancy', showWhen: 'nonzero', hint: 'Leasehold land/facility rent — operating expense for leased property' },
+
+  // ── Fixed expenses (existing) ────────────────────────────────────────
+  { key: 'monthlyUtilities',  label: 'Utilities (monthly)', category: 'expense', inputType: 'currency', group: 'Operating Expenses' },
+  { key: 'annualInsurance',   label: 'Insurance',           category: 'expense', inputType: 'currency', group: 'Fixed Expenses' },
+  { key: 'annualPropertyTax', label: 'Property Tax',        category: 'expense', inputType: 'currency', group: 'Fixed Expenses' },
+
+  // ── Operating expenses (existing + 5 new granular) ───────────────────
+  { key: 'annualMaintenance',         label: 'Maintenance & Repairs', category: 'expense', inputType: 'currency', group: 'Operating Expenses' },
+  { key: 'annualDredging',            label: 'Dredging',              category: 'expense', inputType: 'currency', group: 'Operating Expenses', showWhen: 'nonzero' },
+  { key: 'managementFeePct',          label: 'Management Fee %',      category: 'expense', inputType: 'percent', defaultValue: 0, pctOf: 'revenue', group: 'Management', showWhen: 'nonzero' },
+  { key: 'annualMarketing',           label: 'Marketing',             category: 'expense', inputType: 'currency', group: 'Operating Expenses', showWhen: 'nonzero' },
+  { key: 'annualOutsideServicesExpense', label: 'Outside Services',   category: 'expense', inputType: 'currency', group: 'Operating Expenses', showWhen: 'nonzero' },
+  { key: 'annualAutomobileExpense',   label: 'Automobile Expense',    category: 'expense', inputType: 'currency', group: 'Operating Expenses', showWhen: 'nonzero' },
+  { key: 'annualComputerInternetExpense', label: 'Computer & Internet', category: 'expense', inputType: 'currency', group: 'Operating Expenses', showWhen: 'nonzero' },
+  { key: 'annualProfessionalFees',    label: 'Professional Fees',     category: 'expense', inputType: 'currency', group: 'Operating Expenses', showWhen: 'nonzero', hint: 'AGGREGATE: accounting + legal + other professional services' },
+  { key: 'annualAdmin',               label: 'Admin & General',       category: 'expense', inputType: 'currency', group: 'Operating Expenses', showWhen: 'nonzero' },
+  { key: 'annualOtherExpenses',       label: 'Other Expenses',        category: 'expense', inputType: 'currency', group: 'Operating Expenses', showWhen: 'nonzero' },
+
+  // ── Consolidations (Phase B v1 — per spec) ───────────────────────────
+  { key: 'annualBankMerchantFees', label: 'Bank & Merchant Fees',   category: 'expense', inputType: 'currency', group: 'Operating Expenses', showWhen: 'nonzero', hint: 'CONSOLIDATES: bank service charges + credit card fees + merchant deposit fees + credit report fees' },
+  { key: 'annualLicensesPermits',  label: 'Licenses, Permits & Dues', category: 'expense', inputType: 'currency', group: 'Operating Expenses', showWhen: 'nonzero', hint: 'CONSOLIDATES: licenses + permits + dues + LLC filings' },
 ];
 
 // ---------------------------------------------------------------------------
