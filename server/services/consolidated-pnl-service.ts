@@ -480,25 +480,36 @@ function buildLineItems(
 
 /**
  * Sign convention for NOI contribution — matches Phase 1.2.5 / 1.4:
- *   Revenue:        contribution = +amount
- *   COGS / Expenses contribution = -amount
- *   Non-operating:  contribution =  0      (Phase A — depreciation, amortization,
- *                                            interest expense are EXCLUDED from NOI.
- *                                            Callers must bypass the row entirely
- *                                            when sign === 0, not just multiply by
- *                                            zero, otherwise the addback delta leaks
- *                                            into the year-level rollup.)
- *   Other:          contribution = +amount  (treated as revenue-like; the FM
- *                                            does not currently roll Other
- *                                            into NOI, but the consolidated
- *                                            view stays neutral here so the
- *                                            invariant baseAmount + delta =
- *                                            adjustedAmount holds row-wise.)
+ *   Revenue:          contribution = +amount
+ *   COGS / Expenses   contribution = -amount
+ *   Non-operating:    contribution =  0   (Phase A — depreciation, amortization,
+ *                                          interest expense are EXCLUDED from NOI.
+ *                                          Callers must bypass the row entirely
+ *                                          when sign === 0, not just multiply by
+ *                                          zero, otherwise the addback delta leaks
+ *                                          into the year-level rollup.)
+ *   Business income:  contribution =  0   (Phase A.1 — ancillary operating
+ *                                          businesses on the property — boat
+ *                                          dealership, restaurant, etc. — also
+ *                                          excluded from PROPERTY NOI. Same
+ *                                          zero-contribution rule + same bypass
+ *                                          requirement as non-operating, but
+ *                                          tracked as a DISTINCT category so
+ *                                          downstream consumers can compute
+ *                                          enterprise NOI = property NOI +
+ *                                          business income contribution.)
+ *   Other:            contribution = +amount  (treated as revenue-like; the FM
+ *                                              does not currently roll Other
+ *                                              into NOI, but the consolidated
+ *                                              view stays neutral here so the
+ *                                              invariant baseAmount + delta =
+ *                                              adjustedAmount holds row-wise.)
  */
 function noiSign(category: string): 1 | -1 | 0 {
   const c = category.toLowerCase();
   if (c === 'cogs' || c === 'expenses') return -1;
   if (c === 'non_operating' || c === 'non-operating') return 0;
+  if (c === 'business_income') return 0;
   return 1;
 }
 
@@ -528,11 +539,11 @@ function buildAnnualAdjustments(
     // so it sums directly without sign conversion. Preserves the
     // AnnualAdjustmentGroup invariant: adjustedAmount = baseAmount + adjustmentDelta.
     const sign = noiSign(row.category);
-    // Phase A — non-operating rows are EXCLUDED from the NOI rollup entirely.
-    // Bypassing the row (rather than multiplying by 0) prevents the addback delta
-    // and applied-addback list from leaking depreciation/amortization/interest
-    // adjustments into NOI. Non-op lines surface in the below-NOI display section
-    // via a separate code path.
+    // Phase A / A.1 — non-operating AND business-income rows are EXCLUDED from
+    // the NOI rollup entirely. Bypassing the row (rather than multiplying by 0)
+    // prevents the addback delta and applied-addback list from leaking those
+    // categories' adjustments into NOI. Both surface in distinct below-NOI
+    // display sections via separate code paths.
     if (sign === 0) continue;
     acc.base += sign * row.baseAmount;
     acc.adjusted += sign * row.adjustedAmount;

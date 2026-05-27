@@ -218,6 +218,14 @@ export interface ProjectionYear {
    */
   nonOperatingLines?: ProjectionLineItem[];
   totalNonOperating?: number;
+  /**
+   * Phase A.1 — business income lines (ancillary operating businesses on the
+   * property: boat dealership, restaurant, etc.). Also EXCLUDED from property
+   * NOI but propagated through projection. Tracked separately from non_operating
+   * so enterprise-level metrics can be computed and CRE underwriting stays clean.
+   */
+  businessIncomeLines?: ProjectionLineItem[];
+  totalBusinessIncome?: number;
 }
 
 export interface ExitMetrics {
@@ -382,6 +390,18 @@ function buildYear1(
   }));
   const totalNonOperating = round2(financials.totalNonOperating ?? 0);
 
+  // Phase A.1 — propagate business income lines through Y1 (boat dealership,
+  // restaurant, etc.). Also excluded from property NOI, surfaced in a DISTINCT
+  // below-NOI section so enterprise vs property contribution stays separable.
+  const businessIncomeLines: ProjectionLineItem[] = (financials.businessIncomeLines ?? []).map(l => ({
+    key: l.key,
+    label: l.label,
+    category: l.category ?? 'business_income',
+    amount: round2(l.amount),
+    formula: l.formula,
+  }));
+  const totalBusinessIncome = round2(financials.totalBusinessIncome ?? 0);
+
   // Build monthly breakdown from engine output
   const monthlyBreakdown: ProjectionMonthlyBreakdown[] = financials.monthlyBreakdown.map(
     (m, idx) => ({
@@ -411,6 +431,8 @@ function buildYear1(
     expenseLines,
     nonOperatingLines,
     totalNonOperating,
+    businessIncomeLines,
+    totalBusinessIncome,
     monthlyBreakdown,
     appliedRevenueGrowthRate: 0,
     appliedExpenseGrowthRate: 0,
@@ -542,8 +564,9 @@ function buildProjectedYear(
   });
 
   const newTotalExpenses = round2(newExpenseLines.reduce((s, l) => s + l.amount, 0));
-  // Phase A — NOI explicitly excludes non-operating lines. Depreciation, amortization,
-  // and interest expense never contribute to NOI even when carried in the projection.
+  // Phase A / A.1 — NOI explicitly excludes BOTH non-operating lines (depreciation/
+  // interest/tax) AND business income lines (ancillary operating businesses). Neither
+  // contributes to property NOI even when carried in the projection.
   const computedNOI = round2(newTotalRevenue - newTotalExpenses);
 
   // ── Non-operating lines ────────────────────────────────────────────────────
@@ -557,6 +580,18 @@ function buildProjectedYear(
     // Future enhancement: per-line schedules for declining depreciation, interest amortization.
   }));
   const newTotalNonOperating = round2(newNonOperatingLines.reduce((s, l) => s + l.amount, 0));
+
+  // ── Business income lines ──────────────────────────────────────────────────
+  // Phase A.1 — propagate business income lines (boat dealership, restaurant, etc.)
+  // through the projection. Held CONSTANT year-over-year by default; growth modeling
+  // for ancillary businesses is a separate concern (different drivers from CRE).
+  // Excluded from property NOI just like non-operating lines, but tracked distinctly
+  // so enterprise NOI = property NOI + business income contribution stays computable.
+  const newBusinessIncomeLines: ProjectionLineItem[] = (prevYear.businessIncomeLines ?? []).map(line => ({
+    ...line,
+    // No growth applied — ancillary business growth is its own model.
+  }));
+  const newTotalBusinessIncome = round2(newBusinessIncomeLines.reduce((s, l) => s + l.amount, 0));
 
   // ── Per-year lease NOI override ────────────────────────────────────────────
   // When per-tenant escalation schedules produce a NOI override for this year,
@@ -602,6 +637,8 @@ function buildProjectedYear(
     expenseLines: newExpenseLines,
     nonOperatingLines: newNonOperatingLines,
     totalNonOperating: newTotalNonOperating,
+    businessIncomeLines: newBusinessIncomeLines,
+    totalBusinessIncome: newTotalBusinessIncome,
     monthlyBreakdown,
     appliedRevenueGrowthRate: config.revenueGrowthRate,
     appliedExpenseGrowthRate: config.expenseGrowthRate,

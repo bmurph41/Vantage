@@ -25,6 +25,13 @@ export interface DirectInputFinancials {
   // with `?? []` / `?? 0`.
   nonOperatingLines?: FinancialLine[];
   totalNonOperating?: number;
+  // Phase A.1 — business income bucket. Ancillary operating businesses on the
+  // property (boat dealership, restaurant, etc.). Same NOI math as non_operating
+  // (excluded from property NOI) but a DISTINCT bucket so CRE buyers can
+  // underwrite property cap rate independently of operating-business contribution.
+  // Rendered in a separate below-NOI section, not merged with non_operating.
+  businessIncomeLines?: FinancialLine[];
+  totalBusinessIncome?: number;
   computedFrom: 'direct_input';
   formulaBreakdowns: Record<string, string>;
   monthlyBreakdown: MonthlyBreakdown[];
@@ -33,7 +40,7 @@ export interface DirectInputFinancials {
 export interface FinancialLine {
   label: string;
   amount: number;
-  category: 'revenue' | 'expense' | 'non_operating';
+  category: 'revenue' | 'expense' | 'non_operating' | 'business_income';
   formula?: string;
   key: string;          // stable key for persistence (e.g. 'annualPropertyTax')
   isCustom?: boolean;   // user-added line
@@ -68,7 +75,10 @@ interface COALine {
   // Phase A — third bucket. Aligns with shared/direct-input-coa.ts COAFieldDef.category.
   // 'non_operating' entries (e.g. depreciation, amortization, interest expense) are
   // excluded from NOI but rendered in the below-NOI display section.
-  category: 'revenue' | 'expense' | 'non_operating';
+  // Phase A.1 — fourth bucket. 'business_income' entries (ancillary operating
+  // businesses — boat dealership, restaurant, etc.) are also excluded from
+  // property NOI but rendered in a DISTINCT below-NOI section.
+  category: 'revenue' | 'expense' | 'non_operating' | 'business_income';
   inputKeys: string[];          // keys to look up in inputAssumptions
   computeType: 'direct' | 'pct_of_revenue' | 'pct_of_egi' | 'formula' | 'monthly_x12';
   pctKey?: string;              // for pct-based: key for the percentage value
@@ -687,6 +697,9 @@ function computeFromCOA(
   const expenseLines: FinancialLine[] = [];
   // Phase A — below-NOI bucket. Populated by the third COA filter pass below.
   const nonOperatingLines: FinancialLine[] = [];
+  // Phase A.1 — business income bucket (ancillary operating business). Distinct
+  // from non-operating; populated by the fourth COA filter pass below.
+  const businessIncomeLines: FinancialLine[] = [];
   const formulaBreakdowns: Record<string, string> = {};
 
   // --- Unit mix revenue injection (prepend before COA if available) ---
@@ -795,6 +808,25 @@ function computeFromCOA(
     if (result.formula) formulaBreakdowns[line.label] = result.formula;
   }
 
+  // Phase A.1 — fourth pass: business-income lines (ancillary operating businesses
+  // — boat dealership, restaurant, etc.). Also EXCLUDED from property NOI so CRE
+  // buyers can underwrite the property independently of operating-business
+  // contribution. Tracked separately from non_operating so the display layer can
+  // render them in a DISTINCT below-NOI section.
+  for (const line of coa.filter(l => l.category === 'business_income')) {
+    const result = computeLine(line, inputs, computed, grossRevenue, egi);
+    computed[line.key] = result.amount;
+
+    businessIncomeLines.push({
+      label: line.label,
+      amount: result.amount,
+      category: 'business_income',
+      formula: result.formula,
+      key: line.key,
+    });
+    if (result.formula) formulaBreakdowns[line.label] = result.formula;
+  }
+
   // --- Append custom user lines ---
   const customRevenue = inputs.customRevenueLines ?? [];
   const customExpenses = inputs.customExpenseLines ?? [];
@@ -827,6 +859,10 @@ function computeFromCOA(
   // Phase A — non-operating total. Computed but EXCLUDED from NOI
   // (noi = totalRevenue - totalExpenses below stays unchanged).
   const totalNonOperating = nonOperatingLines.reduce((s, l) => s + l.amount, 0);
+  // Phase A.1 — business income total. Also EXCLUDED from property NOI but
+  // tracked separately so enterprise-level metrics (property NOI + business
+  // income contribution) can be computed downstream when needed.
+  const totalBusinessIncome = businessIncomeLines.reduce((s, l) => s + l.amount, 0);
 
   // --- Monthly breakdown ---
   const _inSeasonMonths: number[] = inputs.inSeasonMonths ?? [];
@@ -874,11 +910,13 @@ function computeFromCOA(
   return {
     totalRevenue,
     totalExpenses,
-    noi: totalRevenue - totalExpenses,  // Phase A — non-operating EXCLUDED from NOI
+    noi: totalRevenue - totalExpenses,  // Phase A/A.1 — non-op AND business-income EXCLUDED from NOI
     revenueLines,
     expenseLines,
     nonOperatingLines,
     totalNonOperating,
+    businessIncomeLines,
+    totalBusinessIncome,
     computedFrom: 'direct_input',
     formulaBreakdowns,
     monthlyBreakdown,

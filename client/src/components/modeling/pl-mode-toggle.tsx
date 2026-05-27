@@ -400,7 +400,31 @@ export function PLBuilder({ project, computedFinancials, isLoading, onRefresh }:
                 </div>
               </div>
 
-              {/* Phase A — Below-NOI section. Renders non-operating lines (depreciation,
+              {/* Phase A.1 — Business Income section (FIRST below-NOI section).
+                  Ancillary operating businesses on the property (boat dealership,
+                  restaurant, etc.). Excluded from property NOI but surfaced here
+                  as a DISTINCT section above Non-Operating so CRE buyers can see
+                  enterprise contribution at a glance. */}
+              {(computedFinancials.businessIncomeLines?.length ?? 0) > 0 && (
+                <div className="border-t pt-3 mt-3">
+                  <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                    Business Income (Below NOI)
+                  </h4>
+                  <div className="space-y-1">
+                    {computedFinancials.businessIncomeLines!.map((line, i) => (
+                      <FinancialLineRow key={i} line={line} formulaBreakdowns={computedFinancials.formulaBreakdowns} />
+                    ))}
+                  </div>
+                  <div className="flex justify-end pt-2 mt-2 border-t border-dashed">
+                    <div className="text-sm">
+                      <span className="text-muted-foreground mr-2">Total Business Income:</span>
+                      <span className="font-semibold">{formatCurrency(computedFinancials.totalBusinessIncome ?? 0)}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Phase A — Non-Operating section. Renders non-operating lines (depreciation,
                   amortization, interest expense) AFTER the NOI summary. Excluded from
                   NOI math but surfaced here so they don't disappear. Mirrors
                   consolidated-pnl-service noiSign === 0 semantics. */}

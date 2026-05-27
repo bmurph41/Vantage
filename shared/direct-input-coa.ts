@@ -17,7 +17,13 @@ export interface COAFieldDef {
   // Phase A — third bucket. 'non_operating' fields (depreciation, amortization,
   // interest expense) are excluded from NOI but rendered in the below-NOI
   // section. Mirrors consolidated-pnl-service noiSign === 0 semantics.
-  category: 'revenue' | 'expense' | 'non_operating';
+  // Phase A.1 — fourth bucket. 'business_income' fields (ancillary operating
+  // businesses on the property — boat dealership, restaurant, etc.) are also
+  // excluded from PROPERTY NOI but rendered in a DISTINCT below-NOI section so
+  // CRE buyers can underwrite property cap rate independently of operating-
+  // business contribution. Same noiSign === 0 math as non_operating; different
+  // semantic bucket. Independently togglable for enterprise-acquisition framing.
+  category: 'revenue' | 'expense' | 'non_operating' | 'business_income';
   inputType: 'currency' | 'percent' | 'number' | 'formula'; // how to render the input
   hint?: string;                  // placeholder / helper text
   group?: string;                 // optional grouping header

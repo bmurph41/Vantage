@@ -53,7 +53,15 @@ const Y1_EXPENSE_CATEGORIES = new Set([
   'operating expense', 'operating expenses',
   'opex', 'payroll',
 ]);
-const Y1_EXCLUDED_CATEGORIES = new Set(['non_operating', 'non-operating']);
+// Phase A / A.1 — expected-exclusion categories. These are tracked as DISTINCT
+// below-NOI buckets via separate code paths; here they must be recognized as
+// expected-exclusion so the fail-loud branch doesn't spuriously warn on every
+// depreciation or boat-sales line. The whole point of recognizing them is the
+// difference between "excluded by design" (silent) and "unrecognized" (warn).
+const Y1_EXCLUDED_CATEGORIES = new Set([
+  'non_operating', 'non-operating',
+  'business_income',  // Phase A.1
+]);
 
 function slugify(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || 'line';

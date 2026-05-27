@@ -37,13 +37,22 @@ const GROUP_TO_SECTION: Record<string, string> = {
   // map here so consolidated-pnl-service noiSign returns 0 and they're excluded
   // from NOI while still rendering in the below-NOI display section.
   'Non-Operating':          'non_operating',
+  // Phase A.1 — ancillary operating business section. Boat dealership, restaurant,
+  // and similar businesses operated on the property map here so they're excluded
+  // from property NOI but tracked in a distinct below-NOI display section.
+  'Business Income':        'business_income',
+  'Boat Sales':             'business_income',
 };
 
-function groupToSection(group: string | undefined, category: 'revenue' | 'expense' | 'non_operating'): string {
+function groupToSection(
+  group: string | undefined,
+  category: 'revenue' | 'expense' | 'non_operating' | 'business_income',
+): string {
   if (group && GROUP_TO_SECTION[group]) return GROUP_TO_SECTION[group];
-  // Phase A — category now includes 'non_operating' as a third bucket.
+  // Phase A / A.1 — category union now includes both 'non_operating' and 'business_income'.
   if (category === 'revenue') return 'revenue';
   if (category === 'expense') return 'expense';
+  if (category === 'business_income') return 'business_income';
   return 'non_operating';
 }
 

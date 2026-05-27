@@ -30,6 +30,10 @@ import type { ConsolidatedLineItem } from '@shared/types/consolidated-pnl';
 const REVENUE = 1_000_000;
 const EXPENSE = 400_000;
 const DEPRECIATION = 100_000;
+// Phase A.1 — ancillary boat-dealership-shaped contribution. Net of a much
+// larger gross (revenue + COGS); the deliberately ROUND number distinguishes
+// it from DEPRECIATION above and proves the two buckets stay distinct.
+const BUSINESS_INCOME_NET = 250_000;
 const EXPECTED_NOI = REVENUE - EXPENSE; // 600,000
 
 function makeLine(
@@ -161,6 +165,67 @@ describe('Phase A regression: dcf-y1-sourcer non_operating exclusion', () => {
     // "filtered result has zero revenue AND zero expense lines")
     expect(y1).toBeNull();
   });
+
+  // ─── Phase A.1 — business_income parallels non_operating ────────────────────
+  it('Phase A.1: business_income excluded from Y1 NOI exactly as non_operating is', () => {
+    const fixtureBI = {
+      lineItems: [
+        makeLine('Slip Revenue', REVENUE, 'Revenue', year),
+        makeLine('Maintenance', EXPENSE, 'Expenses', year),
+        // Boat dealership net contribution — must be EXCLUDED from property NOI
+        makeLine('Used Boat Sales (net)', BUSINESS_INCOME_NET, 'business_income', year),
+      ],
+    };
+    const y1A = buildY1FromConsolidated(fixtureA)!;
+    const y1B = buildY1FromConsolidated(fixtureBI)!;
+    expect(y1B.noi).toBe(y1A.noi);
+    expect(y1B.totalRevenue).toBe(y1A.totalRevenue);
+    expect(y1B.totalExpenses).toBe(y1A.totalExpenses);
+    // business_income line lands in NEITHER revenue NOR expense (the leak we test for)
+    expect(y1B.revenueLines.find((l) => l.label === 'Used Boat Sales (net)')).toBeUndefined();
+    expect(y1B.expenseLines.find((l) => l.label === 'Used Boat Sales (net)')).toBeUndefined();
+  });
+
+  it('Phase A.1: business_income excluded SILENTLY (no spurious unrecognized-category warn)', () => {
+    // The distinction this test enforces: dcf-y1-sourcer's fail-loud branch
+    // must recognize 'business_income' as expected-exclusion (Y1_EXCLUDED_CATEGORIES)
+    // so it doesn't warn the same way it does on truly unknown values.
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const fixtureBI = {
+      lineItems: [
+        makeLine('Slip Revenue', REVENUE, 'Revenue', year),
+        makeLine('Maintenance', EXPENSE, 'Expenses', year),
+        makeLine('Boat Dealership', BUSINESS_INCOME_NET, 'business_income', year),
+      ],
+    };
+    buildY1FromConsolidated(fixtureBI);
+    // Critical: NO unrecognized-category warning. business_income is expected-exclusion,
+    // not unknown. (Phase A's design: distinguish "excluded by design" from "unknown".)
+    expect(warnSpy).not.toHaveBeenCalled();
+
+    warnSpy.mockRestore();
+  });
+
+  it('Phase A.1: BOTH non_operating AND business_income excluded distinctly when both present', () => {
+    // Two buckets, same fixture. Property NOI is unchanged from rev+exp baseline
+    // whether one, the other, or BOTH below-NOI categories are present.
+    const fixtureBoth = {
+      lineItems: [
+        makeLine('Slip Revenue', REVENUE, 'Revenue', year),
+        makeLine('Maintenance', EXPENSE, 'Expenses', year),
+        makeLine('Depreciation', DEPRECIATION, 'non_operating', year),
+        makeLine('Boat Dealership', BUSINESS_INCOME_NET, 'business_income', year),
+      ],
+    };
+    const y1 = buildY1FromConsolidated(fixtureBoth)!;
+    expect(y1.noi).toBe(EXPECTED_NOI);
+    expect(y1.totalRevenue).toBe(REVENUE);
+    expect(y1.totalExpenses).toBe(EXPENSE);
+    // Neither below-NOI line sneaks into the operating buckets
+    expect(y1.expenseLines.find((l) => ['Depreciation','Boat Dealership'].includes(l.label))).toBeUndefined();
+    expect(y1.revenueLines.find((l) => ['Depreciation','Boat Dealership'].includes(l.label))).toBeUndefined();
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -202,6 +267,30 @@ describe('Phase A regression: multi-year-projection-engine non_operating propaga
       { label: 'Depreciation', amount: DEPRECIATION, category: 'non_operating', key: 'depreciation' },
     ],
     totalNonOperating: DEPRECIATION,
+  };
+
+  // Phase A.1 — same as baseFinancials but with a business_income contribution.
+  // Same NOI math (excluded from property NOI), but tracked in a DISTINCT bucket
+  // from non_operating so enterprise vs property contribution stays separable.
+  const financialsWithBusinessIncome: DirectInputFinancials = {
+    ...baseFinancials,
+    businessIncomeLines: [
+      { label: 'Boat Dealership', amount: BUSINESS_INCOME_NET, category: 'business_income', key: 'boat_dealership' },
+    ],
+    totalBusinessIncome: BUSINESS_INCOME_NET,
+  };
+
+  // Phase A.1 — BOTH categories present. Tests the parallel-but-distinct property.
+  const financialsWithBoth: DirectInputFinancials = {
+    ...baseFinancials,
+    nonOperatingLines: [
+      { label: 'Depreciation', amount: DEPRECIATION, category: 'non_operating', key: 'depreciation' },
+    ],
+    totalNonOperating: DEPRECIATION,
+    businessIncomeLines: [
+      { label: 'Boat Dealership', amount: BUSINESS_INCOME_NET, category: 'business_income', key: 'boat_dealership' },
+    ],
+    totalBusinessIncome: BUSINESS_INCOME_NET,
   };
 
   const config = {
@@ -250,6 +339,76 @@ describe('Phase A regression: multi-year-projection-engine non_operating propaga
     // but PRESENT in the data structure for the display layer to render.
     expect(y1.noi).not.toBe(y1.noi - DEPRECIATION); // NOI does NOT include depr
     expect(y1.totalNonOperating).toBe(DEPRECIATION); // depr IS in the bucket
+  });
+
+  // ─── Phase A.1 — business_income parallels non_operating across projection ──
+  it('Phase A.1: business_income excluded from NOI year-over-year exactly as non_operating is', () => {
+    const projA = computeMultiYearProjection(baseFinancials, config);
+    const projB = computeMultiYearProjection(financialsWithBusinessIncome, config);
+    expect(projA.years.length).toBe(projB.years.length);
+    for (let i = 0; i < projA.years.length; i++) {
+      expect(projB.years[i].noi).toBe(projA.years[i].noi);
+      expect(projB.years[i].totalRevenue).toBe(projA.years[i].totalRevenue);
+      expect(projB.years[i].totalExpenses).toBe(projA.years[i].totalExpenses);
+    }
+    expect(projB.totalNOI).toBe(projA.totalNOI);
+  });
+
+  it('Phase A.1: business_income lines + total propagate held-CONSTANT on every projected year', () => {
+    const projB = computeMultiYearProjection(financialsWithBusinessIncome, config);
+    for (const year of projB.years) {
+      expect(year.businessIncomeLines).toBeDefined();
+      expect(year.businessIncomeLines!.length).toBe(1);
+      expect(year.businessIncomeLines![0].label).toBe('Boat Dealership');
+      // Held constant — no growth rate applied (ancillary biz has its own drivers)
+      expect(year.businessIncomeLines![0].amount).toBe(BUSINESS_INCOME_NET);
+      expect(year.totalBusinessIncome).toBe(BUSINESS_INCOME_NET);
+    }
+  });
+
+  it('Phase A.1: DISTINCT BUCKETS — non_operating and business_income do not collapse', () => {
+    // The whole point of (a)-2 over (a)-1: two below-NOI sections, independently
+    // tracked. This test guards against any future "merge them into one bucket"
+    // refactor by asserting totals stay independent and lines stay segregated
+    // by category.
+    const projBoth = computeMultiYearProjection(financialsWithBoth, config);
+    const y1 = projBoth.years[0];
+
+    // Totals are independent — both populated, neither summed into the other
+    expect(y1.totalNonOperating).toBe(DEPRECIATION);
+    expect(y1.totalBusinessIncome).toBe(BUSINESS_INCOME_NET);
+    expect(y1.totalNonOperating).not.toBe(y1.totalBusinessIncome);
+
+    // Lines stay in their category buckets — no cross-contamination
+    expect(y1.nonOperatingLines!.length).toBe(1);
+    expect(y1.nonOperatingLines![0].label).toBe('Depreciation');
+    expect(y1.nonOperatingLines!.find(l => l.label === 'Boat Dealership')).toBeUndefined();
+
+    expect(y1.businessIncomeLines!.length).toBe(1);
+    expect(y1.businessIncomeLines![0].label).toBe('Boat Dealership');
+    expect(y1.businessIncomeLines!.find(l => l.label === 'Depreciation')).toBeUndefined();
+
+    // Property NOI excludes BOTH — same as the rev+exp-only baseline
+    expect(y1.noi).toBe(EXPECTED_NOI);
+    expect(y1.totalRevenue).toBe(REVENUE);
+    expect(y1.totalExpenses).toBe(EXPENSE);
+  });
+
+  it('Phase A.1: NOI UNCHANGED whether 0, 1, or BOTH below-NOI categories are populated', () => {
+    // Cross-fixture NOI equivalence — baseline NOI = NOI with non_op only =
+    // NOI with business_income only = NOI with both. The four-way equivalence
+    // is the cleanest statement of "below-NOI buckets are bucket-isolated".
+    const projA = computeMultiYearProjection(baseFinancials, config);
+    const projNonOp = computeMultiYearProjection(financialsWithNonOp, config);
+    const projBiz = computeMultiYearProjection(financialsWithBusinessIncome, config);
+    const projBoth = computeMultiYearProjection(financialsWithBoth, config);
+
+    expect(projNonOp.years[0].noi).toBe(projA.years[0].noi);
+    expect(projBiz.years[0].noi).toBe(projA.years[0].noi);
+    expect(projBoth.years[0].noi).toBe(projA.years[0].noi);
+    expect(projA.totalNOI).toBe(projNonOp.totalNOI);
+    expect(projA.totalNOI).toBe(projBiz.totalNOI);
+    expect(projA.totalNOI).toBe(projBoth.totalNOI);
   });
 });
 
