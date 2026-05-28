@@ -307,7 +307,11 @@ export interface ParsedRow {
   label: string;
   normalizedLabel: string;
   values: ParsedRowValue[];
-  sectionHint?: 'revenue' | 'cogs' | 'expense' | 'payroll' | null;
+  // 'non_operating' is emitted by the XLSX parser when it sees an
+  // "Other Income/Expense" / "Other Expense" QB Desktop section header — these
+  // belong below NOI. The classifier section HARD GATE treats non_operating as
+  // part of the COST equivalence class (mapping.ts income/cost gate).
+  sectionHint?: 'revenue' | 'cogs' | 'expense' | 'payroll' | 'non_operating' | null;
   trace?: {
     page?: number;
     row?: number;

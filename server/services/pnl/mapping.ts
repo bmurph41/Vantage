@@ -689,12 +689,27 @@ export async function mapParsedStatement(jobId: string): Promise<{ reviewCount: 
     // Cross-class violations are forced to review. Same-class flips (e.g.,
     // parser=revenue, canonical=business_income for a "Used Boat Sales" line
     // segregated below NOI) are intentional design routings, not conflicts.
+    // B3 step 2 + parser-fix 2026-05-28: SECTION HARD GATE — island-bucket
+    // exemption.
+    //
+    // business_income canonicals are a SEGREGATED island bucket containing
+    // their own revenue AND COGS subkeys (Phase A.1 — boat-sales gross profit
+    // tracked below property NOI). A parser-cogs row landing in a
+    // business_income COGS canonical is the segregation working CORRECTLY, not
+    // a sign error. Same for parser-expense + business_income operating-expense
+    // subkeys (e.g. Salesmen Commissions). Exempt the entire business_income
+    // section from the cross-class check.
+    //
+    // Equivalence classes (NO conflict within a class):
+    //   INCOME = { revenue }
+    //   COST   = { cogs, expense, payroll, non_operating }
+    //   ISLAND = { business_income }   ← exempt from gate
     let sectionConflict = false;
     const parserSec: string | null = structuralSection;
     if (parserSec && res.canonicalLineItemId) {
       const matched = canonicalById.get(res.canonicalLineItemId);
-      if (matched) {
-        const incomeClass: ReadonlySet<string> = new Set(['revenue', 'business_income']);
+      if (matched && matched.section !== 'business_income') {
+        const incomeClass: ReadonlySet<string> = new Set(['revenue']);
         const costClass: ReadonlySet<string> = new Set(['cogs', 'expense', 'payroll', 'non_operating']);
         const matchedSec: string = matched.section ?? '';
         const parserIncome = incomeClass.has(parserSec);

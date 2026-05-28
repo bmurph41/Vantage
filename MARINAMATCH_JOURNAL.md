@@ -1,5 +1,67 @@
 # MarinaMatch Platform Journal
 
+## ✅ Parser fix — QB Desktop section detection + island-bucket gate (2026-05-28)
+
+Shipped on commit `<filled-after-commit>` as a single atomic commit, pushed to `origin/main`. Two changes paired because the second is the gate-side complement to the first's correctness story (and both are needed to deliver the demo number honestly). The parser fix rewrites XLSX section-header detection to respect QB Desktop's column-encodes-hierarchy convention; the gate change exempts `business_income` (the segregated below-NOI bucket) from the income/cost cross-class check because that bucket is structurally an island containing its own revenue + COGS internally. Together they take SS3's auto-map rate from 38.2% / 33.3% (pre-fix baseline, B3 step 2 commit `4ff1cb42`) to **85.5% (47/55) / 79.6% (43/54)** — squarely in the projected 75–80% band the prior session's journal flagged as parser-blocked.
+
+### Honest three-stage rate progression on SS3
+
+| Stage | 2024 | 2023 |
+|---|---|---|
+| Baseline (post-B3 step 2) | 21/55 (38.2%) | 18/54 (33.3%) |
+| After parser section-detection fix | 39/55 (70.9%) | 36/54 (66.7%) |
+| After gate widens for business_income | **47/55 (85.5%)** | **43/54 (79.6%)** |
+
+The 38 → 71 jump came from the parser correctly tagging COGS rows as `cogs` (not all-stuck-on-`revenue`) and expense rows as `expense`. That jump alone exposed the secondary bottleneck: 7 boat-sales COGS rows per job were now being deferred by the section gate as `cogs`-vs-`business_income` cross-class conflicts. Those deferrals were false positives — the segregation is the design, not a sign error. The gate widening (3-line change) clears them.
+
+**Spot-check correctness:** every auto-mapped row reviewed; no silent mis-maps. Remaining 8/11 reviews are all bucket (b)/(c): genuinely ambiguous bare labels (Labor, Commissions, Donation, Payroll Expenses, Reimbursed expenses, Equipment Lease, Returned Check Charges) and one classifier-returned-no-key edge case (COGS-Boats & Trailers (Inc.) — paren format defeated the LLM on 2024).
+
+### What changed
+
+- `server/services/pnl/excel-extractor.ts` — (1) `ExcelParsedRow.sectionHint` extended to include `'non_operating'`. (2) `SECTION_KEYWORDS` gained singular `'expense'`, `'other income/expense'`, `'other expense'`, `'other income'`, `'ordinary income'` — singular forms cover QB Desktop's "Income" / "Cost of Goods Sold" / "Expense" / "Other Income/Expense" headers that the pre-fix map (plurals only) missed. (3) New `matchSectionKeyword(normalized)` helper with longer-first iteration order so `'other income/expense'` beats `'other income'` and `'cost of goods sold'` beats `'cost of goods'`. (4) Main loop rewritten with the **labelCol > 1 vs labelCol ≤ 1 split**:
+  - `labelCol > 1` (hierarchical QB Desktop): scan cols `1..(labelCol-1)` for section keywords; a match flips `currentSection`. Zero-value labels AT `labelCol` are SKIPPED (subgroup pseudo-headers — "Payroll Taxes", "New Boat Sales", "Insurance Expense" — which previously hijacked section state by matching SECTION_KEYWORDS substrings).
+  - `labelCol ≤ 1` (flat one-column files): scan `labelCol` itself. Preserves pre-fix behavior for non-QB files.
+- `shared/pnl-pipeline-schema.ts` — `ParsedRow.sectionHint` union extended to include `'non_operating'`; matches the extractor's new emission.
+- `server/services/pnl/mapping.ts` — section HARD GATE island-bucket exemption. The income/cost equivalence-class check now early-returns when `matched.section === 'business_income'`. Cleaner mental model: INCOME = {revenue}, COST = {cogs, expense, payroll, non_operating}, ISLAND = {business_income} (exempt). Comment block in the gate documents Phase A.1's "business_income is a segregated full P&L sub-statement with internal revenue+COGS" semantics so the next reader doesn't need to re-derive it.
+- `db/schema-index.ts` — auto-regen drift only.
+
+### Decisions made
+
+- **Shallower-column scan, not left-to-right-first-match.** Trace data showed TRUE section headers sit in cols SHALLOWER than `labelCol`; subgroup pseudo-headers sit AT `labelCol`. The shallower-column rule cleanly discriminates because columns 1..(labelCol-1) contain only structural headers in QB Desktop. A left-to-right scan would have still hit "Payroll Taxes" at labelCol when no shallower match exists.
+- **`labelCol ≤ 1` fallback preserves flat-file behavior.** Non-QB exports (single label column, no hierarchy) genuinely put section headers IN the label column. The two-tier rule keeps them working with no regression risk.
+- **Bundle parser fix + gate widening in one commit.** Both are part of the demo-number landing correctly. The gate widening surfaced only after the parser fix exposed it (pre-parser-fix, parser-cogs never reached business_income canonicals because everything was tagged revenue). Separating would force the journal entry to reference two commits for one logical "demo number works" story.
+- **business_income exempt from gate, NOT moved to a different equivalence class.** "Exempt the section" reads structurally (this bucket is special; here's why) rather than "redefine INCOME/COST" which buries the semantic. The Phase A.1 design intent — boat-sales as a segregated P&L below property NOI — is preserved in code comment.
+
+### Verification
+
+- **Post-fix trace** (read-only re-run of `extractExcelPnl(SS3_2024)`): all 55 rows now carry correct structural section. Counts: revenue=21, cogs=10, expense=24. Zero rows mis-tagged. r3–r23 (Annual dockage/storage → Winter Storage) all `revenue` ✓; r24–r34 (COGS-parts → Trade Payoff) all `cogs` ✓ (pre-fix were stuck on `revenue`); r35–r55 (Advertising → Salesmen Commissions) all `expense` ✓ (pre-fix were `revenue` then accidentally `payroll`). r16/r52/r69 subgroup pseudo-headers correctly skipped as zero-value rows (no longer hijack section state).
+- **B4 on real SS3 files** (project `2c5b8e46-023c-4c17-988d-8f2148426e97`; jobs `215c4385` (2024) + `5a713a9d` (2023)): **2024 = 47/55 (85.5%)** (was 38.2% baseline, Δ +47.3pp), **2023 = 43/54 (79.6%)** (was 33.3% baseline, Δ +46.3pp). Both in the projected 75–80% band.
+- **Per-row review queue characterization** (post-gate-widening):
+  - (a) business_income false positives: **0** (was 7 in 2024, 6 in 2023; gate widening cleared them all)
+  - (b) classifier returned no key (genuinely ambiguous bare labels): ~5 per job — Labor, Commissions, Donation, Payroll Expenses, Reimbursed expenses
+  - (c) no canonical exists / aggregate w/o subtype: ~3 per job — Cost of Goods Sold (uncategorized leftover), Equipment Lease, Executive Reimbursement, Returned Check Charges
+  - One classifier-failed edge case on 2024: "COGS-Boats & Trailers (Inc.)" — parens format defeated the LLM (returned `[REVIEW]`). Same row auto-mapped on 2023 → annualBoatsAndTrailersCOGS; intermittent LLM behavior, not a structural bug.
+- **Scoped tsc** (`tsconfig.diag-server-only.json`, `--max-old-space-size=6144`): 9 errors total, all pre-existing. excel-extractor.ts lines 577/637 are inside `rawScanExtract`/`detectPeriodsFromSheet` (code untouched today); mapping.ts errors are pre-existing nullable-string drift in `tryAliasMatch`/`tryRegexMatch` from B3 step 2. Zero net-new errors from this commit.
+- **Reset-+-recommit discipline:** Replit auto-commit absorbed the edits into 5 commits during the session (`7c233e82`, `530bbb36`, `25cd72b7`, `76b88e8e`, `2dc2b473`). Per CLAUDE.md standing rule #4, used `git reset --soft origin/main` to collapse to staged content, dropped the ephemeral B4 verification script from staging, recommitted as one atomic commit with intentional message. Reflog preserved the absorbed commits as `HEAD@{0..4}` for recovery if needed.
+
+### Standing-rule notes captured this session
+
+- **`gh auth setup-git` needs to run per-shell, not per-session.** The credential helper does not persist across Bash tool invocations in this workspace. First push after a new Bash invocation fails with "Invalid username or token. Password authentication is not supported"; running `gh auth setup-git` in the same Bash call as the `git push` resolves it. Real friction point — every commit-and-push sequence needs to chain `gh auth setup-git && git push origin main` to be reliable.
+- **Replit auto-commit ABSORPTION is now confirmed across multiple sessions.** Today's session produced 5 absorbed commits before the intentional commit landed. The standing-rule recovery pattern (soft-reset to origin, drop ephemera, atomic recommit) worked cleanly twice this week. Worth promoting from "occasional issue" to "expected behavior with established recovery procedure."
+
+### Next session
+
+**Open follow-ups (filed, not bundled):**
+- **Option B — hierarchy-aware parser w/ `labelPath: string[]`.** Trace showed QB's indent chain (Ordinary Income → Income → Sales → Used Boat Sales) is collapsed to just the leaf at the extractor layer. Carrying parent context would meaningfully help the classifier on ambiguous bare labels ("Commissions" / "Labor" / "Donation" — currently bucket-(c) deferrals). Not demo-blocking; the right durable shape for ambiguity edge cases. ~80-120 line refactor.
+- **Pre-existing tsc cleanup** (9 errors, all in code I haven't touched) — tryAliasMatch/tryRegexMatch nullable-string drift in mapping.ts, ParsedPeriod literal-type drift in rawScanExtract. Small bounded refactor, no functional change.
+- **PNL_LLM_FUZZY_BACKSTOP feature flag** — still off; observe one more release before removing the legacy path entirely.
+
+**Demo-readiness next steps (NOT blocked by anything above):**
+- Audit on Oakdale / other QB Desktop uploads if those exist in the test corpus — confirm the 85% rate generalizes beyond SS3. (Per [[canonical-key-namespace-mismatch]]: SS3 was the empirical anchor; second-marina audit would close the demo-confidence loop.)
+- The remaining bucket (b)/(c) review rows are LP-side bookkeeping artifacts — partly addressable by Option B labelPath context, partly genuinely human-judgment (a "Donation" line in a marina P&L should always be human-confirmed before underwriting).
+
+---
+
 ## ✅ B3 step 2 — closed-vocab classifier + section HARD GATE (2026-05-27)
 
 Shipped on commit `4ff1cb42`, pushed to `origin/main` (verified `git rev-list --left-right --count HEAD...origin/main` = `0	0`). Closes the B3 work tied to the [[canonical-key-namespace-mismatch]] bottleneck identified 2026-05-26: classifier now picks one canonical from an asset-class-scoped enumerated list (or returns `[REVIEW]`), and the downstream lookup uses exact-match against `canonicalByKey` instead of the snake_case-vs-camelCase suffix/displayName fuzzy backstop that was producing silent mis-maps. Five hardening changes ship together as one bisectable commit; the most important is the section HARD GATE, which forces review on any income/cost cross-class violation (parser-tagged revenue → cogs/expense/payroll/non_operating canonical, or vice versa).

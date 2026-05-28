@@ -24,7 +24,7 @@ export interface ExcelParsedRow {
   label: string;
   normalizedLabel: string;
   values: ExcelParsedValue[];
-  sectionHint: 'revenue' | 'cogs' | 'expense' | 'payroll' | null;
+  sectionHint: 'revenue' | 'cogs' | 'expense' | 'payroll' | 'non_operating' | null;
   trace: { page: number; row: number };
 }
 
@@ -157,15 +157,62 @@ function isTotalRow(label: string): boolean {
     /^-{2,}$/.test(label);
 }
 
+// SECTION_KEYWORDS — matched against normalized cell text. Keys that share
+// a substring prefix must list the LONGER form first so the matcher prefers it
+// (e.g. 'other income/expense' must beat 'other income' for QB Desktop's
+// "Other Income/Expense" rollup header). The matcher does an `.endsWith` /
+// `.startsWith` / exact check; longer-first order is enforced by the
+// SECTION_KEYWORD_ORDER iteration below.
 const SECTION_KEYWORDS: Record<string, ExcelParsedRow['sectionHint']> = {
+  // Revenue
   'revenue':'revenue','revenues':'revenue','income':'revenue','sales':'revenue',
+  'ordinary income':'revenue',
+  'other income':'revenue',
+  // COGS
   'cost of goods sold':'cogs','cost of goods':'cogs','cogs':'cogs',
   'cost of sales':'cogs','direct costs':'cogs','direct cost':'cogs',
+  // Operating expense (QB Desktop singular 'Expense' added; previously only
+  // 'expenses' / 'operating expense' / 'overhead' / 'general' matched)
   'operating expense':'expense','operating expenses':'expense','expenses':'expense',
+  'expense':'expense',
   'overhead':'expense','general':'expense','general administrative':'expense','ga':'expense',
+  // Below-NOI — emitted when QB shows "Other Expense" / "Other Income/Expense"
+  // rollups. The classifier section HARD GATE puts non_operating in the COST
+  // equivalence class (mapping.ts income/cost gate).
+  'other income/expense':'non_operating',
+  'other income / expense':'non_operating',
+  'other expense':'non_operating',
+  'other expenses':'non_operating',
+  // Payroll
   'payroll':'payroll','wages':'payroll','salaries':'payroll',
   'payroll expense':'payroll','payroll expenses':'payroll','labor':'payroll','labour':'payroll',
 };
+
+// Match order — longer-first so 'other income/expense' beats 'other income'
+// and 'cost of goods sold' beats 'cost of goods'.
+const SECTION_KEYWORD_ORDER: string[] = Object.keys(SECTION_KEYWORDS)
+  .sort((a, b) => b.length - a.length);
+
+/**
+ * Match a normalized cell text against SECTION_KEYWORDS.
+ * Returns the matched section, or null if no match.
+ * Accepts exact equality, "kw" prefix (with trailing space), or "kw" suffix
+ * (with leading space) — matches the original main-loop predicate but reusable
+ * across the multi-column scan.
+ */
+function matchSectionKeyword(normalized: string): ExcelParsedRow['sectionHint'] {
+  if (!normalized) return null;
+  for (const kw of SECTION_KEYWORD_ORDER) {
+    if (
+      normalized === kw ||
+      normalized.startsWith(kw + ' ') ||
+      normalized.endsWith(' ' + kw)
+    ) {
+      return SECTION_KEYWORDS[kw];
+    }
+  }
+  return null;
+}
 
 // ─── Header row scanning ──────────────────────────────────────────────────────
 
@@ -384,24 +431,65 @@ export function extractExcelPnl(
   let currentSection: ExcelParsedRow['sectionHint'] = null;
   const sheetPageNum = workbook.SheetNames.indexOf(sheetName) + 1;
 
+  // SECTION-HEADER DETECTION RULE (2026-05-27)
+  //
+  // QB Desktop exports encode hierarchy in column position: the section roll-up
+  // headers ("Ordinary Income/Expense", "Income", "Cost of Goods Sold",
+  // "Expense", "Other Income/Expense") live in columns SHALLOWER than
+  // labelColIndex, while leaf data rows live AT labelColIndex. Subgroup
+  // pseudo-headers like "Payroll Taxes" or "New Boat Sales" appear AT
+  // labelColIndex with zero values — these must be SKIPPED, not flipped into
+  // section state, because their label text otherwise hijacks the matcher
+  // (e.g. 'payroll' substring → forces every later row to payroll section).
+  //
+  // Rule:
+  //   labelColIndex > 1  → scan cols 1..(labelColIndex - 1) for section keyword.
+  //                        A match flips currentSection. Zero-value labels AT
+  //                        labelColIndex are skipped (subgroup pseudo-headers).
+  //   labelColIndex ≤ 1  → flat one-column layout. Scan labelColIndex itself
+  //                        (preserves pre-fix behavior for non-QB files).
+  //
+  // See journal entry 2026-05-27 + project_qb_desktop_hierarchical_layout.md
+  // for the trace that produced this rule.
+
   for (let r = headerRowIndex + 1; r < jsonData.length; r++) {
     const rowData = jsonData[r];
     if (!rowData) continue;
     const rawLabel = String(rowData[labelColIndex] ?? '').trim();
-    if (!rawLabel) continue;
-    const lower = normalizeLabel(rawLabel);
+    const lower = rawLabel ? normalizeLabel(rawLabel) : '';
 
-    if (isTotalRow(rawLabel)) continue;
-
-    // Section header detection (no numeric data in row)
-    const hasNumbers = rowData.slice(1).some((v: any) => parseMoney(v) !== null);
-    if (!hasNumbers) {
-      for (const [kw, section] of Object.entries(SECTION_KEYWORDS)) {
-        if (lower === kw || lower.startsWith(kw + ' ') || lower.endsWith(' ' + kw)) {
-          currentSection = section;
+    // Shallower-column section detection (QB Desktop hierarchical layout).
+    // Runs BEFORE the empty-rawLabel skip so a section header in cols 1..k-1
+    // is still picked up even when labelCol's cell is blank.
+    if (labelColIndex > 1) {
+      for (let c = 1; c < labelColIndex; c++) {
+        const cellText = String(rowData[c] ?? '').trim();
+        if (!cellText) continue;
+        const normalized = normalizeLabel(cellText);
+        const matched = matchSectionKeyword(normalized);
+        if (matched) {
+          currentSection = matched;
           break;
         }
       }
+    }
+
+    if (!rawLabel) continue;
+    if (isTotalRow(rawLabel)) continue;
+
+    // Section header detection in flat layouts (labelCol ≤ 1) AND zero-value
+    // skip in hierarchical layouts (labelCol > 1).
+    const hasNumbers = rowData.slice(1).some((v: any) => parseMoney(v) !== null);
+    if (!hasNumbers) {
+      if (labelColIndex <= 1) {
+        // Flat layout — labelCol IS the section-header column.
+        const matched = matchSectionKeyword(lower);
+        if (matched) currentSection = matched;
+      }
+      // Hierarchical layout (labelCol > 1): zero-value labels AT labelCol are
+      // subgroup pseudo-headers ("Payroll Taxes", "New Boat Sales", "Insurance
+      // Expense"). They must NOT flip currentSection — the shallower-column
+      // pass above is the only legitimate section source. Skip the row.
       continue;
     }
 
