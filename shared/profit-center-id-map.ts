@@ -241,6 +241,78 @@ export function multiDocReviewLegacyDeptToPcCode(dept: string): string | null {
   return BY_UI_DEPT.get(mapped)?.code ?? null;
 }
 
+// -----------------------------------------------------------------------------
+// 7th vocabulary — OnboardingWizard's marina catalog (shared/marina-catalog.ts).
+//
+// PROFIT_CENTER_CATALOG IDs do not match canonical `uiDept` for several
+// entries, so `bareDeptToPcCode()` silently returns null for them. Added
+// 2026-05-28 in Phase 2B Session 3 when wiring OnboardingWizard's dual-write
+// to project_profile — the previously-untraced 7th vocabulary.
+//
+// The 13 mapped entries cover every catalog ID that has a canonical PC.
+// Three IDs intentionally have no mapping:
+//   - rv_park     — deprecated (RV Park is its own asset class, not a marina
+//                   sub-PC). Returns null with deprecation warning (parity
+//                   with legacyPcIdToPcCode).
+//   - sailing_school, membership_fees — no canonical PC. Catalog includes
+//                   them but CANONICAL_PROFIT_CENTERS does not. Returning
+//                   null means a user toggling these in OnboardingWizard
+//                   has their declaration dropped from project_profile;
+//                   the legacy `cm.config.profitCenters` array still carries
+//                   the catalog id. Adding canonical PCs for these is a
+//                   product decision deferred beyond the Session 3 cutover.
+// -----------------------------------------------------------------------------
+const MARINA_CATALOG_ID_TO_PC_CODE: Record<string, string | null> = {
+  storage: 'PC-100',
+  fuel: 'PC-200',
+  service: 'PC-300',
+  parts: 'PC-350',
+  ship_store: 'PC-400',           // wild variant — also covered in WILD_BARE_DEPT_ALIASES
+  commercial_tenants: 'PC-500',
+  boat_rentals: 'PC-600',
+  boat_club: 'PC-650',
+  boat_sales: 'PC-700',
+  boat_brokerage: 'PC-800',
+  events: 'PC-850',               // Events & Charters
+  charter_tours: 'PC-850',        // also Events & Charters — both catalog IDs collapse
+  hospitality: 'PC-900',
+  restaurant: 'PC-901',           // F&B
+  rv_park: null,                  // deprecated — see comment above
+  sailing_school: null,           // no canonical PC — declaration dropped
+  membership_fees: null,          // no canonical PC — declaration dropped
+};
+
+const CATALOG_DEPRECATED_IDS = new Set<string>(['rv_park']);
+const CATALOG_UNMAPPED_IDS = new Set<string>(['sailing_school', 'membership_fees']);
+
+/**
+ * OnboardingWizard catalog ID (shared/marina-catalog.ts:PROFIT_CENTER_CATALOG)
+ * → canonical PC code. Used by Session 3+ dual-write to translate the bare
+ * catalog IDs OnboardingWizard persists at `cm.config.profitCenters` (legacy
+ * string[]) into PC-XXX states for project_profile.
+ *
+ * Returns null for deprecated (rv_park) and unmapped (sailing_school,
+ * membership_fees) IDs. Caller drops the declaration in those cases.
+ *
+ * Like legacyPcIdToPcCode, gates the deprecation warning by assetClass to
+ * avoid spamming the console on non-marina projects.
+ */
+export function marinaCatalogIdToPcCode(
+  id: string,
+  options?: { assetClass?: string; warn?: boolean },
+): string | null {
+  const mapped = MARINA_CATALOG_ID_TO_PC_CODE[id];
+  if (mapped !== undefined && mapped !== null) return mapped;
+  const shouldWarn = options?.warn !== false &&
+    (options?.assetClass === 'marina' || options?.assetClass == null);
+  if (CATALOG_DEPRECATED_IDS.has(id) && shouldWarn) {
+    warnOnce(`[profit-center-id-map] deprecated catalog id "${id}" — not a marina sub-PC. Map output is null; caller should drop or migrate.`);
+  } else if (CATALOG_UNMAPPED_IDS.has(id) && shouldWarn) {
+    warnOnce(`[profit-center-id-map] catalog id "${id}" has no canonical PC. Declaration dropped from project_profile; legacy cm.config.profitCenters retains the id.`);
+  }
+  return null;
+}
+
 /**
  * Detect & classify a stored profitCenters JSON value's shape.
  * Used by Session 2's data migration AND by current consumers that need to

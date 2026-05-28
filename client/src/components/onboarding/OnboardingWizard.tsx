@@ -13,6 +13,12 @@ import { Switch } from "@/components/ui/switch";
 import { AddressAutocompleteInput, type NormalizedAddress } from "@/components/ui/address-autocomplete-input";
 import { US_REGIONS } from "@shared/salescomps-constants";
 import { PROFIT_CENTER_CATALOG, AMENITY_CATALOG } from '@shared/marina-catalog';
+import {
+  CANONICAL_PROFIT_CENTERS,
+  marinaCatalogIdToPcCode,
+  type ProfitCenterState,
+  type ProjectProfile,
+} from '@shared/profit-center-id-map';
 import { getAssetClassCatalog } from '@shared/asset-class-catalog';
 import { getModelConfig } from '@shared/asset-class-model-config';
 import { getWizardConfig, getDocumentTypesForAsset } from '@shared/wizard-enhancement-config';
@@ -596,6 +602,50 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
             ...(propertySizeData ? { propertySize: propertySizeData } : {}),
           ...(ownershipData ? { ownership: ownershipData } : {}),
         });
+
+        // Phase 2B Session 3 dual-write: also populate project_profile. Legacy
+        // cm.config.profitCenters write above is preserved. Failure here is
+        // non-blocking — backfillable via scripts/migrate-project-profiles.ts.
+        try {
+          const onlyMarina = (state.assetClass ?? '').toLowerCase() === 'marina';
+          // Only marina has a canonical PC list this session — non-marina rows
+          // get an empty profile from the asset-class default lookup anyway.
+          if (onlyMarina) {
+            const now = new Date().toISOString();
+            const pcStates: Record<string, ProfitCenterState> = {};
+            for (const pc of CANONICAL_PROFIT_CENTERS) {
+              pcStates[pc.code] = { code: pc.code, label: pc.name, status: 'default' };
+            }
+            // OnboardingWizard records the user's full selection set (enabled +
+            // disabled). For each enabled catalog id → declared_yes. Disabled
+            // entries stay at 'default' because OnboardingWizard's checkbox
+            // semantics are opt-in, not opt-out — an untouched catalog item is
+            // not the same as an explicit "no".
+            for (const pc of state.profitCenters) {
+              if (!pc.isEnabled) continue;
+              const code = marinaCatalogIdToPcCode(pc.id, { assetClass: 'marina' });
+              if (!code) continue; // logged inside marinaCatalogIdToPcCode
+              const existing = pcStates[code];
+              pcStates[code] = {
+                code,
+                label: existing?.label ?? code,
+                status: 'declared_yes',
+                declaredAt: now,
+              };
+            }
+            const profilePayload: ProjectProfile = {
+              profitCenters: pcStates,
+              customCategories: [],
+            };
+            try {
+              await apiRequest('PUT', `/api/v1/projects/${projectId}/profile`, profilePayload);
+            } catch (profileErr) {
+              console.warn('[OnboardingWizard] project_profile write failed — legacy cm.config.profitCenters still carries truth:', profileErr);
+            }
+          }
+        } catch (profileWrapperErr) {
+          console.warn('[OnboardingWizard] profile dual-write block threw:', profileWrapperErr);
+        }
       }
     } catch (e) {
       console.warn('Storage config save failed (non-blocking):', e);

@@ -53,6 +53,12 @@ import { useWizardDraft, onWizardSubmitSuccess } from "@/components/wizard/use-w
 import { ResumeDraftModal } from "@/components/wizard/resume-draft-modal";
 import { useAuth } from "@/hooks/use-auth";
 import { cn } from "@/lib/utils";
+import {
+  CANONICAL_PROFIT_CENTERS,
+  wizardKeyToPcCode,
+  type ProfitCenterState,
+  type ProjectProfile,
+} from "@shared/profit-center-id-map";
 
 // ============================================
 // CONSTANTS
@@ -1920,6 +1926,53 @@ export default function SetupWizard() {
 
       if (!response.ok) {
         throw new Error(result.error || result.details?.[0]?.message || "Failed to create project");
+      }
+
+      // Phase 2B Session 3 dual-write: also populate the canonical project_profile
+      // column. Legacy customMetrics.profitCenters write above is preserved (Commercial
+      // Leases tab + inputs.tsx fallback still read it). Failure here is non-blocking —
+      // the project exists; profile can be backfilled by re-running scripts/migrate-
+      // project-profiles.ts or by user re-saving from the wizard.
+      if (result.id) {
+        try {
+          const now = new Date().toISOString();
+          const profitCenters: Record<string, ProfitCenterState> = {};
+          // Seed every canonical PC at status:'default' so the row carries all 17
+          // entries even though the wizard only surfaces 8. PC-999 G&A intentionally
+          // included at default per Session 2 G3 decision (Option B).
+          for (const pc of CANONICAL_PROFIT_CENTERS) {
+            profitCenters[pc.code] = { code: pc.code, label: pc.name, status: 'default' };
+          }
+          // Overlay the 8 wizard toggles → declared_yes / declared_no.
+          for (const wizardKey of Object.keys(payload.profitCenters) as Array<keyof typeof payload.profitCenters>) {
+            const code = wizardKeyToPcCode(wizardKey);
+            if (!code) {
+              console.warn(`[SETUP_WIZARD] No canonical PC code for wizardKey="${wizardKey}" — declaration dropped`);
+              continue;
+            }
+            const cfg = payload.profitCenters[wizardKey];
+            const existing = profitCenters[code];
+            profitCenters[code] = {
+              code,
+              label: existing?.label ?? code,
+              status: cfg?.enabled ? 'declared_yes' : 'declared_no',
+              declaredAt: now,
+            };
+          }
+          const profilePayload: ProjectProfile = { profitCenters, customCategories: [] };
+          const profileRes = await fetch(`/api/v1/projects/${result.id}/profile`, {
+            method: "PUT",
+            headers,
+            credentials: "include",
+            body: JSON.stringify(profilePayload),
+          });
+          if (!profileRes.ok) {
+            const profileErr = await profileRes.text().catch(() => '');
+            console.warn(`[SETUP_WIZARD] Project profile write failed (${profileRes.status}): ${profileErr.slice(0, 200)} — legacy customMetrics.profitCenters still carries the truth; backfill via scripts/migrate-project-profiles.ts`);
+          }
+        } catch (profileErr) {
+          console.warn("[SETUP_WIZARD] Project profile write threw — legacy customMetrics still carries truth:", profileErr);
+        }
       }
 
       if (result.id && wizardStagedFiles.length > 0) {
