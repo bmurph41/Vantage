@@ -2,7 +2,7 @@
 
 ## ✅ Parser fix — QB Desktop section detection + island-bucket gate (2026-05-28)
 
-Shipped on commit `<filled-after-commit>` as a single atomic commit, pushed to `origin/main`. Two changes paired because the second is the gate-side complement to the first's correctness story (and both are needed to deliver the demo number honestly). The parser fix rewrites XLSX section-header detection to respect QB Desktop's column-encodes-hierarchy convention; the gate change exempts `business_income` (the segregated below-NOI bucket) from the income/cost cross-class check because that bucket is structurally an island containing its own revenue + COGS internally. Together they take SS3's auto-map rate from 38.2% / 33.3% (pre-fix baseline, B3 step 2 commit `4ff1cb42`) to **85.5% (47/55) / 79.6% (43/54)** — squarely in the projected 75–80% band the prior session's journal flagged as parser-blocked.
+Shipped on commit `01c636f8` as a single atomic commit, pushed to `origin/main`. Two changes paired because the second is the gate-side complement to the first's correctness story (and both are needed to deliver the demo number honestly). The parser fix rewrites XLSX section-header detection to respect QB Desktop's column-encodes-hierarchy convention; the gate change exempts `business_income` (the segregated below-NOI bucket) from the income/cost cross-class check because that bucket is structurally an island containing its own revenue + COGS internally. Together they take SS3's auto-map rate from 38.2% / 33.3% (pre-fix baseline, B3 step 2 commit `4ff1cb42`) to **85.5% (47/55) / 79.6% (43/54)** — squarely in the projected 75–80% band the prior session's journal flagged as parser-blocked.
 
 ### Honest three-stage rate progression on SS3
 
