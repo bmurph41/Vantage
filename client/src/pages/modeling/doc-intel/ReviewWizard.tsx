@@ -16,7 +16,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { getEnabledRevenueCogsDepts } from "@/lib/pnl-categories";
+import { getEnabledRevenueCogsDepts, getAllDeptOptions, getAnyDeptLabel } from "@/lib/pnl-categories";
 import type { DocIntelUpload, DocIntelExtractedItem, PnlCategory } from "@shared/schema";
 
 interface ExtractedItemWithCategory extends DocIntelExtractedItem {
@@ -32,18 +32,10 @@ interface ReviewWizardProps {
   onComplete: () => void;
 }
 
-const DEPARTMENTS = [
-  { value: "marina_ops", label: "Marina Operations" },
-  { value: "fuel_dock", label: "Fuel Dock" },
-  { value: "ship_store", label: "Ship Store" },
-  { value: "restaurant", label: "Restaurant" },
-  { value: "boat_sales", label: "Boat Sales" },
-  { value: "service_dept", label: "Service Department" },
-  { value: "storage", label: "Storage" },
-  { value: "commercial_leases", label: "Commercial Leases" },
-  { value: "admin", label: "Administration" },
-  { value: "other", label: "Other" },
-];
+// Phase 2B Session 1 (2026-05-28): same swap as MultiDocumentReview.tsx.
+// Canonical full vocabulary; profile drives highlighting (Session 3), not
+// availability.
+const DEPARTMENTS = getAllDeptOptions();
 
 const WIZARD_STEPS = [
   { id: 1, title: "Parse Document", description: "Extract line items from file", icon: FileSpreadsheet },
@@ -434,7 +426,12 @@ export function ReviewWizard({ projectId, upload, categories, onClose, onComplet
 
   const getDepartmentLabel = (value: string | null) => {
     if (!value) return null;
-    return DEPARTMENTS.find(d => d.value === value)?.label;
+    // Phase 2B Session 1: lookups go through canonical pnl-categories label
+    // maps. Items previously classified under the 10-entry legacy vocabulary
+    // (marina_ops, fuel_dock, etc.) fall through to their raw value via
+    // getAnyDeptLabel's defensive return — caller can still read the stored
+    // string even if the label isn't in the canonical map.
+    return getAnyDeptLabel(value);
   };
 
   const toggleCategoryExpanded = (categoryId: string) => {

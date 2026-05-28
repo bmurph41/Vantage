@@ -35,6 +35,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { PLReviewGrid } from "@/components/doc-intel/PLReviewGrid";
+import { getAllDeptOptions } from "@/lib/pnl-categories";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { DocIntelUpload, DocIntelExtractedItem, PnlCategory } from "@shared/schema";
@@ -58,18 +59,15 @@ interface DocumentItemsState {
   [uploadId: string]: ExtractedItemWithCategory[];
 }
 
-const DEPARTMENTS = [
-  { value: "marina_ops", label: "Marina Operations" },
-  { value: "fuel_dock", label: "Fuel Dock" },
-  { value: "ship_store", label: "Ship Store" },
-  { value: "restaurant", label: "Restaurant" },
-  { value: "boat_sales", label: "Boat Sales" },
-  { value: "service_dept", label: "Service Department" },
-  { value: "storage", label: "Storage" },
-  { value: "commercial_leases", label: "Commercial Leases" },
-  { value: "admin", label: "Administration" },
-  { value: "other", label: "Other" },
-];
+// Phase 2B Session 1 (2026-05-28): replaced the previous 10-entry hardcoded
+// vocabulary (marina_ops / fuel_dock / ship_store / restaurant / boat_sales /
+// service_dept / storage / commercial_leases / admin / other) with the
+// canonical full vocab from pnl-categories.ts. Brett's principle: dropdown
+// availability is always the full canonical vocabulary for the asset class;
+// profile drives highlighting/sort-order only, not availability.
+// Historical translation for items already classified under the 10-entry
+// vocabulary lives in shared/profit-center-id-map.ts → multiDocReviewLegacyDeptToPcCode().
+const DEPARTMENTS = getAllDeptOptions();
 
 function sanitizeDisplayText(text: string | null): string {
   if (!text) return '(no description)';

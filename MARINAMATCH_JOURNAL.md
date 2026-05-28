@@ -1,5 +1,75 @@
 # MarinaMatch Platform Journal
 
+## ✅ Phase 2B Session 1 — profit-center ID reconciliation + dropdown-availability behavioral change (2026-05-28)
+
+Shipped on commit `<sha-after-commit>`, pushed to `origin/main`. Lands the canonical PC-XXX translation map (`shared/profit-center-id-map.ts`), reconciles SIX historical profit-center vocabularies, adds PC-901 Food & Beverage to the marina COA pack, extends the UI enum with `parking` and `events_charters`, and changes the behavioral contract for Department dropdowns: they now **always show the full canonical vocabulary**, with the project profile reserved for highlighting/sort-order (Session 3) rather than dictating availability.
+
+### The behavioral change (Brett's principle, literal)
+
+Before this session: a wizard-created project with N profit centers explicitly checked produced a dropdown with N+2 entries (the checked ones plus the implicit `storage`/`miscellaneous` defaults). On project `7df94d2a Sunset Harbor Village Marina` (the project Brett actually screenshotted, NOT SS3), the dropdown displayed only ~4 entries. Mid-mapping a user could not reach the full marina vocabulary even when the line item legitimately belonged to a category the wizard didn't ask about.
+
+After this session: ALL dropdowns show the full canonical vocabulary regardless of wizard config or stored profile shape. The profile remains read (in `getEnabledRevenueCogsDepts`) but is not consulted for availability — it's preserved for future Session 3 work that will use it for visual highlighting and sort-order ("declared" depts at top, others below).
+
+### Three-stage trace this session
+
+1. **Phase 2A trace surfaced the wrong premise.** The spec assumed SS3 had narrow dropdowns from a null-fallback bug. Trace proved current code's null-fallback already returns full vocab (pnl-categories.ts:144). SS3 specifically showed full dropdowns all along — Brett's screenshot was a different project.
+2. **Live-render trace identified the actual narrowing.** `getEnabledRevenueCogsDepts` was working AS DESIGNED on wizard-created projects (filtering to declared subset). The "bug" was that the design itself was wrong — Brett's principle required full vocab availability, not wizard-narrowed.
+3. **Trace also surfaced a sixth vocabulary** (MultiDocumentReview.tsx + ReviewWizard.tsx each carried their own 10-entry hardcoded `DEPARTMENTS` constant — different from the four vocabularies surfaced in Phase 2A and the legacy `string[]` shape).
+
+### Sign-off decisions captured (Brett, 2026-05-28)
+
+- **Q1 (G1–G5 gaps):** G1 (Events & Charters) and G2 (Parking) filled in UI enum. G3 (G&A as profit center vs expense department) deferred to Session 2 — translation map marks PC-999 `kind: 'expense_department'` for now. G4 (ship_store aliases) filled in `WILD_BARE_DEPT_ALIASES`. G5 split: F&B added as new PC-901 in coa_profit_centers + canonical map; RV Park map-to-null with deprecation warning (it's a primary asset class, not a marina sub-profit-center).
+- **Q2 (empty {} / legacy string[] / all-false shapes):** With Brett's "always full vocab for availability" principle, this becomes simpler — dropdowns always show full regardless of shape. The defensive parsing in `getEnabledRevenueCogsDepts` is preserved for highlighting/sort-order use (Session 3).
+- **Q3 (live-render trace first):** Done. Confirmed the screenshot project was wizard-created (Sunset Harbor 7df94d2a), not SS3. Locus is wizard-by-design narrowing, not a bug.
+- **Q4 (translation map scope):** Includes wild variants observed in persisted data (`"ship_store"` no-suffix variant in project 9a10a6a1). Speculative variants not added until seen.
+
+### What changed
+
+- **NEW `shared/profit-center-id-map.ts`** — canonical PC-XXX table (17 entries: PC-100 through PC-999 plus the new PC-901). Exports translation functions: `wizardKeyToPcCode`, `legacyPcIdToPcCode` (with RV Park deprecation warning gated on `assetClass === 'marina'`), `bareDeptToPcCode`, `pcCodeToWizardKey`, `pcCodeToLegacyPcId`, `pcCodeToUiDept`, `getCanonicalProfitCenter`, `multiDocReviewLegacyDeptToPcCode`, `classifyProfitCentersShape` (helper for Session 2 data migration), `getCanonicalProfitCenterList`. Single source of truth between the four primary vocabularies + wild variants.
+- **MODIFIED `client/src/lib/pnl-categories.ts`** — added `parking` and `events_charters` to `RevenueCogsDept` union and `REVENUE_COGS_DEPT_LABELS`. Added new helpers `getAllDeptOptions()` (full revenue+cogs+expense union, deduped) and `getAnyDeptLabel()` (label lookup across both vocabularies). **Behavioral change in `getFilteredDeptOptionsForTier`:** ignores the `enabledRevenueCogsDepts` parameter (kept for API back-compat) and always returns full canonical options for the tier. `getEnabledRevenueCogsDepts` widened to accept all live-observed shapes (`Record<pcId, {isEnabled|enabled}>`, `Array<{id,label,enabled}>`, `string[]`, empty array, null/undefined) and reads both `enabled` and `isEnabled` field names defensively (server emits `isEnabled` per crm-routes.ts:16181 but the declared `ProjectConfig` type uses `enabled` — a drift that Session 2 reconciles when the `project_profile` column lands).
+- **MODIFIED `client/src/pages/modeling/doc-intel/MultiDocumentReview.tsx`** — replaced 10-entry hardcoded `DEPARTMENTS` constant with `getAllDeptOptions()`. Historical translation for items already classified under the 10-entry vocabulary (`marina_ops`, `fuel_dock`, etc.) lives in `multiDocReviewLegacyDeptToPcCode()`.
+- **MODIFIED `client/src/pages/modeling/doc-intel/ReviewWizard.tsx`** — same swap. `getDepartmentLabel` rewritten to use `getAnyDeptLabel` from the canonical vocab.
+- **NEW `scripts/migrate-pc-901-fb.mjs`** — raw SQL heredoc migration. Inserts PC-901 Food & Beverage into `coa_profit_centers` (marina pack) at `sort_order=92` (between PC-900 Hospitality at 90 and PC-950 Amenities at 95). Idempotent — checks for existing row before insert. Ran cleanly: 17 marina profit centers now in DB.
+- **`db/schema-index.ts`** — auto-regen drift only.
+
+### Decisions made
+
+- **Function rename avoided in favor of behavioral change with API back-compat.** `getFilteredDeptOptionsForTier` keeps its name and parameter signature; the `enabledRevenueCogsDepts` parameter is documented as unused but accepted. Avoids breaking the 5 call sites (PLReviewGrid × 4 + ReviewWizard × 1) all of which still compile. Session 3 can remove the dead parameter when the consumer surfaces migrate to the new highlighting API.
+- **Wild variants only when observed in real data.** `WILD_BARE_DEPT_ALIASES` has exactly one entry today (`ship_store → ship_store_retail` from project 9a10a6a1). Future variants get added when they're seen, not speculated. Keeps the alias surface honest and audit-able.
+- **DB sort_order=92, not 901.** DB uses compressed sort values (10/20/.../95/999). My initial migration used 901 which sorted PC-901 AFTER PC-950 visually. Corrected to 92 in the DB and aligned the canonical type's `sortOrder` values in `shared/profit-center-id-map.ts` to the compressed scheme.
+- **Two surfaces fixed, one not:** PLReviewGrid + ReviewWizard + MultiDocumentReview list-view all updated. The PLReviewGrid matrix view (rendered inside MultiDocumentReview when viewMode='matrix') was already profile-aware via `getFilteredDeptOptionsForTier` — automatically picks up the behavioral change with no call-site edit.
+
+### Verification
+
+- **Dev server boot:** `restart-dev` clean. Server healthy after 7s. No compile errors on touched files.
+- **DB migration ran:** marina pack now contains 17 profit centers including PC-901 Food & Beverage (sorted between Hospitality and Amenities).
+- **Empirical data-path verification on all 4 target projects:**
+  - SS3 (`2c5b8e46`) — null config, regression check — POST-FIX dropdown count: **19 entries (full vocab)**. Already was 19 pre-fix; no regression.
+  - Sunset Harbor (`7df94d2a`) — pc_id object with mostly-false PCs, Brett's actual screenshot project — POST-FIX dropdown count: **19 (was 4 pre-fix)**. Fix works as intended.
+  - Test Marina (`9a10a6a1`) — legacy string[] shape `["storage","fuel","ship_store","service","parts","boat_sales","boat_brokerage"]` — POST-FIX dropdown count: **19 (was 2 pre-fix — legacy[] shape was producing the 2-entry storage+miscellaneous bug)**. Fix works.
+  - Keystone Point (`d8a0df1e`) — legacy string[] shape `["storage","fuel","service"]` — POST-FIX dropdown count: **19 (was 2 pre-fix)**. Fix works.
+- **Scoped tsc (`tsconfig.diag-server-only.json`, `--max-old-space-size=6144`):** 7464 lines (server baseline). My touched files (`shared/profit-center-id-map.ts`) appear nowhere in the error output. Zero new errors.
+- **Scoped client tsc (`tsconfig.diag-client-only.json`):** 3654 lines. My touched files (`client/src/lib/pnl-categories.ts`, `MultiDocumentReview.tsx`, `ReviewWizard.tsx`) appear in error output ONLY for pre-existing errors (status type comparisons in PLReviewGrid, MutationFunction signatures, reviewNotes property — all unrelated to my changes). The TS2345 error my initial function signature caused at PLReviewGrid:299 was resolved by widening `ProfitCentersInputShape` to match the over-permissive `ProjectConfig.profitCenters` type declaration.
+- **UI verification limit (honest):** I cannot programmatically load `/modeling/projects/7df94d2a/doc-intel` in a browser and screenshot the dropdown. The code path was traced through render-time function calls and confirmed to produce the full 19-entry option list. Visual confirmation that the dropdown actually shows 19 entries in the rendered UI requires Brett to load the page.
+
+### Open items deferred to Session 2
+
+- **G3 G&A finalization** — PC-999 is currently `kind: 'expense_department'` in the translation map. Session 2 decides whether to keep listing it under `coa_profit_centers` at all, or move it to a separate `coa_expense_departments` table or similar.
+- **The full project profile data-model decision** — the `project_profile` JSONB column on `modeling_projects` with the state machine (`default` / `declared_yes` / `declared_no` / `system_suggested` / `user_confirmed` / `user_removed`) is signed off conceptually but NOT built this session. Session 2 lands the schema + API + asset-class default vocabulary lookup.
+- **Data migration of stored profitCenters shapes** — the 4 stored shapes (null, empty array, legacy string[], pc_id object with mixed enabled/isEnabled field names) all need a one-shot migration to the new canonical shape Session 2 introduces. Translation map's `classifyProfitCentersShape()` helper is already in place for that.
+- **Deprecation warning logging** — `legacyPcIdToPcCode('pc_rv_park', { assetClass: 'marina' })` logs a one-shot warning via `warnOnce`. Session 2 should add a more durable observability surface (count in a metrics table or similar) so we can quantify how many projects need migration.
+- **`enabledRevenueCogsDepts` parameter cleanup** — accepted-but-unused on `getFilteredDeptOptionsForTier`. Session 3 (highlighting UX) removes the dead parameter and migrates call sites to the new highlighting API.
+
+### Next session priority
+
+Session 2 builds:
+1. The `project_profile` JSONB column on `modeling_projects` with the state machine.
+2. CRUD endpoints for reading/writing the profile.
+3. Asset-class default vocabulary lookup (the layer-1 "what the system knows about for marina" — 17 PCs today; pluggable for other asset classes).
+4. One-shot data migration: existing `cm.config.profitCenters` shapes → new `project_profile` column, all entries normalized to PC-XXX codes with state machine values.
+
+---
+
 ## ✅ Junior Analyst scaffolding committed UNWIRED + unauthorized work discarded (2026-05-28)
 
 Shipped on commit `0fbc5a3a`, pushed to `origin/main`. Lands the Junior Analyst agent system as SCAFFOLDING ONLY — the 7 agents (document-intake, underwriting, deal-scout, dd-coordinator, rent-roll, market-pulse, outreach) plus the event bus, base agent, registry, types, REST API, UI panel + mode toggle + suggestion card, and the two new schema tables (`junior_analyst_settings`, `junior_analyst_suggestions` with 5 indexes). DELIBERATELY NOT WIRED: `startJuniorAnalyst()` is not called at boot, `juniorAnalystRouter` is not mounted on the Express app, no UI component mounts `JuniorAnalystPanel`, no `parseOrchestrator` (or any other producer) emits `jaBus.emit()` events. Wiring is a separately-authorized decision reserved for a separate commit. The commit message explicitly documents the unwired status so a future session reading the code doesn't assume it's live.
