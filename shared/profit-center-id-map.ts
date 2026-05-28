@@ -293,3 +293,119 @@ function warnOnce(msg: string): void {
 export function getCanonicalProfitCenterList(): ReadonlyArray<CanonicalProfitCenter> {
   return CANONICAL_PROFIT_CENTERS;
 }
+
+// =============================================================================
+// PROJECT PROFILE (Phase 2B Session 2, 2026-05-28)
+//
+// The project_profile JSONB column on modeling_projects stores per-project,
+// PC-XXX-keyed state describing which profit centers are visible/active/hidden
+// for a given deal. Replaces the legacy customMetrics.config.profitCenters
+// blob (six historical shapes — see classifyProfitCentersShape above).
+//
+// SCOPE this session: WRITE-only. The new column is populated by the one-shot
+// migration and by CRUD endpoints, but the wizard + Inputs & Data UI continue
+// to read customMetrics.config.profitCenters. Session 3+ flips consumers.
+//
+// STATE SEMANTICS — keep this taxonomy explicit so consumers don't drift:
+//
+//   default            Untouched. System has not asked, user has not declared.
+//                      Rendered as "available" (i.e. enabled/visible) by
+//                      default. The asset-class pack pre-populates this state
+//                      for every PC the pack knows about.
+//
+//   declared_yes       User explicitly opted in (wizard checkbox checked, or
+//                      legacy_string_array migration source). Enabled/visible.
+//
+//   declared_no        User explicitly opted out (wizard checkbox unchecked,
+//                      or pc_id_object isEnabled:false migration source).
+//                      Hidden by default but still mappable — uploads can
+//                      surface evidence that flips this to system_suggested
+//                      pending re-confirmation.
+//
+//   system_suggested   Transient. The discovery job (Session 5) noticed PnL
+//                      lines matching this PC and is asking the user to
+//                      confirm/dismiss. Rendered with a "we noticed X" prompt.
+//
+//   user_confirmed     User accepted a system_suggested item. Enabled/visible.
+//                      Distinguished from declared_yes so we can tell whether
+//                      the user opted in proactively or in response to a
+//                      discovery prompt (analytics surface).
+//
+//   user_removed       User dismissed a system_suggested item. Hidden by
+//                      default — same effective visibility as declared_no but
+//                      tracks that the system once proposed it.
+//
+// "Enabled/visible" group:  default, declared_yes, user_confirmed
+// "Hidden by default" group: declared_no, user_removed
+// "Transient prompt" group:  system_suggested
+//
+// PC-999 G&A (G3 follow-up): included in the default profile with kind carried
+// on the canonical record (`getCanonicalProfitCenter('PC-999').kind ===
+// 'expense_department'`). Whether the wizard surfaces it as a togglable PC at
+// all is a Session 3 product decision; the schema doesn't force a stance.
+// =============================================================================
+
+export type ISO8601 = string;
+
+export type ProfitCenterStateKind =
+  | 'default'
+  | 'declared_yes'
+  | 'declared_no'
+  | 'system_suggested'
+  | 'user_confirmed'
+  | 'user_removed';
+
+export const ENABLED_STATES = new Set<ProfitCenterStateKind>([
+  'default',
+  'declared_yes',
+  'user_confirmed',
+]);
+
+export const HIDDEN_STATES = new Set<ProfitCenterStateKind>([
+  'declared_no',
+  'user_removed',
+]);
+
+export interface ProfitCenterState {
+  /** Canonical PC-XXX code (must match a CANONICAL_PROFIT_CENTERS entry). */
+  code: string;
+  /** Display label at the time of state assignment. Free-form so the UI can
+   *  show a snapshot of what the user saw when they made the decision; the
+   *  canonical name is always retrievable via getCanonicalProfitCenter(code). */
+  label: string;
+  status: ProfitCenterStateKind;
+  declaredAt?: ISO8601;
+  discoveredAt?: ISO8601;
+  discoverySource?: {
+    jobId: string;
+    sampleLabels: string[];
+  };
+}
+
+export interface CustomCategory {
+  /** Stable client-generated id (UUID). */
+  id: string;
+  label: string;
+  suggestedSection: 'revenue' | 'cogs' | 'expense' | 'non_operating' | 'business_income';
+  addedAt: ISO8601;
+  occurrenceCount: number;
+  /** If true, the user has flagged this for promotion into the global pack. */
+  proposedForGlobal: boolean;
+}
+
+export interface ProjectProfile {
+  /** PC-XXX → state. Asset-class default pack populates every known PC at
+   *  status 'default'; mutations only change individual entries. */
+  profitCenters: Record<string, ProfitCenterState>;
+  /** ISO timestamp of the last successful auto-discovery run (Session 5+). */
+  lastSystemDiscoveryAt?: ISO8601;
+  customCategories: CustomCategory[];
+}
+
+/**
+ * Empty/no-pack project profile. Returned by getAssetClassDefaultProfile when
+ * the asset class has no COA pack registered. Never throws.
+ */
+export function emptyProjectProfile(): ProjectProfile {
+  return { profitCenters: {}, customCategories: [] };
+}

@@ -1,5 +1,128 @@
 # MarinaMatch Platform Journal
 
+## ✅ Phase 2B Session 2 — project_profile schema + CRUD + asset-class default lookup + one-shot data migration (2026-05-28)
+
+Shipped on commit (this commit), pushed to `origin/main`. Promotes the per-project profit-center config out of `customMetrics.config.profitCenters` into a typed top-level `project_profile` JSONB column on `modeling_projects`, defines the canonical `ProjectProfile` / `ProfitCenterState` / `CustomCategory` types, ships the CRUD API surface under `/api/v1/projects/:projectId/profile`, an asset-class default vocabulary lookup that handles the no-pack case cleanly, and a one-shot migration that translates every existing row's prior shape into the new column.
+
+**Scope this session is WRITE-only.** The wizard + Inputs & Data UI continue to read `customMetrics.config.profitCenters`. Session 3+ flips consumers — verified by `grep` for `project_profile`/`projectProfile` across server + client + shared: only the new files reference it.
+
+### Trace before build
+
+Read-only live-data trace across all 20 `modeling_projects` rows produced the authoritative shape inventory:
+
+| Shape | Count | Notes |
+|---|---|---|
+| `absent` (null) | **16** | Most rows. Hits asset-class-default path. |
+| `legacy_string_array` | **3** | `9a10a6a1` Test Marina (7 values incl. wild `ship_store`), `d8a0df1e` Keystone Point Marina (3 values), `9e98e156` Clearwater Laundry (empty `[]`) |
+| `pc_id_object` | **1** | `7df94d2a` Sunset Harbor: 2 enabled, 12 disabled (incl. deprecated `pc_rv_park`) |
+| `empty_object` | 0 | Never observed |
+| `object_with_code_label` | 0 | The never-observed shape from the spec — confirmed never observed |
+| `unknown` | 0 | — |
+
+Trace also confirmed: `project_profile` column did NOT exist (safe to add), `modeling_projects` has NO RLS (Drizzle is fine here — precedent in `storage.ts`, `external-api-service.ts`, `integration-storage.ts`), `coa_taxonomy_packs` has exactly one row today (`asset_class='MARINA'`), live PCs in DB match the 17 canonical entries.
+
+### Schema decision
+
+`modeling_projects.project_profile jsonb NOT NULL DEFAULT '{}'::jsonb` — promoted as a first-class typed column, **not nested under `custom_metrics`**, so it's queryable in SQL. Drizzle declaration co-located with `customMetrics` and `caseLabels` (`shared/schema.ts:11500`). Startup migration in `server/db-startup-migrations.ts` immediately after `adjustments_master_state` (the most recent modeling_projects column-add precedent). `IF NOT EXISTS` idempotent per the established pattern.
+
+The `ProjectProfile` / `ProfitCenterState` / `CustomCategory` types are defined in `shared/profit-center-id-map.ts` alongside the existing canonical map. State semantics taxonomy documented inline:
+
+- **Enabled/visible group:** `default`, `declared_yes`, `user_confirmed`
+- **Hidden by default group:** `declared_no`, `user_removed`
+- **Transient prompt group:** `system_suggested`
+
+### CRUD endpoints — mount order decision (DELIBERATE)
+
+Endpoints mounted at `/api/v1/projects/:projectId/profile` (`server/routes/project-profile-routes.ts`):
+- `GET /:projectId/profile` — returns stored profile merged with asset-class default
+- `PATCH /:projectId/profile/profit-centers/:code` — single PC state update; validates code + status
+- `POST /:projectId/profile/custom-categories` — append custom category
+- `PUT /:projectId/profile` — full replace (wizard batch updates)
+
+**Mount placement: BEFORE the `/api/v1` catch-all (server/routes.ts:641, immediately before line 642's `apiV1Router` mount).** This deliberately diverges from the `/api/v1/document-extraction` precedent (line 1580) which is mounted AFTER the catch-all and relies on Express middleware fall-through after `authenticateApiKey` 401s. The before-catch-all placement is more deterministic — the in-app user-auth router runs first regardless of whether `authenticateApiKey` falls through or short-circuits. **Future-session note: do NOT "fix" this back to the document-extraction order.** Inline comment in routes.ts flags the intent.
+
+### Asset-class default lookup — handles the no-pack case cleanly
+
+`getAssetClassDefaultProfile(assetClass)` in `server/services/project-profile-service.ts`:
+- Looks up `coa_taxonomy_packs` with `LOWER(asset_class::text) = LOWER($1)` (enum cast needed — `asset_class` column is an enum type, not text)
+- Marina (the only pack today) returns all 17 canonical PCs at status `default`
+- Any asset class without a pack (laundromat, multifamily, STR, business — the live non-marina cases) returns `emptyProjectProfile()` with a log line. Never throws, never returns undefined
+- Pluggable: future asset-class packs supply their own canonical list
+
+### Migration mapping rules + result
+
+One-shot script `scripts/migrate-project-profiles.ts` (run with `npx tsx`). Mapping rules:
+
+| Source shape | Per-PC rule | Unmapped PCs |
+|---|---|---|
+| `absent` / `empty_object` | n/a | full asset-class default |
+| `legacy_string_array` empty | **explicit branch** → asset-class default (not via zero-values incidental loop) | full asset-class default |
+| `legacy_string_array` with values | each value → `bareDeptToPcCode` → `declared_yes`; null returns logged & dropped | remaining canonical PCs → `default` |
+| `pc_id_object` | each key → `legacyPcIdToPcCode`; `isEnabled:true` → `declared_yes`, `isEnabled:false` → `declared_no`; null returns logged & dropped (e.g. `pc_rv_park`) | remaining canonical PCs → `default` |
+| `object_with_code_label` / `unknown` | log + skip | n/a — never observed |
+
+Migration run totals across 20 rows: **`wrote_translated=3`** (Test Marina, Keystone Point, Sunset Harbor) **`wrote_default=12`** (the 12 marina rows with null pc) **`skipped_no_pack=5`** (laundromat 1, multifamily 2, STR 1, business 1 — all received empty default + sentinel so reruns skip them).
+
+**Idempotency** gated by an `_migratedAt` sentinel field inside the JSONB payload. Re-running the migration produces all-20-`skipped_already_populated`. Sentinel is a deliberate untyped artifact (see "Two flagged artifacts" below).
+
+### Sunset Harbor spot-check (spec verification target)
+
+Project `7df94d2a` pc_id_object source: `pc_hospitality` and `pc_marina_amenities` enabled, 12 others disabled including deprecated `pc_rv_park`.
+
+Migrated `project_profile.profitCenters` verified end-to-end (all 17 PCs present):
+- `PC-900 Hospitality` → `declared_yes` ✓
+- `PC-950 Amenities` → `declared_yes` ✓
+- `PC-200/300/350/400/500/600/650/700/750/800/901` (11) → `declared_no` ✓
+- `PC-100 Storage`, `PC-550 Parking`, `PC-850 Events & Charters`, `PC-999 G&A` (4) → `default` ✓ (not present in legacy data → asset-class default fallback)
+- `pc_rv_park` → null return from `legacyPcIdToPcCode` → dropped + logged as UNTRANSLATABLE ✓
+
+### G3 G&A stance (resolved for this session)
+
+PC-999 G&A lives in the default profile alongside the other 16 PCs. Its `kind: 'expense_department'` classification stays on the canonical record (`getCanonicalProfitCenter('PC-999').kind`), NOT on `ProfitCenterState`. Consumers needing behavioral classification call the canonical lookup. **Whether the wizard surfaces PC-999 as a togglable PC at all is a Session 3 product decision** — the schema doesn't force a stance.
+
+### Two flagged artifacts (carry forward)
+
+1. **Mount-order divergence from doc-extraction precedent** — covered above. Journal-noted so a future session doesn't "normalize" it the wrong way. Inline comment in `routes.ts:639-641` repeats the rationale.
+2. **`_migratedAt` sentinel field inside the JSONB payload** — used purely as the idempotency gate for `scripts/migrate-project-profiles.ts`. NOT part of the `ProjectProfile` TypeScript type and NOT surfaced by the GET endpoint (which reads only `profitCenters`, `customCategories`, `lastSystemDiscoveryAt`). **Session 3 cleanup candidate:** decide whether to formalize into a separate column (e.g., `project_profile_migrated_at timestamp`) or drop entirely once all rows are universally migrated. Not refactored this session.
+
+### What changed (files)
+
+- **NEW `server/services/project-profile-service.ts`** — `getAssetClassDefaultProfile`, `getProjectProfile`, `saveProjectProfile`, `updateProfitCenterState`, `addCustomCategory`. Uses raw `pool.query` for asset-class pack lookup (enum cast), Drizzle pattern elsewhere via raw query (modeling_projects has no RLS).
+- **NEW `server/routes/project-profile-routes.ts`** — Express router with GET/PATCH/POST/PUT. Validates status values against the `ProfitCenterStateKind` set; validates `suggestedSection` against the 5 allowed values.
+- **NEW `scripts/migrate-project-profiles.ts`** — one-shot translation script. Imports `bareDeptToPcCode` / `legacyPcIdToPcCode` / `classifyProfitCentersShape` / `CANONICAL_PROFIT_CENTERS` from the canonical map.
+- **MODIFIED `shared/schema.ts`** — added `projectProfile: jsonb('project_profile').default(sql\`'{}'\`)` to `modelingProjects` table (8 lines).
+- **MODIFIED `shared/profit-center-id-map.ts`** — added `ISO8601`, `ProfitCenterStateKind`, `ENABLED_STATES`, `HIDDEN_STATES`, `ProfitCenterState`, `CustomCategory`, `ProjectProfile`, `emptyProjectProfile()` (116 lines with state-semantics doc block).
+- **MODIFIED `server/db-startup-migrations.ts`** — added `modeling_projects: add project_profile` migration entry (5 lines).
+- **MODIFIED `server/routes.ts`** — imported `projectProfileRouter`, mounted at `/api/v1/projects` with `authenticateUser + enforceTenant` BEFORE the `/api/v1` catch-all (5 lines).
+- **`db/schema-index.ts`** — benign auto-regen drift (blank line). Self-resolves on commit hook.
+
+### Verification
+
+- **Live DB column present:** `information_schema.columns` confirms `project_profile jsonb NOT NULL DEFAULT '{}'::jsonb` after server restart picked up the startup migration.
+- **Migration run on dev DB:** totals 3/12/5 as documented above. Sunset Harbor full PC-by-PC verification matches the spec target exactly.
+- **Idempotency:** second migration run → all 20 rows `skipped_already_populated`.
+- **Scoped tsc clean on touched files** (`shared/profit-center-id-map.ts`, `server/services/project-profile-service.ts`, `server/routes/project-profile-routes.ts`, `scripts/migrate-project-profiles.ts`) using project paths + strict mode: zero errors in any of the four. Pre-existing TS7022/7024 noise on `shared/schema.ts` (Drizzle circular-inference baseline) is unchanged.
+- **CRUD round-trip smoke on Sunset Harbor:** GET → 200 (17 PCs with correct merged states), PATCH PC-200 `declared_no → user_confirmed` → 200, POST custom category → 200, GET re-read → both mutations visible. Mutations restored to post-migration baseline via direct DB write so the commit is clean.
+- **Scope guard:** `grep` for `project_profile` / `projectProfile` across server + client + shared returns only the new files + the routes.ts mount line. No live consumer accidentally switched to reading the new column. (`routes.ts.pre-dcf-refactor` is a stale April backup, unrelated.)
+
+### Open items deferred to Session 3+
+
+- **Wizard wiring to WRITE the new column** (Session 3). Wizard currently writes `customMetrics.config.profitCenters` only.
+- **Dropdown + Inputs & Data consumers switching to READ `project_profile`** (Session 3/4). Currently read `customMetrics.config.profitCenters`.
+- **Auto-discover "we noticed X" flow** (Session 5). Will populate `system_suggested` state + `discoverySource` + `lastSystemDiscoveryAt`.
+- **G3 G&A wizard-surfacing decision** — included in default profile this session; whether wizard shows it as togglable defers to Session 3.
+- **`_migratedAt` sentinel cleanup** — decide column-vs-drop in Session 3 once all-rows-migrated invariant is durable.
+
+### Next session priority
+
+Session 3:
+1. Wire the wizard's profit-center step to WRITE to `project_profile` via the new PATCH/PUT endpoints (in addition to or instead of the legacy `cm.config.profitCenters` write).
+2. Wizard-surfacing decision for PC-999 G&A.
+3. Begin flipping dropdown consumers (`getEnabledRevenueCogsDepts` callers) to read the new column.
+4. Cleanup decision on `_migratedAt` sentinel and the unused `enabledRevenueCogsDepts` parameter on `getFilteredDeptOptionsForTier`.
+
+---
+
 ## ✅ Phase 2B Session 1 — profit-center ID reconciliation + dropdown-availability behavioral change (2026-05-28)
 
 Shipped on commit `e77c10b6`, pushed to `origin/main`. Lands the canonical PC-XXX translation map (`shared/profit-center-id-map.ts`), reconciles SIX historical profit-center vocabularies, adds PC-901 Food & Beverage to the marina COA pack, extends the UI enum with `parking` and `events_charters`, and changes the behavioral contract for Department dropdowns: they now **always show the full canonical vocabulary**, with the project profile reserved for highlighting/sort-order (Session 3) rather than dictating availability.

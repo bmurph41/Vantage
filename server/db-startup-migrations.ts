@@ -10932,6 +10932,11 @@ const MIGRATIONS: Migration[] = [
   //    handles fresh bootstraps where the column needs to be added.
   { name: "modeling_addbacks: add is_active", sql: `ALTER TABLE modeling_addbacks ADD COLUMN IF NOT EXISTS is_active boolean NOT NULL DEFAULT true` },
   { name: "modeling_projects: add adjustments_master_state", sql: `ALTER TABLE modeling_projects ADD COLUMN IF NOT EXISTS adjustments_master_state text NOT NULL DEFAULT 'all_on' CHECK (adjustments_master_state IN ('all_on', 'all_off', 'custom'))` },
+  // Phase 2B Session 2 (2026-05-28): promoted profit-center config out of
+  // custom_metrics.config.profitCenters into a typed top-level column.
+  // Default '{}' on insert; one-shot script (scripts/migrate-project-profiles.mjs)
+  // backfills existing rows with PC-XXX-keyed state from prior shapes.
+  { name: "modeling_projects: add project_profile", sql: `ALTER TABLE modeling_projects ADD COLUMN IF NOT EXISTS project_profile jsonb NOT NULL DEFAULT '{}'::jsonb` },
   { name: "modeling_actuals: add source", sql: `ALTER TABLE modeling_actuals ADD COLUMN IF NOT EXISTS source text NOT NULL DEFAULT 'uploaded' CHECK (source IN ('uploaded', 'manual_override'))` },
   { name: "modeling_projection_decisions: create table", sql: `CREATE TABLE IF NOT EXISTS modeling_projection_decisions (project_id uuid NOT NULL, org_id uuid NOT NULL, year integer NOT NULL, handling text NOT NULL DEFAULT 'auto' CHECK (handling IN ('auto', 'manual', 'gap')), needs_review boolean NOT NULL DEFAULT true, created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(), PRIMARY KEY (project_id, year))` },
   { name: "modeling_adjustment_history: create table", sql: `CREATE TABLE IF NOT EXISTS modeling_adjustment_history (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), org_id uuid NOT NULL, project_id uuid NOT NULL, user_id uuid NOT NULL, action_type text NOT NULL CHECK (action_type IN ('addback_toggle','master_state_change','reconciliation_decision','projection_method_change','apply_to_pro_forma','manual_override','addback_created_post_upload','addback_deleted_via_resync')), target_id uuid, old_value jsonb, new_value jsonb, metadata jsonb, created_at timestamptz NOT NULL DEFAULT now())` },

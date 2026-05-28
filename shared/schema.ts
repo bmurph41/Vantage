@@ -11497,6 +11497,14 @@ export const modelingProjects = pgTable('modeling_projects', {
   // Case configuration - custom labels for scenarios (base, aggressive, conservative, custom)
   caseLabels: jsonb('case_labels').default(sql`'{"base": "Base Case", "aggressive": "Aggressive Case", "conservative": "Conservative Case", "custom": "Custom Case"}'`),
 
+  // Phase 2B Session 2 (2026-05-28) — canonical PC-XXX-keyed project profile.
+  // Promoted out of customMetrics.config so it's queryable in SQL. Live consumers
+  // continue to read customMetrics.config.profitCenters this session; Session 3+
+  // will switch the wizard + Inputs & Data layer to read this column.
+  // Shape: { profitCenters: Record<PC-XXX, ProfitCenterState>, customCategories: CustomCategory[], lastSystemDiscoveryAt?: ISO8601 }
+  // See shared/profit-center-id-map.ts for type definitions and state semantics.
+  projectProfile: jsonb('project_profile').default(sql`'{}'`),
+
   // G4: project-level master toggle for the per-line-item adjustments UI.
   // 'all_on' / 'all_off' apply universally; 'custom' means per-line state lives
   // on modeling_addbacks.is_active.

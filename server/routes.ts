@@ -91,6 +91,7 @@ import omRouter from "./om/routes";
 import omBuilderRouter from "./routes/om-builder-routes";
 import documentBuilderRouter from "./routes/document-builder-routes";
 import documentExtractionRouter from "./routes/document-extraction";
+import { projectProfileRouter } from "./routes/project-profile-routes";
 import scraperV2Routes from "./docket/scraper_v2/routes";
 import { liv2Routes } from "./listings/ingestion_v2";
 import marketplaceRoutes from "./routes/marketplace-routes";
@@ -634,6 +635,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/public-records", authenticateUser, enforceTenant, publicRecordsRouter);
   // G.4 + 3.5: Predictive Analytics & Hold-Sell Optimizer
   app.use("/api/predictive", authenticateUser, enforceTenant, predictiveAnalyticsRouter);
+  // Phase 2B Session 2 (2026-05-28): in-app project profile CRUD.
+  // Mounted before the /api/v1 catch-all so authenticated browser sessions
+  // hit this user-auth router instead of authenticateApiKey 401-ing.
+  app.use("/api/v1/projects", authenticateUser, enforceTenant, projectProfileRouter);
   // H.2: White-Label API v1 (API key auth, no session)
   app.use("/api/v1", authenticateApiKey, apiV1Router);
   // E.5: Cash Flow Forecasting Engine
