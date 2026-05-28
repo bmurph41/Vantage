@@ -19991,6 +19991,42 @@ const MIGRATIONS: Migration[] = [
   // users — uncovered columns
   { name: "users: add tos_accepted_at", sql: `ALTER TABLE users ADD COLUMN IF NOT EXISTS tos_accepted_at timestamptz` },
   { name: "users: add tos_version", sql: `ALTER TABLE users ADD COLUMN IF NOT EXISTS tos_version varchar(32)` },
+
+  // ── Junior Analyst — CREATE TABLES (new tables, must exist before column checks)
+  { name: "junior_analyst_settings: create table", sql: `CREATE TABLE IF NOT EXISTS junior_analyst_settings (
+    id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+    org_id varchar NOT NULL,
+    project_id varchar,
+    mode text NOT NULL DEFAULT 'manual',
+    enabled_agents jsonb DEFAULT '["document_intake","underwriting","deal_scout","dd_coordinator","rent_roll","market_pulse","outreach"]',
+    stage_toggles jsonb DEFAULT '{}',
+    created_at timestamp DEFAULT now() NOT NULL,
+    updated_at timestamp DEFAULT now() NOT NULL
+  )` },
+  { name: "junior_analyst_suggestions: create table", sql: `CREATE TABLE IF NOT EXISTS junior_analyst_suggestions (
+    id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+    org_id varchar NOT NULL,
+    project_id varchar,
+    deal_id varchar,
+    agent_id text NOT NULL,
+    agent_name text NOT NULL,
+    type text NOT NULL,
+    title text NOT NULL,
+    body text NOT NULL,
+    data jsonb DEFAULT '{}',
+    status text NOT NULL DEFAULT 'pending',
+    priority text NOT NULL DEFAULT 'normal',
+    triggered_by text,
+    acted_at timestamp,
+    acted_by varchar,
+    created_at timestamp DEFAULT now() NOT NULL,
+    updated_at timestamp DEFAULT now() NOT NULL
+  )` },
+  { name: "junior_analyst_settings: add index ja_settings_org_idx", sql: `CREATE INDEX IF NOT EXISTS ja_settings_org_idx ON junior_analyst_settings (org_id)` },
+  { name: "junior_analyst_settings: add index ja_settings_org_project_idx", sql: `CREATE INDEX IF NOT EXISTS ja_settings_org_project_idx ON junior_analyst_settings (org_id, project_id)` },
+  { name: "junior_analyst_suggestions: add index ja_suggestions_org_status_idx", sql: `CREATE INDEX IF NOT EXISTS ja_suggestions_org_status_idx ON junior_analyst_suggestions (org_id, status)` },
+  { name: "junior_analyst_suggestions: add index ja_suggestions_project_idx", sql: `CREATE INDEX IF NOT EXISTS ja_suggestions_project_idx ON junior_analyst_suggestions (org_id, project_id)` },
+  { name: "junior_analyst_suggestions: add index ja_suggestions_deal_idx", sql: `CREATE INDEX IF NOT EXISTS ja_suggestions_deal_idx ON junior_analyst_suggestions (deal_id)` },
 ];
 
 /**

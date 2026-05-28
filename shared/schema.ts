@@ -30182,3 +30182,49 @@ export const organizationSettings = pgTable("organization_settings", {
   settingValue: text("setting_value"),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
+
+// ── Junior Analyst — Settings ──────────────────────────────────────────────
+export const juniorAnalystSettings = pgTable("junior_analyst_settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  projectId: varchar("project_id"),
+  mode: text("mode").notNull().default("manual"),
+  enabledAgents: jsonb("enabled_agents").default('["document_intake","underwriting","deal_scout","dd_coordinator","rent_roll","market_pulse","outreach"]'),
+  stageToggles: jsonb("stage_toggles").default('{}'),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index("ja_settings_org_idx").on(table.orgId),
+  orgProjectIdx: index("ja_settings_org_project_idx").on(table.orgId, table.projectId),
+}));
+export type JuniorAnalystSettings = typeof juniorAnalystSettings.$inferSelect;
+export const insertJuniorAnalystSettingsSchema = createInsertSchema(juniorAnalystSettings).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertJuniorAnalystSettings = z.infer<typeof insertJuniorAnalystSettingsSchema>;
+
+// ── Junior Analyst — Suggestions ──────────────────────────────────────────
+export const juniorAnalystSuggestions = pgTable("junior_analyst_suggestions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  projectId: varchar("project_id"),
+  dealId: varchar("deal_id"),
+  agentId: text("agent_id").notNull(),
+  agentName: text("agent_name").notNull(),
+  type: text("type").notNull(),
+  title: text("title").notNull(),
+  body: text("body").notNull(),
+  data: jsonb("data").default('{}'),
+  status: text("status").notNull().default("pending"),
+  priority: text("priority").notNull().default("normal"),
+  triggeredBy: text("triggered_by"),
+  actedAt: timestamp("acted_at"),
+  actedBy: varchar("acted_by"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  orgStatusIdx: index("ja_suggestions_org_status_idx").on(table.orgId, table.status),
+  orgProjectIdx: index("ja_suggestions_project_idx").on(table.orgId, table.projectId),
+  dealIdx: index("ja_suggestions_deal_idx").on(table.dealId),
+}));
+export type JuniorAnalystSuggestion = typeof juniorAnalystSuggestions.$inferSelect;
+export const insertJuniorAnalystSuggestionSchema = createInsertSchema(juniorAnalystSuggestions).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertJuniorAnalystSuggestion = z.infer<typeof insertJuniorAnalystSuggestionSchema>;
