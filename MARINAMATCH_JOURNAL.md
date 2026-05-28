@@ -2,7 +2,7 @@
 
 ## ✅ Phase 2B Session 1 — profit-center ID reconciliation + dropdown-availability behavioral change (2026-05-28)
 
-Shipped on commit `<sha-after-commit>`, pushed to `origin/main`. Lands the canonical PC-XXX translation map (`shared/profit-center-id-map.ts`), reconciles SIX historical profit-center vocabularies, adds PC-901 Food & Beverage to the marina COA pack, extends the UI enum with `parking` and `events_charters`, and changes the behavioral contract for Department dropdowns: they now **always show the full canonical vocabulary**, with the project profile reserved for highlighting/sort-order (Session 3) rather than dictating availability.
+Shipped on commit `e77c10b6`, pushed to `origin/main`. Lands the canonical PC-XXX translation map (`shared/profit-center-id-map.ts`), reconciles SIX historical profit-center vocabularies, adds PC-901 Food & Beverage to the marina COA pack, extends the UI enum with `parking` and `events_charters`, and changes the behavioral contract for Department dropdowns: they now **always show the full canonical vocabulary**, with the project profile reserved for highlighting/sort-order (Session 3) rather than dictating availability.
 
 ### The behavioral change (Brett's principle, literal)
 
