@@ -11461,6 +11461,12 @@ export const modelingProjects = pgTable('modeling_projects', {
   purchasePrice: decimal('purchase_price', { precision: 15, scale: 2 }),
   year1CapRate: decimal('year_1_cap_rate', { precision: 5, scale: 2 }), // e.g., 7.25%
   totalStorageUnits: integer('total_storage_units'), // Total number of storage options (wet slips + dry racks, etc.)
+  // Phase 3 Session 3: provenance for the derived Total Slips column. Set when
+  // total_storage_units is derived from customMetrics. NULL = never derived.
+  // (ebitda_computed_at intentionally NOT added this session — the EBITDA
+  // writeback is blocked on an upstream category-classification defect; see the
+  // Phase 3 Session 3 journal entry.)
+  totalStorageUnitsComputedAt: timestamp('total_storage_units_computed_at', { withTimezone: true }),
   ebitda: decimal('ebitda', { precision: 15, scale: 2 }),
   dealOutcome: dealOutcomeEnum('deal_outcome').notNull().default('active'),
   assetClass: varchar("asset_class", { length: 50 }).default("marina"),

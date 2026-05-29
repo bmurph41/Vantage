@@ -114,6 +114,7 @@ import { db } from "./db";
 import { eq, and, desc, asc, sql, inArray, isNull, isNotNull, or, count, ilike, gte, lte } from "drizzle-orm";
 import { VdrStorage } from "./vdr-storage";
 import { VdrPermissionService } from "./vdr-permission-service";
+import { deriveTotalStorageUnits } from "./services/project-derivation-service";
 
 export interface IStorage {
   // Organizations
@@ -7388,16 +7389,48 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createModelingProject(data: InsertModelingProject): Promise<ModelingProject> {
+    // Phase 3 Session 3: derive Total Slips from customMetrics at create time if
+    // departments data was provided and the column wasn't set explicitly.
+    const createData: any = { ...data };
+    if (createData.customMetrics !== undefined && createData.totalStorageUnits == null) {
+      const derived = deriveTotalStorageUnits(createData.assetClass, createData.customMetrics);
+      if (derived != null) {
+        createData.totalStorageUnits = derived;
+        createData.totalStorageUnitsComputedAt = new Date();
+      }
+    }
     const [created] = await db.insert(modelingProjects)
-      .values(data as any)
+      .values(createData)
       .returning();
     return created;
   }
 
   async updateModelingProject(id: string, data: UpdateModelingProject, orgId: string): Promise<ModelingProject | undefined> {
-    const updateData = { ...data, updatedAt: new Date() };
+    const updateData: any = { ...data, updatedAt: new Date() };
+
+    // Phase 3 Session 3: whenever customMetrics is rewritten, refresh the derived
+    // Total Slips column so the Overview KPI stays in sync with the canonical
+    // departments data. Central chokepoint — every /config save funnels here.
+    // Only writes when the derived value is non-null AND differs from current,
+    // so it never clobbers an existing value with null on an unrelated update.
+    if (updateData.customMetrics !== undefined) {
+      const [existing] = await db
+        .select({ assetClass: modelingProjects.assetClass, totalStorageUnits: modelingProjects.totalStorageUnits })
+        .from(modelingProjects)
+        .where(and(eq(modelingProjects.id, id), eq(modelingProjects.orgId, orgId)))
+        .limit(1);
+      if (existing) {
+        const assetClass = (updateData.assetClass ?? existing.assetClass) as string | null;
+        const derived = deriveTotalStorageUnits(assetClass, updateData.customMetrics);
+        if (derived != null && derived !== existing.totalStorageUnits) {
+          updateData.totalStorageUnits = derived;
+          updateData.totalStorageUnitsComputedAt = new Date();
+        }
+      }
+    }
+
     const [updated] = await db.update(modelingProjects)
-      .set(updateData as any)
+      .set(updateData)
       .where(and(
         eq(modelingProjects.id, id),
         eq(modelingProjects.orgId, orgId)

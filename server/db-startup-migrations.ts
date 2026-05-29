@@ -11223,6 +11223,30 @@ const MIGRATIONS: Migration[] = [
   { name: "modeling_projects: add year_1_cap_rate", sql: `ALTER TABLE modeling_projects ADD COLUMN IF NOT EXISTS year_1_cap_rate numeric(5, 2)` },
   { name: "modeling_projects: add total_storage_units", sql: `ALTER TABLE modeling_projects ADD COLUMN IF NOT EXISTS total_storage_units integer` },
   { name: "modeling_projects: add ebitda", sql: `ALTER TABLE modeling_projects ADD COLUMN IF NOT EXISTS ebitda numeric(15, 2)` },
+  // Phase 3 Session 3: provenance for derived Total Slips (set when derived from customMetrics).
+  { name: "modeling_projects: add total_storage_units_computed_at", sql: `ALTER TABLE modeling_projects ADD COLUMN IF NOT EXISTS total_storage_units_computed_at timestamptz` },
+  // Phase 3 Session 3 — Total Slips backfill. Mirrors deriveTotalStorageUnits()
+  // (server/services/project-derivation-service.ts): for marina projects, sum the
+  // `count` of every department whose section='storage'. Idempotent — only fills
+  // rows where total_storage_units IS NULL, so re-runs are no-ops. Keep this SQL
+  // in sync with the helper if the derivation rule changes.
+  { name: "modeling_projects: backfill total_storage_units from departments", sql: `
+    UPDATE modeling_projects p
+    SET total_storage_units = sub.total,
+        total_storage_units_computed_at = now()
+    FROM (
+      SELECT mp.id, SUM((dept.value->>'count')::numeric)::int AS total
+      FROM modeling_projects mp,
+           LATERAL jsonb_each(mp.custom_metrics->'config'->'departments') AS dept
+      WHERE mp.asset_class = 'marina'
+        AND mp.total_storage_units IS NULL
+        AND dept.value->>'section' = 'storage'
+        AND (dept.value->>'count') ~ '^[0-9]+(\\.[0-9]+)?$'
+        AND (dept.value->>'count')::numeric > 0
+      GROUP BY mp.id
+    ) sub
+    WHERE p.id = sub.id AND p.total_storage_units IS NULL AND sub.total > 0
+  ` },
   { name: "modeling_projects: add deal_outcome", sql: `ALTER TABLE modeling_projects ADD COLUMN IF NOT EXISTS deal_outcome text` },
   { name: "modeling_projects: add asset_class", sql: `ALTER TABLE modeling_projects ADD COLUMN IF NOT EXISTS asset_class varchar(50)` },
   { name: "modeling_projects: add model_input_mode", sql: `ALTER TABLE modeling_projects ADD COLUMN IF NOT EXISTS model_input_mode text` },
