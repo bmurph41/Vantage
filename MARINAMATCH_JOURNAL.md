@@ -1,5 +1,104 @@
 # MarinaMatch Platform Journal
 
+## ✅ Phase 2B Session 3 — wizard dual-write to project_profile + dead-parameter cleanup (2026-05-28)
+
+Shipped on commits `4c2c89ff` (commit 1 — wizard dual-write) and `b9c24480` (commit 2 — dead-parameter cleanup), pushed to `origin/main`. Setup-wizard and OnboardingWizard now write BOTH the legacy `customMetrics` shapes AND the new `project_profile` column on every project create. Legacy writes are deliberately preserved — Commercial Leases tab visibility (workspace.tsx) and inputs.tsx fallback still read `cm.profitCenters` and are NOT flipped this session. Consumer flips defer to Sessions 4-6. Commit 2 separately removes the inert `enabledRevenueCogsDepts` parameter from `getFilteredDeptOptionsForTier` and updates its 4 call sites in PLReviewGrid — pure cosmetic cleanup, separately revertable.
+
+### Architecture decision — dual-write, not cut-over
+
+Both wizards POST their legacy shape first (server's `/api/modeling/projects` or `/config` endpoint), then PUT the full 17-PC `ProjectProfile` to `/api/v1/projects/:id/profile` as a follow-up. The PUT is **non-blocking**: try/catch around the call, `console.warn` on failure, project creation succeeds either way. Rationale: legacy `cm.profitCenters` continues to be the source of truth for Commercial Leases tab visibility and inputs.tsx until consumer flips land in Sessions 4-6. The new column is being filled in parallel so consumers can flip atomically once the data is durably populated. Backfill safety net: `scripts/migrate-project-profiles.ts` (Session 2) translates any rows where the PUT silently failed.
+
+### The seventh vocabulary — `marinaCatalogIdToPcCode`
+
+Pre-build trace surfaced a SEVENTH profit-center vocabulary not seen in any of Phase 2A/Session 1/Session 2: `PROFIT_CENTER_CATALOG` in `shared/marina-catalog.ts`. OnboardingWizard renders checkboxes against this catalog and writes the enabled IDs as a bare `string[]` into `cm.config.profitCenters`. Catalog IDs do NOT match canonical `uiDept` values for **7 of 17 entries** — so a naive `bareDeptToPcCode(catalogId)` would have silently dropped half of OnboardingWizard's declarations.
+
+New translation function `marinaCatalogIdToPcCode` added to `shared/profit-center-id-map.ts` (commit 1):
+
+| Group | Count | Notes |
+|---|---|---|
+| Clean map → canonical PC | **13** | storage→PC-100, fuel→PC-200, service→PC-300, parts→PC-350, ship_store→PC-400, commercial_tenants→PC-500, boat_rentals→PC-600, boat_club→PC-650, boat_sales→PC-700, boat_brokerage→PC-800, events→PC-850, charter_tours→PC-850 (collapse to same PC), hospitality→PC-900, restaurant→PC-901 |
+| Deprecated → null + warnOnce | **1** | `rv_park` — primary asset class, not a marina sub-PC. Same warnOnce pattern as `legacyPcIdToPcCode`. Declaration dropped from `project_profile`; legacy column retains the catalog id. |
+| Unmapped → null + warnOnce | **2** | `sailing_school`, `membership_fees`. Catalog includes them but `CANONICAL_PROFIT_CENTERS` does not. Declaration dropped from `project_profile`; legacy column retains. **Deferred product decision** — see "Open items" below. |
+
+### Dual-write semantics by wizard
+
+**Setup-wizard** (`client/src/pages/modeling/projects/setup-wizard.tsx`):
+- After `POST /api/modeling/projects`, `PUT /api/v1/projects/:id/profile` with a full 17-PC profile composed from `CANONICAL_PROFIT_CENTERS`.
+- Eight `wizardKey` toggles → `declared_yes`/`declared_no` via `wizardKeyToPcCode`. Both branches recorded — wizard explicitly OPTS OUT of disabled PCs (checkbox-off has meaning), so `declared_no` is correct.
+- The remaining 9 canonical PCs the wizard doesn't surface (Storage, Parts, Finance, Brokerage, Events, Hospitality, F&B, Amenities, G&A) land at `status='default'`. They must be present in the column for consumers to find them.
+- PC-999 G&A intentionally at `'default'` per **Session 2 G3 Option B**: G&A stays out of the wizard's checkbox grid; its `kind='expense_department'` is carried on the canonical record, not on `ProfitCenterState`.
+
+**OnboardingWizard** (`client/src/components/onboarding/OnboardingWizard.tsx`):
+- After `POST /config` legacy write, `PUT /api/v1/projects/:id/profile` with the full 17-PC profile (marina only — non-marina rows get the empty default from `getAssetClassDefaultProfile`).
+- Enabled catalog IDs → `declared_yes` via `marinaCatalogIdToPcCode`. **Disabled catalog items stay at `'default'`, NOT `declared_no`** — OnboardingWizard's checkbox semantics are opt-in, not opt-out (matching the legacy `string[]` enumeration which never recorded disabled state). This is a semantic difference from setup-wizard.
+
+### End-to-end smoke verification
+
+Both flows exercised against the dev DB. No test data left at session end.
+
+**Setup-wizard sequence** — POST `/projects` with 3 enabled / 5 disabled wizard toggles:
+- `project_profile` carries all 17 PCs with split `{declared_yes: 3, declared_no: 5, default: 9}` ✓
+- Legacy `cm.profitCenters` retains all 8 wizardKey entries with their numeric configs ✓
+- **Commercial Leases tab regression check:** workspace.tsx tab-gate read `cm.profitCenters.commercialTenants.enabled` returns `true` unchanged. No regression in legacy read path. ✓
+
+**OnboardingWizard sequence** — POST `/config` with 6 enabled catalog IDs (including `rv_park` + `sailing_school` to exercise the deprecated/unmapped branches):
+- `project_profile` carries all 17 PCs with split `{declared_yes: 4, default: 13}` ✓ (6 input → 4 mapped, 2 dropped)
+- `rv_park` correctly logged via warnOnce and dropped from new column ✓
+- `sailing_school` correctly logged via warnOnce and dropped from new column ✓
+- Legacy `cm.config.profitCenters` retains all 6 catalog IDs as the bare `string[]` — legacy column carries the truth for the 2 dropped entries ✓
+
+### Commit 2 — dead-parameter cleanup (separate commit, separately revertable)
+
+`getFilteredDeptOptionsForTier(tier, _enabledRevenueCogsDepts?)` → `getFilteredDeptOptionsForTier(tier)`. The underscore-prefixed parameter became inert in Session 1's behavioral change (dropdowns now always return the full canonical vocabulary regardless of input). Session 3 removes it entirely. Four call sites updated in `client/src/components/doc-intel/PLReviewGrid.tsx` (lines 200, 859, 1309, 1618).
+
+**Deliberately preserved:** PLReviewGrid's local `enabledRevCogsDepts` memo and the `enabledDepts` prop threading to child components. These will be re-purposed for highlighting/sort-order UX once consumers flip to read from `project_profile` (Sessions 5-6).
+
+No behavioral change. Verified `REVENUE_COGS_DEPT_LABELS` still has 19 entries (full canonical vocab); function body returns `EXPENSE_DEPT_OPTIONS` / `REVENUE_COGS_DEPT_OPTIONS` / `[]` for the three tier cases.
+
+### What changed (files)
+
+**Commit 1 (`4c2c89ff`, +175 lines across 3 files):**
+- **MODIFIED `shared/profit-center-id-map.ts`** — added `marinaCatalogIdToPcCode` with the 13/1/2 mapping table + warnOnce wiring (+72 lines).
+- **MODIFIED `client/src/pages/modeling/projects/setup-wizard.tsx`** — dual-write block after project create (+53 lines).
+- **MODIFIED `client/src/components/onboarding/OnboardingWizard.tsx`** — dual-write block after `/config` POST (+50 lines).
+
+**Commit 2 (`b9c24480`, 2 files, net −1 line):**
+- **MODIFIED `client/src/lib/pnl-categories.ts`** — removed `_enabledRevenueCogsDepts` parameter from `getFilteredDeptOptionsForTier`; updated JSDoc.
+- **MODIFIED `client/src/components/doc-intel/PLReviewGrid.tsx`** — 4 call sites drop the 2nd arg.
+
+### Verification
+
+- **Scoped tsc on commit 1 files** — three touched files appear in `tsconfig.diag-client-only.json` output only for pre-existing errors. Zero new errors. (Pre-existing OnboardingWizard.tsx errors at lines 445, 1646-1647 are unrelated to dual-write block.)
+- **Scoped tsc on commit 2 files** — `pnl-categories.ts` clean (0 errors); `PLReviewGrid.tsx` has 9 pre-existing errors (TS2353/TS2367/TS2322/TS2345 on `reviewNotes` / status-enum comparison / value-prop typing at lines 552/605/617/795/810/976/1447/1493/1884) — all unrelated to the call-site arg change at lines 200/859/1309/1618. Zero new errors.
+- **End-to-end smoke** — setup-wizard 3/5/9 split and OnboardingWizard 6→4 mapped/2 dropped split both verified empirically against dev DB with `pool.query` reads of `project_profile` post-POST.
+- **Commercial Leases regression** — workspace.tsx tab-gate read against the freshly-created setup-wizard project's `cm.profitCenters.commercialTenants.enabled` returns `true` (the wizard-enabled state) unchanged. Legacy consumer untouched.
+- **Reflog audit pre-commit-2** — confirmed zero HEAD movements between Session 2's `b8ca90a4` (11:46:36 UTC) and commit 1's `4c2c89ff` (12:31:47 UTC), and the working-tree commit-2 edits queued ahead from the prior session are Claude Code's own work, not Replit Agent autonomous activity ([[feedback_replit_agent_autonomous_execution_pattern]]).
+
+### Deferred product decisions
+
+- **`sailing_school` and `membership_fees` — canonical PC question.** `PROFIT_CENTER_CATALOG` surfaces these in OnboardingWizard but `CANONICAL_PROFIT_CENTERS` doesn't track them. Two options to settle in Session 4+:
+  - **(a)** Add canonical PCs (e.g., `PC-???_sailing_school`, `PC-???_membership_fees`) — keeps full round-trip fidelity through `project_profile` and unblocks any future taxonomy work that distinguishes these revenue lines.
+  - **(b)** Accept that OnboardingWizard surfaces concepts the canonical vocabulary doesn't track — legacy `cm.config.profitCenters` retains them as bare strings; `project_profile` drops them as warnOnce. Acceptable if downstream models treat them as `miscellaneous` / general-revenue.
+  - Decision pressure is **low**: only OnboardingWizard surfaces them, no live project has them populated in DB today, and the warnOnce keeps them visible if/when they appear.
+- **G3 G&A wizard surfacing** — Session 2 deferred, Session 3 took Option B (G&A at `'default'`, not surfaced as a togglable). Stance is now durable absent product reversal.
+- **`_migratedAt` sentinel** — no change this session. Disposition deferred to Session 6 legacy-drop step per Session 2 recommendation.
+
+### What's NOT in this session (deferred to Session 4-6)
+
+- **Consumer flips.** `PLReviewGrid` and `ReviewWizard` still read legacy `cm.config.profitCenters`. `workspace.tsx` Commercial Leases tab visibility still reads `cm.profitCenters.commercialTenants.enabled`. `inputs.tsx` fallback still reads `cm.profitCenters`. All four flip in Sessions 4-6 once dual-write population is durable.
+- **Legacy write removal.** Both wizards continue to write the legacy shapes. Removal is gated on all consumers flipping.
+- **Server-side GET `/config` translation removal** — `crm-routes.ts:16157-16188` still translates `cm.config.profitCenters` for the OnboardingWizard read path. Stays until OnboardingWizard's READ-side flips to `/api/v1/projects/:id/profile`.
+
+### Next session priority
+
+Session 4:
+1. **Flip `workspace.tsx` Commercial Leases tab gate** to read `project_profile.profitCenters['PC-500'].status` (visible if state ∈ `ENABLED_STATES`) instead of `cm.profitCenters.commercialTenants.enabled`. Lowest-risk consumer flip — single read site, clear gate semantics.
+2. **Flip `inputs.tsx` profile-aware fallback** to read `project_profile` first, fall back to `cm.profitCenters` only when the new column is empty (defensive during the dual-write window).
+3. **Flip PLReviewGrid + ReviewWizard reads** to derive `enabledRevCogsDepts` from `project_profile` instead of `cm.config.profitCenters`. This is where the preserved `enabledRevCogsDepts` memo + child-prop threading from commit 2 gets re-purposed for highlighting/sort-order.
+4. **Settle the `sailing_school` / `membership_fees` canonical-PC decision** (a) vs (b) before any taxonomy work that distinguishes those revenue lines.
+
+---
+
 ## ✅ Phase 2B Session 2 — project_profile schema + CRUD + asset-class default lookup + one-shot data migration (2026-05-28)
 
 Shipped on commit (this commit), pushed to `origin/main`. Promotes the per-project profit-center config out of `customMetrics.config.profitCenters` into a typed top-level `project_profile` JSONB column on `modeling_projects`, defines the canonical `ProjectProfile` / `ProfitCenterState` / `CustomCategory` types, ships the CRUD API surface under `/api/v1/projects/:projectId/profile`, an asset-class default vocabulary lookup that handles the no-pack case cleanly, and a one-shot migration that translates every existing row's prior shape into the new column.
