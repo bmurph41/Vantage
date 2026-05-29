@@ -1,5 +1,58 @@
 # MarinaMatch Platform Journal
 
+## ✅ Phase 3 Session 3 — Overview KPI writeback: Total Slips shipped, EBITDA BLOCKED at trace gate (2026-05-29)
+
+Shipped Total Slips on commit `f8a8c7e7` + this journal commit, pushed to `origin/main`. EBITDA was **deliberately not shipped** — the B1 trace hit the brief's STOP gate. Cap Rate remains deferred to Session 4.
+
+### Context
+
+Session 2's diagnostic found the Overview KPI cards read stored root columns (`total_storage_units`, `ebitda`, `year_1_cap_rate`) that no pipeline populates — they render "—" even when the data exists. This session set out to wire two of three at write time with `*_computed_at` provenance (decision: backfill columns, not compute-on-render).
+
+### ✅ Total Slips — shipped
+
+`deriveTotalStorageUnits(assetClass, customMetrics)` (new `server/services/project-derivation-service.ts`): for marina, **sum `department.count` where `section === 'storage'`** (wet_slips, dry_racks_*, moorings, lift_slips, …), excluding `section: 'designated'` (service, fuel_dock, restaurant, ship_store, …). Wired at the `storage.ts` create + update chokepoint (every `/config` save funnels through `updateModelingProject`), plus an idempotent startup-migration backfill. New column `total_storage_units_computed_at` for provenance.
+
+**Trace-during-build correction:** the brief's example helper summed `wet_slips + dry_slips`, but `dry_slips` is **not a real key** in the taxonomy — dry storage is `dry_racks_indoor/outdoor`, `boats_on_trailers`, etc., and departments are `section`-tagged. A wet-only sum would have **undercounted Keystone by 282** (its dry racks). Summing by `section==='storage'` is correct and matches the column's own definition ("wet slips + dry racks, etc.").
+
+Verification: backfill populated 2 of 15 marina projects — **Test Marina 300** (wet only), **Keystone 312** (30 wet + 282 dry racks); idempotent (re-run = 0 rows); live writeback path re-derives correctly; helper null-safe on empty/non-marina input → column stays null → card shows "—" (correct empty state). **Brett's 30-sec check: load Test Marina `9a10a6a1` Overview, confirm Total Slips shows 300.**
+
+Honest framing: this is the *smaller* win. The card label says "Total Slips" but the value is **total storage units** (includes dry racks) — a label/semantic nuance flagged for product.
+
+### ⛔ EBITDA — BLOCKED at B1 trace gate (not shipped)
+
+The brief gated B2 on B1: "if modeling_actuals categories aren't clean enough for institutional EBITDA, STOP and report — don't paper over." They aren't. SS3 (`2c5b8e46`, 948 actuals) most-recent-year (2024) computes EBITDA = Revenue − COGS − Expenses = 3,155,908 − 1,165,350 − 12,179,394 = **−$10,188,836** — implausible (opex 4× revenue).
+
+Root cause: the `category` column is **structurally** clean (only `Revenue`/`COGS`/`Expenses` exist) but **semantically polluted** — revenue lines are mis-filed under `Expenses`:
+- **"Used Boat Sales" $4.28M** (revenue) → filed as `Expenses`; appears ONLY in Expenses, not split
+- **"Other Income" $214K, "Rental Income" $111K** → `Expenses`
+- ~$4.6M of revenue mis-filed in Expenses total (a ~$9.2M EBITDA swing — should add, instead subtracts)
+- ~$5.6M of `(COGS)`-labelled lines also sit in `Expenses` (EBITDA-neutral, since both subtract — but confirms the bucket→category mapping is unreliable)
+
+This is an **upstream classification defect** in the parser-bucket → `promote.normalizeBucketToCategory` mapping (not in the EBITDA math). Computing EBITDA on it would display a confidently-wrong −$10.19M on the Overview — **worse than "—".** So: `computeProjectEbitda` was written, the trace disproved its input-cleanliness assumption, and the function + its schema column (`ebitda_computed_at`) were **removed** rather than shipped unwired (avoiding the "scaffolding shipped unwired" anti-pattern).
+
+**Next move for EBITDA:** its own diagnostic session — *why does "Used Boat Sales" classify into an expense bucket?* Is it SS3-specific or systemic in the bucket→category mapping? EBITDA writeback is a ~1-hour wire the moment the category assignment is trustworthy; the computation logic is straightforward (Revenue − COGS − OpEx, most-recent year).
+
+### Deferred / not done (intentional)
+
+- **Cap Rate** — Session 4's own brief; needs a trace of where Pro Forma Year 1 NOI persists before any writeback. `year_1_cap_rate` untouched this session.
+- **Asset-class-aware size getter** — marina-only for now; other classes replicate the pattern when prioritized.
+- **EBITDA writeback** — blocked as above.
+
+### Methodology flag — Phase 2C inventory GREEN was too generous
+
+The Phase 2C status inventory classified Overview as GREEN, but GREEN meant **"renders without error,"** not **"displays real data from canonical sources."** Overview rendered fine while every KPI but Purchase Price was silently disconnected from its data. Future inventory passes must distinguish *renders* from *shows real data* — a tab can be GREEN-renders and RED-data simultaneously.
+
+### Overview cards — state after this session
+
+| Card | State |
+|---|---|
+| Purchase Price | works (unchanged) — reads `purchase_price` |
+| Total Slips | **now populated** for projects with departments data (300/312), "—" otherwise |
+| EBITDA | still "—" everywhere — blocked on category-classification defect |
+| Cap Rate | still "—" everywhere — Session 4 |
+
+---
+
 ## ✅ Phase 3 Session 2 — pnl_facts write-path fix (Defects A+B) + demo-number correction (2026-05-29)
 
 Shipped on commit `826e14ba` (code) + this journal commit, pushed to `origin/main`. Closes the doc-upload → financial-model write-path gap that Phase 3 Session 1's trace diagnosed.
