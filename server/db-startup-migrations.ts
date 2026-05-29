@@ -19474,6 +19474,14 @@ const MIGRATIONS: Migration[] = [
   { name: "pnl_facts: add index pnl_facts_org_asset_idx", sql: `CREATE INDEX IF NOT EXISTS pnl_facts_org_asset_idx ON pnl_facts (org_id, asset_id)` },
   { name: "pnl_facts: add index pnl_facts_fiscal_year_idx", sql: `CREATE INDEX IF NOT EXISTS pnl_facts_fiscal_year_idx ON pnl_facts (fiscal_year)` },
 
+  // pnl_facts — Phase 3 Session 2 (Defect B): expand the fact grain to include
+  // source_label so sibling parser rows that classify to the same canonical
+  // line item coexist instead of colliding on insert. Drop the old 4-col key,
+  // add the 5-col key. Idempotent: re-runnable safely (old constraint is
+  // strictly more restrictive, so existing rows satisfy the new key).
+  { name: "pnl_facts: drop legacy doc_line_period unique constraint", sql: `ALTER TABLE pnl_facts DROP CONSTRAINT IF EXISTS pnl_facts_doc_line_period_unique` },
+  { name: "pnl_facts: add doc_line_period_label unique constraint", sql: `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'pnl_facts_doc_line_period_label_unique') THEN ALTER TABLE pnl_facts ADD CONSTRAINT pnl_facts_doc_line_period_label_unique UNIQUE (document_id, canonical_line_item_id, period_start, period_end, source_label); END IF; END $$;` },
+
   // pnl_jobs — uncovered indexes
   { name: "pnl_jobs: add index pnl_jobs_document_idx", sql: `CREATE INDEX IF NOT EXISTS pnl_jobs_document_idx ON pnl_jobs (document_id)` },
   { name: "pnl_jobs: add index pnl_jobs_status_idx", sql: `CREATE INDEX IF NOT EXISTS pnl_jobs_status_idx ON pnl_jobs (status)` },

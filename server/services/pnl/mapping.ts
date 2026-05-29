@@ -17,6 +17,8 @@ import { and, eq, or, isNull, sql, desc, asc } from 'drizzle-orm';
 import { getLlmClassifier, type ClassificationRequest } from '../../utils/llm';
 import { normalizeDepartment, normalizeBucket } from '../../utils/department-mapping';
 import { isMustReviewLabel } from './key-bank';
+import { storeMappedFacts } from './ingest';
+import { promotePnlFactsToActuals } from './promote-to-actuals';
 
 interface AmbiguousDepartmentOption {
   department: string;
@@ -529,7 +531,13 @@ async function resolveAssetClassForJob(jobId: string): Promise<string | undefine
   }
 }
 
-export async function mapParsedStatement(jobId: string): Promise<{ reviewCount: number; autoMappedCount: number }> {
+export async function mapParsedStatement(jobId: string): Promise<{
+  reviewCount: number;
+  autoMappedCount: number;
+  storedCount: number;
+  promotedCount: number;
+  status: 'completed' | 'stored';
+}> {
   const parsed = await db.query.pnlParsedStatements.findFirst({
     where: eq(pnlParsedStatements.jobId, jobId),
   });
@@ -792,26 +800,113 @@ export async function mapParsedStatement(jobId: string): Promise<{ reviewCount: 
     };
   }
   
-  await db
-    .update(pnlParsedStatements)
-    .set({ parsedJson: pj })
-    .where(eq(pnlParsedStatements.id, parsed.id));
-  
-  if (reviewInserts.length) {
-    await db.delete(pnlReviewItems).where(
-      and(eq(pnlReviewItems.jobId, parsed.jobId), eq(pnlReviewItems.status, 'needs_review'))
-    );
-    await db.insert(pnlReviewItems).values(reviewInserts);
+  // ────────────────────────────────────────────────────────────────────────
+  // Phase 3 Session 2 (Defect A): chain the WRITE path — persist parsedJson +
+  // review items, materialize pnl_facts, promote to modeling_actuals, and set
+  // the terminal job status — all inside ONE transaction. The job is either
+  // fully advanced or not advanced at all; a failure anywhere rolls the whole
+  // chain back to the pre-call state (no half-completed limbo, no wiped facts).
+  //
+  // This makes the previously-orphaned "mapped/store" resting state impossible:
+  // mapping no longer stops one step short of the facts table. Re-running on an
+  // already-completed job is safe and idempotent — facts and actuals are
+  // delete-then-inserted within the same transaction.
+  // ────────────────────────────────────────────────────────────────────────
+  const reviewCount = reviewInserts.length;
+
+  // Resolve the linked modeling project (promote target) and the existing
+  // parser-layer metrics to preserve. Reads only — fine outside the tx.
+  const [doc] = await db
+    .select({ modelingProjectId: pnlDocuments.modelingProjectId })
+    .from(pnlDocuments)
+    .where(eq(pnlDocuments.id, parsed.documentId))
+    .limit(1);
+  const modelingProjectId = doc?.modelingProjectId ?? null;
+
+  const jobRow = await db.query.pnlJobs.findFirst({ where: eq(pnlJobs.id, jobId) });
+  const existingMetrics = (jobRow?.parseMetricsJson as Record<string, any>) ?? {};
+
+  // Distinct canonical line items the mapper resolved (mapper-layer metric).
+  const mappedCanonicals = new Set<string>();
+  for (const row of rows) {
+    if (row.mapping?.canonicalLineItemId) mappedCanonicals.add(row.mapping.canonicalLineItemId);
   }
-  
-  await db
-    .update(pnlJobs)
-    .set({ status: 'mapped', stage: 'store', updatedAt: new Date() })
-    .where(eq(pnlJobs.id, jobId));
-  
-  console.log(`[P&L Mapping] Job ${jobId}: ${autoMappedCount} auto-mapped, ${reviewInserts.length} need review`);
-  
-  return { reviewCount: reviewInserts.length, autoMappedCount };
+
+  const isComplete = reviewCount === 0;
+  const completedAtIso = new Date().toISOString();
+
+  let storeMetrics: Awaited<ReturnType<typeof storeMappedFacts>> | null = null;
+  let promoteMetrics: Awaited<ReturnType<typeof promotePnlFactsToActuals>> | null = null;
+
+  await db.transaction(async (tx) => {
+    // 1) Persist the mapping output.
+    await tx
+      .update(pnlParsedStatements)
+      .set({ parsedJson: pj })
+      .where(eq(pnlParsedStatements.id, parsed.id));
+
+    // 2) Refresh review items.
+    if (reviewInserts.length) {
+      await tx.delete(pnlReviewItems).where(
+        and(eq(pnlReviewItems.jobId, parsed.jobId), eq(pnlReviewItems.status, 'needs_review'))
+      );
+      await tx.insert(pnlReviewItems).values(reviewInserts);
+    }
+
+    // 3) Materialize pnl_facts for the auto-mapped lines (joins this tx).
+    storeMetrics = await storeMappedFacts(jobId, tx);
+
+    // 4) Promote facts → modeling_actuals (canonical-level, summed) if linked.
+    if (modelingProjectId) {
+      promoteMetrics = await promotePnlFactsToActuals(parsed.orgId, modelingProjectId, parsed.documentId, tx);
+    }
+
+    // 5) Honest, full-pipeline metrics — so a future trace never has to query
+    //    three tables to learn what the pipeline actually did.
+    const pipelineComplete = !!storeMetrics && (!modelingProjectId ? false : !!promoteMetrics);
+    const parseMetricsJson = {
+      ...existingMetrics,
+      parser: existingMetrics.parser ?? existingMetrics,
+      mapper: {
+        autoMappedCount,
+        reviewItemCount: reviewCount,
+        distinctCanonicals: mappedCanonicals.size,
+      },
+      store: storeMetrics,
+      promote: promoteMetrics ?? { skipped: true, reason: modelingProjectId ? 'promote-not-run' : 'no-linked-project' },
+      pipelineComplete,
+      completedAt: completedAtIso,
+    };
+
+    // 6) Terminal status — mirrors the orchestrator's existing semantics
+    //    (parseOrchestrator.ts): no pending reviews → completed/done;
+    //    otherwise stored/review (facts+actuals still populated for the
+    //    auto-mapped subset). Either way the chain ran end-to-end.
+    await tx
+      .update(pnlJobs)
+      .set(
+        isComplete
+          ? { status: 'completed', stage: 'done', completedAt: new Date(), parseMetricsJson, updatedAt: new Date() }
+          : { status: 'stored', stage: 'review', parseMetricsJson, updatedAt: new Date() }
+      )
+      .where(eq(pnlJobs.id, jobId));
+  });
+
+  const storedCount = storeMetrics ? (storeMetrics as { storedCount: number }).storedCount : 0;
+  const promotedCount = promoteMetrics ? (promoteMetrics as { actualsWritten: number }).actualsWritten : 0;
+
+  console.log(
+    `[P&L Mapping] Job ${jobId}: ${autoMappedCount} auto-mapped, ${reviewCount} need review, ` +
+    `${storedCount} facts stored, ${promotedCount} actuals promoted → status=${isComplete ? 'completed' : 'stored'}`
+  );
+
+  return {
+    reviewCount,
+    autoMappedCount,
+    storedCount,
+    promotedCount,
+    status: isComplete ? 'completed' : 'stored',
+  };
 }
 
 export async function addToKeywordBank(

@@ -76,6 +76,16 @@ export const pnlParsedStatements = pgTable('pnl_parsed_statements', {
   jobIdx: index('pnl_parsed_statements_job_idx').on(table.jobId),
 }));
 
+// Grain: one row per (canonical_line_item_id × period × source_label).
+// Multiple parser rows that classify to the SAME canonical line item (e.g.
+// "Bank Service Charges", "Credit card fees", "Merchant deposit fees" all →
+// one "Bank/Merchant Fees" canonical) each preserve their own source_label
+// provenance here — they are NOT collapsed at the facts layer. Downstream
+// consumers that need canonical-level totals (promotePnlFactsToActuals →
+// modeling_actuals, the financial engines) SUM across source_labels; drill-down
+// / audit / sub-line analytics read source_label directly off pnl_facts.
+// The unique key includes source_label so those sibling rows coexist instead
+// of colliding (Phase 3 Session 2 — Defect B fix).
 export const pnlFacts = pgTable('pnl_facts', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
   orgId: varchar('org_id').notNull(),
@@ -96,11 +106,12 @@ export const pnlFacts = pgTable('pnl_facts', {
   fileData: text('file_data'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ({
-  docLinePeriodUnique: unique('pnl_facts_doc_line_period_unique').on(
+  docLinePeriodLabelUnique: unique('pnl_facts_doc_line_period_label_unique').on(
     table.documentId,
     table.canonicalLineItemId,
     table.periodStart,
-    table.periodEnd
+    table.periodEnd,
+    table.sourceLabel
   ),
   orgAssetIdx: index('pnl_facts_org_asset_idx').on(table.orgId, table.assetId),
   fiscalYearIdx: index('pnl_facts_fiscal_year_idx').on(table.fiscalYear),

@@ -604,7 +604,6 @@ export async function processPnlJob(jobId: string): Promise<void> {
 
 export async function runPnlPipeline(jobId: string): Promise<{ status: string; storedCount?: number; reviewCount?: number }> {
   const { mapParsedStatement } = await import('./mapping');
-  const { storeMappedFacts } = await import('./ingest');
 
   try {
     await processPnlJob(jobId);
@@ -616,33 +615,16 @@ export async function runPnlPipeline(jobId: string): Promise<{ status: string; s
       return { status: 'needs_review', reviewCount: 1 };
     }
 
-    const { reviewCount } = await mapParsedStatement(jobId);
-    const { storedCount } = await storeMappedFacts(jobId);
-
-    if (reviewCount === 0) {
-      await db
-        .update(pnlJobs)
-        .set({
-          status: 'completed' as PnlJobStatus,
-          stage: 'done',
-          completedAt: new Date(),
-          updatedAt: new Date(),
-        })
-        .where(eq(pnlJobs.id, jobId));
-
-      return { status: 'completed', storedCount, reviewCount };
-    } else {
-      await db
-        .update(pnlJobs)
-        .set({
-          status: 'stored' as PnlJobStatus,
-          stage: 'review',
-          updatedAt: new Date(),
-        })
-        .where(eq(pnlJobs.id, jobId));
-
-      return { status: 'needs_review', storedCount, reviewCount };
-    }
+    // Phase 3 Session 2 (Defect A): mapParsedStatement now owns the full write
+    // chain — it persists the mapping, materializes pnl_facts, promotes to
+    // modeling_actuals, and sets the terminal job status (completed/done when
+    // no reviews pending, else stored/review) inside a single transaction.
+    const { reviewCount, storedCount, status } = await mapParsedStatement(jobId);
+    return {
+      status: status === 'completed' ? 'completed' : 'needs_review',
+      storedCount,
+      reviewCount,
+    };
   } catch (err: any) {
     await db
       .update(pnlJobs)
