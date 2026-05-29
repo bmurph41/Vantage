@@ -1,5 +1,98 @@
 # MarinaMatch Platform Journal
 
+## ✅ Phase 2B Session 4 — first consumer flip (Commercial Leases tab gate) + OPTED_IN_STATES distinction (2026-05-29)
+
+Shipped on commit `d6b05639`, pushed to `origin/main`. First consumer flip in the Phase 2B dual-write → cutover sequence. `workspace.tsx` Commercial Leases tab visibility AND content render gate now read `project_profile.profitCenters['PC-500'].status` through a new `OPTED_IN_STATES` set instead of legacy `cm.profitCenters.commercialTenants.enabled`. Adds `OPTED_IN_STATES = {declared_yes, user_confirmed}` as a sibling export to `ENABLED_STATES` in `shared/profit-center-id-map.ts`, with a documented state-semantics doc block establishing the convention for Sessions 5-6.
+
+### The state-semantics finding (trace surfaced before the flip)
+
+Pre-flip trace across all 20 `modeling_projects` rows showed **14 of 20 would have post-flip-visible Commercial Leases tabs that were previously hidden** if the flip used `ENABLED_STATES.has(status)`. Breakdown:
+
+| Bucket | Rows | Pre-flip BEFORE (legacy `=== true`) | Naive AFTER (`ENABLED_STATES.has`) | Why |
+|---|---|---|---|---|
+| Marina, PC-500='declared_no' | 1 (Sunset Harbor `7df94d2a`) | false | false | Matches — explicit legacy `commercial_tenants: isEnabled:false` → migrated to `declared_no` |
+| Marina, PC-500='default' | 13 (Test Marina, Keystone, SS3, Layer-0, 10× Sunset Bay Beta) | false | **true** ❌ | Session 2 asset-class fallback set PC-500 to `'default'`; `'default'` is in `ENABLED_STATES` |
+| Non-marina, PC-500 absent | 5 (business, laundromat, 2 multifamily, 1 STR) | false | false | `Set.has(undefined) → false` |
+
+Root cause: `'default'` means **"no user signal — asset-class fallback used"**, not "user opted in." Treating it as visible is the right semantics for AVAILABILITY surfaces (dropdowns per Session 1 — Brett's principle, mid-mapping users need access to the full vocabulary) but the WRONG semantics for OPT-IN feature gates (tab visibility, pro-forma inclusion, feature unlocks — these should only light up on explicit user signal).
+
+### Resolution: per-consumer state set, formalized in the canonical map
+
+Approved Option A from the Session 4 trace report: each consumer surface picks consciously between two semantic sets, defined in `shared/profit-center-id-map.ts`:
+
+```typescript
+export const ENABLED_STATES = new Set<ProfitCenterStateKind>([
+  'default', 'declared_yes', 'user_confirmed',
+]);
+
+export const OPTED_IN_STATES = new Set<ProfitCenterStateKind>([
+  'declared_yes', 'user_confirmed',
+]);
+```
+
+State-semantics doc block added immediately above the exports establishes the convention:
+- **AVAILABILITY surfaces** (dropdowns, option lists) → `ENABLED_STATES`. `'default'` is visible because the user hasn't ruled it out.
+- **OPT-IN feature gates** (tab visibility, pro-forma sections, feature unlocks) → `OPTED_IN_STATES`. `'default'` does NOT auto-enable; only explicit `declared_yes` (wizard checkbox) or `user_confirmed` (in-flow acceptance) lights up the feature.
+- `'system_suggested'` is in NEITHER — it's the transient prompt state for auto-discovery (Session 5+); UI treats it as "show the prompt card," not "treat as enabled."
+
+This is a structural decision, not a one-off workspace.tsx fix. Sessions 5-6 consumer flips (PLReviewGrid, ReviewWizard, inputs.tsx) will explicitly pick which set fits their UX role.
+
+### Why Option A vs the alternatives
+
+| Option | Mechanism | Why rejected |
+|---|---|---|
+| A | Per-consumer state set (`OPTED_IN_STATES` vs `ENABLED_STATES`) | **Chosen.** Clean separation, no transitional debt, semantically honest. |
+| B | Backfill `'default'` → `'declared_no'` for migrated-from-absent rows | Rewrites historical data; loses "no signal" distinction; future tab additions that DO want default-visible behavior get hurt. |
+| C | Hold flip until every project has explicit user intent on PC-500 | Requires re-touching every project via wizard, which won't happen organically. Indefinite stall. |
+
+### What changed (files)
+
+**Commit `d6b05639`, +39/-3 across 2 files:**
+
+- **MODIFIED `shared/profit-center-id-map.ts`** — added `OPTED_IN_STATES` set + state-semantics doc block above the `ENABLED_STATES` / `OPTED_IN_STATES` / `HIDDEN_STATES` exports.
+- **MODIFIED `client/src/pages/modeling/projects/workspace.tsx`** — added `OPTED_IN_STATES` import from `@shared/profit-center-id-map`. Flipped both reads:
+  - Line 956 (tab visibility gate): `OPTED_IN_STATES.has((project?.projectProfile as any)?.profitCenters?.['PC-500']?.status)`
+  - Line 1065 (content render gate): same expression. Previously line 1064 used a truthy check (not `=== true`) — the two gates are now uniform.
+- **`db/schema-index.ts`** — benign auto-regen (pre-commit hook), not in commit scope.
+
+### Architectural decisions
+
+- **No legacy fallback during dual-write.** Per Session 4 directive, both gates read `project_profile` only — no `cm.profitCenters.commercialTenants.enabled` belt-and-suspenders. Justification: the 20/20 empirical check confirmed no row diverges, and a transitional fallback would just be code to delete in Session 6.
+- **Asset-class layer (`tabOverrides.showCommercialLeases`) ordering preserved.** Line 954's asset-class gate still runs FIRST. The flip is profile-layer only. Non-marina projects where `getModelConfig(assetClass).tabs.commercialLeases === false` continue to have the tab hidden regardless of profile state.
+- **Two gates unified to one expression.** Pre-flip, line 956 used strict `=== true` and line 1064 used truthy check — semantically should always have matched, but legacy code carried defensive belt-and-suspenders against URL-direct navigation when the rail was hidden. Post-flip, both gates use the same `OPTED_IN_STATES.has(...)` call; semantic uniformity is now explicit.
+- **`projectProfile` field flow.** `getModelingProject` in `server/storage.ts:7370` uses `db.select()` (SELECT *), so the new column auto-flows to the client on `project.projectProfile`. No API-layer changes needed; the read path was already plumbed by Session 2's schema addition.
+
+### Verification
+
+- **20/20 empirical match check** — re-ran the BEFORE/AFTER trace immediately before commit. Every row's post-flip `OPTED_IN_STATES.has(pc500_status)` matches its pre-flip `legacy === true` evaluation:
+  - Sunset Harbor (PC-500=`declared_no`): false/false ✓
+  - 13 marina rows (PC-500=`default`): false/false ✓ — `'default'` correctly NOT in `OPTED_IN_STATES`
+  - 5 non-marina rows (PC-500 missing): false/false ✓ — `Set.has(undefined) → false`
+  - Keystone Point + Test Marina (legacy `string[]` → migrated to `default`): false/false ✓
+- **Scoped tsc** — `tsc -p tsconfig.diag-client-only.json` went from 3656 → 3659 lines (+3 lines, all on `workspace.tsx`):
+  - 1× TS6305 "Output file has not been built from source file" on the new import at line 109
+  - 2× TS2339 "Property 'projectProfile' does not exist on type ModelingProject" at lines 956/1065
+  - All 3 are **stale `dist-types/shared/schema.d.ts` artifacts** — that file is from 2026-05-22 (predates Session 2's schema addition). Source `shared/schema.ts:11506` declares `projectProfile: jsonb('project_profile')`. Same noise pattern as Session 3 Commit 1's `OnboardingWizard.tsx:21` + `setup-wizard.tsx:61` TS6305 errors that pre-exist this session. Self-resolves on dist-types rebuild.
+- **Zero new real type errors.** The runtime read path resolves correctly because Vite's TS pipeline uses the source schema, not the stale declarations.
+- **UI verification limit (honest, same standing as Session 1's dropdown check):** I cannot programmatically load `/modeling/projects/7df94d2a` in a browser and screenshot the tab rail. The code path was traced through render-time function calls and the empirical 20/20 match confirms the gate computes the expected value. Visual confirmation that Sunset Harbor's Commercial Leases tab is hidden (and a marina with `declared_yes` would show it) requires Brett to load the page.
+- **Reflog pre-commit audit** — `git reflog --date=iso -10` shows only the Session 3 sequence + this commit; zero unexpected HEAD movements between Session 3 close (`0890c055` 2026-05-28 12:55 UTC) and Session 4 commit (`d6b05639` 2026-05-29). The pre-existing `db/schema-index.ts` whitespace drift at session start was the documented benign auto-regen ([[project_db_schema_index_hooks]]).
+
+### Open items deferred
+
+- **`sailing_school` / `membership_fees` canonical-PC decision** (carried from Session 3) — not addressed this session; still queued for Session 5+ when a real surface needs to distinguish them.
+- **`_migratedAt` sentinel** — no change; remains a Session 6 legacy-drop concern.
+- **Live UI spot-check** — visual confirmation that the Commercial Leases tab on Sunset Harbor renders hidden; Brett can confirm.
+
+### Next session priority
+
+Session 5:
+1. **Flip `inputs.tsx` profile-aware fallback** to read `project_profile` via the appropriate state set (likely `ENABLED_STATES` — `inputs.tsx` is an availability surface where users need to see the full vocabulary). Decide explicitly which set fits and document inline.
+2. **Flip PLReviewGrid + ReviewWizard reads** to derive `enabledRevCogsDepts` from `project_profile`. This is where the preserved `enabledRevCogsDepts` memo + child-prop threading from Session 3 Commit 2 gets re-purposed for highlighting/sort-order. State set: likely `ENABLED_STATES` (availability surface).
+3. **Settle `sailing_school` / `membership_fees` canonical-PC question** if any Session 5 surface touches them.
+4. **Establish the auto-discovery prompt UI** — the consumer of `'system_suggested'` state; both reads' state-set choice should be explicitly documented (likely "neither — render as prompt card").
+
+---
+
 ## ✅ Phase 2B Session 3 — wizard dual-write to project_profile + dead-parameter cleanup (2026-05-28)
 
 Shipped on commits `4c2c89ff` (commit 1 — wizard dual-write) and `b9c24480` (commit 2 — dead-parameter cleanup), pushed to `origin/main`. Setup-wizard and OnboardingWizard now write BOTH the legacy `customMetrics` shapes AND the new `project_profile` column on every project create. Legacy writes are deliberately preserved — Commercial Leases tab visibility (workspace.tsx) and inputs.tsx fallback still read `cm.profitCenters` and are NOT flipped this session. Consumer flips defer to Sessions 4-6. Commit 2 separately removes the inert `enabledRevenueCogsDepts` parameter from `getFilteredDeptOptionsForTier` and updates its 4 call sites in PLReviewGrid — pure cosmetic cleanup, separately revertable.
