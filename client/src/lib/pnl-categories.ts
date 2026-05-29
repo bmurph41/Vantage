@@ -278,25 +278,24 @@ export function getEnabledRevenueCogsDepts(
  * Returns dropdown options for the given category tier.
  *
  * Phase 2B Session 1 (2026-05-28) — behavioral change:
- * AVAILABILITY is now ALWAYS the full canonical vocabulary for the tier. The
- * `enabledRevenueCogsDepts` parameter is preserved for API back-compat but
- * IGNORED — see Brett's principle that dropdowns must always reflect the full
- * options for the asset class, with the profile driving highlighting/sort
- * (Session 3) rather than availability. Mid-mapping, a user must be able to
- * choose any valid dept regardless of what the wizard collected.
+ * AVAILABILITY is now ALWAYS the full canonical vocabulary for the tier.
+ * Brett's principle: dropdowns must always reflect the full options for the
+ * asset class; profile state drives highlighting/sort, not availability.
+ * Mid-mapping, a user must be able to choose any valid dept regardless of
+ * what the wizard collected.
  *
  * The previous wizard-narrowing behavior (filter REVENUE_COGS_DEPT_OPTIONS by
  * enabledRevenueCogsDepts) produced symptoms like the 4-5 entry dropdown
  * Brett observed on Sunset Harbor Village Marina (project 7df94d2a) where the
  * wizard collected only `pc_marina_amenities` + `pc_hospitality` enabled.
+ *
+ * Phase 2B Session 3 (2026-05-28): the unused `_enabledRevenueCogsDepts`
+ * back-compat parameter was removed. Call sites in PLReviewGrid drop the 2nd
+ * arg. PLReviewGrid's local `enabledRevCogsDepts` memo + child prop are
+ * retained as documented-dead — they'll be re-purposed for highlighting state
+ * once the consumer flips to read project_profile (Sessions 5-6).
  */
-export function getFilteredDeptOptionsForTier(
-  tier: CategoryTier | null,
-  _enabledRevenueCogsDepts?: RevenueCogsDept[]
-) {
-  // _enabledRevenueCogsDepts intentionally unused (see jsdoc). Parameter kept
-  // for API back-compat with existing call sites that pass it; can be removed
-  // in Session 3 once consumers migrate to getDeptOptionsForTier directly.
+export function getFilteredDeptOptionsForTier(tier: CategoryTier | null) {
   if (!tier) return [];
   if (tier === "expense") return EXPENSE_DEPT_OPTIONS;
   return REVENUE_COGS_DEPT_OPTIONS;

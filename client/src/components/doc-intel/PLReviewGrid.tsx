@@ -197,7 +197,7 @@ function BulkDepartmentSelect({
     );
   }
 
-  const deptOptions = getFilteredDeptOptionsForTier(commonTier, enabledRevCogsDepts);
+  const deptOptions = getFilteredDeptOptionsForTier(commonTier);
 
   return (
     <Select
@@ -856,7 +856,7 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling, statusFil
             return <span className="text-muted-foreground text-sm">Select category first</span>;
           }
 
-          const deptOptions = getFilteredDeptOptionsForTier(currentTier, enabledRevCogsDepts);
+          const deptOptions = getFilteredDeptOptionsForTier(currentTier);
           const currentDept =
             currentTier === "expense"
               ? (item.expenseDeptConfirmed || item.expenseDeptSuggested)
@@ -1306,7 +1306,7 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling, statusFil
                             <SelectValue placeholder={commonTier ? "Set department" : "Set category first"} />
                           </SelectTrigger>
                           <SelectContent>
-                            {getFilteredDeptOptionsForTier(commonTier, enabledRevCogsDepts).map(opt => (
+                            {getFilteredDeptOptionsForTier(commonTier).map(opt => (
                               <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
                             ))}
                           </SelectContent>
@@ -1615,7 +1615,7 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling, statusFil
                                   Set category first
                                 </span>
                               );
-                              const deptOptions = getFilteredDeptOptionsForTier(currentTier, enabledRevCogsDepts);
+                              const deptOptions = getFilteredDeptOptionsForTier(currentTier);
                               const optimisticDept = optimisticDepartments[rowKey];
                               const serverDept = currentTier === "expense"
                                 ? (firstItem.expenseDeptConfirmed || firstItem.expenseDeptSuggested)
