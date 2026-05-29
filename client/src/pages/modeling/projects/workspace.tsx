@@ -106,6 +106,7 @@ import TaxAndDistributionsPage from './workspace/tax-distributions';
 import DebtInputs from './workspace/debt-inputs';
 import { UploadDropzone } from '@/pages/modeling/doc-intel/UploadDropzone';
 import { getModelConfig, getTabOverrides } from "@shared/asset-class-model-config";
+import { OPTED_IN_STATES } from "@shared/profit-center-id-map";
 import { getStorageSubTypes } from "@/lib/storage-sub-types";
 import UnitMixLeases from "./workspace/unit-mix-leases";
 import ProfitCentersDynamic from "./workspace/profit-centers-dynamic";
@@ -952,8 +953,8 @@ export default function ProjectWorkspace() {
                 if (tab.value === "replacement-cost" && !tabOverrides.showReplacementCost) return false;
                 if (tab.value === "commercial-leases") {
                   if (!tabOverrides.showCommercialLeases) return false;
-                  const cm = project?.customMetrics as any;
-                  return cm?.profitCenters?.commercialTenants?.enabled === true;
+                  const status = (project?.projectProfile as any)?.profitCenters?.['PC-500']?.status;
+                  return OPTED_IN_STATES.has(status);
                 }
                 return true;
               }).map((tab) => {
@@ -1061,7 +1062,7 @@ export default function ProjectWorkspace() {
         </TabsContent>
 
         <TabsContent value="commercial-leases" className="mt-8 space-y-4">
-          {(project?.customMetrics as any)?.profitCenters?.commercialTenants?.enabled ? (
+          {OPTED_IN_STATES.has((project?.projectProfile as any)?.profitCenters?.['PC-500']?.status) ? (
             <CommercialLeasesWorkspace projectId={projectId!} projectName={project.marinaName} onTabChange={handleTabChange} />
           ) : (
             <Card className="p-8 text-center">

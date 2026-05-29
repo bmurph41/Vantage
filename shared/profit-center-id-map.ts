@@ -427,8 +427,43 @@ export type ProfitCenterStateKind =
   | 'user_confirmed'
   | 'user_removed';
 
+// =============================================================================
+// State-set semantics — pick the right set for your consumer surface.
+//
+// Consumers fall into two semantic groups:
+//
+//   1. AVAILABILITY surfaces (dropdowns, option lists, "what can the user
+//      reach mid-mapping?"). 'default' SHOULD be visible — the user hasn't
+//      ruled it out, and Session 1's Brett principle requires mid-mapping
+//      access to the full canonical vocabulary regardless of wizard config.
+//      → Use `ENABLED_STATES`.
+//
+//   2. OPT-IN feature gates (tab visibility, pro-forma section inclusion,
+//      feature unlocks). 'default' means "no user signal" — and that should
+//      NOT auto-enable an opt-in feature. Only explicit declarations
+//      ('declared_yes' from wizard checkbox, 'user_confirmed' from in-flow
+//      acceptance) light up the feature.
+//      → Use `OPTED_IN_STATES`.
+//
+// The distinction surfaced during the Session 4 trace for the Commercial
+// Leases tab gate: 14 of 20 marina rows had PC-500 at 'default' (Session 2
+// asset-class fallback) — `ENABLED_STATES.has('default')` returned true and
+// would have shown the tab on every marina project regardless of user intent.
+// `OPTED_IN_STATES` matches the legacy `=== true` semantics exactly.
+//
+// HIDDEN_STATES is the inverse of ENABLED_STATES (`declared_no`, `user_removed`).
+// Note `'system_suggested'` is in NEITHER ENABLED nor HIDDEN nor OPTED_IN — it's
+// the transient state for the auto-discovery prompt (Session 5+); UI treats it
+// as "show the prompt card," not "treat as enabled."
+// =============================================================================
+
 export const ENABLED_STATES = new Set<ProfitCenterStateKind>([
   'default',
+  'declared_yes',
+  'user_confirmed',
+]);
+
+export const OPTED_IN_STATES = new Set<ProfitCenterStateKind>([
   'declared_yes',
   'user_confirmed',
 ]);
