@@ -1,5 +1,63 @@
 # MarinaMatch Platform Journal
 
+## ✅ Phase 3 Session 2 — pnl_facts write-path fix (Defects A+B) + demo-number correction (2026-05-29)
+
+Shipped on commit `826e14ba` (code) + this journal commit, pushed to `origin/main`. Closes the doc-upload → financial-model write-path gap that Phase 3 Session 1's trace diagnosed.
+
+### What was broken (Session 1 trace, recap)
+
+The 2026-05-28 reclassification (commit `01c636f8`) rewrote `parsedJson` (47/55 lines mapped on SS3 2024) + review items and parked the job at `status='mapped'/stage='store'` — but the store step **never ran**, so `pnl_facts` held stale 2-canonical data from the original 2026-05-25 run and `modeling_actuals` was **empty**. Two defects:
+- **Defect A (orchestration gap):** `mapParsedStatement` stopped one step short of the facts table; nothing chained `storeMappedFacts` → `promote`.
+- **Defect B (latent insert crash):** even if store were re-run, the 4-col unique key `(doc, canonical, periodStart, periodEnd)` made sibling rows that map to one canonical (4 bank-fee lines → "Bank & Merchant Fees") collide → batch insert throws → with the pre-DELETE, a re-run would leave **zero** facts.
+
+### Demo-number correction — classifier accuracy ≠ end-to-end fidelity
+
+**This is the honest reframing the Session 1 trace called for.** The "**85.5% (47/55) / 79.6% (43/54)**" figure (commit `01c636f8`, entry below) is **classifier accuracy measured at the `parsedJson` layer** — it is genuine and unchanged. But until this session, **none of it reached the model**: `pnl_facts` was stale at 2 canonicals and `modeling_actuals` was empty. The headline number described a state two hops upstream of anything the engine consumes.
+
+Two distinct metrics, kept distinct from here on:
+- **Classifier accuracy (parsed-layer):** ~85.5% / 79.6% — % of P&L lines auto-mapped to a canonical. Genuine, pre-existing.
+- **End-to-end pipeline fidelity:** post-fix, **100% of auto-mapped lines now reach `pnl_facts` and `modeling_actuals`.** This is the metric that means "the model sees the data."
+
+Any future reference to "the auto-map rate" must say which layer it means. The new `parse_metrics_json.pipelineComplete` flag + `store`/`promote` sections make end-to-end fidelity queryable from one row.
+
+### What shipped (commit `826e14ba`)
+
+- **Fact grain + transactional store** (`ingest.ts`, `pnl-pipeline-schema.ts`, `db-startup-migrations.ts`): unique key expanded to include `source_label` (`pnl_facts_doc_line_period_label_unique`); sibling rows under one canonical coexist. `storeMappedFacts` pre-aggregates by `(canonical × period × source_label)` in memory and wraps DELETE+INSERT in a transaction (failure rolls back, never wipes). Idempotent migration.
+- **Orchestration chain** (`mapping.ts`, `parseOrchestrator.ts`): `mapParsedStatement` now persists mapping + review items, materializes `pnl_facts`, promotes to `modeling_actuals`, and sets terminal status — all in ONE transaction. The orphaned `mapped/store` resting state is now impossible. `runPnlPipeline` no longer double-stores.
+- **Promote SUM** (`promote-to-actuals.ts`): sums across `source_labels` → one canonical-level `modeling_actuals` row per `(canonical × period)`; sub-line detail stays on `pnl_facts` for drill-down. Replaced a dead dedup DELETE (filtered on a nonexistent column) with a correct year-scoped, source-typed delete; stable `sourceRecordId`.
+- **Observability:** `parse_metrics_json` now carries `parser`/`mapper`/`store`/`promote`/`pipelineComplete`/`completedAt`.
+
+### Verification (live SS3, both jobs re-run through the chain)
+
+| | SS3 2024 (`215c4385`) | SS3 2023 (`5a713a9d`) |
+|---|---|---|
+| pnl_facts | **576** (48 source_labels × 12) | **504** (42 × 12) |
+| distinct canonicals | 42 | 37 |
+| modeling_actuals | **504** (42 × 12) | **444** (37 × 12) |
+| multi-label canonicals coexist | 3 (Bank&Merchant ×4, Licenses ×3, Other Exp ×2) | 4 |
+| SUM-at-promote | exact (4 facts/mo → 1 summed actual) ✓ | exact ✓ |
+| pipelineComplete | true | true |
+
+- Project `2c5b8e46` now holds **948 actuals** (504 + 444) — the year-scoped dedup did not wipe 2024 when promoting 2023.
+- **Idempotency:** store+promote twice on the same parsedJson → 576/504 stable, zero duplication.
+- **Rollback:** `storeMappedFacts` inside a tx that throws → facts preserved (not wiped). Transactional safety verified end-to-end, not trusted.
+- **Scoped server tsc unchanged** (3541 total; per-file ingest 3 / promote 0 / mapping 7 / parseOrch 1 — zero new errors).
+- Counts differ slightly from Session 1's static figures (2023 mapped 41 vs 44) because re-running `mapParsedStatement` re-classifies via the LLM (nondeterministic); the fix mechanics are deterministic and proven.
+
+### Gotchas / decisions
+
+- **Jobs land `status='stored'/stage='review'`, NOT `'completed'`**, because SS3 has 8/13 lines pending review. Conscious divergence from the brief's literal "completed" — it mirrors existing orchestrator semantics (`parseOrchestrator`: reviews pending → stored/review). The auto-mapped facts + actuals ARE fully populated; "completed" is reserved for zero pending reviews.
+- **`DbOrTx` typed correctly** as `typeof db | Tx` (Tx derived from `db.transaction`'s callback), not the unsound `typeof db` widening that `fund-service.ts` uses — a `PgTransaction` lacks `$client`.
+- **Drizzle `sql\`... = ANY(${jsArray})\`` mis-binds arrays** under neon (`malformed array literal`). Use `inArray()` from the query builder. (Caught + fixed during verification; the failure rolled back cleanly, proving the tx wrapper.)
+
+### Next-session items
+
+1. **Brett's 30-second check:** load the SS3 modeling project's Historical P&L tab and confirm it now renders real data from `modeling_actuals` (Claude can't drive the browser).
+2. **`/remap` follow-up:** resolving a single review item (`routes.ts:359`) stores the newly-mapped fact but still does NOT re-promote → that one line won't reach `modeling_actuals` until a full re-map. Pre-existing; chain `promote` into the remap path for full consistency.
+3. **Multi-doc-same-year dedup:** the promote year-scoped delete assumes one document per `(project, year)`. A future multi-doc-same-year scenario needs `(year, month)` scoping. Flagged in-code.
+
+---
+
 ## ✅ Phase 2B Session 4 — first consumer flip (Commercial Leases tab gate) + OPTED_IN_STATES distinction (2026-05-29)
 
 Shipped on commit `d6b05639`, pushed to `origin/main`. First consumer flip in the Phase 2B dual-write → cutover sequence. `workspace.tsx` Commercial Leases tab visibility AND content render gate now read `project_profile.profitCenters['PC-500'].status` through a new `OPTED_IN_STATES` set instead of legacy `cm.profitCenters.commercialTenants.enabled`. Adds `OPTED_IN_STATES = {declared_yes, user_confirmed}` as a sibling export to `ENABLED_STATES` in `shared/profit-center-id-map.ts`, with a documented state-semantics doc block establishing the convention for Sessions 5-6.
@@ -442,6 +500,8 @@ Filed `[[replit-agent-autonomous-execution-pattern]]`. The behavior is now confi
 ---
 
 ## ✅ Parser fix — QB Desktop section detection + island-bucket gate (2026-05-28)
+
+> **Forward correction (Phase 3 Session 2, 2026-05-29):** the "85.5% / 79.6%" below is **classifier accuracy at the `parsedJson` layer**, not end-to-end fidelity. At the time of this entry that mapping never reached `pnl_facts`/`modeling_actuals` (write-path gap, Defects A+B). Fixed 2026-05-29 — see the Phase 3 Session 2 entry at the top of this journal. Read "85.5%" as "classifier auto-map rate," not "% of the P&L the model sees."
 
 Shipped on commit `01c636f8` as a single atomic commit, pushed to `origin/main`. Two changes paired because the second is the gate-side complement to the first's correctness story (and both are needed to deliver the demo number honestly). The parser fix rewrites XLSX section-header detection to respect QB Desktop's column-encodes-hierarchy convention; the gate change exempts `business_income` (the segregated below-NOI bucket) from the income/cost cross-class check because that bucket is structurally an island containing its own revenue + COGS internally. Together they take SS3's auto-map rate from 38.2% / 33.3% (pre-fix baseline, B3 step 2 commit `4ff1cb42`) to **85.5% (47/55) / 79.6% (43/54)** — squarely in the projected 75–80% band the prior session's journal flagged as parser-blocked.
 
